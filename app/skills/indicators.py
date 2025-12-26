@@ -37,11 +37,16 @@ async def get_technical_indicator(req: IndicatorRequest) -> Dict[str, Any]:
 
     try:
         if indicator == "RSI":
-            # RSI Simple
+            # RSI Simple (Wilder's Smoothing matches MT5 behavior)
             delta = df['close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=req.period).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=req.period).mean()
-            rs = gain / loss
+            gain = (delta.where(delta > 0, 0))
+            loss = (-delta.where(delta < 0, 0))
+            
+            # Wilder's Smoothing equivalent to EWM with com=period-1 (alpha=1/period)
+            avg_gain = gain.ewm(com=req.period - 1, adjust=False).mean()
+            avg_loss = loss.ewm(com=req.period - 1, adjust=False).mean()
+            
+            rs = avg_gain / avg_loss
             df['rsi'] = 100 - (100 / (1 + rs))
             result_data["value"] = float(df['rsi'].iloc[-1])
             
@@ -59,11 +64,14 @@ async def get_technical_indicator(req: IndicatorRequest) -> Dict[str, Any]:
             result_data["value"] = float(df['ma'].iloc[-1])
 
         elif indicator == "ATR":
+            # ATR (Wilder's Smoothing)
             high_low = df['high'] - df['low']
             high_cp = np.abs(df['high'] - df['close'].shift())
             low_cp = np.abs(df['low'] - df['close'].shift())
             df['tr'] = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
-            df['atr'] = df['tr'].rolling(window=req.period).mean()
+            
+            # Use EWM for ATR to match MT5
+            df['atr'] = df['tr'].ewm(com=req.period - 1, adjust=False).mean()
             result_data["value"] = float(df['atr'].iloc[-1])
 
         elif indicator == "MACD":

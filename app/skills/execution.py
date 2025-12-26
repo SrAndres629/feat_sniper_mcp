@@ -127,6 +127,19 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
         tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
         exec_price = tick.ask if action == "BUY" else tick.bid
 
+    # Detectar Filling Mode soportado por el símbolo
+    filling_mode = mt5.ORDER_FILLING_RETURN  # Default legacy
+    
+    # Solo aplica lógica compleja para Market Orders (no pendientes)
+    if "LIMIT" not in action and "STOP" not in action:
+        # flags es una máscara de bits
+        s_filling = symbol_info.filling_mode
+        
+        if s_filling & mt5.SYMBOL_FILLING_IOC:
+            filling_mode = mt5.ORDER_FILLING_IOC
+        elif s_filling & mt5.SYMBOL_FILLING_FOK:
+            filling_mode = mt5.ORDER_FILLING_FOK
+            
     request = {
         "action": mt5.TRADE_ACTION_DEAL if "LIMIT" not in action and "STOP" not in action else mt5.TRADE_ACTION_PENDING,
         "symbol": symbol,
@@ -139,7 +152,7 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
         "magic": 234000,
         "comment": order_data.comment,
         "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC if "LIMIT" not in action and "STOP" not in action else mt5.ORDER_FILLING_RETURN,
+        "type_filling": filling_mode,
     }
 
     logger.info(f"Enviando orden {action} de {volume} lots en {symbol} a {exec_price} (Dev: {dynamic_deviation})")

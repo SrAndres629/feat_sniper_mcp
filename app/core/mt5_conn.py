@@ -52,19 +52,30 @@ class MT5Connection:
             logger.info("Watchdog de conexión MT5 iniciado.")
 
     async def _connection_watchdog(self):
-        """Tarea periódica que verifica y restaura la conexión."""
+        """Tarea periódica que verifica y restaura la conexión con Backoff Exponencial."""
+        backoff = 10
+        max_backoff = 60
+        
         while True:
-            await asyncio.sleep(20)  # Verificar cada 20 segundos
+            await asyncio.sleep(backoff) 
             try:
                 is_connected = await self.execute(lambda: mt5.terminal_info() is not None)
                 if not is_connected:
-                    logger.warning("Watchdog: Conexión MT5 perdida. Intentando restaurar...")
-                    await self.execute(self._initialize_mt5)
+                    logger.warning(f"Watchdog: Conexión MT5 perdida. Reintentando en {backoff}s...")
+                    success = await self.execute(self._initialize_mt5)
+                    
+                    if success:
+                        logger.info("Watchdog: Conexión restaurada.")
+                        backoff = 10 # Reset
+                    else:
+                        backoff = min(max_backoff, backoff * 2) # Incrementar espera
                 else:
-                    # Opcional: Refrescar información de símbolos críticos
+                    backoff = 10 # Reset si estamos bien
                     logger.debug("Watchdog: Conexión OK.")
+                    
             except Exception as e:
-                logger.error(f"Error en watchdog de MT5: {e}")
+                logger.error(f"Error crítico en watchdog de MT5: {e}")
+                backoff = min(max_backoff, backoff * 2)
 
     def _initialize_mt5(self) -> bool:
         """Lógica interna de inicialización (bloqueante)."""

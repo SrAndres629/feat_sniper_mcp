@@ -31,10 +31,14 @@ class OrderValidator:
         if volume > symbol_info.volume_max:
             return False, f"Volumen {volume} superior al máximo permitido ({symbol_info.volume_max})."
         
-        # Validar Step (Paso de volumen)
-        remainder = (volume * 100) % (symbol_info.volume_step * 100)
-        if remainder > 0.001:
-            return False, f"Volumen {volume} no cumple con el paso de volumen ({symbol_info.volume_step})."
+        # Validar Step (Paso de volumen) con tolerancia a punto flotante
+        # Algoritmo: volume debe ser múltiplo de step
+        # round(volume / step) * step debería ser casi igual a volume
+        steps = round(volume / symbol_info.volume_step)
+        expected_vol = steps * symbol_info.volume_step
+        
+        if abs(volume - expected_vol) > 0.00001:
+             return False, f"Volumen {volume} no cumple con el paso de volumen ({symbol_info.volume_step})."
 
         # 3. Validar Stops (SL/TP) y Congelación (Freeze Level/Stop Level)
         # Obtenemos el precio actual

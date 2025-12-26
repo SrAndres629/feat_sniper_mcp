@@ -34,8 +34,19 @@ TIMEFRAME_MAP = {
 }
 
 # Sistema de Caché en Memoria
+# Sistema de Caché en Memoria
 _candles_cache: Dict[str, Dict[str, Any]] = {}
 _account_cache: Dict[str, Any] = {"data": None, "timestamp": 0}
+MAX_CACHE_SIZE = 100  # Prevent memory leaks by limiting cache keys
+
+def _clean_cache():
+    """Mantiene el tamaño del caché bajo control."""
+    if len(_candles_cache) > MAX_CACHE_SIZE:
+        # Eliminar el 20% más antiguo
+        keys_to_remove = sorted(_candles_cache.keys(), key=lambda k: _candles_cache[k]['timestamp'])[:int(MAX_CACHE_SIZE * 0.2)]
+        for k in keys_to_remove:
+            del _candles_cache[k]
+
 
 async def get_candles(symbol: str, timeframe: str, n_candles: int = 100, output_format: str = "json") -> Dict[str, Any]:
     """
@@ -96,7 +107,10 @@ async def get_candles(symbol: str, timeframe: str, n_candles: int = 100, output_
             "timestamp": now
         }
     
-    # Guardar en caché
+    # Guardar en caché con limpieza previa
+    if len(_candles_cache) > MAX_CACHE_SIZE:
+        _clean_cache()
+        
     _candles_cache[cache_key] = {"data": data, "timestamp": now}
     logger.debug(f"Caché MISS para {cache_key}. Datos actualizados.")
     
@@ -160,8 +174,16 @@ async def get_volatility_metrics(symbol: str, timeframe: str = "H1", period: int
     
     df = pd.DataFrame(rates)
     
-    # Cálculo simple de ATR: Promedio de (High - Low)
-    df['tr'] = df['high'] - df['low']
+    # Cálculo correcto de ATR (True Range)
+    df['prev_close'] = df['close'].shift(1)
+    df['tr0'] = df['high'] - df['low']
+    df['tr1'] = (df['high'] - df['prev_close']).abs()
+    df['tr2'] = (df['low'] - df['prev_close']).abs()
+    
+    # El True Range es el máximo de las 3 medidas
+    df['tr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1)
+    
+    # ATR es la media móvil del TR
     atr = df['tr'].tail(period).mean()
     
     # Obtener Spread actual
@@ -174,12 +196,19 @@ async def get_volatility_metrics(symbol: str, timeframe: str = "H1", period: int
     spread_points = symbol_info.spread
     spread_value = tick.ask - tick.bid
     
-    # Status de volatilidad (Lógica simple: comparado con el promedio histórico si existiera, 
-    # aquí comparamos el TR actual vs ATR)
+    # Status de volatilidad robusto (Percentil)
+    # Comparamos el ATR actual con la media del ATR de los últimos periodos si es posible, 
+    # o usamos la desviación estándar del TR.
+    tr_mean = df['tr'].mean()
+    tr_std = df['tr'].std()
+    
     current_tr = df['tr'].iloc[-1]
-    if current_tr > (atr * 1.5):
+    
+    if current_tr > (tr_mean + 2 * tr_std):
+        status = "EXTREME"
+    elif current_tr > (tr_mean + tr_std):
         status = "HIGH"
-    elif current_tr < (atr * 0.5):
+    elif current_tr < (tr_mean - 0.5 * tr_std):
         status = "LOW"
     else:
         status = "NORMAL"
