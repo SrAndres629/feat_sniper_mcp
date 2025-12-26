@@ -1,0 +1,194 @@
+import logging
+import time
+from typing import Dict, List, Optional, Any
+import pandas as pd
+import MetaTrader5 as mt5
+from app.core.mt5_conn import mt5_conn
+from app.core.config import settings
+
+logger = logging.getLogger("MT5_Bridge.Skills.Market")
+
+# Mapeo de Timeframes
+TIMEFRAME_MAP = {
+    "M1": mt5.TIMEFRAME_M1,
+    "M2": mt5.TIMEFRAME_M2,
+    "M3": mt5.TIMEFRAME_M3,
+    "M4": mt5.TIMEFRAME_M4,
+    "M5": mt5.TIMEFRAME_M5,
+    "M6": mt5.TIMEFRAME_M6,
+    "M10": mt5.TIMEFRAME_M10,
+    "M12": mt5.TIMEFRAME_M12,
+    "M15": mt5.TIMEFRAME_M15,
+    "M20": mt5.TIMEFRAME_M20,
+    "M30": mt5.TIMEFRAME_M30,
+    "H1": mt5.TIMEFRAME_H1,
+    "H2": mt5.TIMEFRAME_H2,
+    "H3": mt5.TIMEFRAME_H3,
+    "H4": mt5.TIMEFRAME_H4,
+    "H6": mt5.TIMEFRAME_H6,
+    "H8": mt5.TIMEFRAME_H8,
+    "H12": mt5.TIMEFRAME_H12,
+    "D1": mt5.TIMEFRAME_D1,
+    "W1": mt5.TIMEFRAME_W1,
+    "MN1": mt5.TIMEFRAME_MN1,
+}
+
+# Sistema de Caché en Memoria
+_candles_cache: Dict[str, Dict[str, Any]] = {}
+_account_cache: Dict[str, Any] = {"data": None, "timestamp": 0}
+
+async def get_candles(symbol: str, timeframe: str, n_candles: int = 100, output_format: str = "json") -> Dict[str, Any]:
+    """
+    Obtiene las últimas N velas con sistema de caché de 3 segundos.
+    Soporta formato CSV para ahorrar tokens en la ventana de contexto de la IA.
+    """
+    now = time.time()
+    tf_upper = timeframe.upper()
+    cache_key = f"{symbol}_{tf_upper}_{n_candles}_{output_format}"
+    
+    # Intentar obtener de caché
+    cached = _candles_cache.get(cache_key)
+    if cached and (now - cached["timestamp"]) < settings.MARKET_DATA_CACHE_TTL:
+        logger.debug(f"Caché HIT para {cache_key}")
+        return cached["data"]
+    
+    # Validar timeframe
+    if tf_upper not in TIMEFRAME_MAP:
+        raise ValueError(f"Timeframe {timeframe} no es válido.")
+    
+    mt5_tf = TIMEFRAME_MAP[tf_upper]
+    
+    # Asegurar que el símbolo es visible
+    await mt5_conn.execute(mt5.symbol_select, symbol, True)
+    
+    # Obtener datos de MT5 de forma no bloqueante
+    rates = await mt5_conn.execute(mt5.copy_rates_from_pos, symbol, mt5_tf, 0, n_candles)
+    
+    if rates is None or len(rates) == 0:
+        return {
+            "status": "error",
+            "message": "No se pudieron obtener datos del mercado.",
+            "mt5_error": await mt5_conn.execute(mt5.last_error)
+        }
+    
+    # Procesar con Pandas
+    df = pd.DataFrame(rates)
+    df['time'] = pd.to_datetime(df['time'], unit='s').astype(str)
+    
+    if output_format == "csv":
+        # Formato ultra-compacto: time,o,h,l,c,v
+        csv_data = df[['time', 'open', 'high', 'low', 'close', 'tick_volume']].to_csv(index=False, header=True)
+        data = {
+            "status": "success",
+            "symbol": symbol,
+            "timeframe": tf_upper,
+            "format": "csv",
+            "candles_csv": csv_data,
+            "timestamp": now
+        }
+    else:
+        data = {
+            "status": "success",
+            "symbol": symbol,
+            "timeframe": tf_upper,
+            "format": "json",
+            "candles": df[['time', 'open', 'high', 'low', 'close', 'tick_volume']].to_dict('records'),
+            "timestamp": now
+        }
+    
+    # Guardar en caché
+    _candles_cache[cache_key] = {"data": data, "timestamp": now}
+    logger.debug(f"Caché MISS para {cache_key}. Datos actualizados.")
+    
+    return data
+
+async def get_account_metrics() -> Dict[str, Any]:
+    """
+    Obtiene métricas de la cuenta con caché de 0.5 segundos.
+    """
+    now = time.time()
+    
+    # Intentar obtener de caché
+    if _account_cache["data"] and (now - _account_cache["timestamp"]) < settings.ACCOUNT_CACHE_TTL:
+        return _account_cache["data"]
+    
+    # Obtener info de cuenta
+    account_info = await mt5_conn.execute(mt5.account_info)
+    if account_info is None:
+        return {
+            "status": "error",
+            "message": "Fallo al leer información de la cuenta.",
+            "mt5_error": await mt5_conn.execute(mt5.last_error)
+        }
+    
+    total_positions = await mt5_conn.execute(mt5.positions_total)
+    
+    data = {
+        "status": "success",
+        "balance": account_info.balance,
+        "equity": account_info.equity,
+        "margin_free": account_info.margin_free,
+        "margin_level": (account_info.equity / account_info.margin * 100) if account_info.margin > 0 else 0,
+        "positions_total": total_positions,
+        "profit": account_info.profit,
+        "server": account_info.server,
+        "currency": account_info.currency,
+        "timestamp": now
+    }
+    
+    # Guardar en caché
+    _account_cache["data"] = data
+    _account_cache["timestamp"] = now
+    
+    return data
+
+async def get_volatility_metrics(symbol: str, timeframe: str = "H1", period: int = 14) -> Dict[str, Any]:
+    """
+    Calcula métricas de volatilidad (ATR y Spread) para un símbolo.
+    """
+    tf_upper = timeframe.upper()
+    if tf_upper not in TIMEFRAME_MAP:
+        raise ValueError(f"Timeframe {timeframe} no es válido.")
+    
+    mt5_tf = TIMEFRAME_MAP[tf_upper]
+    
+    # Obtener velas para calcular ATR (period + 1 para tener suficientes diferencias)
+    rates = await mt5_conn.execute(mt5.copy_rates_from_pos, symbol, mt5_tf, 0, period + 1)
+    
+    if rates is None or len(rates) < period:
+        return {"status": "error", "message": "No hay suficientes datos para calcular volatilidad."}
+    
+    df = pd.DataFrame(rates)
+    
+    # Cálculo simple de ATR: Promedio de (High - Low)
+    df['tr'] = df['high'] - df['low']
+    atr = df['tr'].tail(period).mean()
+    
+    # Obtener Spread actual
+    symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
+    tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
+    
+    if not symbol_info or not tick:
+        return {"status": "error", "message": "No se pudo obtener información del símbolo para spread."}
+    
+    spread_points = symbol_info.spread
+    spread_value = tick.ask - tick.bid
+    
+    # Status de volatilidad (Lógica simple: comparado con el promedio histórico si existiera, 
+    # aquí comparamos el TR actual vs ATR)
+    current_tr = df['tr'].iloc[-1]
+    if current_tr > (atr * 1.5):
+        status = "HIGH"
+    elif current_tr < (atr * 0.5):
+        status = "LOW"
+    else:
+        status = "NORMAL"
+    
+    return {
+        "status": "success",
+        "symbol": symbol,
+        "atr": float(atr),
+        "spread": float(spread_value),
+        "spread_points": int(spread_points),
+        "volatility_status": status
+    }
