@@ -113,12 +113,30 @@ class MT5Connection:
     async def execute(self, func: Callable[..., T], *args, **kwargs) -> T:
         """
         Punto de entrada maestro para ejecutar cualquier función de mt5.
-        
-        - Protege la llamada con un Lock (MT5 no es thread-safe).
-        - Ejecuta en un hilo separado para no bloquear el Event Loop de FastAPI.
+        Instrumentado con OTel y Métricas de Latencia.
         """
-        # Aseguramos que la ejecución síncrona ocurra en un hilo dedicado de anyio
-        return await anyio.to_thread.run_sync(self._locked_execution, func, *args, **kwargs)
+        from app.core.observability import obs_engine, tracer
+        import time
+
+        start_time = time.time()
+        op_name = func.__name__ if hasattr(func, "__name__") else "mt5_call"
+        
+        with tracer.start_as_current_span(f"mt5_{op_name}") as span:
+            if "symbol" in kwargs:
+                span.set_attribute("symbol", kwargs["symbol"])
+            elif args and isinstance(args[0], str) and len(args[0]) < 10:
+                span.set_attribute("symbol", args[0])
+
+            try:
+                result = await anyio.to_thread.run_sync(self._locked_execution, func, *args, **kwargs)
+                
+                duration = time.time() - start_time
+                obs_engine.track_latency(op_name, "GLOBAL", duration)
+                
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                raise e
 
     def _locked_execution(self, func: Callable[..., T], *args, **kwargs) -> T:
         """Envuelve la ejecución de la función dentro del lock de MT5."""

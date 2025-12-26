@@ -10,10 +10,11 @@ logger = logging.getLogger("MT5_Bridge.Skills.Calendar")
 
 # Mapeo de importancia MT5
 # CALENDAR_IMPORTANCE_NONE (0), LOW (1), MEDIUM (2), HIGH (3)
+# Nota: Usamos enteros directos porque algunas versiones de la lib no exponen las constantes
 IMPORTANCE_MAP = {
-    "LOW": mt5.CALENDAR_IMPORTANCE_LOW,
-    "MEDIUM": mt5.CALENDAR_IMPORTANCE_MEDIUM,
-    "HIGH": mt5.CALENDAR_IMPORTANCE_HIGH
+    "LOW": 1,
+    "MEDIUM": 2,
+    "HIGH": 3
 }
 
 async def get_economic_calendar(req: CalendarRequest) -> Dict[str, Any]:

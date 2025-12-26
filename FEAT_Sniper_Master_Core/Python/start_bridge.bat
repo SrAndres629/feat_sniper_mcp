@@ -1,0 +1,6 @@
+@echo off
+title Institutional Model Bridge
+echo Starting Python Bridge Service...
+echo Monitoring for MT5 Data Exports...
+python institutional_bridge.py
+pause

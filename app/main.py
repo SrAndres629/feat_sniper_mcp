@@ -1,4 +1,5 @@
 import logging
+import MetaTrader5 as mt5
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -69,6 +70,18 @@ app.add_middleware(
 )
 
 # =============================================================================
+# MIDDLEWARE & TRACEABILITY
+# =============================================================================
+
+@app.middleware("http")
+async def add_correlation_id_header(request: Request, call_next):
+    correlation_id = request.headers.get(settings.CORRELATION_ID_HEADER) or "REQ_" + datetime.utcnow().strftime("%y%m%d%H%M%S")
+    request.state.correlation_id = correlation_id
+    response = await call_next(request)
+    response.headers[settings.CORRELATION_ID_HEADER] = correlation_id
+    return response
+
+# =============================================================================
 # EXCEPTION HANDLER (GLOBAL ENVELOPE)
 # =============================================================================
 
@@ -78,12 +91,14 @@ async def global_exception_handler(request: Request, exc: Exception):
     Captura cualquier error no controlado y lo devuelve en el formato Envelope.
     Garantiza que n8n nunca reciba un error plano.
     """
-    logger.exception(f"Error no controlado en {request.url.path}")
+    c_id = getattr(request.state, "correlation_id", "UNKNOWN")
+    logger.exception(f"[{c_id}] Error no controlado en {request.url.path}")
     
     return JSONResponse(
         status_code=500,
         content={
             "status": "error",
+            "correlation_id": c_id,
             "data": None,
             "error": {
                 "code": "INTERNAL_SERVER_ERROR",
@@ -101,7 +116,6 @@ async def global_exception_handler(request: Request, exc: Exception):
 @app.get("/health", response_model=ResponseModel[dict])
 async def health_check():
     """Verifica el estado de la conexión con MetaTrader 5."""
-    import MetaTrader5 as mt5
     connected = await mt5_conn.execute(mt5.terminal_info) is not None
     
     return ResponseModel(
@@ -231,3 +245,66 @@ async def get_volatility(request: VolatilityRequest):
 async def manage_position(request: PositionManageRequest):
     """Gestiona una posición abierta (Cierre o Modificación)."""
     return await trade_mgmt.manage_position(request)
+
+# =============================================================================
+# INSTITUTIONAL ANALYTICS & RISK
+# =============================================================================
+
+@app.post("/analytics/performance", response_model=ResponseModel[dict])
+async def get_performance(request: HistoryRequest):
+    """Auditoría cuantitativa de rendimiento (Sharpe, Win Rate, etc)."""
+    from app.services.analytics import analytics_engine
+    
+    # 1. Obtener historial raw
+    history_data = await history.get_trade_history(request)
+    if history_data["status"] == "error":
+        return ResponseModel(status="error", error=ErrorDetail(code="HISTORY_ERROR", message=history_data["message"], suggestion="Revisa el terminal MT5."))
+    
+    # 2. Procesar métricas institucionales
+    metrics = await analytics_engine.get_performance_metrics(history_data.get("deals", []))
+    return ResponseModel(status="success", data=metrics)
+
+@app.get("/risk/metrics", response_model=ResponseModel[dict])
+async def get_risk_status():
+    """Estado actual de exposición y riesgo de la cuenta."""
+    from app.services.risk_engine import risk_engine
+    
+    exposure = await risk_engine.get_total_exposure()
+    drawdown_ok = await risk_engine.check_drawdown_limit()
+    
+    return ResponseModel(
+        status="success",
+        data={
+            "total_exposure_percent": round(exposure, 2),
+            "drawdown_limit_healthy": drawdown_ok,
+            "max_drawdown_allowed": settings.MAX_DAILY_DRAWDOWN_PERCENT
+        }
+    )
+
+# =============================================================================
+# SNIPER 2.0 ADVANCED SKILLS
+# =============================================================================
+
+@app.post("/sniper/setup_score", response_model=ResponseModel[dict])
+async def get_ml_score(request: IndicatorRequest):
+    """Clasificación de setups con ML-Lite y detección de anomalías."""
+    from app.skills.ml_sniper import ml_sniper
+    result = await ml_sniper.score_setup(request.symbol, request.timeframe)
+    return ResponseModel(status="success", data=result)
+
+@app.get("/sniper/liquidity/{symbol}", response_model=ResponseModel[dict])
+async def get_liquidity(symbol: str):
+    """Análisis de profundidad de mercado (DoM) institucional."""
+    from app.skills.liquidity import liquidity_engine
+    result = await liquidity_engine.get_market_depth(symbol)
+    return ResponseModel(status="success", data=result)
+
+@app.get("/system/health", response_model=ResponseModel[dict])
+async def get_system_health():
+    """Monitoreo de Circuit Breaker y estado de latencia p99."""
+    from app.services.circuit_breaker import circuit_breaker
+    
+    return ResponseModel(
+        status="success",
+        data=circuit_breaker.get_status()
+    )

@@ -73,9 +73,23 @@ class OrderValidator:
         if daily_loss_percent > settings.MAX_DAILY_DRAWDOWN_PERCENT:
             return False, f"Límite de Drawdown Diario excedido ({daily_loss_percent:.2f}% > {settings.MAX_DAILY_DRAWDOWN_PERCENT}%). Trading bloqueado."
 
-        # 5. Modo de Prueba (Risk Free)
-        if settings.RISK_FREE_MODE and volume > 0.01:
-            return False, "Modo RISK_FREE activo. Solo se permiten órdenes de 0.01 lotes."
+        # 5. Institutional Constraints (New)
+        positions_total = await mt5_conn.execute(mt5.positions_total)
+        if positions_total >= settings.MAX_OPEN_POSITIONS:
+            return False, f"Límite institucional de posiciones alcanzado ({positions_total}/{settings.MAX_OPEN_POSITIONS})."
+
+        # Check for Correlation Exposure (Simplistic approach: how many trades in same currency group)
+        # Institutional standard: Check Correlation Matrix here. 
+        # For now, we limit total trades per symbol to prevent over-concentration.
+        symbol_positions = 0
+        all_positions = await mt5_conn.execute(mt5.positions_get)
+        if all_positions:
+            for p in all_positions:
+                if p.symbol == symbol:
+                    symbol_positions += 1
+        
+        if symbol_positions >= 3: # Max 3 trades per symbol
+            return False, f"Sobre-exposición detectada en {symbol}. Máximo 3 posiciones permitidas."
 
         return True, None
 
