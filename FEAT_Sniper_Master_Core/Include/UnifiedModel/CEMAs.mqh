@@ -1,26 +1,25 @@
 //+------------------------------------------------------------------+
 //|                                                      CEMAs.mqh |
-//|                         30 EMAs Engine - Memory Map             |
-//|                    Micro/Meso/Macro Temporal Scales             |
+//|                    Multifractal EMA Engine - 31 Layers          |
+//|         Micro (Red), Operational (Green), Macro (Blue), Bias (Grey) |
 //+------------------------------------------------------------------+
 #ifndef CEMAS_MQH
 #define CEMAS_MQH
 
 //+------------------------------------------------------------------+
 //| EMA GROUP DEFINITIONS                                            |
-//| Fast (Micro): 3,5,8,13 — Algorithms, scalpers, noise            |
-//| Medium (Meso): 21,34,55,89 — Smart Money, fair value            |
-//| Slow (Macro): 144,233,377,610 — Heavy capital, structure        |
 //+------------------------------------------------------------------+
-#define EMA_COUNT 12
-#define EMA_FAST_COUNT 4
-#define EMA_MEDIUM_COUNT 4
-#define EMA_SLOW_COUNT 4
+#define EMA_COUNT 31
+#define EMA_MICRO_COUNT 10
+#define EMA_OPERATIONAL_COUNT 10
+#define EMA_MACRO_COUNT 10
+#define EMA_BIAS_COUNT 1
 
 enum ENUM_EMA_GROUP {
-   EMA_GROUP_FAST,    // Microstructure (3,5,8,13)
-   EMA_GROUP_MEDIUM,  // Institutional (21,34,55,89)
-   EMA_GROUP_SLOW     // Macro (144,233,377,610)
+   EMA_GROUP_MICRO,       // 1-14 periods (Red)
+   EMA_GROUP_OPERATIONAL, // 16-224 periods (Green)
+   EMA_GROUP_MACRO,       // 256-1280 periods (Blue)
+   EMA_GROUP_BIAS         // 2048 period (Grey)
 };
 
 //+------------------------------------------------------------------+
@@ -53,10 +52,10 @@ struct SFanMetrics {
    double   totalSpread;      // Distance between fastest and slowest
    double   compression;      // Global compression (0=max spread, 1=compressed)
    double   openingSpeed;     // Rate of spread change
-   bool     bullishOrder;     // Fast > Medium > Slow
-   bool     bearishOrder;     // Fast < Medium < Slow
-   bool     isConverging;     // EMAs coming together
-   bool     isDiverging;      // EMAs spreading apart
+   bool     bullishOrder;     // Micro > Operational > Macro
+   bool     bearishOrder;     // Micro < Operational < Macro
+   bool     isConverging;     // Layers coming together
+   bool     isDiverging;      // Layers spreading apart
 };
 
 //+------------------------------------------------------------------+
@@ -64,10 +63,11 @@ struct SFanMetrics {
 //+------------------------------------------------------------------+
 class CEMAs {
 private:
-   SEMAData          m_emas[EMA_COUNT];
-   SEMAGroupMetrics  m_fastMetrics;
-   SEMAGroupMetrics  m_mediumMetrics;
-   SEMAGroupMetrics  m_slowMetrics;
+   SEMAData          m_ptrEmas[EMA_COUNT];
+   SEMAGroupMetrics  m_microMetrics;
+   SEMAGroupMetrics  m_operationalMetrics;
+   SEMAGroupMetrics  m_macroMetrics;
+   SEMAGroupMetrics  m_biasMetrics;
    SFanMetrics       m_fanMetrics;
    
    int               m_emaPeriods[EMA_COUNT];
@@ -90,8 +90,8 @@ private:
    void              CalculateFanMetrics();
    
 public:
-                     CEMAs();
-                    ~CEMAs();
+   CEMAs();
+   ~CEMAs();
    
    // Initialization
    bool              Init(string symbol, ENUM_TIMEFRAMES tf, int atrPeriod = 14);
@@ -106,15 +106,14 @@ public:
    double            GetEMASlope(int index) const;
    double            GetEMACurvature(int index) const;
    int               GetEMAPeriod(int index) const;
-   double            GetEMACurvature(int index) const;
-   int               GetEMAPeriod(int index) const;
    ENUM_EMA_GROUP    GetEMAGroup(int index) const;
    int               GetHandle(int index) const;
    
    // Getters - Group Metrics
-   SEMAGroupMetrics  GetFastMetrics() const { return m_fastMetrics; }
-   SEMAGroupMetrics  GetMediumMetrics() const { return m_mediumMetrics; }
-   SEMAGroupMetrics  GetSlowMetrics() const { return m_slowMetrics; }
+   SEMAGroupMetrics  GetMicroMetrics() const { return m_microMetrics; }
+   SEMAGroupMetrics  GetOperationalMetrics() const { return m_operationalMetrics; }
+   SEMAGroupMetrics  GetMacroMetrics() const { return m_macroMetrics; }
+   SEMAGroupMetrics  GetBiasMetrics() const { return m_biasMetrics; }
    
    // Getters - Fan Metrics
    SFanMetrics       GetFanMetrics() const { return m_fanMetrics; }
@@ -137,10 +136,23 @@ CEMAs::CEMAs() {
    m_atr = 0;
    m_atrHandle = INVALID_HANDLE;
    
-   // Define EMA periods (Fibonacci-based)
-   m_emaPeriods[0] = 3;    m_emaPeriods[1] = 5;    m_emaPeriods[2] = 8;    m_emaPeriods[3] = 13;
-   m_emaPeriods[4] = 21;   m_emaPeriods[5] = 34;   m_emaPeriods[6] = 55;   m_emaPeriods[7] = 89;
-   m_emaPeriods[8] = 144;  m_emaPeriods[9] = 233;  m_emaPeriods[10] = 377; m_emaPeriods[11] = 610;
+   // MICRO Periods (Red)
+   m_emaPeriods[0] = 1; m_emaPeriods[1] = 2; m_emaPeriods[2] = 3; m_emaPeriods[3] = 6;
+   m_emaPeriods[4] = 7; m_emaPeriods[5] = 8; m_emaPeriods[6] = 9; m_emaPeriods[7] = 12;
+   m_emaPeriods[8] = 13; m_emaPeriods[9] = 14;
+   
+   // OPERATIONAL Periods (Green)
+   m_emaPeriods[10] = 16; m_emaPeriods[11] = 24; m_emaPeriods[12] = 32; m_emaPeriods[13] = 48;
+   m_emaPeriods[14] = 64; m_emaPeriods[15] = 96; m_emaPeriods[16] = 128; m_emaPeriods[17] = 160;
+   m_emaPeriods[18] = 192; m_emaPeriods[19] = 224;
+   
+   // MACRO Periods (Blue)
+   m_emaPeriods[20] = 256; m_emaPeriods[21] = 320; m_emaPeriods[22] = 384; m_emaPeriods[23] = 448;
+   m_emaPeriods[24] = 512; m_emaPeriods[25] = 640; m_emaPeriods[26] = 768; m_emaPeriods[27] = 896;
+   m_emaPeriods[28] = 1024; m_emaPeriods[29] = 1280;
+   
+   // BIAS Period (Grey)
+   m_emaPeriods[30] = 2048;
    
    for(int i = 0; i < EMA_COUNT; i++) {
       m_emaHandles[i] = INVALID_HANDLE;
@@ -163,10 +175,11 @@ CEMAs::~CEMAs() {
 //+------------------------------------------------------------------+
 void CEMAs::AssignGroups() {
    for(int i = 0; i < EMA_COUNT; i++) {
-      m_emas[i].period = m_emaPeriods[i];
-      if(i < EMA_FAST_COUNT) m_emas[i].group = EMA_GROUP_FAST;
-      else if(i < EMA_FAST_COUNT + EMA_MEDIUM_COUNT) m_emas[i].group = EMA_GROUP_MEDIUM;
-      else m_emas[i].group = EMA_GROUP_SLOW;
+      m_ptrEmas[i].period = m_emaPeriods[i];
+      if(i < EMA_MICRO_COUNT) m_ptrEmas[i].group = EMA_GROUP_MICRO;
+      else if(i < EMA_MICRO_COUNT + EMA_OPERATIONAL_COUNT) m_ptrEmas[i].group = EMA_GROUP_OPERATIONAL;
+      else if(i < EMA_MICRO_COUNT + EMA_OPERATIONAL_COUNT + EMA_MACRO_COUNT) m_ptrEmas[i].group = EMA_GROUP_MACRO;
+      else m_ptrEmas[i].group = EMA_GROUP_BIAS;
    }
 }
 
@@ -178,11 +191,12 @@ bool CEMAs::Init(string symbol, ENUM_TIMEFRAMES tf, int atrPeriod = 14) {
    m_timeframe = tf;
    m_atrPeriod = atrPeriod;
    
-   // Create EMA handles
+   // Create EMA handles (30 EMAs + 1 SMMA)
    for(int i = 0; i < EMA_COUNT; i++) {
-      m_emaHandles[i] = iMA(m_symbol, m_timeframe, m_emaPeriods[i], 0, MODE_EMA, PRICE_CLOSE);
+      ENUM_MA_METHOD method = (i == 30) ? MODE_SMMA : MODE_EMA;
+      m_emaHandles[i] = iMA(m_symbol, m_timeframe, m_emaPeriods[i], 0, method, PRICE_CLOSE);
       if(m_emaHandles[i] == INVALID_HANDLE) {
-         Print("[CEMAs] Failed to create EMA handle for period ", m_emaPeriods[i]);
+         Print("[CEMAs] Failed to create handle for period ", m_emaPeriods[i]);
          Deinit();
          return false;
       }
@@ -228,7 +242,7 @@ bool CEMAs::Calculate(int shift = 0) {
    // Get ATR
    if(CopyBuffer(m_atrHandle, 0, shift, 1, buffer) <= 0) return false;
    m_atr = buffer[0];
-   if(m_atr <= 0) m_atr = 0.0001;  // Prevent division by zero
+   if(m_atr <= 0) m_atr = 0.0001;
    
    // Get EMA values
    for(int i = 0; i < EMA_COUNT; i++) {
@@ -237,28 +251,27 @@ bool CEMAs::Calculate(int shift = 0) {
       if(CopyBuffer(m_emaHandles[i], 0, shift, 2, buffer) < 2) return false;
       
       m_emaBuffers[i] = buffer[1];  // Current
-      double prevEma = buffer[0];   // Previous
+      double prevVal = buffer[0];   // Previous
       
-      m_emas[i].prevValue = m_emas[i].value;
-      m_emas[i].value = m_emaBuffers[i];
+      m_ptrEmas[i].prevValue = m_ptrEmas[i].value;
+      m_ptrEmas[i].value = m_emaBuffers[i];
       
-      // Calculate slope (normalized by ATR)
-      double rawSlope = m_emaBuffers[i] - prevEma;
-      m_emas[i].slope = NormalizeSlope(rawSlope);
+      // Calculate slope
+      double rawSlope = m_emaBuffers[i] - prevVal;
+      m_ptrEmas[i].slope = NormalizeSlope(rawSlope);
       
-      // Calculate curvature (change in slope)
+      // Curvature
       if(m_emaPrevBuffers[i] > 0) {
-         double prevSlope = (m_emaPrevBuffers[i] - prevEma);
-         m_emas[i].curvature = (rawSlope - prevSlope) / m_atr;
-      } else {
-         m_emas[i].curvature = 0;
-      }
+         double prevSlope = (m_emaPrevBuffers[i] - prevVal);
+         m_ptrEmas[i].curvature = (rawSlope - prevSlope) / m_atr;
+      } else m_ptrEmas[i].curvature = 0;
    }
    
    // Calculate group metrics
-   CalculateGroupMetrics(EMA_GROUP_FAST, m_fastMetrics);
-   CalculateGroupMetrics(EMA_GROUP_MEDIUM, m_mediumMetrics);
-   CalculateGroupMetrics(EMA_GROUP_SLOW, m_slowMetrics);
+   CalculateGroupMetrics(EMA_GROUP_MICRO, m_microMetrics);
+   CalculateGroupMetrics(EMA_GROUP_OPERATIONAL, m_operationalMetrics);
+   CalculateGroupMetrics(EMA_GROUP_MACRO, m_macroMetrics);
+   CalculateGroupMetrics(EMA_GROUP_BIAS, m_biasMetrics);
    
    // Calculate fan metrics
    CalculateFanMetrics();
@@ -278,12 +291,13 @@ double CEMAs::NormalizeSlope(double slope) {
 //| Calculate Group Metrics                                          |
 //+------------------------------------------------------------------+
 void CEMAs::CalculateGroupMetrics(ENUM_EMA_GROUP group, SEMAGroupMetrics &metrics) {
-   int startIdx = 0, endIdx = 0;
+   int startIdx = 0, count = 0;
    
    switch(group) {
-      case EMA_GROUP_FAST:   startIdx = 0; endIdx = EMA_FAST_COUNT; break;
-      case EMA_GROUP_MEDIUM: startIdx = EMA_FAST_COUNT; endIdx = startIdx + EMA_MEDIUM_COUNT; break;
-      case EMA_GROUP_SLOW:   startIdx = EMA_FAST_COUNT + EMA_MEDIUM_COUNT; endIdx = startIdx + EMA_SLOW_COUNT; break;
+      case EMA_GROUP_MICRO:       startIdx = 0; count = EMA_MICRO_COUNT; break;
+      case EMA_GROUP_OPERATIONAL: startIdx = 10; count = EMA_OPERATIONAL_COUNT; break;
+      case EMA_GROUP_MACRO:       startIdx = 20; count = EMA_MACRO_COUNT; break;
+      case EMA_GROUP_BIAS:        startIdx = 30; count = EMA_BIAS_COUNT; break;
    }
    
    double sumValue = 0, sumSlope = 0;
@@ -291,19 +305,18 @@ void CEMAs::CalculateGroupMetrics(ENUM_EMA_GROUP group, SEMAGroupMetrics &metric
    int slopeSign = 0;
    bool allSameSign = true;
    
-   for(int i = startIdx; i < endIdx; i++) {
-      sumValue += m_emas[i].value;
-      sumSlope += m_emas[i].slope;
+   for(int i = startIdx; i < startIdx + count; i++) {
+      sumValue += m_ptrEmas[i].value;
+      sumSlope += m_ptrEmas[i].slope;
       
-      if(m_emas[i].value < minValue) minValue = m_emas[i].value;
-      if(m_emas[i].value > maxValue) maxValue = m_emas[i].value;
+      if(m_ptrEmas[i].value < minValue) minValue = m_ptrEmas[i].value;
+      if(m_ptrEmas[i].value > maxValue) maxValue = m_ptrEmas[i].value;
       
-      int currentSign = (m_emas[i].slope > 0) ? 1 : ((m_emas[i].slope < 0) ? -1 : 0);
+      int currentSign = (m_ptrEmas[i].slope > 0) ? 1 : ((m_ptrEmas[i].slope < 0) ? -1 : 0);
       if(i == startIdx) slopeSign = currentSign;
       else if(currentSign != slopeSign && currentSign != 0) allSameSign = false;
    }
    
-   int count = endIdx - startIdx;
    metrics.avgValue = sumValue / count;
    metrics.avgSlope = sumSlope / count;
    metrics.spread = maxValue - minValue;
@@ -315,126 +328,73 @@ void CEMAs::CalculateGroupMetrics(ENUM_EMA_GROUP group, SEMAGroupMetrics &metric
 //| Calculate Fan Metrics                                            |
 //+------------------------------------------------------------------+
 void CEMAs::CalculateFanMetrics() {
-   // Total spread: fastest to slowest
-   double fastestEMA = m_emas[0].value;
-   double slowestEMA = m_emas[EMA_COUNT - 1].value;
+   double fastestEMA = m_ptrEmas[0].value;
+   double slowestEMA = m_ptrEmas[30].value;
    m_fanMetrics.totalSpread = MathAbs(fastestEMA - slowestEMA);
    
-   // Compression (0 = max spread, 1 = compressed)
-   double refSpread = m_atr * 10;  // Reference spread
+   double refSpread = m_atr * 20;
    m_fanMetrics.compression = 1.0 - MathMin(1.0, m_fanMetrics.totalSpread / refSpread);
    
-   // Opening speed (rate of change of spread)
    static double prevSpread = 0;
    m_fanMetrics.openingSpeed = (m_fanMetrics.totalSpread - prevSpread) / m_atr;
    prevSpread = m_fanMetrics.totalSpread;
    
-   // Order detection
-   bool bullish = true, bearish = true;
-   for(int i = 1; i < EMA_COUNT; i++) {
-      if(m_emas[i-1].value <= m_emas[i].value) bullish = false;
-      if(m_emas[i-1].value >= m_emas[i].value) bearish = false;
-   }
+   bool bullish = (m_ptrEmas[0].value > m_ptrEmas[10].value && m_ptrEmas[10].value > m_ptrEmas[20].value);
+   bool bearish = (m_ptrEmas[0].value < m_ptrEmas[10].value && m_ptrEmas[10].value < m_ptrEmas[20].value);
+   
    m_fanMetrics.bullishOrder = bullish;
    m_fanMetrics.bearishOrder = bearish;
-   
-   // Convergence/Divergence
    m_fanMetrics.isConverging = (m_fanMetrics.openingSpeed < -0.1);
    m_fanMetrics.isDiverging = (m_fanMetrics.openingSpeed > 0.1);
 }
 
 //+------------------------------------------------------------------+
-//| Get EMA Value by Index                                           |
+//| Getters                                                          |
 //+------------------------------------------------------------------+
 double CEMAs::GetEMA(int index) const {
    if(index < 0 || index >= EMA_COUNT) return 0;
-   return m_emas[index].value;
+   return m_ptrEmas[index].value;
 }
-
-//+------------------------------------------------------------------+
-//| Get EMA Slope by Index                                           |
-//+------------------------------------------------------------------+
 double CEMAs::GetEMASlope(int index) const {
    if(index < 0 || index >= EMA_COUNT) return 0;
-   return m_emas[index].slope;
+   return m_ptrEmas[index].slope;
 }
-
-//+------------------------------------------------------------------+
-//| Get EMA Curvature by Index                                       |
-//+------------------------------------------------------------------+
 double CEMAs::GetEMACurvature(int index) const {
    if(index < 0 || index >= EMA_COUNT) return 0;
-   return m_emas[index].curvature;
+   return m_ptrEmas[index].curvature;
 }
-
-//+------------------------------------------------------------------+
-//| Get EMA Period by Index                                          |
-//+------------------------------------------------------------------+
 int CEMAs::GetEMAPeriod(int index) const {
    if(index < 0 || index >= EMA_COUNT) return 0;
-   return m_emas[index].period;
+   return m_ptrEmas[index].period;
 }
-
-//+------------------------------------------------------------------+
-//| Get EMA Group by Index                                           |
-//+------------------------------------------------------------------+
 ENUM_EMA_GROUP CEMAs::GetEMAGroup(int index) const {
-   if(index < 0 || index >= EMA_COUNT) return EMA_GROUP_FAST;
-   return m_emas[index].group;
+   if(index < 0 || index >= EMA_COUNT) return EMA_GROUP_MICRO;
+   return m_ptrEmas[index].group;
 }
-
-//+------------------------------------------------------------------+
-//| Get EMA Handle by Index                                          |
-//+------------------------------------------------------------------+
 int CEMAs::GetHandle(int index) const {
    if(index < 0 || index >= EMA_COUNT) return INVALID_HANDLE;
    return m_emaHandles[index];
 }
 
-//+------------------------------------------------------------------+
-//| Get Price Position Relative to EMA Cloud (-1 to 1)               |
-//+------------------------------------------------------------------+
 double CEMAs::GetPricePosition(double price) const {
-   double cloudHigh = m_emas[0].value;
-   double cloudLow = m_emas[0].value;
-   
-   for(int i = 1; i < EMA_COUNT; i++) {
-      if(m_emas[i].value > cloudHigh) cloudHigh = m_emas[i].value;
-      if(m_emas[i].value < cloudLow) cloudLow = m_emas[i].value;
+   double cloudHigh = -DBL_MAX, cloudLow = DBL_MAX;
+   for(int i = 0; i < EMA_COUNT; i++) {
+      if(m_ptrEmas[i].value > cloudHigh) cloudHigh = m_ptrEmas[i].value;
+      if(m_ptrEmas[i].value < cloudLow) cloudLow = m_ptrEmas[i].value;
    }
-   
-   double cloudMid = (cloudHigh + cloudLow) / 2;
-   double cloudRange = cloudHigh - cloudLow;
-   
-   if(cloudRange <= 0) return 0;
-   
-   double position = (price - cloudMid) / (cloudRange / 2);
-   return MathMax(-2.0, MathMin(2.0, position));
+   double range = cloudHigh - cloudLow;
+   if(range <= 0) return 0;
+   return (price - ((cloudHigh + cloudLow) / 2.0)) / (range / 2.0);
 }
 
-//+------------------------------------------------------------------+
-//| Is Price Above EMA Cloud                                         |
-//+------------------------------------------------------------------+
 bool CEMAs::IsPriceAboveCloud(double price) const {
-   for(int i = 0; i < EMA_COUNT; i++) {
-      if(price <= m_emas[i].value) return false;
-   }
+   for(int i = 0; i < EMA_COUNT; i++) if(price <= m_ptrEmas[i].value) return false;
    return true;
 }
-
-//+------------------------------------------------------------------+
-//| Is Price Below EMA Cloud                                         |
-//+------------------------------------------------------------------+
 bool CEMAs::IsPriceBelowCloud(double price) const {
-   for(int i = 0; i < EMA_COUNT; i++) {
-      if(price >= m_emas[i].value) return false;
-   }
+   for(int i = 0; i < EMA_COUNT; i++) if(price >= m_ptrEmas[i].value) return false;
    return true;
 }
-
-//+------------------------------------------------------------------+
-//| Is Price Inside EMA Cloud                                        |
-//+------------------------------------------------------------------+
 bool CEMAs::IsPriceInCloud(double price) const {
    return !IsPriceAboveCloud(price) && !IsPriceBelowCloud(price);
 }

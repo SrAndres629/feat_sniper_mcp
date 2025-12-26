@@ -1,7 +1,6 @@
 //+------------------------------------------------------------------+
-//|                                                    CVisuals.mqh |
-//|                    Visualization Layer                          |
-//|            Panel, EMAs Ribbon, Liquidity Zones                  |
+//|                                                   CVisuals.mqh |
+//|                    Visualization Engine - Dashboard + Levels      |
 //+------------------------------------------------------------------+
 #ifndef CVISUALS_MQH
 #define CVISUALS_MQH
@@ -11,447 +10,197 @@
 #include "CLiquidity.mqh"
 #include "CFSM.mqh"
 
-//+------------------------------------------------------------------+
-//| COLOR SCHEME                                                     |
-//+------------------------------------------------------------------+
-struct SColorScheme {
-   // EMA Groups
-   color    emaFast;
-   color    emaMedium;
-   color    emaSlow;
-   
-   // States
-   color    stateAccumulation;
-   color    stateExpansion;
-   color    stateDistribution;
-   color    stateReset;
-   
-   // Liquidity
-   color    liqExternal;
-   color    liqInternal;
-   color    liqImbalance;
-   
-   // Panel
-   color    panelBg;
-   color    panelText;
-   color    panelHighlight;
-};
-
-//+------------------------------------------------------------------+
-//| CVISUALS CLASS                                                   |
-//+------------------------------------------------------------------+
 class CVisuals {
 private:
-   string            m_prefix;
-   long              m_chartId;
-   SColorScheme      m_colors;
+   string         m_prefix;
+   long           m_chart;
+   CEMAs*         m_ptrEmas;
+   CFEAT*         m_ptrFeat;
+   CLiquidity*    m_ptrLiq;
+   CFSM*          m_ptrFsm;
    
-   bool              m_drawEMAs;
-   bool              m_drawPanel;
-   bool              m_drawLiquidity;
-   bool              m_drawFEAT;
-   
-   int               m_panelX;
-   int               m_panelY;
-   int               m_panelWidth;
-   int               m_lineHeight;
-   int               m_fontSize;
-   
-   // Component references
-   CEMAs*            m_emas;
-   CFEAT*            m_feat;
-   CLiquidity*       m_liquidity;
-   CFSM*             m_fsm;
-   
-   // Helper methods
-   void              CreateLabel(string name, int x, int y, string text, color clr, int size = 9);
-   void              CreateRectangle(string name, int x, int y, int width, int height, color bg, color border);
-   void              CreateLine(string name, datetime t1, double p1, datetime t2, double p2, color clr, int width = 1, ENUM_LINE_STYLE style = STYLE_SOLID);
-   void              CreateRectanglePrice(string name, datetime t1, double p1, datetime t2, double p2, color clr, bool fill = true);
-   color             GetStateColor(ENUM_MARKET_STATE state);
-   string            GetFormString(ENUM_FORM_TYPE type);
-   string            GetSpaceString(ENUM_SPACE_TYPE type);
-   string            GetAccelString(ENUM_ACCEL_TYPE type);
-   
+   bool           m_showEMAs;
+   bool           m_showDashboard;
+   bool           m_showLiquidity;
+   bool           m_showStructure;
+
+   void           CreateLabel(string name, int x, int y, string text, color clr, int size);
+   void           CreateHLine(string name, double price, color clr, ENUM_LINE_STYLE style, int width);
+   void           CreateBox(string name, datetime t1, double p1, datetime t2, double p2, color clr, int width, ENUM_LINE_STYLE style, bool fill);
+   void           CreateArrow(string name, datetime t, double price, int code, color clr);
+
 public:
-                     CVisuals();
-                    ~CVisuals();
-   
-   // Configuration
-   void              Init(string prefix, long chartId = 0);
-   void              SetComponents(CEMAs* emas, CFEAT* feat, CLiquidity* liq, CFSM* fsm);
-   void              SetColorScheme(const SColorScheme &scheme);
-   void              SetDrawOptions(bool emas, bool panel, bool liquidity, bool feat);
-   void              SetPanelPosition(int x, int y);
-   
-   // Drawing
-   void              Draw(datetime currentTime, double currentPrice);
-   void              DrawEMAs(datetime startTime, datetime endTime);
-   void              DrawPanel();
-   void              DrawLiquidity(datetime startTime, datetime endTime);
-   void              DrawFEATInfo();
-   
-   // Cleanup
-   void              Clear();
+   CVisuals();
+   ~CVisuals() { Clear(); }
+
+   void Init(string prefix, long chartID) { m_prefix = prefix; m_chart = chartID; }
+   void SetComponents(CEMAs* e, CFEAT* f, CLiquidity* l, CFSM* sm) { m_ptrEmas = e; m_ptrFeat = f; m_ptrLiq = l; m_ptrFsm = sm; }
+   void SetDrawOptions(bool emas, bool dash, bool liq, bool structr) { m_showEMAs = emas; m_showDashboard = dash; m_showLiquidity = liq; m_showStructure = structr; }
+
+   void Draw(datetime t, double close);
+   void Clear();
 };
 
-//+------------------------------------------------------------------+
-//| Constructor                                                      |
-//+------------------------------------------------------------------+
-CVisuals::CVisuals() {
-   m_prefix = "UM_";
-   m_chartId = 0;
-   
-   m_drawEMAs = true;
-   m_drawPanel = true;
-   m_drawLiquidity = true;
-   m_drawFEAT = true;
-   
-   m_panelX = 10;
-   m_panelY = 30;
-   m_panelWidth = 250;
-   m_lineHeight = 18;
-   m_fontSize = 9;
-   
-   // Default color scheme
-   m_colors.emaFast = clrYellow;
-   m_colors.emaMedium = clrOrange;
-   m_colors.emaSlow = clrRed;
-   
-   m_colors.stateAccumulation = clrDodgerBlue;
-   m_colors.stateExpansion = clrLime;
-   m_colors.stateDistribution = clrOrange;
-   m_colors.stateReset = clrMagenta;
-   
-   m_colors.liqExternal = clrCrimson;
-   m_colors.liqInternal = clrGold;
-   m_colors.liqImbalance = clrDarkViolet;
-   
-   m_colors.panelBg = C'20,20,30';
-   m_colors.panelText = clrWhite;
-   m_colors.panelHighlight = clrGold;
-   
-   m_emas = NULL;
-   m_feat = NULL;
-   m_liquidity = NULL;
-   m_fsm = NULL;
-}
+CVisuals::CVisuals() : m_ptrEmas(NULL), m_ptrFeat(NULL), m_ptrLiq(NULL), m_ptrFsm(NULL), m_showEMAs(true), m_showDashboard(true), m_showLiquidity(true), m_showStructure(true) {}
 
-//+------------------------------------------------------------------+
-//| Destructor                                                       |
-//+------------------------------------------------------------------+
-CVisuals::~CVisuals() {
-   Clear();
-}
+void CVisuals::Clear() { ObjectsDeleteAll(m_chart, m_prefix); }
 
-//+------------------------------------------------------------------+
-//| Initialize                                                       |
-//+------------------------------------------------------------------+
-void CVisuals::Init(string prefix, long chartId = 0) {
-   m_prefix = prefix;
-   m_chartId = chartId;
-}
+void CVisuals::Draw(datetime t, double close) {
+   ObjectsDeleteAll(m_chart, m_prefix);
+   int x = 20, y = 30, h = 18;
 
-//+------------------------------------------------------------------+
-//| Set Components                                                   |
-//+------------------------------------------------------------------+
-void CVisuals::SetComponents(CEMAs* emas, CFEAT* feat, CLiquidity* liq, CFSM* fsm) {
-   m_emas = emas;
-   m_feat = feat;
-   m_liquidity = liq;
-   m_fsm = fsm;
-}
-
-//+------------------------------------------------------------------+
-//| Set Color Scheme                                                 |
-//+------------------------------------------------------------------+
-void CVisuals::SetColorScheme(const SColorScheme &scheme) {
-   m_colors = scheme;
-}
-
-//+------------------------------------------------------------------+
-//| Set Draw Options                                                 |
-//+------------------------------------------------------------------+
-void CVisuals::SetDrawOptions(bool emas, bool panel, bool liquidity, bool feat) {
-   m_drawEMAs = emas;
-   m_drawPanel = panel;
-   m_drawLiquidity = liquidity;
-   m_drawFEAT = feat;
-}
-
-//+------------------------------------------------------------------+
-//| Set Panel Position                                               |
-//+------------------------------------------------------------------+
-void CVisuals::SetPanelPosition(int x, int y) {
-   m_panelX = x;
-   m_panelY = y;
-}
-
-//+------------------------------------------------------------------+
-//| Main Draw Method                                                 |
-//+------------------------------------------------------------------+
-void CVisuals::Draw(datetime currentTime, double currentPrice) {
-   Clear();
-   
-   datetime startTime = currentTime - PeriodSeconds(PERIOD_CURRENT) * 100;
-   datetime endTime = currentTime + PeriodSeconds(PERIOD_CURRENT) * 5;
-   
-   if(m_drawLiquidity && m_liquidity != NULL) DrawLiquidity(startTime, endTime);
-   if(m_drawPanel) DrawPanel();
-   
-   ChartRedraw(m_chartId);
-}
-
-//+------------------------------------------------------------------+
-//| Draw EMAs as Ribbons                                             |
-//+------------------------------------------------------------------+
-void CVisuals::DrawEMAs(datetime startTime, datetime endTime) {
-   if(m_emas == NULL || !m_emas.IsReady()) return;
-   
-   // Note: In practice, EMAs are drawn as indicator buffers
-   // This method can be used for additional visual elements
-}
-
-//+------------------------------------------------------------------+
-//| Draw Info Panel                                                  |
-//+------------------------------------------------------------------+
-void CVisuals::DrawPanel() {
-   int x = m_panelX;
-   int y = m_panelY;
-   int h = m_lineHeight;
-   int panelHeight = h * 14 + 15;
-   
-   // Background
-   CreateRectangle(m_prefix + "PanelBG", x - 5, y - 5, m_panelWidth, panelHeight, m_colors.panelBg, clrGray);
-   
-   // Title
-   CreateLabel(m_prefix + "Title", x, y, "=== UNIFIED MODEL ===", m_colors.panelHighlight, 10);
-   y += h + 5;
-   
-   // State
-   if(m_fsm != NULL) {
-      ENUM_MARKET_STATE state = m_fsm.GetState();
-      color stateClr = GetStateColor(state);
-      CreateLabel(m_prefix + "State", x, y, "State: " + m_fsm.GetStateString(), stateClr, m_fontSize);
-      y += h;
+   if(m_showDashboard && m_ptrFsm != NULL && m_ptrEmas != NULL && m_ptrFeat != NULL && m_ptrLiq != NULL) {
+      CreateLabel(m_prefix+"Title", x, y, "FEAT SNIPER V3 - INSTITUTIONAL", clrGold, 10); y += h + 5;
       
-      CreateLabel(m_prefix + "Conf", x, y, StringFormat("Confidence: %.1f%%", m_fsm.GetConfidence()), m_colors.panelText, m_fontSize);
-      y += h;
+      // Context: Premium/Discount
+      SLiquidityContext lctx = m_ptrLiq.GetContext();
+      string pdLabel = "EQUILIBRIUM";
+      color pdClr = clrSilver;
+      if(lctx.isPremium) { pdLabel = "PREMIUM"; pdClr = clrTomato; }
+      if(lctx.isDiscount) { pdLabel = "DISCOUNT"; pdClr = clrLime; }
+      CreateLabel(m_prefix+"PD_Status", x, y, "CONTEXT: " + pdLabel, pdClr, 9); y += h;
       
-      SFSMMetrics metrics = m_fsm.GetMetrics();
-      CreateLabel(m_prefix + "Effort", x, y, StringFormat("Effort: %.3f", metrics.effort), m_colors.panelText, m_fontSize);
-      y += h;
-      CreateLabel(m_prefix + "Result", x, y, StringFormat("Result: %.3f", metrics.result), m_colors.panelText, m_fontSize);
-      y += h;
-   }
-   
-   // FEAT
-   y += 5;
-   CreateLabel(m_prefix + "FeatTitle", x, y, "--- FEAT ---", clrSilver, m_fontSize);
-   y += h;
-   
-   if(m_feat != NULL) {
-      SFormMetrics form = m_feat.GetForm();
-      SSpaceMetrics space = m_feat.GetSpace();
-      SAccelMetrics accel = m_feat.GetAccel();
-      STimeMetrics time = m_feat.GetTime();
+      // State
+      CreateLabel(m_prefix+"State", x, y, "STATE: " + m_ptrFsm.GetStateString(), clrDodgerBlue, 8); y += h;
       
-      CreateLabel(m_prefix + "Form", x, y, "F: " + GetFormString(form.type), m_colors.panelText, m_fontSize);
-      y += h;
-      CreateLabel(m_prefix + "Space", x, y, "E: " + GetSpaceString(space.type), m_colors.panelText, m_fontSize);
-      y += h;
-      CreateLabel(m_prefix + "Accel", x, y, "A: " + GetAccelString(accel.type), m_colors.panelText, m_fontSize);
-      y += h;
-      CreateLabel(m_prefix + "Time", x, y, StringFormat("T: %s [%.1fx]", time.activeSession, time.tfMultiplier), m_colors.panelText, m_fontSize);
-      y += h;
+      // Time Module
+      STimeMetrics tm = m_ptrFeat.GetTime();
+      string kzLabel = tm.isKillzone ? (tm.isLondonKZ ? "[LONDON KZ]" : "[NY KZ]") : "";
+      color kzClr = tm.isKillzone ? clrCyan : clrGray;
+      CreateLabel(m_prefix+"Session", x, y, "SESSION: " + tm.activeSession + " " + kzLabel, kzClr, 8); y += h;
       
-      color scoreClr = (m_feat.GetCompositeScore() > 60) ? clrLime : ((m_feat.GetCompositeScore() < 40) ? clrRed : clrYellow);
-      CreateLabel(m_prefix + "FeatScore", x, y, StringFormat("FEAT Score: %.0f", m_feat.GetCompositeScore()), scoreClr, m_fontSize);
-      y += h;
-   }
-   
-   // Liquidity
-   y += 5;
-   CreateLabel(m_prefix + "LiqTitle", x, y, "--- LIQUIDITY ---", clrSilver, m_fontSize);
-   y += h;
-   
-   if(m_liquidity != NULL) {
-      SLiquidityContext ctx = m_liquidity.GetContext();
-      string aboveStr = (ctx.nearestAbove.price > 0) ? DoubleToString(ctx.nearestAbove.price, _Digits) : "---";
-      string belowStr = (ctx.nearestBelow.price > 0) ? DoubleToString(ctx.nearestBelow.price, _Digits) : "---";
+      // Acceleration
+      SAccelMetrics acm = m_ptrFeat.GetAccel();
+      color accelClr = acm.isInstitutional ? clrCyan : (acm.velocity > 1.0 ? clrLime : clrWhite);
+      CreateLabel(m_prefix+"Accel", x, y, StringFormat("ACCEL: %.2f | Vel: %.2f", acm.momentum, acm.velocity), accelClr, 8); y += h;
       
-      CreateLabel(m_prefix + "LiqAbove", x, y, "Above: " + aboveStr, m_colors.liqExternal, m_fontSize);
-      y += h;
-      CreateLabel(m_prefix + "LiqBelow", x, y, "Below: " + belowStr, m_colors.liqExternal, m_fontSize);
-   }
-}
-
-//+------------------------------------------------------------------+
-//| Draw Liquidity Levels                                            |
-//+------------------------------------------------------------------+
-void CVisuals::DrawLiquidity(datetime startTime, datetime endTime) {
-   if(m_liquidity == NULL) return;
-   
-   int count = m_liquidity.GetLevelCount();
-   for(int i = 0; i < MathMin(count, 30); i++) {
-      SLiquidityLevel lvl = m_liquidity.GetLevel(i);
-      if(lvl.mitigated) continue;
+      // Alerts
+      if(acm.isInstitutional) {
+         CreateLabel(m_prefix+"Intent", x, y, ">> INTENCION INSTITUCIONAL", clrCyan, 9); y += h;
+      }
+      if(acm.isExhausted) {
+         CreateLabel(m_prefix+"Exhaust", x, y, "!! AGOTAMIENTO DETECTADO", clrOrange, 9); y += h;
+      }
       
-      color clr = (lvl.type == LIQ_EXTERNAL) ? m_colors.liqExternal :
-                  (lvl.type == LIQ_INTERNAL) ? m_colors.liqInternal : m_colors.liqImbalance;
+      // Composite Score
+      double score = m_ptrFeat.GetCompositeScore();
+      color scoreClr = (score > 70) ? clrLime : (score > 40 ? clrYellow : clrRed);
+      CreateLabel(m_prefix+"Score", x, y, StringFormat("SCORE: %.0f/100", score), scoreClr, 9); y += h + 5;
       
-      ENUM_LINE_STYLE style = (lvl.type == LIQ_EXTERNAL) ? STYLE_SOLID : STYLE_DOT;
-      int width = (lvl.strength > 0.7) ? 2 : 1;
+      // Equilibrium Line
+      if(lctx.equilibrium > 0) {
+         CreateHLine(m_prefix+"EQ", lctx.equilibrium, clrDarkGray, STYLE_DASHDOT, 1);
+      }
+   }
+
+   if(m_ptrLiq != NULL) {
+      // Structure Lines (BOS/CHoCH)
+      if(m_showStructure) {
+         int sCount = m_ptrLiq.GetStructureCount();
+         for(int i = 0; i < sCount; i++) {
+            SStructureEvent e = m_ptrLiq.GetStructureEvent(i);
+            if(e.active) {
+               string name = m_prefix + "STRUCT_" + IntegerToString(i);
+               color c = e.isBullish ? clrLime : clrRed;
+               ENUM_LINE_STYLE st = (e.type == STRUCT_BOS) ? STYLE_SOLID : STYLE_DASH;
+               ObjectCreate(m_chart, name, OBJ_TREND, 0, e.time, e.price, TimeCurrent(), e.price);
+               ObjectSetInteger(m_chart, name, OBJPROP_COLOR, c);
+               ObjectSetInteger(m_chart, name, OBJPROP_STYLE, st);
+               ObjectSetInteger(m_chart, name, OBJPROP_RAY_RIGHT, true);
+               
+               string lblName = name + "_LBL";
+               ObjectCreate(m_chart, lblName, OBJ_TEXT, 0, e.time, e.price);
+               ObjectSetString(m_chart, lblName, OBJPROP_TEXT, (e.type == STRUCT_BOS ? " BOS" : " CHoCH"));
+               ObjectSetInteger(m_chart, lblName, OBJPROP_COLOR, c);
+               ObjectSetInteger(m_chart, lblName, OBJPROP_FONTSIZE, 7);
+            }
+         }
+         
+         // Patterns (M/W/GC)
+         int pCount = m_ptrLiq.GetPatternCount();
+         for(int i = 0; i < pCount; i++) {
+            SPatternEvent p = m_ptrLiq.GetPatternEvent(i);
+            string name = m_prefix + "PAT_" + IntegerToString(i);
+            color c = p.isBullish ? clrLime : clrRed;
+            int code = p.isBullish ? 233 : 234; // Arrow up/down
+            CreateArrow(name, p.time, p.price, code, c);
+            
+            string lblName = name + "_LBL";
+            ObjectCreate(m_chart, lblName, OBJ_TEXT, 0, p.time, p.price);
+            ObjectSetString(m_chart, lblName, OBJPROP_TEXT, " " + p.description);
+            ObjectSetInteger(m_chart, lblName, OBJPROP_COLOR, c);
+            ObjectSetInteger(m_chart, lblName, OBJPROP_FONTSIZE, 8);
+         }
+      }
       
-      string name = m_prefix + "Liq_" + IntegerToString(i);
-      CreateLine(name, startTime, lvl.price, endTime, lvl.price, clr, width, style);
+      // Zones
+      if(m_showLiquidity) {
+         int zCount = m_ptrLiq.GetZoneCount();
+         for(int i = 0; i < zCount; i++) {
+            SInstitutionalZone z = m_ptrLiq.GetZone(i);
+            if(z.mitigated) continue;
+            string name = m_prefix + "ZONE_" + IntegerToString(i);
+            color clrZone = clrDimGray;
+            if(z.type == ZONE_FVG) clrZone = z.isBullish ? C'30,50,30' : C'50,30,30';
+            if(z.type == ZONE_OB) clrZone = z.isBullish ? C'0,100,0' : C'100,0,0';
+            if(z.type == ZONE_CONFLUENCE) clrZone = clrFuchsia;
+            if(z.type == ZONE_PC) clrZone = clrGoldenrod;
+            
+            CreateBox(name, z.time, z.top, TimeCurrent(), z.bottom, clrZone, 1, STYLE_SOLID, true);
+            
+            string lblName = name + "_LBL";
+            ObjectCreate(m_chart, lblName, OBJ_TEXT, 0, z.time, z.top);
+            ObjectSetString(m_chart, lblName, OBJPROP_TEXT, " " + z.label);
+            ObjectSetInteger(m_chart, lblName, OBJPROP_COLOR, clrWhite);
+            ObjectSetInteger(m_chart, lblName, OBJPROP_FONTSIZE, 7);
+         }
+         
+         // Liquidity Levels
+         for(int i=0; i<m_ptrLiq.GetLevelCount(); i++) {
+            SLiquidityLevel lvl = m_ptrLiq.GetLevel(i);
+            if(lvl.mitigated) continue;
+            string name = m_prefix + "LVL_" + IntegerToString(i);
+            color c = (lvl.side==LIQ_ABOVE ? clrOrangeRed : clrMediumSeaGreen);
+            int w = 1;
+            if(lvl.type == LIQ_POOL) { w = 2; c = clrYellow; }
+            CreateHLine(name, lvl.price, c, STYLE_DOT, w);
+         }
+      }
    }
    
-   // Draw imbalances
-   int imbCount = m_liquidity.GetImbalanceCount();
-   for(int i = 0; i < MathMin(imbCount, 10); i++) {
-      SImbalance imb = m_liquidity.GetImbalance(i);
-      if(imb.mitigated) continue;
-      
-      string name = m_prefix + "Imb_" + IntegerToString(i);
-      CreateRectanglePrice(name, imb.time, imb.high, TimeCurrent(), imb.low, m_colors.liqImbalance, false);
-   }
+   ChartRedraw(m_chart);
 }
 
-//+------------------------------------------------------------------+
-//| Draw FEAT Info                                                   |
-//+------------------------------------------------------------------+
-void CVisuals::DrawFEATInfo() {
-   // Additional FEAT visualization can be added here
+void CVisuals::CreateLabel(string name, int x, int y, string text, color clr, int size) {
+   ObjectCreate(m_chart, name, OBJ_LABEL, 0, 0, 0);
+   ObjectSetInteger(m_chart, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(m_chart, name, OBJPROP_YDISTANCE, y);
+   ObjectSetString(m_chart, name, OBJPROP_TEXT, text);
+   ObjectSetInteger(m_chart, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(m_chart, name, OBJPROP_FONTSIZE, size);
 }
 
-//+------------------------------------------------------------------+
-//| Clear All Objects                                                |
-//+------------------------------------------------------------------+
-void CVisuals::Clear() {
-   ObjectsDeleteAll(m_chartId, m_prefix);
+void CVisuals::CreateHLine(string name, double price, color clr, ENUM_LINE_STYLE style, int width) {
+   ObjectCreate(m_chart, name, OBJ_HLINE, 0, 0, price);
+   ObjectSetInteger(m_chart, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(m_chart, name, OBJPROP_STYLE, style);
+   ObjectSetInteger(m_chart, name, OBJPROP_WIDTH, width);
 }
 
-//+------------------------------------------------------------------+
-//| Create Label Helper (Optimized)                                  |
-//+------------------------------------------------------------------+
-void CVisuals::CreateLabel(string name, int x, int y, string text, color clr, int size = 9) {
-   if(ObjectFind(m_chartId, name) < 0) {
-      ObjectCreate(m_chartId, name, OBJ_LABEL, 0, 0, 0);
-      ObjectSetString(m_chartId, name, OBJPROP_FONT, "Consolas");
-      ObjectSetInteger(m_chartId, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-   }
-   
-   ObjectSetInteger(m_chartId, name, OBJPROP_XDISTANCE, x);
-   ObjectSetInteger(m_chartId, name, OBJPROP_YDISTANCE, y);
-   ObjectSetString(m_chartId, name, OBJPROP_TEXT, text);
-   ObjectSetInteger(m_chartId, name, OBJPROP_COLOR, clr);
-   ObjectSetInteger(m_chartId, name, OBJPROP_FONTSIZE, size);
+void CVisuals::CreateBox(string name, datetime t1, double p1, datetime t2, double p2, color clr, int width, ENUM_LINE_STYLE style, bool fill) {
+   ObjectCreate(m_chart, name, OBJ_RECTANGLE, 0, t1, p1, t2, p2);
+   ObjectSetInteger(m_chart, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(m_chart, name, OBJPROP_WIDTH, width);
+   ObjectSetInteger(m_chart, name, OBJPROP_STYLE, style);
+   ObjectSetInteger(m_chart, name, OBJPROP_FILL, fill);
+   ObjectSetInteger(m_chart, name, OBJPROP_BACK, true);
 }
 
-//+------------------------------------------------------------------+
-//| Create Rectangle Helper (Optimized)                              |
-//+------------------------------------------------------------------+
-void CVisuals::CreateRectangle(string name, int x, int y, int width, int height, color bg, color border) {
-   if(ObjectFind(m_chartId, name) < 0) {
-      ObjectCreate(m_chartId, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
-      ObjectSetInteger(m_chartId, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
-      ObjectSetInteger(m_chartId, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
-      ObjectSetInteger(m_chartId, name, OBJPROP_BACK, false);
-   }
-   
-   ObjectSetInteger(m_chartId, name, OBJPROP_XDISTANCE, x);
-   ObjectSetInteger(m_chartId, name, OBJPROP_YDISTANCE, y);
-   ObjectSetInteger(m_chartId, name, OBJPROP_XSIZE, width);
-   ObjectSetInteger(m_chartId, name, OBJPROP_YSIZE, height);
-   ObjectSetInteger(m_chartId, name, OBJPROP_BGCOLOR, bg);
-   ObjectSetInteger(m_chartId, name, OBJPROP_COLOR, border);
+void CVisuals::CreateArrow(string name, datetime t, double price, int code, color clr) {
+   ObjectCreate(m_chart, name, OBJ_ARROW, 0, t, price);
+   ObjectSetInteger(m_chart, name, OBJPROP_ARROWCODE, code);
+   ObjectSetInteger(m_chart, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(m_chart, name, OBJPROP_WIDTH, 2);
 }
 
-//+------------------------------------------------------------------+
-//| Create Line Helper (Optimized)                                   |
-//+------------------------------------------------------------------+
-void CVisuals::CreateLine(string name, datetime t1, double p1, datetime t2, double p2, color clr, int width = 1, ENUM_LINE_STYLE style = STYLE_SOLID) {
-   if(ObjectFind(m_chartId, name) < 0) {
-      ObjectCreate(m_chartId, name, OBJ_TREND, 0, t1, p1, t2, p2);
-      ObjectSetInteger(m_chartId, name, OBJPROP_RAY_RIGHT, false);
-      ObjectSetInteger(m_chartId, name, OBJPROP_BACK, true);
-   } else {
-      ObjectSetInteger(m_chartId, name, OBJPROP_TIME, 0, t1);
-      ObjectSetDouble(m_chartId, name, OBJPROP_PRICE, 0, p1);
-      ObjectSetInteger(m_chartId, name, OBJPROP_TIME, 1, t2);
-      ObjectSetDouble(m_chartId, name, OBJPROP_PRICE, 1, p2);
-   }
-   
-   ObjectSetInteger(m_chartId, name, OBJPROP_COLOR, clr);
-   ObjectSetInteger(m_chartId, name, OBJPROP_WIDTH, width);
-   ObjectSetInteger(m_chartId, name, OBJPROP_STYLE, style);
-}
-
-//+------------------------------------------------------------------+
-//| Create Price Rectangle Helper (Optimized)                        |
-//+------------------------------------------------------------------+
-void CVisuals::CreateRectanglePrice(string name, datetime t1, double p1, datetime t2, double p2, color clr, bool fill = true) {
-   if(ObjectFind(m_chartId, name) < 0) {
-      ObjectCreate(m_chartId, name, OBJ_RECTANGLE, 0, t1, p1, t2, p2);
-      ObjectSetInteger(m_chartId, name, OBJPROP_BACK, true);
-   } else {
-      ObjectSetInteger(m_chartId, name, OBJPROP_TIME, 0, t1);
-      ObjectSetDouble(m_chartId, name, OBJPROP_PRICE, 0, p1);
-      ObjectSetInteger(m_chartId, name, OBJPROP_TIME, 1, t2);
-      ObjectSetDouble(m_chartId, name, OBJPROP_PRICE, 1, p2);
-   }
-   
-   ObjectSetInteger(m_chartId, name, OBJPROP_COLOR, clr);
-   ObjectSetInteger(m_chartId, name, OBJPROP_FILL, fill);
-}
-
-//+------------------------------------------------------------------+
-//| Get State Color                                                  |
-//+------------------------------------------------------------------+
-color CVisuals::GetStateColor(ENUM_MARKET_STATE state) {
-   switch(state) {
-      case STATE_ACCUMULATION: return m_colors.stateAccumulation;
-      case STATE_EXPANSION:    return m_colors.stateExpansion;
-      case STATE_DISTRIBUTION: return m_colors.stateDistribution;
-      case STATE_RESET:        return m_colors.stateReset;
-   }
-   return m_colors.panelText;
-}
-
-//+------------------------------------------------------------------+
-//| Get Form Type as String                                          |
-//+------------------------------------------------------------------+
-string CVisuals::GetFormString(ENUM_FORM_TYPE type) {
-   switch(type) {
-      case FORM_CONSTRUCTION: return "Construction";
-      case FORM_IMPULSE:      return "Impulse";
-      case FORM_EXHAUSTION:   return "Exhaustion";
-   }
-   return "Undefined";
-}
-
-//+------------------------------------------------------------------+
-//| Get Space Type as String                                         |
-//+------------------------------------------------------------------+
-string CVisuals::GetSpaceString(ENUM_SPACE_TYPE type) {
-   switch(type) {
-      case SPACE_EXPANDED:   return "Expanded";
-      case SPACE_COMPRESSED: return "Compressed";
-      case SPACE_VOID:       return "Void";
-   }
-   return "Normal";
-}
-
-//+------------------------------------------------------------------+
-//| Get Accel Type as String                                         |
-//+------------------------------------------------------------------+
-string CVisuals::GetAccelString(ENUM_ACCEL_TYPE type) {
-   switch(type) {
-      case ACCEL_VALID: return "Valid";
-      case ACCEL_FAKE:  return "Fake";
-   }
-   return "None";
-}
-
-#endif // CVISUALS_MQH
+#endif

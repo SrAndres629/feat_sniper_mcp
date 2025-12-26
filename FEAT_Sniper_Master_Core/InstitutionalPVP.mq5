@@ -103,6 +103,7 @@ struct SPVPResult {
    int      pocBin;
    int      vahBin;
    int      valBin;
+   bool     isValid;
 };
 
 struct SSessionTime {
