@@ -2,6 +2,7 @@
 //|                                                      CEMAs.mqh |
 //|                    Multifractal EMA Engine - 31 Layers          |
 //|         Micro (Red), Operational (Green), Macro (Blue), Bias (Grey) |
+//|         Updated for User Physics: Wind(8), River(21), Wall(50), Magnet(200) |
 //+------------------------------------------------------------------+
 #ifndef CEMAS_MQH
 #define CEMAS_MQH
@@ -14,6 +15,12 @@
 #define EMA_OPERATIONAL_COUNT 10
 #define EMA_MACRO_COUNT 10
 #define EMA_BIAS_COUNT 1
+
+// Indices of Key Physics Objects
+#define EMA_IDX_WIND 5    // Index of EMA 8
+#define EMA_IDX_RIVER 11  // Index of EMA 21
+#define EMA_IDX_WALL 13   // Index of EMA 50
+#define EMA_IDX_MAGNET 19 // Index of EMA 200 (Moved to end of Operational or start of Macro)
 
 enum ENUM_EMA_GROUP {
    EMA_GROUP_MICRO,       // 1-14 periods (Red)
@@ -109,6 +116,16 @@ public:
    ENUM_EMA_GROUP    GetEMAGroup(int index) const;
    int               GetHandle(int index) const;
    
+   // New Physics Getters
+   double            GetWind() const { return m_ptrEmas[EMA_IDX_WIND].value; }   // EMA 8
+   double            GetRiver() const { return m_ptrEmas[EMA_IDX_RIVER].value; } // EMA 21
+   double            GetWall() const { return m_ptrEmas[EMA_IDX_WALL].value; }   // EMA 50
+   double            GetMagnet() const { return m_ptrEmas[EMA_IDX_MAGNET].value; } // EMA 200
+   
+   double            GetWindSlope() const { return m_ptrEmas[EMA_IDX_WIND].slope; }
+   double            GetRiverSlope() const { return m_ptrEmas[EMA_IDX_RIVER].slope; }
+   double            GetWallSlope() const { return m_ptrEmas[EMA_IDX_WALL].slope; }
+   
    // Getters - Group Metrics
    SEMAGroupMetrics  GetMicroMetrics() const { return m_microMetrics; }
    SEMAGroupMetrics  GetOperationalMetrics() const { return m_operationalMetrics; }
@@ -126,6 +143,7 @@ public:
    
    // Getters - ATR
    double            GetATR() const { return m_atr; }
+   double            GetBiasSlope() const { return m_ptrEmas[30].slope; }
 };
 
 //+------------------------------------------------------------------+
@@ -136,20 +154,26 @@ CEMAs::CEMAs() {
    m_atr = 0;
    m_atrHandle = INVALID_HANDLE;
    
-   // MICRO Periods (Red)
-   m_emaPeriods[0] = 1; m_emaPeriods[1] = 2; m_emaPeriods[2] = 3; m_emaPeriods[3] = 6;
-   m_emaPeriods[4] = 7; m_emaPeriods[5] = 8; m_emaPeriods[6] = 9; m_emaPeriods[7] = 12;
+   // MICRO Periods (Red) - 10 Layers
+   m_emaPeriods[0] = 1; m_emaPeriods[1] = 2; m_emaPeriods[2] = 3; m_emaPeriods[3] = 4;
+   m_emaPeriods[4] = 6; 
+   m_emaPeriods[5] = 8; // KEY: WIND (Index 5)
+   m_emaPeriods[6] = 10; m_emaPeriods[7] = 12;
    m_emaPeriods[8] = 13; m_emaPeriods[9] = 14;
    
-   // OPERATIONAL Periods (Green)
-   m_emaPeriods[10] = 16; m_emaPeriods[11] = 24; m_emaPeriods[12] = 32; m_emaPeriods[13] = 48;
-   m_emaPeriods[14] = 64; m_emaPeriods[15] = 96; m_emaPeriods[16] = 128; m_emaPeriods[17] = 160;
-   m_emaPeriods[18] = 192; m_emaPeriods[19] = 224;
+   // OPERATIONAL Periods (Green) - 10 Layers (+ Magnet at end)
+   m_emaPeriods[10] = 16; 
+   m_emaPeriods[11] = 21; // KEY: RIVER (Index 11)
+   m_emaPeriods[12] = 32; 
+   m_emaPeriods[13] = 50; // KEY: WALL (Index 13)
+   m_emaPeriods[14] = 64; m_emaPeriods[15] = 96; m_emaPeriods[16] = 100; m_emaPeriods[17] = 128;
+   m_emaPeriods[18] = 150; 
+   m_emaPeriods[19] = 200; // KEY: MAGNET (Index 19)
    
-   // MACRO Periods (Blue)
-   m_emaPeriods[20] = 256; m_emaPeriods[21] = 320; m_emaPeriods[22] = 384; m_emaPeriods[23] = 448;
-   m_emaPeriods[24] = 512; m_emaPeriods[25] = 640; m_emaPeriods[26] = 768; m_emaPeriods[27] = 896;
-   m_emaPeriods[28] = 1024; m_emaPeriods[29] = 1280;
+   // MACRO Periods (Blue) - 10 Layers (Deep Institutional)
+   m_emaPeriods[20] = 256; m_emaPeriods[21] = 300; m_emaPeriods[22] = 365; m_emaPeriods[23] = 400;
+   m_emaPeriods[24] = 500; m_emaPeriods[25] = 600; m_emaPeriods[26] = 800; m_emaPeriods[27] = 900;
+   m_emaPeriods[28] = 1000; m_emaPeriods[29] = 1200;
    
    // BIAS Period (Grey)
    m_emaPeriods[30] = 2048;

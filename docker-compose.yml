@@ -1,0 +1,15 @@
+services:
+  mcp-brain:
+    build: .
+    container_name: feat-sniper-brain
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8000:8000"
+      - "5555:5555"
+    networks:
+      - feat-network
+
+networks:
+  feat-network:
+    driver: bridge

@@ -2,9 +2,14 @@
 //|                                                   CInterop.mqh |
 //|                    MT5 <> Python Interoperability               |
 //|         Upgraded for Full FEAT + EMAs + Multitemporal Export    |
+//|         NOW WITH ZMQ SUPPORT (Port 5555)                        |
 //+------------------------------------------------------------------+
 #ifndef CINTEROP_MQH
 #define CINTEROP_MQH
+
+#include <Zmq/ZmqMsg.mqh>
+#include <Zmq/ZmqSocket.mqh>
+#include <Zmq/Context.mqh>
 
 #include "CEMAs.mqh"
 #include "CFEAT.mqh"
@@ -62,150 +67,133 @@ struct SBarDataExport {
 class CInterop {
 private:
    bool   m_enabled;
-   string m_path;
-   string m_filename;
-   bool   m_headerWritten;
+   Context *m_context;
+   Socket  *m_socket;
+   bool     m_zmqInitialised;
 
 public:
-   CInterop() : m_enabled(true), m_path(""), m_filename("UnifiedModel_Features.csv"), m_headerWritten(false) {}
+   CInterop();
+   ~CInterop();
+   
    void SetEnabled(bool e) { m_enabled = e; }
-   void SetDataPath(string p) { m_path = p; }
-   void SetFilename(string f) { m_filename = f; }
+   
+   // Initialize ZMQ connection
+   bool InitZMQ();
 
-   bool AppendBarData(string filename, datetime time, double open, double high, double low, double close,
-                      double effort, double result, double compression, double slope, double speed, 
-                      double confidence, string state);
+   // NEW: Send features via ZMQ
+   bool SendFeaturesZMQ(SBarDataExport &data, string symbol);
    
-   // NEW: Full feature export
-   bool ExportFeatures(SBarDataExport &data);
-   
-   // Write CSV header
-   bool WriteHeader(int handle);
+   // Helper to format JSON string (MQL5 doesn't have native JSON builder yet)
+   string BuildJson(SBarDataExport &data, string symbol);
 };
 
 //+------------------------------------------------------------------+
-//| Legacy AppendBarData (backward compatibility)                     |
+//| Constructor                                                      |
 //+------------------------------------------------------------------+
-bool CInterop::AppendBarData(string filename, datetime time, double o, double h, double l, double c,
-                            double eff, double res, double comp, double slp, double spd, 
-                            double conf, string state) {
-   if(!m_enabled) return false;
-   int handle = FileOpen(filename, FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON);
-   if(handle == INVALID_HANDLE) {
-      handle = FileOpen(filename, FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON);
-      if(handle != INVALID_HANDLE)
-         FileWrite(handle, "time,open,high,low,close,effort,result,microComp,operSlope,layerSep,state");
+CInterop::CInterop() : m_enabled(true), m_zmqInitialised(false) {
+   m_context = NULL;
+   m_socket = NULL;
+}
+
+//+------------------------------------------------------------------+
+//| Destructor                                                       |
+//+------------------------------------------------------------------+
+CInterop::~CInterop() {
+   if(m_socket != NULL) { delete m_socket; }
+   if(m_context != NULL) { delete m_context; }
+}
+
+//+------------------------------------------------------------------+
+//| Initialize ZMQ                                                    |
+//+------------------------------------------------------------------+
+bool CInterop::InitZMQ() {
+   if(m_zmqInitialised) return true;
+   
+   // Create ZMQ Context
+   m_context = new Context();
+   if(m_context == NULL) {
+      Print("CInterop: Failed to create ZMQ Context");
+      return false;
    }
-   if(handle == INVALID_HANDLE) return false;
-   FileSeek(handle, 0, SEEK_END);
-   FileWrite(handle, TimeToString(time) + "," + DoubleToString(o, 5) + "," + DoubleToString(h, 5) + "," +
-                     DoubleToString(l, 5) + "," + DoubleToString(c, 5) + "," + DoubleToString(eff, 5) + "," +
-                     DoubleToString(res, 5) + "," + DoubleToString(comp, 5) + "," + DoubleToString(slp, 5) + "," +
-                     DoubleToString(spd, 5) + "," + state);
-   FileClose(handle);
+
+   // Create PUSH Socket (Fire & Forget to Python)
+   m_socket = m_context.createSocket(ZMQ_PUSH);
+   if(m_socket == NULL) {
+      Print("CInterop: Failed to create ZMQ Socket");
+      return false;
+   }
+
+   // Connect to Docker brain
+   if(!m_socket.connect("tcp://localhost:5555")) {
+      Print("CInterop: Failed to connect to tcp://localhost:5555");
+      return false;
+   }
+   
+   // Set Linger to 0 to avoid blocking on close
+   m_socket.setLinger(0);
+
+   Print("CInterop: ZMQ Bridge Connected on Port 5555");
+   m_zmqInitialised = true;
    return true;
 }
 
 //+------------------------------------------------------------------+
-//| Write CSV Header                                                  |
+//| Send Features via ZMQ                                             |
 //+------------------------------------------------------------------+
-bool CInterop::WriteHeader(int handle) {
-   if(handle == INVALID_HANDLE) return false;
-   FileWrite(handle, 
-      "time,open,high,low,close,volume," +
-      "microComp,microSlope,microCurv,operComp,operSlope,macroSlope,biasSlope,layerSep12,layerSep23,fanBull,fanBear," +
-      "hasBOS,hasCHoCH,hasHCH,isIntent,curvScore,compRatio," +
-      "atZone,proxScore,zoneType," +
-      "velocity,momentum,deltaFlow,rsi,macdHist,ao,ac,isInst,isExhaust," +
-      "isKZ,isLondonKZ,isNYKZ,isAgainstH4,h4Dir,session," +
-      "state,score," +
-      "domTrend,mtfConf,mtfAgainst,m5Bias,h1Bias,h4Bias,d1Bias"
-   );
+bool CInterop::SendFeaturesZMQ(SBarDataExport &data, string symbol) {
+   if(!m_enabled) return false;
+   if(!m_zmqInitialised) {
+      if(!InitZMQ()) return false;
+   }
+
+   string json = BuildJson(data, symbol);
+   
+   ZmqMsg request(json);
+   if(!m_socket.send(request, true)) { // Non-blocking send
+      Print("CInterop: ZMQ Send Failed");
+      return false;
+   }
+   
    return true;
 }
 
 //+------------------------------------------------------------------+
-//| Full Feature Export                                               |
+//| Manual JSON Builder (Fast & Lightweight)                         |
 //+------------------------------------------------------------------+
-bool CInterop::ExportFeatures(SBarDataExport &data) {
-   if(!m_enabled) return false;
+string CInterop::BuildJson(SBarDataExport &data, string symbol) {
+   string json = "{";
    
-   string fullPath = m_path + m_filename;
-   int handle = FileOpen(fullPath, FILE_READ|FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON);
+   // Header
+   json += "\"type\":\"MKT_SNAPSHOT\",";
+   json += "\"symbol\":\"" + symbol + "\",";
+   json += "\"time\":\"" + TimeToString(data.time) + "\",";
    
-   if(handle == INVALID_HANDLE) {
-      handle = FileOpen(fullPath, FILE_WRITE|FILE_CSV|FILE_ANSI|FILE_COMMON);
-      if(handle != INVALID_HANDLE) {
-         WriteHeader(handle);
-         m_headerWritten = true;
-      }
-   }
+   // Price
+   json += "\"price\":{";
+   json += "\"o\":" + DoubleToString(data.open, 5) + ",";
+   json += "\"h\":" + DoubleToString(data.high, 5) + ",";
+   json += "\"l\":" + DoubleToString(data.low, 5) + ",";
+   json += "\"c\":" + DoubleToString(data.close, 5) + ",";
+   json += "\"v\":" + DoubleToString(data.volume, 2);
+   json += "},";
    
-   if(handle == INVALID_HANDLE) return false;
-   FileSeek(handle, 0, SEEK_END);
+   // FEAT Metrics
+   json += "\"feat\":{";
+   json += "\"velocity\":" + DoubleToString(data.velocity, 4) + ",";
+   json += "\"momentum\":" + DoubleToString(data.momentum, 4) + ",";
+   json += "\"deltaFlow\":" + DoubleToString(data.deltaFlow, 4) + ",";
+   json += "\"rsi\":" + DoubleToString(data.rsi, 2) + ",";
+   json += "\"macdHist\":" + DoubleToString(data.macdHist, 6) + ",";
+   json += "\"isInstitutional\":" + (data.isInstitutional ? "true" : "false") + ",";
+   json += "\"isExhausted\":" + (data.isExhausted ? "true" : "false");
+   json += "},";
    
-   // Build CSV row
-   string row = TimeToString(data.time) + "," +
-                DoubleToString(data.open, 5) + "," +
-                DoubleToString(data.high, 5) + "," +
-                DoubleToString(data.low, 5) + "," +
-                DoubleToString(data.close, 5) + "," +
-                DoubleToString(data.volume, 2) + "," +
-                // EMA Layers
-                DoubleToString(data.microComp, 4) + "," +
-                DoubleToString(data.microSlope, 4) + "," +
-                DoubleToString(data.microCurvature, 4) + "," +
-                DoubleToString(data.operComp, 4) + "," +
-                DoubleToString(data.operSlope, 4) + "," +
-                DoubleToString(data.macroSlope, 4) + "," +
-                DoubleToString(data.biasSlope, 4) + "," +
-                DoubleToString(data.layerSep12, 4) + "," +
-                DoubleToString(data.layerSep23, 4) + "," +
-                IntegerToString(data.fanBullish ? 1 : 0) + "," +
-                IntegerToString(data.fanBearish ? 1 : 0) + "," +
-                // FEAT Form
-                IntegerToString(data.hasBOS ? 1 : 0) + "," +
-                IntegerToString(data.hasCHoCH ? 1 : 0) + "," +
-                IntegerToString(data.hasHCH ? 1 : 0) + "," +
-                IntegerToString(data.isIntentCandle ? 1 : 0) + "," +
-                DoubleToString(data.curvatureScore, 4) + "," +
-                DoubleToString(data.compressionRatio, 4) + "," +
-                // FEAT Space
-                IntegerToString(data.atZone ? 1 : 0) + "," +
-                DoubleToString(data.proximityScore, 4) + "," +
-                data.activeZoneType + "," +
-                // FEAT Acceleration
-                DoubleToString(data.velocity, 4) + "," +
-                DoubleToString(data.momentum, 4) + "," +
-                DoubleToString(data.deltaFlow, 4) + "," +
-                DoubleToString(data.rsi, 2) + "," +
-                DoubleToString(data.macdHist, 6) + "," +
-                DoubleToString(data.ao, 4) + "," +
-                DoubleToString(data.ac, 4) + "," +
-                IntegerToString(data.isInstitutional ? 1 : 0) + "," +
-                IntegerToString(data.isExhausted ? 1 : 0) + "," +
-                // FEAT Time
-                IntegerToString(data.isKillzone ? 1 : 0) + "," +
-                IntegerToString(data.isLondonKZ ? 1 : 0) + "," +
-                IntegerToString(data.isNYKZ ? 1 : 0) + "," +
-                IntegerToString(data.isAgainstH4 ? 1 : 0) + "," +
-                IntegerToString(data.h4Direction) + "," +
-                data.activeSession + "," +
-                // FSM
-                data.marketState + "," +
-                DoubleToString(data.compositeScore, 2) + "," +
-                // Multitemporal
-                data.dominantTrend + "," +
-                IntegerToString(data.mtfConfluence) + "," +
-                IntegerToString(data.mtfAgainstBias ? 1 : 0) + "," +
-                DoubleToString(data.m5Bias, 3) + "," +
-                DoubleToString(data.h1Bias, 3) + "," +
-                DoubleToString(data.h4Bias, 3) + "," +
-                DoubleToString(data.d1Bias, 3);
+   // State
+   json += "\"state\":\"" + data.marketState + "\",";
+   json += "\"score\":" + DoubleToString(data.compositeScore, 2);
    
-   FileWrite(handle, row);
-   FileClose(handle);
-   return true;
+   json += "}";
+   return json;
 }
 
 #endif // CINTEROP_MQH

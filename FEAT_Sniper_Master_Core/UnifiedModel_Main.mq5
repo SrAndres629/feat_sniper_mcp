@@ -1,125 +1,124 @@
 //+------------------------------------------------------------------+
 //|                                          UnifiedModel_Main.mq5 |
 //|                    Unified Institutional Model                  |
-//|              31 Multifractal Layers + FEAT + Liquidity          |
-//|                                                                  |
-//| NOTE: This indicator focuses on EMA Layers, FEAT, and Liquidity.|
-//|       Volume Profile (PVP) is handled by 'InstitutionalPVP.mq5' |
-//|       to maintain performance and visual clarity.               |
+//|    Senior Quantitative Engineer Edition (Gas, Water, Wall, Bedrock)|
 //+------------------------------------------------------------------+
 #property copyright "Institutional Trading Systems"
 #property link      "https://github.com/SrAndres629/feat_sniper_mcp"
-#property version   "2.01"
+#property version   "2.25"
 #property indicator_chart_window
 #property indicator_buffers 31
 #property indicator_plots   31
 
-// --- EMA VISUAL HIERARCHY ---
-// Micro: Thin, Reactive (Red/Orange)
+// --- EMA VISUAL HIERARCHY (SENIOR ENGINEER PHYSICS) ---
+
+// 1. MICRO (GAS) - Yellow/Gold (Momentum)
 #property indicator_label1 "M1"
 #property indicator_type1 DRAW_LINE
-#property indicator_color1 C'80,0,0' // Dark Red
+#property indicator_color1 clrGold
 #property indicator_width1 1
 #property indicator_label2 "M2"
 #property indicator_type2 DRAW_LINE
-#property indicator_color2 C'100,0,0'
+#property indicator_color2 clrGold
 #property indicator_width2 1
 #property indicator_label3 "M3"
 #property indicator_type3 DRAW_LINE
-#property indicator_color3 C'120,0,0'
+#property indicator_color3 clrGold
 #property indicator_width3 1
 #property indicator_label4 "M4"
 #property indicator_type4 DRAW_LINE
-#property indicator_color4 C'140,0,0'
+#property indicator_color4 clrYellow
 #property indicator_width4 1
-#property indicator_label5 "M5 (Core)"
+#property indicator_label5 "M5 (WIND/GAS)"
 #property indicator_type5 DRAW_LINE
-#property indicator_color5 clrRed   // Bright Red (Core)
-#property indicator_width5 2    // Slightly thicker
+#property indicator_color5 clrYellow
+#property indicator_width5 2    // Core Gas
 #property indicator_label6 "M6"
 #property indicator_type6 DRAW_LINE
-#property indicator_color6 C'255,69,0' // Orange Red
+#property indicator_color6 clrYellow
 #property indicator_width6 1
 #property indicator_label7 "M7"
 #property indicator_type7 DRAW_LINE
-#property indicator_color7 C'255,69,0'
+#property indicator_color7 clrKhaki
 #property indicator_width7 1
 #property indicator_label8 "M8"
 #property indicator_type8 DRAW_LINE
-#property indicator_color8 clrOrange
+#property indicator_color8 clrKhaki
 #property indicator_width8 1
 #property indicator_label9 "M9"
 #property indicator_type9 DRAW_LINE
-#property indicator_color9 clrOrange
+#property indicator_color9 clrPaleGoldenrod
 #property indicator_width9 1
 #property indicator_label10 "M10"
 #property indicator_type10 DRAW_LINE
-#property indicator_color10 clrOrange
+#property indicator_color10 clrPaleGoldenrod
 #property indicator_width10 1
 
-// Operational: Structure (Green)
-#property indicator_label11 "O1"
+// 2. OPERATIONAL (WATER) - Orange/Red (Friction)
+#property indicator_label11 "O1 (RIVER Start)"
 #property indicator_type11 DRAW_LINE
-#property indicator_color11 C'0,100,0' // Dark Green
+#property indicator_color11 clrOrangeRed
 #property indicator_width11 1
-#property indicator_label12 "O2"
+#property indicator_label12 "O2 (RIVER Core)"
 #property indicator_type12 DRAW_LINE
-#property indicator_color12 C'0,128,0'
-#property indicator_width12 1
+#property indicator_color12 clrRed
+#property indicator_width12 2 // EMA 21
 #property indicator_label13 "O3"
 #property indicator_type13 DRAW_LINE
-#property indicator_color13 C'34,139,34'
+#property indicator_color13 clrOrangeRed
 #property indicator_width13 1
-#property indicator_label14 "O4"
+
+// 3. STRUCTURAL (WALL) - Green (Brick Wall)
+#property indicator_label14 "O4 (WALL Core)"
 #property indicator_type14 DRAW_LINE
-#property indicator_color14 C'34,139,34'
-#property indicator_width14 1
-#property indicator_label15 "O5 (Core)"
+#property indicator_color14 clrLimeGreen
+#property indicator_width14 3 // EMA 50 (Thick Wall)
+#property indicator_label15 "O5"
 #property indicator_type15 DRAW_LINE
-#property indicator_color15 clrLime // Bright Lime (Core)
-#property indicator_width15 2
+#property indicator_color15 clrLime
+#property indicator_width15 1
 #property indicator_label16 "O6"
 #property indicator_type16 DRAW_LINE
-#property indicator_color16 C'50,205,50' // Lime Green
+#property indicator_color16 clrLime
 #property indicator_width16 1
 #property indicator_label17 "O7"
 #property indicator_type17 DRAW_LINE
-#property indicator_color17 C'154,205,50'
+#property indicator_color17 clrSpringGreen
 #property indicator_width17 1
 #property indicator_label18 "O8"
 #property indicator_type18 DRAW_LINE
-#property indicator_color18 C'154,205,50'
+#property indicator_color18 clrSpringGreen
 #property indicator_width18 1
 #property indicator_label19 "O9"
 #property indicator_type19 DRAW_LINE
-#property indicator_color19 clrYellow
+#property indicator_color19 clrMediumSpringGreen
 #property indicator_width19 1
-#property indicator_label20 "O10"
+#property indicator_label20 "O10 (MAGNET Lead)"
 #property indicator_type20 DRAW_LINE
-#property indicator_color20 clrYellow
+#property indicator_color20 clrMediumPurple
 #property indicator_width20 1
 
-// Macro: Background (Blue)
-#property indicator_label21 "Ma1"
+// 4. MACRO (BEDROCK) - Purple/Blue (Gravity)
+#property indicator_label21 "Ma1 (BEDROCK Core)"
 #property indicator_type21 DRAW_LINE
-#property indicator_color21 C'0,0,139' // Dark Blue
-#property indicator_width21 1
+#property indicator_color21 clrDarkViolet // EMA 200+
+#property indicator_width21 2
 #property indicator_label22 "Ma2"
 #property indicator_type22 DRAW_LINE
-#property indicator_color22 C'0,0,205'
+#property indicator_color22 clrBlueViolet
 #property indicator_width22 1
 #property indicator_label23 "Ma3"
 #property indicator_type23 DRAW_LINE
-#property indicator_color23 C'0,0,255'
+#property indicator_color23 clrMediumSlateBlue
 #property indicator_width23 1
 #property indicator_label24 "Ma4"
 #property indicator_type24 DRAW_LINE
-#property indicator_color24 C'65,105,225'
+#property indicator_color24 clrSlateBlue
 #property indicator_width24 1
-#property indicator_label25 "Ma5 (Core)"
+#property indicator_label25 "Ma5"
 #property indicator_type25 DRAW_LINE
 #property indicator_color25 clrDodgerBlue
-#property indicator_width25 2
+#property indicator_width25 1
 #property indicator_label26 "Ma6"
 #property indicator_type26 DRAW_LINE
 #property indicator_color26 clrDeepSkyBlue
@@ -145,8 +144,8 @@
 #property indicator_label31 "Bias"
 #property indicator_type31 DRAW_LINE
 #property indicator_color31 clrDimGray
-#property indicator_width31 3 // Prominent thickness
-#property indicator_style31 STYLE_SOLID
+#property indicator_width31 1 
+#property indicator_style31 STYLE_DOT
 
 #include <UnifiedModel\CEMAs.mqh>
 #include <UnifiedModel\CFEAT.mqh>
@@ -159,7 +158,8 @@
 input group "--- Configuration ---"
 input int ATR_Period = 14;
 input int Lookback = 100;
-input bool ShowDashboard = true; // Toggle Information Panel
+input bool ShowDashboard = true; // Toggle Senior Engineer HUD
+input bool ExportData = true;    // Export Data for Neural Training
 input string Bridge_Path = "c:\\Users\\acord\\OneDrive\\Desktop\\Bot\\feat_sniper_mcp\\FEAT_Sniper_Master_Core\\Python\\start_bridge.bat";
 
 double b0[], b1[], b2[], b3[], b4[], b5[], b6[], b7[], b8[], b9[];
@@ -189,14 +189,20 @@ int OnInit() {
    if(!g_emas.Init(_Symbol, _Period, ATR_Period)) return INIT_FAILED;
    g_feat.SetEMAs(&g_emas);
    g_feat.SetLiquidity(&g_liq);
-   if(!g_feat.Init(_Symbol, _Period)) return INIT_FAILED;  // Initialize RSI/MACD/AO handles
+   if(!g_feat.Init(_Symbol, _Period)) return INIT_FAILED;
    g_liq.Init(_Symbol, _Period, 50, Lookback, 5.0, 0.5);
    g_fsm.SetComponents(&g_emas, &g_feat, &g_liq);
    g_fsm.SetBufferSize(Lookback);
+   
    g_vis.Init("UM_", ChartID());
    g_vis.SetComponents(&g_emas, &g_feat, &g_liq, &g_fsm);
    g_vis.SetDrawOptions(true, ShowDashboard, true, true);
-   g_mtf.Init(_Symbol);  // Initialize Multitemporal analysis
+   
+   g_io.SetEnabled(ExportData);
+   g_io.SetDataPath(""); 
+   g_io.SetFilename("UnifiedModel_LiveFeed.csv");
+   
+   g_mtf.Init(_Symbol);
    
    return INIT_SUCCEEDED;
 }
@@ -253,17 +259,89 @@ int OnCalculate(const int total, const int prev, const datetime &time[], const d
    static datetime last = 0;
    if(time[total-1] != last) {
       last = time[total-1];
-      last = time[total-1];
-      g_emas.Calculate(0);
       
-      // Calculate FEAT V2 Layers
+      // 1. UPDATE CALCULATIONS
+      g_emas.Calculate(0); 
       g_liq.Calculate(high, low, open, close, time, total, close[total-1]);
       g_feat.Calculate((ENUM_TIMEFRAMES)_Period, time[total-1], open[total-1], high[total-1], low[total-1], close[total-1], (double)tick[total-1]);
-      
       g_fsm.Calculate(close[total-1], close[total-2], (double)tick[total-1]);
-      g_mtf.Calculate();  // Multitemporal analysis
+      g_mtf.Calculate();  
+      
+      // 2. DRAW VISUALS
       if(ShowDashboard) g_vis.Draw(time[total-1], close[total-1]);
       else g_vis.Clear();
+      
+      // 3. EXPORT DATA
+      if(ExportData) {
+         SBarDataExport data;
+         data.time = time[total-1];
+         data.open = open[total-1];
+         data.high = high[total-1];
+         data.low = low[total-1];
+         data.close = close[total-1];
+         data.volume = (double)tick[total-1];
+         
+         SEMAGroupMetrics mic = g_emas.GetMicroMetrics();
+         SEMAGroupMetrics opr = g_emas.GetOperationalMetrics();
+         SEMAGroupMetrics mac = g_emas.GetMacroMetrics();
+         SFanMetrics fan = g_emas.GetFanMetrics();
+         CFEAT::SResult feat = g_feat.GetResult(); // Use scoped resolution for embedded struct
+         SMultitemporalResult mtf = g_mtf.GetResult();
+         
+         data.microComp = mic.compression;
+         data.microSlope = mic.avgSlope;
+         data.microCurvature = feat.form.curvatureScore;
+         data.operComp = opr.compression;
+         data.operSlope = opr.avgSlope;
+         data.macroSlope = mac.avgSlope;
+         data.biasSlope = g_emas.GetBiasSlope();
+         
+         data.layerSep12 = feat.space.fastMediumGap;
+         data.layerSep23 = feat.space.mediumSlowGap;
+         data.fanBullish = fan.bullishOrder;
+         data.fanBearish = !fan.bullishOrder;
+         
+         data.hasBOS = feat.form.hasBOS;
+         data.hasCHoCH = feat.form.hasCHoCH;
+         data.hasHCH = feat.form.hasHCH;
+         data.isIntentCandle = feat.form.isIntentCandle;
+         data.curvatureScore = feat.form.curvatureScore;
+         data.compressionRatio = feat.form.compressionRatio;
+         
+         data.atZone = feat.space.atZone;
+         data.proximityScore = feat.space.proximityScore;
+         data.activeZoneType = feat.space.activeZoneType;
+         
+         data.velocity = feat.accel.velocity;
+         data.momentum = feat.accel.momentum;
+         data.deltaFlow = feat.accel.deltaFlow;
+         data.rsi = feat.accel.rsi;
+         data.macdHist = feat.accel.macdHist;
+         data.ao = feat.accel.ao;
+         data.ac = feat.accel.ac;
+         data.isInstitutional = feat.accel.isInstitutional;
+         data.isExhausted = feat.accel.isExhausted;
+         
+         data.isKillzone = feat.time.isKillzone;
+         data.isLondonKZ = (StringFind(feat.time.activeSession, "LONDON") >= 0); 
+         data.isNYKZ = (StringFind(feat.time.activeSession, "NY") >= 0); 
+         data.isAgainstH4 = false; // Deprecated but kept for struct
+         data.h4Direction = 0;
+         data.activeSession = feat.time.activeSession;
+         
+         data.marketState = g_fsm.GetStateString();
+         data.compositeScore = feat.compositeScore;
+         
+         data.dominantTrend = mtf.dominantTrend;
+         data.mtfConfluence = mtf.confluenceScore;
+         data.mtfAgainstBias = mtf.isAgainstBias;
+         data.m5Bias = mtf.states[0].bias;
+         data.h1Bias = mtf.states[1].bias;
+         data.h4Bias = mtf.states[2].bias;
+         data.d1Bias = mtf.states[3].bias;
+         
+         g_io.ExportFeatures(data);
+      }
    }
    
    return total;

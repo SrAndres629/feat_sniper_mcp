@@ -1,6 +1,6 @@
 //+------------------------------------------------------------------+
 //|                                                   CVisuals.mqh |
-//|                    Visualization Engine - Dashboard + Levels      |
+//|             FEAT SNIPER HUD - Professional Dashboard              |
 //+------------------------------------------------------------------+
 #ifndef CVISUALS_MQH
 #define CVISUALS_MQH
@@ -14,193 +14,142 @@ class CVisuals {
 private:
    string         m_prefix;
    long           m_chart;
-   CEMAs*         m_ptrEmas;
-   CFEAT*         m_ptrFeat;
-   CLiquidity*    m_ptrLiq;
-   CFSM*          m_ptrFsm;
-   
-   bool           m_showEMAs;
+   CEMAs* m_ptrEmas;
+   CFEAT* m_ptrFeat;
+   CLiquidity* m_ptrLiq;
+   CFSM* m_ptrFsm;
    bool           m_showDashboard;
-   bool           m_showLiquidity;
-   bool           m_showStructure;
 
-   void           CreateLabel(string name, int x, int y, string text, color clr, int size);
-   void           CreateHLine(string name, double price, color clr, ENUM_LINE_STYLE style, int width);
-   void           CreateBox(string name, datetime t1, double p1, datetime t2, double p2, color clr, int width, ENUM_LINE_STYLE style, bool fill);
-   void           CreateArrow(string name, datetime t, double price, int code, color clr);
-
+   // Helpers gráficos
+   void CreateRect(string name, int x, int y, int w, int h, color bg, color border);
+   void CreateText(string name, int x, int y, string text, color clr, int size, string font="Consolas", bool bold=false);
+   
 public:
    CVisuals();
    ~CVisuals() { Clear(); }
-
    void Init(string prefix, long chartID) { m_prefix = prefix; m_chart = chartID; }
    void SetComponents(CEMAs* e, CFEAT* f, CLiquidity* l, CFSM* sm) { m_ptrEmas = e; m_ptrFeat = f; m_ptrLiq = l; m_ptrFsm = sm; }
-   void SetDrawOptions(bool emas, bool dash, bool liq, bool structr) { m_showEMAs = emas; m_showDashboard = dash; m_showLiquidity = liq; m_showStructure = structr; }
-
+   void SetDrawOptions(bool emas, bool dash, bool liq, bool structr) { m_showDashboard = dash; }
    void Draw(datetime t, double close);
    void Clear();
 };
 
-CVisuals::CVisuals() : m_ptrEmas(NULL), m_ptrFeat(NULL), m_ptrLiq(NULL), m_ptrFsm(NULL), m_showEMAs(true), m_showDashboard(true), m_showLiquidity(true), m_showStructure(true) {}
+CVisuals::CVisuals() : m_ptrEmas(NULL), m_ptrFeat(NULL), m_ptrLiq(NULL), m_ptrFsm(NULL), m_showDashboard(true) {}
 
 void CVisuals::Clear() { ObjectsDeleteAll(m_chart, m_prefix); }
 
 void CVisuals::Draw(datetime t, double close) {
-   ObjectsDeleteAll(m_chart, m_prefix);
-   int x = 20, y = 30, h = 18;
+   // Clear previous HUD elements
+   ObjectsDeleteAll(m_chart, m_prefix + "HUD");
 
-   if(m_showDashboard && m_ptrFsm != NULL && m_ptrEmas != NULL && m_ptrFeat != NULL && m_ptrLiq != NULL) {
-      CreateLabel(m_prefix+"Title", x, y, "FEAT SNIPER V3 - INSTITUTIONAL", clrGold, 10); y += h + 5;
-      
-      // Context: Premium/Discount
-      SLiquidityContext lctx = m_ptrLiq.GetContext();
-      string pdLabel = "EQUILIBRIUM";
-      color pdClr = clrSilver;
-      if(lctx.isPremium) { pdLabel = "PREMIUM"; pdClr = clrTomato; }
-      if(lctx.isDiscount) { pdLabel = "DISCOUNT"; pdClr = clrLime; }
-      CreateLabel(m_prefix+"PD_Status", x, y, "CONTEXT: " + pdLabel, pdClr, 9); y += h;
-      
-      // State
-      CreateLabel(m_prefix+"State", x, y, "STATE: " + m_ptrFsm.GetStateString(), clrDodgerBlue, 8); y += h;
-      
-      // Time Module
-      STimeMetrics tm = m_ptrFeat.GetTime();
-      string kzLabel = tm.isKillzone ? (tm.isLondonKZ ? "[LONDON KZ]" : "[NY KZ]") : "";
-      color kzClr = tm.isKillzone ? clrCyan : clrGray;
-      CreateLabel(m_prefix+"Session", x, y, "SESSION: " + tm.activeSession + " " + kzLabel, kzClr, 8); y += h;
-      
-      // Acceleration
-      SAccelMetrics acm = m_ptrFeat.GetAccel();
-      color accelClr = acm.isInstitutional ? clrCyan : (acm.velocity > 1.0 ? clrLime : clrWhite);
-      CreateLabel(m_prefix+"Accel", x, y, StringFormat("ACCEL: %.2f | Vel: %.2f", acm.momentum, acm.velocity), accelClr, 8); y += h;
-      
-      // Alerts
-      if(acm.isInstitutional) {
-         CreateLabel(m_prefix+"Intent", x, y, ">> INTENCION INSTITUCIONAL", clrCyan, 9); y += h;
-      }
-      if(acm.isExhausted) {
-         CreateLabel(m_prefix+"Exhaust", x, y, "!! AGOTAMIENTO DETECTADO", clrOrange, 9); y += h;
-      }
-      
-      // Composite Score
-      double score = m_ptrFeat.GetCompositeScore();
-      color scoreClr = (score > 70) ? clrLime : (score > 40 ? clrYellow : clrRed);
-      CreateLabel(m_prefix+"Score", x, y, StringFormat("SCORE: %.0f/100", score), scoreClr, 9); y += h + 5;
-      
-      // Equilibrium Line
-      if(lctx.equilibrium > 0) {
-         CreateHLine(m_prefix+"EQ", lctx.equilibrium, clrDarkGray, STYLE_DASHDOT, 1);
-      }
-   }
+   if(!m_showDashboard || m_ptrFeat == NULL) return;
 
-   if(m_ptrLiq != NULL) {
-      // Structure Lines (BOS/CHoCH)
-      if(m_showStructure) {
-         int sCount = m_ptrLiq.GetStructureCount();
-         for(int i = 0; i < sCount; i++) {
-            SStructureEvent e = m_ptrLiq.GetStructureEvent(i);
-            if(e.active) {
-               string name = m_prefix + "STRUCT_" + IntegerToString(i);
-               color c = e.isBullish ? clrLime : clrRed;
-               ENUM_LINE_STYLE st = (e.type == STRUCT_BOS) ? STYLE_SOLID : STYLE_DASH;
-               ObjectCreate(m_chart, name, OBJ_TREND, 0, e.time, e.price, TimeCurrent(), e.price);
-               ObjectSetInteger(m_chart, name, OBJPROP_COLOR, c);
-               ObjectSetInteger(m_chart, name, OBJPROP_STYLE, st);
-               ObjectSetInteger(m_chart, name, OBJPROP_RAY_RIGHT, true);
-               
-               string lblName = name + "_LBL";
-               ObjectCreate(m_chart, lblName, OBJ_TEXT, 0, e.time, e.price);
-               ObjectSetString(m_chart, lblName, OBJPROP_TEXT, (e.type == STRUCT_BOS ? " BOS" : " CHoCH"));
-               ObjectSetInteger(m_chart, lblName, OBJPROP_COLOR, c);
-               ObjectSetInteger(m_chart, lblName, OBJPROP_FONTSIZE, 7);
-            }
-         }
-         
-         // Patterns (M/W/GC)
-         int pCount = m_ptrLiq.GetPatternCount();
-         for(int i = 0; i < pCount; i++) {
-            SPatternEvent p = m_ptrLiq.GetPatternEvent(i);
-            string name = m_prefix + "PAT_" + IntegerToString(i);
-            color c = p.isBullish ? clrLime : clrRed;
-            int code = p.isBullish ? 233 : 234; // Arrow up/down
-            CreateArrow(name, p.time, p.price, code, c);
-            
-            string lblName = name + "_LBL";
-            ObjectCreate(m_chart, lblName, OBJ_TEXT, 0, p.time, p.price);
-            ObjectSetString(m_chart, lblName, OBJPROP_TEXT, " " + p.description);
-            ObjectSetInteger(m_chart, lblName, OBJPROP_COLOR, c);
-            ObjectSetInteger(m_chart, lblName, OBJPROP_FONTSIZE, 8);
-         }
-      }
-      
-      // Zones
-      if(m_showLiquidity) {
-         int zCount = m_ptrLiq.GetZoneCount();
-         for(int i = 0; i < zCount; i++) {
-            SInstitutionalZone z = m_ptrLiq.GetZone(i);
-            if(z.mitigated) continue;
-            string name = m_prefix + "ZONE_" + IntegerToString(i);
-            color clrZone = clrDimGray;
-            if(z.type == ZONE_FVG) clrZone = z.isBullish ? C'30,50,30' : C'50,30,30';
-            if(z.type == ZONE_OB) clrZone = z.isBullish ? C'0,100,0' : C'100,0,0';
-            if(z.type == ZONE_CONFLUENCE) clrZone = clrFuchsia;
-            if(z.type == ZONE_PC) clrZone = clrGoldenrod;
-            
-            CreateBox(name, z.time, z.top, TimeCurrent(), z.bottom, clrZone, 1, STYLE_SOLID, true);
-            
-            string lblName = name + "_LBL";
-            ObjectCreate(m_chart, lblName, OBJ_TEXT, 0, z.time, z.top);
-            ObjectSetString(m_chart, lblName, OBJPROP_TEXT, " " + z.label);
-            ObjectSetInteger(m_chart, lblName, OBJPROP_COLOR, clrWhite);
-            ObjectSetInteger(m_chart, lblName, OBJPROP_FONTSIZE, 7);
-         }
-         
-         // Liquidity Levels
-         for(int i=0; i<m_ptrLiq.GetLevelCount(); i++) {
-            SLiquidityLevel lvl = m_ptrLiq.GetLevel(i);
-            if(lvl.mitigated) continue;
-            string name = m_prefix + "LVL_" + IntegerToString(i);
-            color c = (lvl.side==LIQ_ABOVE ? clrOrangeRed : clrMediumSeaGreen);
-            int w = 1;
-            if(lvl.type == LIQ_POOL) { w = 2; c = clrYellow; }
-            CreateHLine(name, lvl.price, c, STYLE_DOT, w);
-         }
-      }
+   // 1. GET INTELLIGENCE
+   SEngineerReport engineer = m_ptrFeat.GetEngineer();
+   STacticianReport tactician = m_ptrFeat.GetTactician();
+   SSniperReport sniper = m_ptrFeat.GetSniper();
+   
+   // 2. LAYOUT CONFIG
+   int startX = 20;
+   int startY = 40;
+   int col1W = 200; 
+   int col2W = 180;
+   int padding = 5;
+   
+   // --- HEADER: SNIPER DECISION ---
+   color headerColor = C'40,40,40';
+   if(sniper.decision == "DISPARAR") {
+      headerColor = (sniper.order.action == "BUY") ? C'0,180,60' : C'220,40,40'; 
+   } else if(sniper.confidence > 50) {
+      headerColor = C'150,120,0'; // Warning/Preparing
    }
    
+   CreateRect(m_prefix+"HUD_HeadBG", startX, startY, col1W+col2W+padding, 40, headerColor, clrBlack);
+   string title = "SNIPER: " + sniper.decision + " (" + DoubleToString(sniper.confidence, 0) + "%)";
+   if(sniper.decision == "DISPARAR") title += " -> " + sniper.order.action;
+   
+   CreateText(m_prefix+"HUD_Title", startX + (col1W+col2W)/2, startY+20, title, clrWhite, 12, "Impact", true);
+
+   // --- COLUMN 1: QUANTITATIVE ENGINEER (Physics) ---
+   int y = startY + 45;
+   CreateRect(m_prefix+"HUD_Col1BG", startX, y, col1W, 160, C'20,20,20', C'60,60,60');
+   CreateText(m_prefix+"HUD_L_Eng", startX+5, y+5, "INGENIERO CUANTITATIVO", clrGold, 9, "Arial", true);
+   
+   y += 20;
+   CreateText(m_prefix+"HUD_Trend", startX+5, y, "Vector: " + engineer.trend, clrWhite, 8);
+   y += 15;
+   CreateText(m_prefix+"HUD_Pres", startX+5, y, "Presion: " + engineer.pressure, clrSilver, 8);
+   y += 15;
+   CreateText(m_prefix+"HUD_RSI", startX+5, y, "RSI: " + engineer.rsiState, clrWhite, 8);
+   y += 15;
+   CreateText(m_prefix+"HUD_Path", startX+5, y, "Ruta: " + engineer.criticalPath, clrAqua, 8);
+   y += 15;
+   CreateText(m_prefix+"HUD_Energy", startX+5, y, "Energia: " + engineer.energyState, clrWhite, 8);
+   y += 15;
+   CreateText(m_prefix+"HUD_DFlow", startX+5, y, "DeltaFlow: " + DoubleToString(sniper.deltaFlow, 2), (sniper.deltaFlow>0?clrLime:clrRed), 8);
+   y += 15;
+   CreateText(m_prefix+"HUD_Ord", startX+5, y, "ORDEN: " + engineer.engineerOrder, clrGold, 8, "Consolas", true);
+
+   // --- COLUMN 2: TACTICIAN (Space-Time) ---
+   int x2 = startX + col1W + padding;
+   y = startY + 45;
+   CreateRect(m_prefix+"HUD_Col2BG", x2, y, col2W, 160, C'20,20,20', C'60,60,60');
+   CreateText(m_prefix+"HUD_L_Tac", x2+5, y+5, "TACTICO (TIEMPO-ESPACIO)", clrSilver, 9, "Arial", true);
+   
+   y += 20;
+   color timeColor = tactician.isOperableTime ? clrLime : clrRed;
+   CreateText(m_prefix+"HUD_Time", x2+5, y, "Hora: " + tactician.currentTime + " (" + EnumToString(tactician.sessionState)+")", timeColor, 8);
+   y += 15;
+   CreateText(m_prefix+"HUD_POI", x2+5, y, "POI: " + tactician.poiDetected, (tactician.poiDetected!="NONE"?clrGold:clrSilver), 8);
+   y += 15;
+   CreateText(m_prefix+"HUD_Loc", x2+5, y, "Ubic: " + tactician.locationRelative, clrWhite, 8);
+   y += 15;
+   CreateText(m_prefix+"HUD_Sep", x2+5, y, "Separacion: " + DoubleToString(tactician.layerSeparation, 5), clrSilver, 8);
+   y += 30;
+   CreateText(m_prefix+"HUD_Act", x2+5, y, "VERDICTO: " + tactician.action, (tactician.action=="BUSCAR_GATILLO"?clrLime:clrWhite), 9, "Arial", true);
+
+   // --- FOOTER: DIAGNOSIS ---
+   y = startY + 45 + 160 + padding;
+   CreateRect(m_prefix+"HUD_FootBG", startX, y, col1W+col2W+padding, 25, C'10,10,10', C'60,60,60');
+   CreateText(m_prefix+"HUD_Diag", startX+5, y+5, "DIAGNOSTICO: " + sniper.finalReason, clrWhite, 8);
+   
+   // --- SNIPER TRIGGER PANEL (IF SHOOT) ---
+   if(sniper.decision == "DISPARAR") {
+      y += 30;
+      CreateRect(m_prefix+"HUD_SnipBG", startX, y, col1W+col2W+padding, 40, C'0,50,0', clrLime);
+      string trade = "ENTRY: " + DoubleToString(sniper.order.entryPrice, _Digits) + 
+                     "  SL: " + DoubleToString(sniper.order.slPrice, _Digits) + 
+                     "  TP: " + DoubleToString(sniper.order.tpPrice, _Digits);
+      CreateText(m_prefix+"HUD_Trade", startX+200, y+20, trade, clrWhite, 9, "Consolas", true);
+   }
+
    ChartRedraw(m_chart);
 }
 
-void CVisuals::CreateLabel(string name, int x, int y, string text, color clr, int size) {
+// --- HELPERS ---
+void CVisuals::CreateRect(string name, int x, int y, int w, int h, color bg, color border) {
+   ObjectCreate(m_chart, name, OBJ_RECTANGLE_LABEL, 0, 0, 0);
+   ObjectSetInteger(m_chart, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(m_chart, name, OBJPROP_YDISTANCE, y);
+   ObjectSetInteger(m_chart, name, OBJPROP_XSIZE, w);
+   ObjectSetInteger(m_chart, name, OBJPROP_YSIZE, h);
+   ObjectSetInteger(m_chart, name, OBJPROP_BGCOLOR, bg);
+   ObjectSetInteger(m_chart, name, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(m_chart, name, OBJPROP_COLOR, border);
+   ObjectSetInteger(m_chart, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   ObjectSetInteger(m_chart, name, OBJPROP_BACK, false);
+}
+
+void CVisuals::CreateText(string name, int x, int y, string text, color clr, int size, string font, bool bold) {
    ObjectCreate(m_chart, name, OBJ_LABEL, 0, 0, 0);
    ObjectSetInteger(m_chart, name, OBJPROP_XDISTANCE, x);
    ObjectSetInteger(m_chart, name, OBJPROP_YDISTANCE, y);
    ObjectSetString(m_chart, name, OBJPROP_TEXT, text);
    ObjectSetInteger(m_chart, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(m_chart, name, OBJPROP_FONTSIZE, size);
+   ObjectSetString(m_chart, name, OBJPROP_FONT, font);
+   ObjectSetInteger(m_chart, name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   if(StringFind(name, "Title") >= 0 || StringFind(name, "Trade") >= 0)
+       ObjectSetInteger(m_chart, name, OBJPROP_ANCHOR, ANCHOR_CENTER);
 }
-
-void CVisuals::CreateHLine(string name, double price, color clr, ENUM_LINE_STYLE style, int width) {
-   ObjectCreate(m_chart, name, OBJ_HLINE, 0, 0, price);
-   ObjectSetInteger(m_chart, name, OBJPROP_COLOR, clr);
-   ObjectSetInteger(m_chart, name, OBJPROP_STYLE, style);
-   ObjectSetInteger(m_chart, name, OBJPROP_WIDTH, width);
-}
-
-void CVisuals::CreateBox(string name, datetime t1, double p1, datetime t2, double p2, color clr, int width, ENUM_LINE_STYLE style, bool fill) {
-   ObjectCreate(m_chart, name, OBJ_RECTANGLE, 0, t1, p1, t2, p2);
-   ObjectSetInteger(m_chart, name, OBJPROP_COLOR, clr);
-   ObjectSetInteger(m_chart, name, OBJPROP_WIDTH, width);
-   ObjectSetInteger(m_chart, name, OBJPROP_STYLE, style);
-   ObjectSetInteger(m_chart, name, OBJPROP_FILL, fill);
-   ObjectSetInteger(m_chart, name, OBJPROP_BACK, true);
-}
-
-void CVisuals::CreateArrow(string name, datetime t, double price, int code, color clr) {
-   ObjectCreate(m_chart, name, OBJ_ARROW, 0, t, price);
-   ObjectSetInteger(m_chart, name, OBJPROP_ARROWCODE, code);
-   ObjectSetInteger(m_chart, name, OBJPROP_COLOR, clr);
-   ObjectSetInteger(m_chart, name, OBJPROP_WIDTH, 2);
-}
-
 #endif

@@ -1,0 +1,16 @@
+FEAT_Sniper_Master_Core/
+.venv/
+__pycache__/
+.git/
+*.log
+*.mq5
+*.mqh
+*.ex5
+*.ps1
+*.bat
+.env
+Dockerfile
+.dockerignore
+implementation_plan.md
+task.md
+walkthrough.md

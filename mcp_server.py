@@ -1,32 +1,40 @@
-"""
-MT5 Neural Sentinel - Official MCP Server
-=========================================
-Exhibe las herramientas de trading de MT5 directamente a clientes MCP (Claude Desktop, Cursor, etc.)
-utilizando la infraestructura robusta de la aplicación 'app'.
-"""
-
 import logging
+import sys
 from fastmcp import FastMCP
-import MetaTrader5 as mt5
+from contextlib import asynccontextmanager
+
+# Configuración de Logging CRÍTICA para MCP
+# Todo log debe ir a stderr para no romper el protocolo JSON-RPC en stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stderr
+)
+logger = logging.getLogger("MT5_MCP_Server")
+
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    mt5 = None
+    logger.warning("MetaTrader5 module not found found. Running in Linux/Docker mode? Some local-only features will be disabled.")
+
 
 # Importar lógica de negocio de la app
 from app.core.mt5_conn import mt5_conn
-from app.skills import market, vision, execution, trade_mgmt, indicators, history, calendar, quant_coder, custom_loader
-from app.models.schemas import (
-    MarketDataRequest, TradeOrderRequest, PanoramaRequest, 
-    VolatilityRequest, PositionManageRequest, IndicatorRequest,
-    HistoryRequest, CalendarRequest, MQL5CodeRequest
+from app.skills import (
+    market, vision, execution, trade_mgmt, 
+    indicators, history, calendar, 
+    quant_coder, custom_loader,
+    tester, unified_model, remote_compute # Nuevos módulos
 )
-
-# Configuración de Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("MT5_MCP_Server")
-
-from contextlib import asynccontextmanager
+from app.models.schemas import (
+    MarketDataRequest, TradeOrderRequest, PositionManageRequest, 
+    IndicatorRequest, HistoryRequest, CalendarRequest, MQL5CodeRequest
+)
 
 from app.core.zmq_bridge import zmq_bridge
 from app.skills.advanced_analytics import advanced_analytics
-from app.core.observability import obs_engine
+from app.services.supabase_sync import supabase_sync
 
 @asynccontextmanager
 async def app_lifespan(server: FastMCP):
@@ -37,7 +45,9 @@ async def app_lifespan(server: FastMCP):
     # Iniciar ZMQ Bridge para Streaming de baja latencia
     async def on_signal(data):
         logger.info(f"Señal recibida vía ZMQ: {data}")
-        # Aquí se podrían disparar notificaciones o lógicas automáticas
+        # Sincronizar con la nube de forma asíncrona (Fire & Forget)
+        import asyncio
+        asyncio.create_task(supabase_sync.log_signal(data))
         
     await zmq_bridge.start(on_signal)
     
@@ -48,137 +58,128 @@ async def app_lifespan(server: FastMCP):
         await zmq_bridge.stop()
         await mt5_conn.shutdown()
 
-# Inicializar FastMCP con Lifespan
+# Inicializar FastMCP
 mcp = FastMCP("MT5_Neural_Sentinel", lifespan=app_lifespan)
 
 # Registrar Skills de Indicadores Propios
 custom_loader.register_custom_skills(mcp)
 
-# =============================================================================
-# INSTITUTIONAL SKILLS
-# =============================================================================
-
-@mcp.tool()
-async def skill_ml_shadow_test(symbol: str, model_id: str = "RF_Institutional_V2"):
-    """
-    Ejecuta un modelo en modo sombra (Shadow Testing) para validar performance.
-    """
-    return await advanced_analytics.run_shadow_test(symbol, model_id)
-
-@mcp.tool()
-async def skill_get_sentiment(symbol: str):
-    """
-    Obtiene el sentimiento institucional y riesgo macro para un símbolo.
-    """
-    return await advanced_analytics.get_market_sentiment(symbol)
-
-@mcp.tool()
-async def skill_get_alpha_health():
-    """
-    Reporte de salud del Alpha: Monitoriza el decaimiento del modelo y precisión.
-    """
-    return await advanced_analytics.get_alpha_health_report()
-
-@mcp.tool()
-async def skill_get_latency_metrics():
-    """
-    Devuelve métricas de latencia p90/p99 del bridge MT5.
-    Útil para auditorías de ejecución y detección de slippage.
-    """
-    # En un entorno real, extraeríamos esto de las métricas de Prometheus
-    return {
-        "p50_latency_ms": 12.5,
-        "p90_latency_ms": 45.2,
-        "p99_latency_ms": 120.8,
-        "status": "HEALTHY"
-    }
+# Registrar Skills de Cómputo Remoto (NEXUS)
+remote_compute.register_remote_skills(mcp)
 
 # =============================================================================
-# ASYNC SIGNAL STREAMING (RESOURCES)
-# =============================================================================
-
-@mcp.resource("signals://live")
-async def get_live_signals():
-    """
-    Recurso de streaming continuo que devuelve el estado real de las señales ZMQ.
-    Sustituye el polling por un flujo de datos bajo demanda.
-    """
-    return "Estado del stream ZMQ: ACTIVO. Escuchando señales institucionales..."
-
-# =============================================================================
-# TOOLS EXPOSURE (EXISTING)
+# PILLAR 1: CÓRTEX DE COMPILACIÓN (Code Builder)
 # =============================================================================
 
 @mcp.tool()
-async def get_market_data(symbol: str, timeframe: str = "M5", n_candles: int = 100, output_format: str = "json"):
+async def create_and_compile_indicator(name: str, code: str, compile: bool = True):
     """
-    Obtiene datos históricos de velas (OHLCV).
-    - output_format: 'json' o 'csv' (usar csv para ahorrar tokens).
+    Escribe y compila un nuevo indicador .mq5. 
+    Retorna el log de compilación para auto-corrección.
     """
-    req = MarketDataRequest(symbol=symbol, timeframe=timeframe, n_candles=n_candles, output_format=output_format)
-    return await market.get_candles(req.symbol, req.timeframe, req.n_candles, req.output_format)
+    req = MQL5CodeRequest(name=name, code=code, compile=compile)
+    return await quant_coder.create_native_indicator(req)
+
+# =============================================================================
+# PILLAR 2: OJO DE HALCÓN (Data Bridge)
+# =============================================================================
 
 @mcp.tool()
-async def get_account_status():
-    """Obtiene el estado actual de la cuenta: balance, equidad, margen y profit."""
-    return await market.get_account_metrics()
+async def get_market_snapshot(symbol: str, timeframe: str = "M5"):
+    """
+    Radiografía completa del mercado: Precio, Vela actual, Volatilidad y Cuenta.
+    Ideal para decisiones de alta frecuencia.
+    """
+    return await market.get_market_snapshot(symbol, timeframe)
+
+@mcp.tool()
+async def get_candles(symbol: str, timeframe: str = "M5", n_candles: int = 100):
+    """Obtiene velas históricas (OHLCV)."""
+    return await market.get_candles(symbol, timeframe, n_candles)
 
 @mcp.tool()
 async def get_market_panorama(resize_factor: float = 0.75):
-    """
-    Captura una imagen del terminal MT5 para análisis visual de patrones.
-    """
+    """Captura visual del gráfico."""
     return await vision.capture_panorama(resize_factor=resize_factor)
+
+# =============================================================================
+# PILLAR 3: SIMULADOR DE SOMBRAS (Backtest Automator)
+# =============================================================================
+
+@mcp.tool()
+async def run_shadow_backtest(
+    expert_name: str, 
+    symbol: str, 
+    period: str = "H1", 
+    days: int = 30,
+    deposit: int = 10000
+):
+    """
+    Ejecuta una prueba de estrategia en segundo plano usando el Strategy Tester de MT5.
+    """
+    # Calcular fechas
+    import datetime
+    end_date = datetime.datetime.now()
+    start_date = end_date - datetime.timedelta(days=days)
+    
+    return await tester.run_strategy_test(
+        expert_name=expert_name,
+        symbol=symbol,
+        period=period,
+        date_from=start_date.strftime("%Y.%m.%d"),
+        date_to=end_date.strftime("%Y.%m.%d"),
+        deposit=deposit
+    )
+
+# =============================================================================
+# PILLAR 4: INYECCIÓN ESTRATÉGICA (Unified Model)
+# =============================================================================
+
+@mcp.tool()
+async def query_unified_brain(sql_query: str):
+    """
+    Consulta la base de datos de conocimiento unificado (Unified Model).
+    Solo permite SELECT.
+    """
+    return await unified_model.unified_db.query_custom_sql(sql_query)
+
+# =============================================================================
+# EXECUTION & MANAGEMENT SKILLS
+# =============================================================================
 
 @mcp.tool()
 async def execute_trade(symbol: str, action: str, volume: float, price: float = None, sl: float = None, tp: float = None, comment: str = "MCP_Order"):
-    """
-    Ejecuta una orden de trading.
-    - action: BUY, SELL, BUY_LIMIT, SELL_LIMIT, BUY_STOP, SELL_STOP.
-    - price: Requerido para órdenes LIMIT/STOP.
-    """
+    """Ejecuta órdenes: BUY, SELL, LIMIT, STOP."""
     req = TradeOrderRequest(symbol=symbol, action=action, volume=volume, price=price, sl=sl, tp=tp, comment=comment)
     result = await execution.send_order(req)
     return result.dict()
 
 @mcp.tool()
-async def manage_trade(ticket: int, action: str, volume: float = None, sl: float = None, tp: float = None, price: float = None):
-    """
-    Gestiona una posición o orden existente.
-    - action: CLOSE, MODIFY, DELETE (delete es para órdenes pendientes).
-    """
-    req = PositionManageRequest(ticket=ticket, action=action, volume=volume, sl=sl, tp=tp, price=price)
+async def manage_trade(ticket: int, action: str, volume: float = None, sl: float = None, tp: float = None):
+    """Gestiona posiciones: CLOSE, MODIFY_SL_TP, DELETE."""
+    req = PositionManageRequest(ticket=ticket, action=action, volume=volume, sl=sl, tp=tp)
     result = await trade_mgmt.manage_position(req)
     return result.dict()
 
 @mcp.tool()
-async def create_mql5_indicator(name: str, code: str, compile: bool = True):
-    """
-    Escribe y compila un nuevo indicador nativo (.mq5) en MetaTrader 5.
-    Permite a la IA crear sus propias herramientas de análisis visual.
-    """
-    req = MQL5CodeRequest(name=name, code=code, compile=compile)
-    return await quant_coder.create_native_indicator(req)
+async def get_account_status():
+    """Estado financiero de la cuenta."""
+    return await market.get_account_metrics()
 
 @mcp.tool()
-async def get_technical_indicator(symbol: str, indicator: str, timeframe: str = "M15", period: int = 14):
-    """
-    Calcula indicadores técnicos: RSI, MACD, MA (Moving Average), ATR, BOLLINGER.
-    """
-    req = IndicatorRequest(symbol=symbol, indicator=indicator, timeframe=timeframe, period=period)
-    return await indicators.get_technical_indicator(req)
-
-@mcp.tool()
-async def get_trade_performance(days: int = 30):
-    """Analiza el historial de trading y devuelve KPIs: Win Rate, Profit Factor, etc."""
-    req = HistoryRequest(days=days)
-    return await history.get_trade_history(req)
-
-@mcp.tool()
-async def get_economic_calendar(currency: str = None, importance: str = None, days_forward: int = 1):
-    """Consulta eventos económicos próximos. importance: LOW, MEDIUM, HIGH."""
-    req = CalendarRequest(currency=currency, importance=importance, days_forward=days_forward)
+async def get_economic_calendar():
+    """Eventos económicos de alto impacto próximos."""
+    req = CalendarRequest(importance="HIGH", days_forward=1)
     return await calendar.get_economic_calendar(req)
+
+# =============================================================================
+# SYSTEM HEALTH
+# =============================================================================
+
+@mcp.resource("signals://live")
+async def get_live_signals():
+    """Stream de señales ZMQ disponibles."""
+    return "Stream Active"
 
 if __name__ == "__main__":
     mcp.run()
