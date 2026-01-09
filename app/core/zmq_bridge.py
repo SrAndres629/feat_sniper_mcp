@@ -12,7 +12,7 @@ class ZMQBridge:
     Puente de ultra-baja latencia usando ZeroMQ.
     Sustituye el polling de archivos CSV por una arquitectura Event-Driven.
     """
-    def __init__(self, host: str = "127.0.0.1", port: int = 5555):
+    def __init__(self, host: str = "0.0.0.0", port: int = 5555):
         self.context = zmq.asyncio.Context()
         self.socket = self.context.socket(zmq.SUB)
         self.addr = f"tcp://{host}:{port}"
@@ -23,11 +23,16 @@ class ZMQBridge:
     async def start(self, callback: Callable):
         """Inicia el suscriptor ZeroMQ."""
         self._callback = callback
-        self.socket.connect(self.addr)
-        self.socket.subscribe("") # Suscribirse a todos los mensajes
+        try:
+            self.socket.bind(self.addr)
+            self.socket.subscribe("") # Suscribirse a todos los mensajes
+            logger.info(f"ZMQ Bridge ESCUCHANDO en {self.addr} (BIND mode)")
+        except Exception as e:
+            logger.error(f"Error haciendo BIND en ZMQ: {e}")
+            raise e
+        
         self.is_running = True
         self._task = asyncio.create_task(self._listen())
-        logger.info(f"ZMQ Bridge conectado a {self.addr} (SUB mode)")
 
     async def stop(self):
         """Detiene el bridge."""

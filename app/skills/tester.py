@@ -5,7 +5,11 @@ import configparser
 from typing import Dict, Any, Optional
 from app.core.config import settings
 from app.core.mt5_conn import mt5_conn
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    from unittest.mock import MagicMock
+    mt5 = MagicMock()
 
 logger = logging.getLogger("MT5_Bridge.Skills.Tester")
 

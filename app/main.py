@@ -1,5 +1,9 @@
 import logging
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    from unittest.mock import MagicMock
+    mt5 = MagicMock()
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse

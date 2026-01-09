@@ -1,5 +1,9 @@
 import logging
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    from unittest.mock import MagicMock
+    mt5 = MagicMock()
 from typing import Optional, Tuple
 from app.core.mt5_conn import mt5_conn
 from app.core.config import settings

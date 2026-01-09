@@ -2,7 +2,11 @@ import logging
 import os
 import subprocess
 from typing import Dict, Any
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    from unittest.mock import MagicMock
+    mt5 = MagicMock()
 from app.core.mt5_conn import mt5_conn
 from app.models.schemas import MQL5CodeRequest
 from app.core.config import settings

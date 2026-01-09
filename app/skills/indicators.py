@@ -1,6 +1,10 @@
 import logging
 from typing import Dict, Any, List, Optional
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    from unittest.mock import MagicMock
+    mt5 = MagicMock()
 import pandas as pd
 import numpy as np
 from app.core.mt5_conn import mt5_conn

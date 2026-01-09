@@ -116,8 +116,8 @@ bool CInterop::InitZMQ() {
       return false;
    }
 
-   // Create PUSH Socket (Fire & Forget to Python)
-   m_socket = new Socket(*m_context, ZMQ_PUSH);
+   // Create PUB Socket (Streaming to Python)
+   m_socket = new Socket(*m_context, ZMQ_PUB);
    if(m_socket == NULL) {
       Print("CInterop: Failed to create ZMQ Socket");
       return false;

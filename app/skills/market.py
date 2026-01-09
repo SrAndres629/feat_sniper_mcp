@@ -2,7 +2,11 @@ import logging
 import time
 from typing import Dict, List, Optional, Any
 import pandas as pd
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    from unittest.mock import MagicMock
+    mt5 = MagicMock()
 from app.core.mt5_conn import mt5_conn
 from app.core.config import settings
 

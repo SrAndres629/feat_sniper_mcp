@@ -1,7 +1,11 @@
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
-import MetaTrader5 as mt5
+try:
+    import MetaTrader5 as mt5
+except ImportError:
+    from unittest.mock import MagicMock
+    mt5 = MagicMock()
 import pandas as pd
 from app.core.mt5_conn import mt5_conn
 from app.models.schemas import CalendarRequest
