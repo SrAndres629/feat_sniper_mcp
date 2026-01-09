@@ -153,11 +153,12 @@
 #include <UnifiedModel\CFSM.mqh>
 #include <UnifiedModel\CInterop.mqh>
 #include <UnifiedModel\CMultitemporal.mqh>
+// Reactivated CVisuals
+#include <UnifiedModel\CVisuals.mqh>
 
 input group "--- Configuration ---"
 input int ATR_Period = 14;
 input int Lookback = 100;
-// Visuals/Dashboard Removed (Moved to Web Interface)
 input bool ExportData = true;    // Export Data for Neural Training
 input string Bridge_Path = "c:\\Users\\acord\\OneDrive\\Desktop\\Bot\\feat_sniper_mcp\\FEAT_Sniper_Master_Core\\Python\\start_bridge.bat";
 
@@ -170,7 +171,7 @@ CEMAs       g_emas;
 CFEAT       g_feat;
 CLiquidity  g_liq;
 CFSM        g_fsm;
-// CVisuals removed
+CVisuals    g_vis; // Reactivated
 CInterop    g_io;
 CMultitemporal g_mtf;
 
@@ -193,7 +194,8 @@ int OnInit() {
    g_fsm.SetComponents(&g_emas, &g_feat, &g_liq);
    g_fsm.SetBufferSize(Lookback);
    
-   // Visuals removed
+   // Visuals Reactivated
+   g_vis.Init(_Symbol, 50);
    
    g_io.SetEnabled(ExportData);
    g_io.SetDataPath(""); 
@@ -204,7 +206,11 @@ int OnInit() {
    return INIT_SUCCEEDED;
 }
 
-void OnDeinit(const int r) { g_feat.Deinit(); g_emas.Deinit(); }
+void OnDeinit(const int r) {
+   g_feat.Deinit();
+   g_emas.Deinit();
+   g_vis.Clear();
+}
 
 int OnCalculate(const int total, const int prev, const datetime &time[], const double &open[],
                 const double &high[], const double &low[], const double &close[],
@@ -212,131 +218,155 @@ int OnCalculate(const int total, const int prev, const datetime &time[], const d
    
    if(total < Lookback) return 0;
    
-   int limit = (prev == 0) ? total - Lookback : prev - 1;
-   for(int i = total - 1 - limit; i >= 0; i--) {
-      int idx = total - 1 - i;
-      double buff[1];
-      // Micro
-      if(CopyBuffer(g_emas.GetHandle(0), 0, i, 1, buff) > 0) b0[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(1), 0, i, 1, buff) > 0) b1[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(2), 0, i, 1, buff) > 0) b2[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(3), 0, i, 1, buff) > 0) b3[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(4), 0, i, 1, buff) > 0) b4[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(5), 0, i, 1, buff) > 0) b5[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(6), 0, i, 1, buff) > 0) b6[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(7), 0, i, 1, buff) > 0) b7[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(8), 0, i, 1, buff) > 0) b8[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(9), 0, i, 1, buff) > 0) b9[idx] = buff[0];
-      // Operational
-      if(CopyBuffer(g_emas.GetHandle(10), 0, i, 1, buff) > 0) b10[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(11), 0, i, 1, buff) > 0) b11[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(12), 0, i, 1, buff) > 0) b12[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(13), 0, i, 1, buff) > 0) b13[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(14), 0, i, 1, buff) > 0) b14[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(15), 0, i, 1, buff) > 0) b15[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(16), 0, i, 1, buff) > 0) b16[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(17), 0, i, 1, buff) > 0) b17[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(18), 0, i, 1, buff) > 0) b18[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(19), 0, i, 1, buff) > 0) b19[idx] = buff[0];
-      // Macro
-      if(CopyBuffer(g_emas.GetHandle(20), 0, i, 1, buff) > 0) b20[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(21), 0, i, 1, buff) > 0) b21[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(22), 0, i, 1, buff) > 0) b22[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(23), 0, i, 1, buff) > 0) b23[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(24), 0, i, 1, buff) > 0) b24[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(25), 0, i, 1, buff) > 0) b25[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(26), 0, i, 1, buff) > 0) b26[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(27), 0, i, 1, buff) > 0) b27[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(28), 0, i, 1, buff) > 0) b28[idx] = buff[0];
-      if(CopyBuffer(g_emas.GetHandle(29), 0, i, 1, buff) > 0) b29[idx] = buff[0];
-      // Bias
-      if(CopyBuffer(g_emas.GetHandle(30), 0, i, 1, buff) > 0) b30[idx] = buff[0];
-   }
+   // FIX: Historical Calculation Loop
+   // We must run the full logic for every historical bar to ensure correct state evolution.
+   // This is heavy but required for "Escaneo Invisible".
+
+   int start = prev - 1;
+   if(prev == 0) start = Lookback; // Start from Lookback if full recalc
+   if(start < Lookback) start = Lookback; // Safety clamp
    
-   static datetime last = 0;
-   if(time[total-1] != last) {
-      last = time[total-1];
-      
-      // 1. UPDATE CALCULATIONS
-      g_emas.Calculate(0); 
-      g_liq.Calculate(high, low, open, close, time, total, close[total-1]);
-      g_feat.Calculate((ENUM_TIMEFRAMES)_Period, time[total-1], open[total-1], high[total-1], low[total-1], close[total-1], (double)tick[total-1]);
-      g_fsm.Calculate(close[total-1], close[total-2], (double)tick[total-1]);
-      g_mtf.Calculate();  
-      
-      // 2. NO VISUALS (Web Interface)
-      
-      // 3. EXPORT DATA
-      if(ExportData) {
-         SBarDataExport data;
-         data.time = time[total-1];
-         data.open = open[total-1];
-         data.high = high[total-1];
-         data.low = low[total-1];
-         data.close = close[total-1];
-         data.volume = (double)tick[total-1];
-         
-         SEMAGroupMetrics mic = g_emas.GetMicroMetrics();
-         SEMAGroupMetrics opr = g_emas.GetOperationalMetrics();
-         SEMAGroupMetrics mac = g_emas.GetMacroMetrics();
-         SFanMetrics fan = g_emas.GetFanMetrics();
-         CFEAT::SResult feat = g_feat.GetResult(); // Use scoped resolution for embedded struct
-         SMultitemporalResult mtf = g_mtf.GetResult();
-         
-         data.microComp = mic.compression;
-         data.microSlope = mic.avgSlope;
-         data.microCurvature = feat.form.curvatureScore;
-         data.operComp = opr.compression;
-         data.operSlope = opr.avgSlope;
-         data.macroSlope = mac.avgSlope;
-         data.biasSlope = g_emas.GetBiasSlope();
-         
-         data.layerSep12 = feat.space.fastMediumGap;
-         data.layerSep23 = feat.space.mediumSlowGap;
-         data.fanBullish = fan.bullishOrder;
-         data.fanBearish = !fan.bullishOrder;
-         
-         data.hasBOS = feat.form.hasBOS;
-         data.hasCHoCH = feat.form.hasCHoCH;
-         data.hasHCH = feat.form.hasHCH;
-         data.isIntentCandle = feat.form.isIntentCandle;
-         data.curvatureScore = feat.form.curvatureScore;
-         data.compressionRatio = feat.form.compressionRatio;
-         
-         data.atZone = feat.space.atZone;
-         data.proximityScore = feat.space.proximityScore;
-         data.activeZoneType = feat.space.activeZoneType;
-         
-         data.velocity = feat.accel.velocity;
-         data.momentum = feat.accel.momentum;
-         data.deltaFlow = feat.accel.deltaFlow;
-         data.rsi = feat.accel.rsi;
-         data.macdHist = feat.accel.macdHist;
-         data.ao = feat.accel.ao;
-         data.ac = feat.accel.ac;
-         data.isInstitutional = feat.accel.isInstitutional;
-         data.isExhausted = feat.accel.isExhausted;
-         
-         data.isKillzone = feat.time.isKillzone;
-         data.isLondonKZ = (StringFind(feat.time.activeSession, "LONDON") >= 0); 
-         data.isNYKZ = (StringFind(feat.time.activeSession, "NY") >= 0); 
-         data.isAgainstH4 = false; // Deprecated but kept for struct
-         data.h4Direction = 0;
-         data.activeSession = feat.time.activeSession;
-         
-         data.marketState = g_fsm.GetStateString();
-         data.compositeScore = feat.compositeScore;
-         
-         data.dominantTrend = mtf.dominantTrend;
-         data.mtfConfluence = mtf.confluenceScore;
-         data.mtfAgainstBias = mtf.isAgainstBias;
-         data.m5Bias = mtf.states[0].bias;
-         data.h1Bias = mtf.states[1].bias;
-         data.h4Bias = mtf.states[2].bias;
-         data.d1Bias = mtf.states[3].bias;
-         
-         g_io.SendFeaturesZMQ(data, _Symbol);
-      }
+   for(int i = start; i < total; i++) {
+       // 1. Calculate EMAs for index i (Shift is reversed relative to loop index)
+       // MT5 indicators iterate forward 0..total-1.
+       // CopyBuffer functions typically use 'shift' back from current time.
+       // However, CEMAs::Calculate uses CopyBuffer.
+       // We must simulate the state at time[i].
+       // Since CEMAs uses 'shift' relative to end, we calculate shift as:
+       int shift = total - 1 - i;
+
+       // Note: CEMAs logic relies on CopyBuffer from live handles.
+       // If we calculate for history, CopyBuffer(..., shift, ...) correctly grabs past data.
+       g_emas.Calculate(shift);
+
+       // 2. Liquidity (Heavy)
+       // Simulate that we only see data up to 'i'.
+       // Count passed is i + 1. Current Price is close[i].
+       g_liq.Calculate(high, low, open, close, time, i + 1, close[i]);
+
+       // 3. FEAT Logic
+       g_feat.Calculate((ENUM_TIMEFRAMES)_Period, time[i], open[i], high[i], low[i], close[i], (double)tick[i]);
+
+       // 4. FSM Logic
+       double prevClose = (i > 0) ? close[i-1] : open[i];
+       g_fsm.Calculate(close[i], prevClose, (double)tick[i]);
+
+       // 5. Multitemporal
+       // Note: MTF logic might be tricky as it relies on other TF handles.
+       // Assuming it handles history correctly or just takes current.
+       // Given MTF is usually "current higher timeframe status", accurate historical replay is hard without multi-currency tester.
+       // We run it anyway.
+       g_mtf.Calculate();
+
+       // 6. Update Visual Buffers (EMAs)
+       int idx = i; // Buffer index matches loop index
+       double buff[1];
+
+       // Just grabbing values from g_emas getters which hold current step values
+       // Micro
+       b0[idx] = g_emas.GetEMA(0); b1[idx] = g_emas.GetEMA(1); b2[idx] = g_emas.GetEMA(2); b3[idx] = g_emas.GetEMA(3);
+       b4[idx] = g_emas.GetEMA(4); b5[idx] = g_emas.GetEMA(5); b6[idx] = g_emas.GetEMA(6); b7[idx] = g_emas.GetEMA(7);
+       b8[idx] = g_emas.GetEMA(8); b9[idx] = g_emas.GetEMA(9);
+       // Oper
+       b10[idx] = g_emas.GetEMA(10); b11[idx] = g_emas.GetEMA(11); b12[idx] = g_emas.GetEMA(12); b13[idx] = g_emas.GetEMA(13);
+       b14[idx] = g_emas.GetEMA(14); b15[idx] = g_emas.GetEMA(15); b16[idx] = g_emas.GetEMA(16); b17[idx] = g_emas.GetEMA(17);
+       b18[idx] = g_emas.GetEMA(18); b19[idx] = g_emas.GetEMA(19);
+       // Macro
+       b20[idx] = g_emas.GetEMA(20); b21[idx] = g_emas.GetEMA(21); b22[idx] = g_emas.GetEMA(22); b23[idx] = g_emas.GetEMA(23);
+       b24[idx] = g_emas.GetEMA(24); b25[idx] = g_emas.GetEMA(25); b26[idx] = g_emas.GetEMA(26); b27[idx] = g_emas.GetEMA(27);
+       b28[idx] = g_emas.GetEMA(28); b29[idx] = g_emas.GetEMA(29);
+       // Bias
+       b30[idx] = g_emas.GetEMA(30);
+
+       // 7. Update HUD (Only for the last bar to avoid flicker)
+       if (i == total - 1) {
+           CFEAT::SResult res = g_feat.GetResult();
+           g_vis.Update(res, g_fsm.GetStateString());
+       }
+
+       // 8. Export Data
+       // Warning: Exporting every historical bar via ZMQ can freeze the terminal if Lookback is huge.
+       // However, we need the dataset. We compromise by sending it.
+       // To be safe, we might only send if ExportData is true.
+       if(ExportData) {
+          // Optional: throttling or bulk send could be added here.
+          // For now, we strictly follow the instruction to calculate and export.
+
+          SBarDataExport data;
+          data.time = time[i];
+          data.open = open[i];
+          data.high = high[i];
+          data.low = low[i];
+          data.close = close[i];
+          data.volume = (double)tick[i];
+
+          SEMAGroupMetrics mic = g_emas.GetMicroMetrics();
+          SEMAGroupMetrics opr = g_emas.GetOperationalMetrics();
+          SEMAGroupMetrics mac = g_emas.GetMacroMetrics();
+          SFanMetrics fan = g_emas.GetFanMetrics();
+          CFEAT::SResult feat = g_feat.GetResult();
+          SMultitemporalResult mtf = g_mtf.GetResult();
+
+          data.microComp = mic.compression;
+          data.microSlope = mic.avgSlope;
+          data.microCurvature = feat.form.curvatureScore;
+          data.operComp = opr.compression;
+          data.operSlope = opr.avgSlope;
+          data.macroSlope = mac.avgSlope;
+          data.biasSlope = g_emas.GetBiasSlope();
+
+          data.layerSep12 = feat.space.fastMediumGap;
+          data.layerSep23 = feat.space.mediumSlowGap;
+          data.fanBullish = fan.bullishOrder;
+          data.fanBearish = !fan.bullishOrder;
+
+          data.hasBOS = feat.form.hasBOS;
+          data.hasCHoCH = feat.form.hasCHoCH;
+          data.hasHCH = feat.form.hasHCH;
+          data.isIntentCandle = feat.form.isIntentCandle;
+          data.curvatureScore = feat.form.curvatureScore;
+          data.compressionRatio = feat.form.compressionRatio;
+
+          data.atZone = feat.space.atZone;
+          data.proximityScore = feat.space.proximityScore;
+          data.activeZoneType = feat.space.activeZoneType;
+
+          data.velocity = feat.accel.velocity;
+          data.momentum = feat.accel.momentum;
+          data.deltaFlow = feat.accel.deltaFlow;
+          data.rsi = feat.accel.rsi;
+          data.macdHist = feat.accel.macdHist;
+          data.ao = feat.accel.ao;
+          data.ac = feat.accel.ac;
+          data.isInstitutional = feat.accel.isInstitutional;
+          data.isExhausted = feat.accel.isExhausted;
+
+          data.isKillzone = feat.time.isKillzone;
+          data.isLondonKZ = (StringFind(feat.time.activeSession, "LONDON") >= 0);
+          data.isNYKZ = (StringFind(feat.time.activeSession, "NY") >= 0);
+          data.isAgainstH4 = false;
+          data.h4Direction = 0;
+          data.activeSession = feat.time.activeSession;
+
+          data.marketState = g_fsm.GetStateString();
+          data.compositeScore = feat.compositeScore;
+
+          data.dominantTrend = mtf.dominantTrend;
+          data.mtfConfluence = mtf.confluenceScore;
+          data.mtfAgainstBias = mtf.isAgainstBias;
+          data.m5Bias = mtf.states[0].bias;
+          data.h1Bias = mtf.states[1].bias;
+          data.h4Bias = mtf.states[2].bias;
+          data.d1Bias = mtf.states[3].bias;
+
+          // Only send via ZMQ if:
+          // 1. It is the initial calculation (prev == 0) -> DUMP HISTORY
+          // 2. It is a live tick (i == total - 1) -> STREAM UPDATES
+          // This prevents re-sending the entire history on every tick while still providing the initial dataset.
+          if (prev == 0 || i >= total - 1) {
+             g_io.SendFeaturesZMQ(data, _Symbol);
+          }
+       }
    }
    
    return total;

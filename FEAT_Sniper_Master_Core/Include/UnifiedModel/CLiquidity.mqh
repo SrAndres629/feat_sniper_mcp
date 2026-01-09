@@ -186,26 +186,37 @@ bool CLiquidity::Init(string symbol, ENUM_TIMEFRAMES tf, int maxLevels, int look
    return true;
 }
 
+// FIX: Removed incorrect clamping of count. Now uses count as the end index.
 bool CLiquidity::Calculate(const double &high[], const double &low[], const double &open[], const double &close[], const datetime &time[], int count, double currentPrice) {
    if(count < 10) return false;
-   int barsToProcess = MathMin(count, m_lookbackBars);
+   // We scan from count-1 backwards, up to Lookback depth.
+
    ArrayResize(m_levels, 0); m_imbalanceCount = 0; m_zoneCount = 0; m_structCount = 0; m_swingCount = 0; m_patternCount = 0;
-   DetectHighsLows(high, low, time, barsToProcess);
-   DetectStructure(high, low, close, time, barsToProcess);
-   DetectPatterns(close, time, barsToProcess);
-   DetectExternalLiquidity(high, low, time, barsToProcess);
-   DetectInternalLiquidity(high, low, close, time, barsToProcess);
-   DetectImbalances(high, low, open, close, time, barsToProcess);
-   DetectInstitutionalZones(open, high, low, close, time, barsToProcess);
+
+   DetectHighsLows(high, low, time, count);
+   DetectStructure(high, low, close, time, count);
+   DetectPatterns(close, time, count);
+   DetectExternalLiquidity(high, low, time, count);
+   DetectInternalLiquidity(high, low, close, time, count);
+   DetectImbalances(high, low, open, close, time, count);
+   DetectInstitutionalZones(open, high, low, close, time, count);
+
    DetectConfluence();
-   UpdateMitigation(high[0], low[0]);
+   // Check mitigation against current candle (count-1)
+   UpdateMitigation(high[count-1], low[count-1]);
    BuildContext(currentPrice);
    return true;
 }
 
+// FIX: All Detect loops now run from (count - OFFSET) down to (count - Lookback)
+// instead of (count - OFFSET) down to 0.
+
 void CLiquidity::DetectHighsLows(const double &high[], const double &low[], const datetime &time[], int count) {
    double lastSH = 0, lastSL = 0, prevSH = 0, prevSL = 0;
-   for(int i = count - 5; i >= 0; i--) {
+   int stop = MathMax(0, count - m_lookbackBars);
+
+   for(int i = count - 3; i >= stop; i--) { // Reduced lookahead offset to 3 (needs i+2)
+      if (i+2 >= count) continue;
       bool isSH = (high[i] > high[i+1] && high[i] > high[i+2] && high[i] > high[i-1] && high[i] > high[i-2]);
       bool isSL = (low[i] < low[i+1] && low[i] < low[i+2] && low[i] < low[i-1] && low[i] < low[i-2]);
       if(isSH) {
@@ -223,7 +234,10 @@ void CLiquidity::DetectHighsLows(const double &high[], const double &low[], cons
 
 void CLiquidity::DetectStructure(const double &high[], const double &low[], const double &close[], const datetime &time[], int count) {
    int lastHighIndex = -1, lastLowIndex = -1; double lastHighPrice = 0, lastLowPrice = DBL_MAX; bool trendBullish = false;
-   for(int i = count - 5; i >= 0; i--) {
+   int stop = MathMax(0, count - m_lookbackBars);
+
+   for(int i = count - 3; i >= stop; i--) {
+      if (i+2 >= count) continue;
       bool isSH = (high[i] > high[i+1] && high[i] > high[i+2] && high[i] > high[i-1] && high[i] > high[i-2]);
       bool isSL = (low[i] < low[i+1] && low[i] < low[i+2] && low[i] < low[i-1] && low[i] < low[i-2]);
       if(isSH) { lastHighIndex = i; lastHighPrice = high[i]; }
@@ -254,7 +268,7 @@ void CLiquidity::DetectStructure(const double &high[], const double &low[], cons
 }
 
 void CLiquidity::DetectPatterns(const double &close[], const datetime &time[], int count) {
-   // GC Pattern from CHoCH
+   // GC Pattern from CHoCH (Logic depends on m_structures which is already built correctly now)
    for(int i = 0; i < m_structCount; i++) {
       if(m_structures[i].type == STRUCT_CHOCH) {
          SPatternEvent p; p.type = PAT_GC; p.time = m_structures[i].time; p.price = m_structures[i].price; p.isBullish = m_structures[i].isBullish; p.description = "GC";
@@ -264,11 +278,7 @@ void CLiquidity::DetectPatterns(const double &close[], const datetime &time[], i
    
    // M/W Pattern Detection from Swing Sequence
    if(m_swingCount >= 4) {
-      // Look at most recent 4 swings
       SSwingPoint s0 = m_swings[0], s1 = m_swings[1], s2 = m_swings[2], s3 = m_swings[3];
-      
-      // M-Pattern (Bearish Double Top): LH after HH sequence
-      // s3=HL, s2=HH, s1=LH(lower than HH), s0=LL or break
       if(s2.type == SWING_HH && s1.type == SWING_LH && s1.price < s2.price * 0.995) {
          SPatternEvent p; p.type = PAT_M; p.time = s1.time; p.price = s2.price; p.isBullish = false;
          p.description = "M-Pattern (Double Top)";
@@ -276,9 +286,6 @@ void CLiquidity::DetectPatterns(const double &close[], const datetime &time[], i
          for(int i=0; i<m_patternCount; i++) if(m_patterns[i].type == PAT_M && m_patterns[i].time == p.time) exists = true;
          if(!exists && m_patternCount < m_maxLevels) m_patterns[m_patternCount++] = p;
       }
-      
-      // W-Pattern (Bullish Double Bottom): HL after LL sequence
-      // s3=LH, s2=LL, s1=HL(higher than LL), s0=HH or break
       if(s2.type == SWING_LL && s1.type == SWING_HL && s1.price > s2.price * 1.005) {
          SPatternEvent p; p.type = PAT_W; p.time = s1.time; p.price = s2.price; p.isBullish = true;
          p.description = "W-Pattern (Double Bottom)";
@@ -290,17 +297,18 @@ void CLiquidity::DetectPatterns(const double &close[], const datetime &time[], i
 }
 
 void CLiquidity::DetectExternalLiquidity(const double &high[], const double &low[], const datetime &time[], int count) {
-   for(int i = 2; i < count - 2; i++) {
+   int stop = MathMax(0, count - m_lookbackBars);
+   for(int i = count - 3; i >= stop; i--) { // i+2 safe check
+      if(i+2 >= count) continue;
+
       if(high[i] > high[i-1] && high[i] > high[i-2] && high[i] > high[i+1] && high[i] > high[i+2]) {
          AddLevel(high[i], LIQ_EXTERNAL, LIQ_ABOVE, time[i], 0.8, "SwingHigh");
-         // Liquidity Pool (Equal Highs)
          for(int j=i-1; j>MathMax(0,i-20); j--) {
             if(MathAbs(high[i]-high[j]) < m_equalThreshold) { AddLevel(high[i], LIQ_POOL, LIQ_ABOVE, time[i], 1.2, "LiquidityPool(EQH)"); break; }
          }
       }
       if(low[i] < low[i-1] && low[i] < low[i-2] && low[i] < low[i+1] && low[i] < low[i+2]) {
          AddLevel(low[i], LIQ_EXTERNAL, LIQ_BELOW, time[i], 0.8, "SwingLow");
-         // Liquidity Pool (Equal Lows)
          for(int j=i-1; j>MathMax(0,i-20); j--) {
             if(MathAbs(low[i]-low[j]) < m_equalThreshold) { AddLevel(low[i], LIQ_POOL, LIQ_BELOW, time[i], 1.2, "LiquidityPool(EQL)"); break; }
          }
@@ -309,14 +317,20 @@ void CLiquidity::DetectExternalLiquidity(const double &high[], const double &low
 }
 
 void CLiquidity::DetectInternalLiquidity(const double &high[], const double &low[], const double &close[], const datetime &time[], int count) {
-   for(int i = 5; i < count - 5; i++) {
+   int stop = MathMax(0, count - m_lookbackBars);
+   for(int i = count - 4; i >= stop; i--) { // i+3 safe
+      if(i+3 >= count) continue;
+
       if(high[i] >= high[i-1] && high[i] >= high[i+1] && high[i] < high[i-3] && high[i] < high[i+3]) AddLevel(high[i], LIQ_INTERNAL, LIQ_ABOVE, time[i], 0.4, "MicroHigh");
       if(low[i] <= low[i-1] && low[i] <= low[i+1] && low[i] > low[i-3] && low[i] > low[i+3]) AddLevel(low[i], LIQ_INTERNAL, LIQ_BELOW, time[i], 0.4, "MicroLow");
    }
 }
 
 void CLiquidity::DetectImbalances(const double &high[], const double &low[], const double &open[], const double &close[], const datetime &time[], int count) {
-   for(int i = 1; i < count - 1; i++) {
+   int stop = MathMax(1, count - m_lookbackBars);
+   for(int i = count - 2; i >= stop; i--) { // i+1 safe
+      if(i+1 >= count) continue;
+
       if(low[i-1] > high[i+1] && (low[i-1]-high[i+1]) > m_atr*m_fvgMinSize) {
          SImbalance imb; imb.high = low[i-1]; imb.low = high[i+1]; imb.midpoint = (imb.high+imb.low)/2; imb.time = time[i]; imb.mitigated = false; imb.fillPercent = 0; imb.isBullish = true;
          if(m_imbalanceCount < m_maxLevels) m_imbalances[m_imbalanceCount++] = imb;
@@ -329,7 +343,8 @@ void CLiquidity::DetectImbalances(const double &high[], const double &low[], con
 }
 
 void CLiquidity::DetectInstitutionalZones(const double &open[], const double &high[], const double &low[], const double &close[], const datetime &time[], int count) {
-   for(int i = 2; i < count - 2; i++) {
+   int stop = MathMax(0, count - m_lookbackBars);
+   for(int i = count - 1; i >= stop; i--) {
       double body = MathAbs(close[i] - open[i]), r = high[i] - low[i];
       double uW = high[i] - MathMax(open[i], close[i]), lW = MathMin(open[i], close[i]) - low[i];
       if(r > m_atr * 0.5) {
