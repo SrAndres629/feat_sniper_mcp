@@ -8,7 +8,7 @@
 #define CINTEROP_MQH
 
 #include <Zmq/ZmqMsg.mqh>
-#include <Zmq/ZmqSocket.mqh>
+#include <Zmq/Socket.mqh>
 #include <Zmq/Context.mqh>
 
 #include "CEMAs.mqh"
@@ -117,20 +117,20 @@ bool CInterop::InitZMQ() {
    }
 
    // Create PUSH Socket (Fire & Forget to Python)
-   m_socket = m_context.createSocket(ZMQ_PUSH);
+   m_socket = new Socket(*m_context, ZMQ_PUSH);
    if(m_socket == NULL) {
       Print("CInterop: Failed to create ZMQ Socket");
       return false;
    }
 
    // Connect to Docker brain
-   if(!m_socket.connect("tcp://localhost:5555")) {
+   if(!m_socket->connect("tcp://localhost:5555")) {
       Print("CInterop: Failed to connect to tcp://localhost:5555");
       return false;
    }
    
    // Set Linger to 0 to avoid blocking on close
-   m_socket.setLinger(0);
+   m_socket->setLinger(0);
 
    Print("CInterop: ZMQ Bridge Connected on Port 5555");
    m_zmqInitialised = true;
@@ -149,7 +149,7 @@ bool CInterop::SendFeaturesZMQ(SBarDataExport &data, string symbol) {
    string json = BuildJson(data, symbol);
    
    ZmqMsg request(json);
-   if(!m_socket.send(request, true)) { // Non-blocking send
+   if(!m_socket->send(request, true)) { // Non-blocking send
       Print("CInterop: ZMQ Send Failed");
       return false;
    }

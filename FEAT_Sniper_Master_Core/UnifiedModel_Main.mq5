@@ -151,14 +151,13 @@
 #include <UnifiedModel\CFEAT.mqh>
 #include <UnifiedModel\CLiquidity.mqh>
 #include <UnifiedModel\CFSM.mqh>
-#include <UnifiedModel\CVisuals.mqh>
 #include <UnifiedModel\CInterop.mqh>
 #include <UnifiedModel\CMultitemporal.mqh>
 
 input group "--- Configuration ---"
 input int ATR_Period = 14;
 input int Lookback = 100;
-input bool ShowDashboard = true; // Toggle Senior Engineer HUD
+// Visuals/Dashboard Removed (Moved to Web Interface)
 input bool ExportData = true;    // Export Data for Neural Training
 input string Bridge_Path = "c:\\Users\\acord\\OneDrive\\Desktop\\Bot\\feat_sniper_mcp\\FEAT_Sniper_Master_Core\\Python\\start_bridge.bat";
 
@@ -171,7 +170,7 @@ CEMAs       g_emas;
 CFEAT       g_feat;
 CLiquidity  g_liq;
 CFSM        g_fsm;
-CVisuals    g_vis;
+// CVisuals removed
 CInterop    g_io;
 CMultitemporal g_mtf;
 
@@ -194,9 +193,7 @@ int OnInit() {
    g_fsm.SetComponents(&g_emas, &g_feat, &g_liq);
    g_fsm.SetBufferSize(Lookback);
    
-   g_vis.Init("UM_", ChartID());
-   g_vis.SetComponents(&g_emas, &g_feat, &g_liq, &g_fsm);
-   g_vis.SetDrawOptions(true, ShowDashboard, true, true);
+   // Visuals removed
    
    g_io.SetEnabled(ExportData);
    g_io.SetDataPath(""); 
@@ -207,7 +204,7 @@ int OnInit() {
    return INIT_SUCCEEDED;
 }
 
-void OnDeinit(const int r) { g_feat.Deinit(); g_emas.Deinit(); g_vis.Clear(); }
+void OnDeinit(const int r) { g_feat.Deinit(); g_emas.Deinit(); }
 
 int OnCalculate(const int total, const int prev, const datetime &time[], const double &open[],
                 const double &high[], const double &low[], const double &close[],
@@ -267,9 +264,7 @@ int OnCalculate(const int total, const int prev, const datetime &time[], const d
       g_fsm.Calculate(close[total-1], close[total-2], (double)tick[total-1]);
       g_mtf.Calculate();  
       
-      // 2. DRAW VISUALS
-      if(ShowDashboard) g_vis.Draw(time[total-1], close[total-1]);
-      else g_vis.Clear();
+      // 2. NO VISUALS (Web Interface)
       
       // 3. EXPORT DATA
       if(ExportData) {
@@ -340,7 +335,7 @@ int OnCalculate(const int total, const int prev, const datetime &time[], const d
          data.h4Bias = mtf.states[2].bias;
          data.d1Bias = mtf.states[3].bias;
          
-         g_io.ExportFeatures(data);
+         g_io.SendFeaturesZMQ(data, _Symbol);
       }
    }
    
