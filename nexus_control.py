@@ -124,7 +124,13 @@ class NexusControl:
         # Robust parsing of REPAIR_REQUEST
         try:
             import re
-            json_match = re.search(r'REPAIR_REQUEST_START\s*(\{.*?\})\s*REPAIR_REQUEST_END', p.stdout, re.DOTALL)
+            
+            def strip_ansi(text):
+                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+                return ansi_escape.sub('', text)
+
+            clean_stdout = strip_ansi(p.stdout)
+            json_match = re.search(r'REPAIR_REQUEST_START\s*(\{.*?\})\s*REPAIR_REQUEST_END', clean_stdout, re.DOTALL)
             
             if json_match:
                 tracer_str = json_match.group(1)
