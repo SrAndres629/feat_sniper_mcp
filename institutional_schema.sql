@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS market_ticks (
     tick_time TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     
     -- Partition hint
-    partition_date DATE GENERATED ALWAYS AS (tick_time::DATE) STORED
+    partition_date DATE GENERATED ALWAYS AS ((tick_time AT TIME ZONE 'UTC')::DATE) STORED
 );
 
 -- Indexes for fast queries

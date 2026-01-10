@@ -1,0 +1,12 @@
+.env
+__pycache__/
+*.pyc
+.ipynb_checkpoints
+.chroma/
+chroma_storage/
+data/
+models/
+*.log
+.DS_Store
+node_modules/
+.next/
