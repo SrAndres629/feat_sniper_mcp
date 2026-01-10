@@ -173,7 +173,87 @@ async def get_economic_calendar():
     return await calendar.get_economic_calendar(req)
 
 # =============================================================================
-# SYSTEM HEALTH
+# PILLAR 5: MEMORIA INFINITA (RAG Memory)
+# =============================================================================
+
+@mcp.tool()
+async def remember(text: str, category: str = "general"):
+    """
+    Almacena información en memoria permanente RAG.
+    Las memorias persisten entre reinicios del contenedor.
+    
+    Categorías sugeridas: analysis, trade, news, pattern, lesson, config
+    """
+    from app.services.rag_memory import rag_memory
+    doc_id = rag_memory.store(text, category=category)
+    return {"status": "stored", "id": doc_id, "category": category}
+
+@mcp.tool()
+async def recall(query: str, limit: int = 5, category: str = None):
+    """
+    Busca información relevante en memoria RAG usando búsqueda semántica.
+    Retorna los documentos más similares a la query.
+    """
+    from app.services.rag_memory import rag_memory
+    results = rag_memory.search(query, k=limit, category=category)
+    return {
+        "query": query,
+        "count": len(results),
+        "memories": results
+    }
+
+@mcp.tool()
+async def forget(category: str):
+    """
+    Elimina todas las memorias de una categoría específica.
+    Útil para limpiar información obsoleta.
+    """
+    from app.services.rag_memory import rag_memory
+    count = rag_memory.forget(category=category)
+    return {"status": "deleted", "count": count, "category": category}
+
+@mcp.tool()
+async def memory_stats():
+    """
+    Obtiene estadísticas de la memoria RAG.
+    """
+    from app.services.rag_memory import rag_memory
+    return {
+        "total_memories": rag_memory.count(),
+        "categories": rag_memory.get_categories()
+    }
+
+# =============================================================================
+# PILLAR 6: SYSTEM ADMIN (Auto-Diagnóstico)
+# =============================================================================
+
+@mcp.tool()
+async def system_check():
+    """
+    Revisa la salud del servidor (CPU, RAM, Disco).
+    Útil para auto-diagnóstico antes de operaciones pesadas.
+    """
+    from app.skills.system_ops import system_health_check
+    return await system_health_check()
+
+@mcp.tool()
+async def system_environment():
+    """
+    Obtiene información del entorno de ejecución.
+    """
+    from app.skills.system_ops import get_environment_info
+    return await get_environment_info()
+
+@mcp.tool()
+async def system_cleanup():
+    """
+    Limpia caches de Python para liberar memoria.
+    """
+    from app.skills.system_ops import cleanup_cache
+    return await cleanup_cache()
+
+# =============================================================================
+# SYSTEM RESOURCES
 # =============================================================================
 
 @mcp.resource("signals://live")
@@ -191,8 +271,8 @@ if __name__ == "__main__":
     is_docker = not sys.stdin.isatty() or os.environ.get("DOCKER_MODE", "").lower() == "true"
     
     if is_docker:
-        logger.info("🐳 Modo Docker detectado - Iniciando servidor HTTP en puerto 8000...")
-        mcp.run(transport="http", host="0.0.0.0", port=8000)
+        logger.info("🐳 Modo Docker detectado - Iniciando servidor SSE en puerto 8000...")
+        mcp.run(transport="sse", host="0.0.0.0", port=8000)
     else:
         logger.info("🖥️ Modo Windows detectado - Iniciando servidor STDIO...")
         mcp.run()

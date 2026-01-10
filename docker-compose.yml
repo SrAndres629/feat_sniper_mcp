@@ -7,9 +7,33 @@ services:
     ports:
       - "8000:8000"
       - "5555:5555"
+    volumes:
+      - chroma-data:/app/data/chroma
+    environment:
+      - CHROMA_PERSIST_DIR=/app/data/chroma
+      - DOCKER_MODE=true
+    networks:
+      - feat-network
+
+  web-dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: feat-sniper-dashboard
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - mcp-brain
     networks:
       - feat-network
 
 networks:
   feat-network:
     driver: bridge
+
+volumes:
+  chroma-data:
+    driver: local
