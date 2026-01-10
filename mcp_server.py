@@ -253,6 +253,61 @@ async def system_cleanup():
     return await cleanup_cache()
 
 # =============================================================================
+# PILLAR 7: QUANTUM LEAP ML (Stochastic Predictions)
+# =============================================================================
+
+@mcp.tool()
+async def ml_predict(features: dict):
+    """
+    Genera predicción ML usando ensemble GBM+LSTM.
+    Shadow Mode por defecto (no ejecuta, solo predice).
+    
+    Args:
+        features: Dict con close, rsi, ema_fast, ema_slow, volume, feat_score, fsm_state, etc.
+    """
+    from app.ml.ml_engine import predict
+    return await predict(features)
+
+@mcp.tool()
+async def ml_status():
+    """
+    Estado del sistema ML: modelos cargados, modo, etc.
+    """
+    from app.ml.ml_engine import get_ml_status
+    return await get_ml_status()
+
+@mcp.tool()
+async def ml_collect_sample(symbol: str, candle: dict, indicators: dict):
+    """
+    Recolecta muestra para training dataset con Oracle labeling.
+    
+    Args:
+        symbol: Par de divisas
+        candle: Dict con open, high, low, close, volume
+        indicators: Dict con RSI, EMAs, FEAT score, FSM state, etc.
+    """
+    from app.ml.data_collector import collect_sample
+    return await collect_sample(symbol, candle, indicators)
+
+@mcp.tool()
+async def ml_train():
+    """
+    Entrena modelos GBM y LSTM si hay datos suficientes.
+    Requiere 1000+ muestras etiquetadas.
+    """
+    from app.ml.train_models import train_all
+    return train_all()
+
+@mcp.tool()
+async def ml_enable_execution(enable: bool = True):
+    """
+    (PELIGROSO) Activa/desactiva ejecución real de órdenes.
+    Solo usar después de verificar predicciones en Shadow Mode.
+    """
+    from app.ml.ml_engine import enable_execution
+    return await enable_execution(enable)
+
+# =============================================================================
 # SYSTEM RESOURCES
 # =============================================================================
 

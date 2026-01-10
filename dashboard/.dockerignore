@@ -1,0 +1,16 @@
+# Dependencies installed in container
+node_modules/
+.next/
+
+# Development files
+*.log
+.env.local
+.env*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
