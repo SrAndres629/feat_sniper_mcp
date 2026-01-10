@@ -127,9 +127,36 @@ class NexusControl:
                 tracer_str = p.stdout.split("REPAIR_REQUEST_START")[1].split("REPAIR_REQUEST_END")[0].strip()
                 tracer = json.loads(tracer_str)
                 critical = tracer.get("critical", [])
+                
                 if not critical:
                     log("[OK] Auditoria superada. Sistema nominal.", GREEN)
                     return True
+                
+                # Granular Failure Report
+                log("\n" + "!"*60, RED)
+                log(">>> REPORTE DE FALLOS (Acción Requerida)", RED + BOLD)
+                
+                ANOMALY_MAP = {
+                    "CONFIG_MISSING": "Faltan credenciales en .env (SUPABASE_URL/KEY)",
+                    "ZMQ_NOT_READY": "ZMQ Bridge (Puerto 5555) no responde. ¿MT5 cerrado?",
+                    "MT5_OFFLINE": "MetaTrader 5 no detectado en procesos.",
+                    "DB_EMPTY": "Base de datos vacía (Esperando primer tick).",
+                    "DATA_STALE": "Datos obsoletos en DB (>5 min sin ticks).",
+                    "RAG_MISSING": "Memoria RAG corrupta o no montada.",
+                    "NO_SKILLS": "MCP Server no cargó las skills (revisar mcp_server.py)."
+                }
+
+                for code in critical:
+                    # Handle dynamic codes like CONFIG_MISSING_KEY
+                    desc = ANOMALY_MAP.get(code, "Error desconocido")
+                    if "CONFIG_MISSING" in code and code not in ANOMALY_MAP:
+                        desc = f"Configuración incompleta: {code.replace('CONFIG_MISSING_', '')}"
+                        
+                    log(f"  [X] {code}: {desc}", YELLOW)
+                    
+                log("!"*60 + "\n", RED)
+                return False
+
         except Exception as e:
             log(f"[⚠] Error parsing tracer: {e}", YELLOW)
 
@@ -137,7 +164,7 @@ class NexusControl:
             log("[OK] Auditoria superada (Failsafe).", GREEN)
             return True
             
-        log("[ERR] Anomalías detectadas en la auditoria.", RED)
+        log("[ERR] Fallo crítico en auditoría. Revisa el detalle arriba.", RED)
         return False
 
     def open_dashboard(self):
