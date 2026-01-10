@@ -85,7 +85,7 @@ class SQLiteWALConnection:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS ticks (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    timestamp TEXT NOT NULL,
+                    tick_time TEXT NOT NULL,
                     symbol TEXT NOT NULL,
                     close REAL, open REAL, high REAL, low REAL, volume REAL,
                     rsi REAL, ema_fast REAL, ema_slow REAL, ema_spread REAL,
@@ -99,7 +99,7 @@ class SQLiteWALConnection:
             # Índices para queries rápidas
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_ticks_symbol_ts 
-                ON ticks(symbol, timestamp DESC)
+                ON ticks(symbol, tick_time DESC)
             """)
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_ticks_unlabeled 
@@ -111,7 +111,7 @@ class SQLiteWALConnection:
                 CREATE TABLE IF NOT EXISTS training_samples (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     tick_id INTEGER REFERENCES ticks(id),
-                    timestamp TEXT NOT NULL,
+                    tick_time TEXT NOT NULL,
                     symbol TEXT NOT NULL,
                     close REAL, open REAL, high REAL, low REAL, volume REAL,
                     rsi REAL, ema_fast REAL, ema_slow REAL, ema_spread REAL,
@@ -125,7 +125,7 @@ class SQLiteWALConnection:
             # Índice para training
             conn.execute("""
                 CREATE INDEX IF NOT EXISTS idx_training_ts 
-                ON training_samples(timestamp)
+                ON training_samples(tick_time)
             """)
             
             conn.commit()
@@ -155,7 +155,7 @@ class OracleLabeler:
         with self.db.get_connection() as conn:
             # Encontrar ticks sin etiquetar que ya tienen N velas futuras
             query = """
-                SELECT t1.id, t1.timestamp, t1.close as entry_price,
+                SELECT t1.id, t1.tick_time, t1.close as entry_price,
                        (SELECT close FROM ticks t2 
                         WHERE t2.symbol = t1.symbol 
                         AND t2.id = t1.id + :lookahead) as future_price
@@ -196,10 +196,10 @@ class OracleLabeler:
                 # Copiar a training_samples para acceso rápido
                 conn.execute("""
                     INSERT INTO training_samples 
-                    (tick_id, timestamp, symbol, close, open, high, low, volume,
+                    (tick_id, tick_time, symbol, close, open, high, low, volume,
                      rsi, ema_fast, ema_slow, ema_spread, feat_score, fsm_state,
                      atr, compression, liquidity_above, liquidity_below, label)
-                    SELECT id, timestamp, symbol, close, open, high, low, volume,
+                    SELECT id, tick_time, symbol, close, open, high, low, volume,
                            rsi, ema_fast, ema_slow, ema_spread, feat_score, fsm_state,
                            atr, compression, liquidity_above, liquidity_below, :label
                     FROM ticks WHERE id = :id
@@ -254,10 +254,10 @@ class DataCollector:
         Añade tick al batch. Flush automático cuando alcanza BATCH_SIZE.
         """
         features = self.compute_features(candle, indicators)
-        timestamp = datetime.utcnow().isoformat()
+        tick_time = candle.get("time") or datetime.utcnow().isoformat()
         
         record = {
-            "timestamp": timestamp,
+            "tick_time": tick_time,
             "symbol": symbol,
             **features
         }
@@ -276,11 +276,11 @@ class DataCollector:
         with self.db.get_connection() as conn:
             conn.executemany("""
                 INSERT INTO ticks (
-                    timestamp, symbol, close, open, high, low, volume,
+                    tick_time, symbol, close, open, high, low, volume,
                     rsi, ema_fast, ema_slow, ema_spread, feat_score, fsm_state,
                     atr, compression, liquidity_above, liquidity_below
                 ) VALUES (
-                    :timestamp, :symbol, :close, :open, :high, :low, :volume,
+                    :tick_time, :symbol, :close, :open, :high, :low, :volume,
                     :rsi, :ema_fast, :ema_slow, :ema_spread, :feat_score, :fsm_state,
                     :atr, :compression, :liquidity_above, :liquidity_below
                 )

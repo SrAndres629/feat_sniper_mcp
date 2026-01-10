@@ -31,6 +31,7 @@ from app.models.schemas import (
     MarketDataRequest, TradeOrderRequest, PositionManageRequest, 
     IndicatorRequest, HistoryRequest, CalendarRequest, MQL5CodeRequest
 )
+from app.ml.data_collector import data_collector
 
 from app.core.zmq_bridge import zmq_bridge
 from app.skills.advanced_analytics import advanced_analytics
@@ -43,13 +44,30 @@ async def app_lifespan(server: FastMCP):
     await mt5_conn.startup()
     
     # Iniciar ZMQ Bridge para Streaming de baja latencia
-    async def on_signal(data):
-        logger.info(f"Señal recibida vía ZMQ: {data}")
-        # Sincronizar con la nube de forma asíncrona (Fire & Forget)
-        import asyncio
-        asyncio.create_task(supabase_sync.log_signal(data))
+    async def on_zmq_message(data):
+        msg_type = data.get("type", "signal")
         
-    await zmq_bridge.start(on_signal)
+        if msg_type == "tick":
+            # 1. Local Collection (SQL Lite for ML training)
+            # collect_sample expect symbols, candle, indicators
+            # data typically has symbol and candle info
+            import asyncio
+            symbol = data.get("symbol")
+            candle = data.get("candle", data)
+            indicators_data = data.get("indicators", {})
+            
+            # Non-blocking local collection
+            data_collector.collect(symbol, candle, indicators_data)
+            
+            # 2. Institutional Sync (Supabase market_ticks)
+            asyncio.create_task(supabase_sync.log_tick(data))
+            
+        elif msg_type == "signal":
+            logger.info(f"Señal recibida vía ZMQ: {data}")
+            import asyncio
+            asyncio.create_task(supabase_sync.log_signal(data))
+        
+    await zmq_bridge.start(on_zmq_message)
     
     try:
         yield

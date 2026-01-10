@@ -8,11 +8,13 @@ Runs inside Docker container and checks all vital systems.
 Uses only standard Python libraries (no rebuild required).
 """
 
+
 import os
 import sys
 import socket
 import sqlite3
-from datetime import datetime, timedelta
+import glob
+from datetime import datetime, timezone
 import urllib.request
 import urllib.error
 
@@ -21,6 +23,7 @@ GREEN = "\033[92m"
 RED = "\033[91m"
 YELLOW = "\033[93m"
 CYAN = "\033[96m"
+WHITE = "\033[97m"
 RESET = "\033[0m"
 BOLD = "\033[1m"
 
@@ -29,13 +32,25 @@ def err(msg): return f"{RED}[ERR]{RESET} {msg}"
 def warn(msg): return f"{YELLOW}[⚠] {RESET} {msg}"
 def info(msg): return f"{CYAN}[INF]{RESET} {msg}"
 
+def check_config_validity():
+    """Verify if environment variables are set."""
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    missing = []
+    if not url: missing.append("SUPABASE_URL")
+    if not key: missing.append("SUPABASE_KEY")
+    
+    if missing:
+        return err(f"Variables faltantes: {', '.join(missing)}")
+    return ok("Configuración ..... Credenciales cargadas")
 
 def check_zmq_bridge():
     """Check if ZMQ port 5555 is in use (bridge active)."""
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(1)
-        result = sock.connect_ex(('localhost', 5555))
+        # In Docker, we check 127.0.0.1
+        result = sock.connect_ex(('127.0.0.1', 5555))
         sock.close()
         
         if result == 0:
@@ -45,169 +60,142 @@ def check_zmq_bridge():
     except Exception as e:
         return err(f"ZMQ Bridge ...... Error: {e}")
 
+def check_data_freshness():
+    """SRE-Grade Sync Check: Measures LAG against Supabase (Schema Fixed)."""
+    config_status = check_config_validity()
+    if "[ERR]" in config_status:
+        return f"  {config_status}\n  {err('Sincronización ... ABORTADA p/ falta de config')}"
 
-def check_rag_memory():
-    """Check ChromaDB connection and vector count."""
     try:
-        import chromadb
-        from chromadb.config import Settings
-        
-        persist_dir = os.environ.get("CHROMA_PERSIST_DIR", "/app/data/chroma")
-        
-        if not os.path.exists(persist_dir):
-            return warn("RAG Memory ...... Directorio no existe (primera ejecución)")
-            
-        client = chromadb.PersistentClient(path=persist_dir)
-        collections = client.list_collections()
-        
-        total_vectors = 0
-        for col in collections:
-            total_vectors += col.count()
-            
-        return ok(f"RAG Memory ...... {total_vectors} Recuerdos indexados")
+        from supabase import create_client, Client
     except ImportError:
-        return warn("RAG Memory ...... ChromaDB no instalado")
-    except Exception as e:
-        return err(f"RAG Memory ...... Error: {str(e)[:50]}")
-
-
-def check_data_feed():
-    """Check SQLite database and last tick timestamp."""
-    db_path = "/app/data/market_data.db"
+        return warn("Sincronización ... Librería 'supabase' no instalada")
     
-    if not os.path.exists(db_path):
-        return warn("Data Feed ....... Base de datos no creada (sin datos aún)")
-    
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+        
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+        supabase: Client = create_client(url, key)
         
-        # Check total ticks
-        cursor.execute("SELECT COUNT(*) FROM ticks")
-        total_ticks = cursor.fetchone()[0]
+        # SCHEMA FIX: Using 'tick_time' instead of 'timestamp'
+        res = supabase.table('market_ticks').select('tick_time, symbol, bid').order('tick_time', desc=True).limit(1).execute()
         
-        if total_ticks == 0:
-            return warn("Data Feed ....... 0 ticks (esperando datos de MT5)")
+        if not res.data:
+            return warn("Sincronización ... 0 ticks encontrados (Base de Datos vacía)")
+
+        last_tick = res.data[0]
+        last_ts_str = last_tick['tick_time']
+        symbol = last_tick.get('symbol', 'N/A')
+        price = last_tick.get('bid', 0.0)
+
+        # Parse UTC Timestamp
+        last_dt = datetime.fromisoformat(last_ts_str.replace("Z", "+00:00"))
+        now_utc = datetime.now(timezone.utc)
         
-        # Check last timestamp
-        cursor.execute("SELECT MAX(timestamp) FROM ticks")
-        last_ts = cursor.fetchone()[0]
-        conn.close()
+        delta_seconds = int((now_utc - last_dt).total_seconds())
+        if delta_seconds < 0: delta_seconds = 0
         
-        if last_ts:
-            try:
-                last_dt = datetime.fromisoformat(last_ts.replace("Z", ""))
-                age_seconds = (datetime.utcnow() - last_dt).total_seconds()
-                
-                if age_seconds < 60:
-                    return ok(f"Data Feed ....... {total_ticks} ticks (último: hace {int(age_seconds)}s)")
-                elif age_seconds < 300:
-                    return warn(f"Data Feed ....... {total_ticks} ticks (último: hace {int(age_seconds)}s - LAG?)")
-                else:
-                    return err(f"Data Feed ....... Último dato hace {int(age_seconds)}s (MT5 Desconectado?)")
-            except:
-                return ok(f"Data Feed ....... {total_ticks} ticks almacenados")
+        status_line = f"Último Tick ..... Hace {delta_seconds}s ({symbol} @ {price})"
         
-        return ok(f"Data Feed ....... {total_ticks} ticks almacenados")
-    except sqlite3.OperationalError as e:
-        if "no such table" in str(e):
-            return warn("Data Feed ....... Tabla ticks no existe (iniciando recolección)")
-        return err(f"Data Feed ....... SQL Error: {e}")
+        if delta_seconds < 60:
+            return f"  {ok(status_line)}\n  {ok('Estado .......... FLUJO EN TIEMPO REAL')}"
+        elif delta_seconds < 300:
+            return f"  {warn(status_line)}\n  {warn('Estado .......... LATENCIA ALTA')}"
+        else:
+            return f"  {err(status_line)}\n  {err('Estado .......... DESCONECTADO (Stale Data)')}"
+            
     except Exception as e:
-        return err(f"Data Feed ....... Error: {str(e)[:50]}")
+        return err(f"Sincronización ... Error: {str(e)[:50]}")
 
-
-def check_ml_models():
-    """Check if ML models exist."""
-    models_dir = "/app/models"
-    gbm_path = os.path.join(models_dir, "gbm_v1.joblib")
-    lstm_path = os.path.join(models_dir, "lstm_v1.pt")
+def get_last_logs(lines=15):
+    """Retrieve last lines of log if possible."""
+    # Try common log locations or general output
+    log_files = glob.glob("/app/*.log") + glob.glob("/app/data/*.log")
+    if not log_files:
+        # Fallback to system check if we can (though in docker it's tricky)
+        return "No se encontraron archivos .log específicos en /app"
     
-    gbm_exists = os.path.exists(gbm_path)
-    lstm_exists = os.path.exists(lstm_path)
-    
-    if gbm_exists and lstm_exists:
-        return ok("ML Engine ....... Modelos GBM + LSTM cargados")
-    elif gbm_exists:
-        return warn("ML Engine ....... Solo GBM (LSTM pendiente)")
-    elif lstm_exists:
-        return warn("ML Engine ....... Solo LSTM (GBM pendiente)")
-    else:
-        return warn("ML Engine ....... Sin modelos (Shadow Mode - recolectando datos)")
-
-
-def check_execution_mode():
-    """Check if execution is enabled."""
-    exec_enabled = os.environ.get("EXECUTION_ENABLED", "false").lower() == "true"
-    
-    if exec_enabled:
-        return err("Execution Mode .. ⚠️ LIVE - Ejecución REAL activa")
-    else:
-        return ok("Execution Mode .. Shadow Mode (solo predicciones)")
-
-
-def check_sse_api():
-    """Check if SSE API is responding."""
+    # Get newest log
+    latest_log = max(log_files, key=os.path.getmtime)
     try:
-        req = urllib.request.Request("http://localhost:8000/", method="GET")
-        req.add_header("Accept", "text/event-stream")
-        
-        with urllib.request.urlopen(req, timeout=3) as response:
-            return ok("API Server ...... Puerto 8000 SSE Activo")
-    except urllib.error.URLError as e:
-        return warn(f"API Server ...... No responde: {str(e.reason)[:30]}")
+        with open(latest_log, 'r') as f:
+            content = f.readlines()
+            return "".join(content[-lines:])
     except Exception as e:
-        return warn(f"API Server ...... Error: {str(e)[:30]}")
+        return f"Error al leer log {latest_log}: {e}"
 
-
-def check_memory_usage():
-    """Check container memory usage."""
+def check_process_health():
+    """Verify if vital processes are running + Autopsia logic."""
     try:
         import psutil
-        mem = psutil.virtual_memory()
-        used_mb = mem.used / (1024 * 1024)
-        total_mb = mem.total / (1024 * 1024)
-        percent = mem.percent
+        procs = []
+        for p in psutil.process_iter(['cmdline']):
+            try:
+                cmd = " ".join(p.info['cmdline'] or [])
+                if "data_collector.py" in cmd or "mcp_server.py" in cmd:
+                    procs.append(p)
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
         
-        if percent < 70:
-            return ok(f"Memory Usage .... {used_mb:.0f}MB / {total_mb:.0f}MB ({percent}%)")
-        elif percent < 85:
-            return warn(f"Memory Usage .... {used_mb:.0f}MB / {total_mb:.0f}MB ({percent}%)")
+        if procs:
+            return ok(f"Procesos ........ VIVOS (Nucleus Active)")
         else:
-            return err(f"Memory Usage .... {used_mb:.0f}MB / {total_mb:.0f}MB ({percent}%) ⚠️ ALTO")
+            autopsy = get_last_logs()
+            return f"{err('Procesos ........ data_collector.py MUERTO')}\n{WHITE}─────── AUTOPSIA: ÚLTIMO LOG ───────{RESET}\n{autopsy}\n{WHITE}────────────────────────────────────{RESET}"
     except ImportError:
-        return info("Memory Usage .... psutil no disponible")
+        return info("Procesos ........ psutil no disponible")
     except Exception as e:
-        return info(f"Memory Usage .... No disponible")
+        return warn(f"Procesos ........ Error al verificar: {str(e)[:30]}")
 
+def check_rag_memory():
+    """Check ChromaDB volume."""
+    try:
+        persist_dir = os.environ.get("CHROMA_PERSIST_DIR", "/app/data/chroma")
+        if not os.path.exists(persist_dir):
+            return warn("RAG Memory ...... Vacío (sin directorio)")
+        files = os.listdir(persist_dir)
+        return ok(f"RAG Memory ...... {len(files)} archivos de persistencia")
+    except Exception:
+        return warn("RAG Memory ...... Error al acceder")
+
+def check_sse_api():
+    """Check SSE API health."""
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8000/sse", method="GET")
+        req.add_header("Accept", "text/event-stream")
+        with urllib.request.urlopen(req, timeout=2) as response:
+            return ok("API Server ...... SSE Activo (Puerto 8000)")
+    except Exception:
+        return warn("API Server ...... Puerto 8000 No responde")
 
 def main():
-    print()
-    print(f"{BOLD}{CYAN}╔══════════════════════════════════════════════════════════╗{RESET}")
-    print(f"{BOLD}{CYAN}║           FEAT SNIPER NEXUS - SYSTEM STATUS              ║{RESET}")
+    print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════════╗{RESET}")
+    print(f"{BOLD}{CYAN}║           FEAT SNIPER NEXUS - SRE DASHBOARD              ║{RESET}")
     print(f"{BOLD}{CYAN}╚══════════════════════════════════════════════════════════╝{RESET}")
-    print()
-    print(f"  Timestamp: {datetime.utcnow().isoformat()}Z")
-    print()
-    print(f"{BOLD}  ─── Core Systems ───{RESET}")
-    print(f"  {check_zmq_bridge()}")
-    print(f"  {check_sse_api()}")
-    print()
-    print(f"{BOLD}  ─── Data Layer ───{RESET}")
-    print(f"  {check_data_feed()}")
-    print(f"  {check_rag_memory()}")
-    print()
-    print(f"{BOLD}  ─── ML Engine ───{RESET}")
-    print(f"  {check_ml_models()}")
-    print(f"  {check_execution_mode()}")
-    print()
-    print(f"{BOLD}  ─── Resources ───{RESET}")
-    print(f"  {check_memory_usage()}")
-    print()
-    print(f"{CYAN}  ────────────────────────────────────────────────────────{RESET}")
-    print(f"  {GREEN}✓{RESET} Diagnóstico completado")
+    print(f"\n  {WHITE}Timestamp UTC: {datetime.now(timezone.utc).isoformat()}{RESET}\n")
+    
+    print(f"{BOLD}  ─── Configuración ───{RESET}")
+    print(f"  {check_config_validity()}")
     print()
 
+    print(f"{BOLD}  ─── Sincronización ───{RESET}")
+    print(check_data_freshness())
+    print()
+    
+    print(f"{BOLD}  ─── Core Health ───{RESET}")
+    print(f"  {check_zmq_bridge()}")
+    print(f"  {check_process_health()}")
+    print(f"  {check_sse_api()}")
+    print()
+    
+    print(f"{BOLD}  ─── Intelligence ───{RESET}")
+    print(f"  {check_rag_memory()}")
+    print()
+    
+    print(f"{CYAN}  ────────────────────────────────────────────────────────{RESET}")
+    print(f"  {GREEN}✓{RESET} Auditoría NEXUS completada")
+    print()
 
 if __name__ == "__main__":
     main()
+

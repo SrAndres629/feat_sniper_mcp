@@ -7,9 +7,10 @@ class Settings(BaseSettings):
     Configuración global del sistema cargada desde variables de entorno o archivo .env.
     """
     # MetaTrader 5 Credentials
-    MT5_LOGIN: int
-    MT5_PASSWORD: str
-    MT5_SERVER: str
+    # MetaTrader 5 Credentials (Optional for Linux/Docker)
+    MT5_LOGIN: Optional[int] = None
+    MT5_PASSWORD: Optional[str] = None
+    MT5_SERVER: Optional[str] = None
     MT5_PATH: Optional[str] = None  # Ruta al terminal64.exe si no es la por defecto
     
     # API Settings

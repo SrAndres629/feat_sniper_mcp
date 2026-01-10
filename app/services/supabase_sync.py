@@ -52,6 +52,34 @@ class SupabaseSync:
         except Exception as e:
             logger.error(f"Error sincronizando señal con Supabase: {e}")
 
+
+    async def log_tick(self, data: Dict[str, Any]):
+        """Registra un tick de mercado en la tabla market_ticks (Institutional)."""
+        if not self._client:
+            return
+
+        try:
+            # Adaptar datos al esquema market_ticks
+            # Campos esperados: symbol, bid, ask, volume, tick_time
+            payload = {
+                "symbol": data.get("symbol", "UNKNOWN"),
+                "bid": float(data.get("bid", data.get("close", 0))),
+                "ask": float(data.get("ask", data.get("close", 0))),
+                "volume": float(data.get("volume", 0)),
+                "tick_time": data.get("tick_time") or data.get("time")
+            }
+            
+            # Quitar nulos
+            payload = {k: v for k, v in payload.items() if v is not None}
+            
+            import anyio
+            await anyio.to_thread.run_sync(
+                lambda: self._client.table("market_ticks").insert(payload).execute()
+            )
+            # logger.debug(f"Tick sync: {payload['symbol']} @ {payload['bid']}")
+        except Exception as e:
+            logger.error(f"Error sincronizando tick con Supabase: {e}")
+
     async def update_performance(self, model_id: str, metrics: Dict[str, Any]):
         """Actualiza métricas de performance del modelo ML en la nube."""
         if not self._client:
