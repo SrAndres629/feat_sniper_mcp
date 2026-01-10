@@ -1,30 +1,34 @@
-FROM python:3.11-slim-bullseye
+# FEAT Sniper NEXUS - Docker Image
+# Optimized with Layer Caching for ML dependencies
 
-# Prevent Python from writing .pyc files and enable unbuffered logging
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
-# Using bullseye-slim to avoid OOM in build and keeping it minimal
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    python3-dev \
-    libzmq3-dev \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# =============================================================================
+# LAYER 1: HEAVY ML DEPENDENCIES (Cached - 3GB+, rarely changes)
+# PyTorch CPU + ChromaDB + XGBoost
+# =============================================================================
+COPY requirements_heavy.txt .
+RUN pip install --no-cache-dir -r requirements_heavy.txt
 
-# Install python dependencies
+# =============================================================================
+# LAYER 2: LIGHT DEPENDENCIES (Changes occasionally)
+# =============================================================================
 COPY requirements.txt .
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# =============================================================================
+# LAYER 3: SOURCE CODE (Changes frequently)
+# This layer rebuilds quickly because previous layers are cached
+# =============================================================================
 COPY . .
 
-# Expose the API port
-EXPOSE 8000
+# Create necessary directories
+RUN mkdir -p /app/data /app/models
 
-# Start the MCP server
+# Expose SSE and ZMQ ports
+EXPOSE 8000 5555
+
+# Start MCP Server
 CMD ["python", "mcp_server.py"]

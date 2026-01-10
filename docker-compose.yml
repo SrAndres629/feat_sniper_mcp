@@ -8,7 +8,9 @@ services:
       - "8000:8000"
       - "5555:5555"
     volumes:
-      - chroma-data:/app/data/chroma
+      - ./chroma_storage:/app/data/chroma
+      - ./data:/app/data
+      - ./models:/app/models
     environment:
       - CHROMA_PERSIST_DIR=/app/data/chroma
       - DOCKER_MODE=true
