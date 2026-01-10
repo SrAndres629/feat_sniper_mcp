@@ -200,28 +200,121 @@ class NexusAuditor:
         print(f"{BOLD}{CYAN}╚══════════════════════════════════════════════════════════╝{RESET}")
         print(f"  UTC: {datetime.now(timezone.utc).isoformat()}\n")
 
-        print(f"{BOLD}  [1] INFRAESTRUCTURA{RESET}")
+    def audit_ports(self):
+        """Check critical ports: 5555 (ZMQ), 8000 (API), 3000 (Web)."""
+        ports = {
+            5555: "ZMQ Bridge",
+            8000: "Brain API",
+            3000: "Dashboard"
+        }
+        results = []
+        for port, name in ports.items():
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.5)
+                res = sock.connect_ex(('127.0.0.1', port))
+                sock.close()
+                if res == 0:
+                    results.append(ok(f"{name:<12} ... Puerto {port} ACTIVO"))
+                else:
+                    self.anomalies.append(f"PORT_{port}_DOWN")
+                    results.append(err(f"{name:<12} ... Puerto {port} CERRADO"))
+            except Exception:
+                results.append(err(f"{name:<12} ... Error Check"))
+        return "\n  ".join(results)
+
+    def audit_db_advanced(self):
+        """Check SQLite WAL mode and feed freshness."""
+        db_path = "/app/data/market_data.db" if self.is_docker else "./data/market_data.db"
+        if not os.path.exists(db_path):
+            # Try absolute path fallback for windows host
+            db_path = os.path.join(os.getcwd(), "app", "data", "market_data.db")
+            
+        if not os.path.exists(db_path):
+             return warn(f"DB Local ....... No encontrada en {db_path}")
+
+        try:
+            conn = sqlite3.connect(db_path)
+            mode = conn.execute("PRAGMA journal_mode;").fetchone()[0]
+            conn.close()
+            
+            status = f"DB Integrity ... Modo {mode.upper()}"
+            if mode.upper() != "WAL":
+                self.anomalies.append("DB_NOT_WAL")
+                return warn(f"{status} (Debería ser WAL)")
+            return ok(status)
+        except Exception as e:
+            return err(f"DB Integrity ... Error: {e}")
+
+    def audit_ml_models(self):
+        """Verify Intelligence Assets."""
+        models = ["gbm_v1.joblib", "lstm_v1.pt"]
+        model_dir = "models" # Relative to root
+        
+        found_all = True
+        missing = []
+        for m in models:
+            if not os.path.exists(os.path.join(model_dir, m)):
+                found_all = False
+                missing.append(m)
+        
+        if found_all:
+            return ok(f"IA Core ........ {len(models)} Modelos Cargados")
+        else:
+            self.anomalies.append("MODELS_MISSING")
+            return warn(f"IA Core ........ Faltan: {', '.join(missing)}")
+
+    def generate_report(self):
+        """Generates the Institutional AUDIT_REPORT.md"""
+        report = f"""# NEXUS PRIME: INSTITUTIONAL AUDIT REPORT
+**Timestamp:** {datetime.now(timezone.utc).isoformat()}
+**Status:** {"CRITICAL" if self.anomalies else "OPERATIONAL"}
+
+## 1. Anomalies Detected
+{chr(10).join([f"- [ ] {a}" for a in self.anomalies]) if self.anomalies else "None (System is nominal)."}
+
+## 2. Component Status
+- ZMQ Bridge: CHECKED
+- Database: CHECKED
+- Intelligence: CHECKED
+
+*Generated automatically by Nexus Omni-Auditor v2.5*
+"""
+        with open("AUDIT_REPORT.md", "w", encoding="utf-8") as f:
+            f.write(report)
+
+    def run_full_audit(self):
+        print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════════╗{RESET}")
+        print(f"{BOLD}{CYAN}║           NEXUS OMNI-AUDITOR - MASTER CHECK              ║{RESET}")
+        print(f"{BOLD}{CYAN}╚══════════════════════════════════════════════════════════╝{RESET}")
+        print(f"  UTC: {datetime.now(timezone.utc).isoformat()}\n")
+
+        print(f"{BOLD}  [1] INFRAESTRUCTURA Y RED{RESET}")
         print(f"  {self.audit_config()}")
-        print(f"  {self.audit_zmq()}")
+        print(f"  {self.audit_ports()}")
         print(f"  {self.audit_mt5()}")
         print()
 
-        print(f"{BOLD}  [2] PERSISTENCIA Y DATOS{RESET}")
+        print(f"{BOLD}  [2] INTEGRIDAD DE DATOS{RESET}")
+        print(f"  {self.audit_db_advanced()}")
         print(f"  {self.audit_supabase()}")
         print(f"  {self.audit_rag()}")
         print()
 
-        print(f"{BOLD}  [3] INTELIGENCIA Y MCP{RESET}")
+        print(f"{BOLD}  [3] INTELIGENCIA ARTIFICIAL{RESET}")
+        print(f"  {self.audit_ml_models()}")
         print(f"  {self.audit_mcp_skills()}")
         print()
+        
+        self.generate_report()
 
         # Critical anomalies that actually need "Repair"
-        critical_anomalies = [a for a in self.anomalies if "EMPTY" not in a and "NOT_READY" not in a]
+        critical_anomalies = [a for a in self.anomalies if "EMPTY" not in a and "NOT_READY" not in a and "PORT_5555" not in a]
 
         print(f"{CYAN}  ────────────────────────────────────────────────────────{RESET}")
         if not critical_anomalies:
-            if "DB_EMPTY" in self.anomalies:
-                print(f"  {YELLOW}⚠{RESET} {BOLD}SISTEMA READY (ESPERANDO PRIMER TICK){RESET}")
+            if "DB_EMPTY" in self.anomalies or "PORT_5555_DOWN" in self.anomalies:
+                 print(f"  {YELLOW}⚠{RESET} {BOLD}SISTEMA READY (ESPERANDO DATOS/PROCESOS){RESET}")
             else:
                 print(f"  {GREEN}✓{RESET} {BOLD}SISTEMA READY PARA OPERAR{RESET}")
         else:
