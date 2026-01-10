@@ -201,6 +201,216 @@ async def get_trade_decision(symbol: str, timeframe: str = "M5"):
         "execution_enabled": ml_prediction.get("execution_enabled", False) if ml_prediction else False
     }
 
+@mcp.tool()
+async def get_full_market_context(symbol: str, timeframe: str = "M5"):
+    """
+    ⭐ SUPER ENDPOINT PARA N8N (SSH Gateway).
+    
+    Consolida TODO en un único JSON para que el Agente N8N tome decisiones
+    basadas en la estrategia FEAT completa, no en datos crudos.
+    
+    Incluye:
+    - raw_data: OHLCV actual
+    - indicators: FEAT, PVP, EMAs
+    - ml_insight: Predicción + Explicabilidad
+    - memory_context: Recuerdos RAG relevantes
+    - strategy_guidance: Prompt sugerido para N8N
+    """
+    from datetime import datetime
+    
+    # 1. DATOS CRUDOS
+    snapshot = await market.get_market_snapshot(symbol, timeframe)
+    price_data = snapshot.get("price", {})
+    candle = snapshot.get("current_candle", {})
+    volatility = snapshot.get("volatility", {})
+    
+    raw_data = {
+        "open": candle.get("open"),
+        "high": candle.get("high"),
+        "low": candle.get("low"),
+        "close": candle.get("close"),
+        "volume": candle.get("volume"),
+        "bid": price_data.get("bid"),
+        "ask": price_data.get("ask"),
+        "spread_points": volatility.get("spread_points")
+    }
+    
+    # 2. INDICADORES FEAT
+    indicators = {
+        "feat": {
+            "score": 0.0,  # Placeholder - viene de MT5 vía ZMQ
+            "form": {"bos": False, "choch": False, "intent_candle": False},
+            "space": {"at_zone": False, "proximity": 0.0, "zone_type": "NONE"},
+            "acceleration": {
+                "velocity": 0.0,
+                "momentum": 0.0,
+                "rsi": 50.0,
+                "is_exhausted": False
+            },
+            "time": {
+                "is_killzone": False,
+                "session": "UNKNOWN",
+                "is_london_kz": False,
+                "is_ny_kz": False
+            }
+        },
+        "ema_layers": {
+            "micro": {"compression": 0.5, "slope": 0.0},
+            "operational": {"slope": 0.0},
+            "macro": {"slope": 0.0},
+            "bias": {"slope": 0.0, "direction": "NEUTRAL"}
+        },
+        "pvp": {
+            "poc": None,  # Point of Control
+            "vah": None,  # Value Area High
+            "val": None,  # Value Area Low
+            "distance_to_poc": None
+        },
+        "volatility": {
+            "atr": volatility.get("atr"),
+            "atr_pips": volatility.get("atr_pips"),
+            "status": volatility.get("volatility_status", "NORMAL")
+        },
+        "fsm_state": "CALIBRATING"
+    }
+    
+    # 3. ML INSIGHT CON EXPLICABILIDAD
+    ml_insight = {
+        "model": "NONE",
+        "prediction": "WAIT",
+        "win_probability": 0.5,
+        "anomaly_score": 0.0,
+        "is_anomaly": False,
+        "top_drivers": [],
+        "explanation": "ML models not loaded - collecting training data"
+    }
+    
+    try:
+        from app.ml.ml_engine import ml_engine
+        
+        features = {
+            "close": raw_data.get("close", 0) or 0,
+            "open": raw_data.get("open", 0) or 0,
+            "high": raw_data.get("high", 0) or 0,
+            "low": raw_data.get("low", 0) or 0,
+            "volume": raw_data.get("volume", 0) or 0,
+            "rsi": indicators["feat"]["acceleration"]["rsi"],
+            "ema_fast": raw_data.get("close", 0) or 0,
+            "ema_slow": raw_data.get("close", 0) or 0,
+            "ema_spread": 0,
+            "feat_score": indicators["feat"]["score"],
+            "fsm_state": 0,
+            "atr": volatility.get("atr", 0.001) or 0.001,
+            "compression": 0.5,
+            "liquidity_above": 0,
+            "liquidity_below": 0
+        }
+        
+        pred = ml_engine.ensemble_predict(features)
+        
+        ml_insight = {
+            "model": pred.get("source", "NONE"),
+            "prediction": pred.get("prediction", "WAIT"),
+            "win_probability": pred.get("p_win", 0.5),
+            "anomaly_score": pred.get("anomaly_score", 0.0),
+            "is_anomaly": pred.get("is_anomaly", False),
+            "top_drivers": _get_top_drivers(features, pred),
+            "explanation": _generate_explanation(pred, indicators)
+        }
+    except Exception as e:
+        logger.warning(f"ML insight unavailable: {e}")
+    
+    # 4. MEMORIA RAG
+    memory_context = []
+    try:
+        from app.services.rag_memory import rag_memory
+        memories = rag_memory.search(f"{symbol} trading pattern", limit=3)
+        memory_context = [
+            {"text": m["text"][:200], "relevance": m["score"]}
+            for m in memories
+        ]
+    except Exception as e:
+        logger.debug(f"RAG unavailable: {e}")
+    
+    # 5. GUÍA PARA EL AGENTE N8N
+    strategy_guidance = {
+        "system_prompt_suggestion": f"""
+You are analyzing {symbol} on {timeframe} timeframe.
+Current market state: {indicators['fsm_state']}
+Volatility: {indicators['volatility']['status']}
+
+FEAT Strategy Rules:
+- Only trade during killzones (London/NY overlap)
+- Wait for FSM state = EXPANSION for entries
+- Respect PVP levels (POC, VAH, VAL) as support/resistance
+- FEAT Score > 70 = Strong signal
+- Anomaly = Potential manipulation, avoid trading
+
+Based on the data provided, decide: BUY, SELL, or WAIT.
+        """.strip(),
+        "decision_checklist": [
+            "Is it a killzone? (London or NY session)",
+            "Is FSM in EXPANSION or ready to expand?",
+            "Is price at a significant PVP level?",
+            "Is FEAT Score > 70?",
+            "Is ML win_probability > 0.6?",
+            "Is anomaly_score < 0.5? (no manipulation)"
+        ]
+    }
+    
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "timestamp": datetime.utcnow().isoformat(),
+        "raw_data": raw_data,
+        "indicators": indicators,
+        "ml_insight": ml_insight,
+        "memory_context": memory_context,
+        "strategy_guidance": strategy_guidance
+    }
+
+
+def _get_top_drivers(features: dict, prediction: dict) -> list:
+    """Extrae los factores principales que influyen en la predicción."""
+    drivers = []
+    
+    if features.get("rsi", 50) < 30:
+        drivers.append("RSI_Oversold")
+    elif features.get("rsi", 50) > 70:
+        drivers.append("RSI_Overbought")
+        
+    if features.get("feat_score", 0) > 70:
+        drivers.append("FEAT_Strong_Signal")
+        
+    if features.get("ema_spread", 0) > 0:
+        drivers.append("EMA_Bullish_Cross")
+    elif features.get("ema_spread", 0) < 0:
+        drivers.append("EMA_Bearish_Cross")
+        
+    if prediction.get("is_anomaly"):
+        drivers.append("ANOMALY_DETECTED")
+        
+    return drivers[:5]
+
+
+def _generate_explanation(prediction: dict, indicators: dict) -> str:
+    """Genera explicación legible para el agente N8N."""
+    p_win = prediction.get("p_win", 0.5)
+    source = prediction.get("source", "NONE")
+    
+    if source == "NONE":
+        return "No ML models available. Decision based on rules only."
+        
+    direction = "LONG" if p_win > 0.5 else "SHORT"
+    confidence = "high" if abs(p_win - 0.5) > 0.3 else "moderate" if abs(p_win - 0.5) > 0.15 else "low"
+    
+    explanation = f"{source} model suggests {direction} with {confidence} confidence ({p_win:.1%}). "
+    
+    if prediction.get("is_anomaly"):
+        explanation += "⚠️ ANOMALY DETECTED - potential market manipulation. Avoid trading."
+        
+    return explanation
+
 # =============================================================================
 # PILLAR 3: SIMULADOR DE SOMBRAS (Backtest Automator)
 # =============================================================================
