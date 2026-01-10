@@ -30,7 +30,7 @@ RESET = "\033[0m"
 BOLD = "\033[1m"
 
 # Force UTF-8 for stdout if possible, or handle replacement
-if sys.stdout.encoding != 'utf-8':
+if hasattr(sys.stdout, 'encoding') and sys.stdout.encoding != 'utf-8':
     try:
         sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
     except Exception:
@@ -39,8 +39,10 @@ if sys.stdout.encoding != 'utf-8':
 # Fallback symbols if encoding fails
 USE_FANCY = True
 try:
-    "✅".encode(sys.stdout.encoding or 'ascii')
-except UnicodeEncodeError:
+    # Check encoding efficiently
+    enc = getattr(sys.stdout, 'encoding', 'ascii') or 'ascii'
+    "✅".encode(enc)
+except Exception:
     USE_FANCY = False
 
 def safe_print(msg):
