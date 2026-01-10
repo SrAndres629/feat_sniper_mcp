@@ -64,6 +64,43 @@ def load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray]:
     return np.array(X, dtype=np.float32), np.array(y, dtype=np.int64)
 
 
+def load_from_sqlite(db_path: str = "data/market_data.db") -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Carga dataset directamente desde SQLite (más eficiente que CSV).
+    Lee de la tabla training_samples.
+    
+    Returns:
+        X: Features matrix (N, D)
+        y: Labels array (N,)
+    """
+    import sqlite3
+    
+    if not os.path.exists(db_path):
+        raise FileNotFoundError(f"Database not found: {db_path}")
+        
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    
+    query = f"""
+        SELECT {', '.join(FEATURE_NAMES)}, label
+        FROM training_samples
+        ORDER BY timestamp
+    """
+    
+    cursor = conn.execute(query)
+    rows = cursor.fetchall()
+    conn.close()
+    
+    if not rows:
+        raise ValueError("No training samples in database")
+        
+    X = np.array([[row[k] for k in FEATURE_NAMES] for row in rows], dtype=np.float32)
+    y = np.array([row["label"] for row in rows], dtype=np.int64)
+    
+    logger.info(f"Loaded {len(X)} samples from SQLite: {db_path}")
+    return X, y
+
+
 # =============================================================================
 # FASE 2: GRADIENT BOOSTING (TABULAR)
 # =============================================================================

@@ -9,6 +9,24 @@
 | `SEQ_LEN` | `32` | Longitud de secuencia LSTM |
 | `N_LOOKAHEAD` | `10` | Velas para Oracle labeling |
 | `PROFIT_THRESHOLD` | `0.002` | 0.2% para WIN |
+| `BATCH_SIZE` | `100` | Ticks por batch insert |
+
+## 💾 Database (SQLite WAL)
+
+| Setting | Value |
+|---------|-------|
+| **Path** | `data/market_data.db` |
+| **Mode** | WAL (Write-Ahead Logging) |
+| **Concurrency** | ✅ Reads/Writes simultáneas |
+| **Tables** | `ticks`, `training_samples` |
+| **Indexes** | `symbol+timestamp`, `unlabeled` |
+
+```sql
+PRAGMA journal_mode=WAL;
+PRAGMA synchronous=NORMAL;
+PRAGMA cache_size=10000;
+PRAGMA temp_store=MEMORY;
+```
 
 ## 🧠 Models
 
