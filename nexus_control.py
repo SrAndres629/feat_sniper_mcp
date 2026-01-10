@@ -191,9 +191,25 @@ class NexusControl:
             time.sleep(2)
             self.start_mt5()
             repaired = True
-            
+
+        if "MODELS_MISSING" in anomalies:
+            log("[FIX] Modelos de IA faltantes. Iniciando entrenamiento de emergencia...", YELLOW)
+            # Check if training script exists
+            train_script = os.path.join(PROJECT_DIR, "app", "ml", "train_models.py")
+            if os.path.exists(train_script):
+                log(f"[EXEC] python {train_script}", WHITE)
+                # Run training (this might take a while)
+                t_out, t_err, t_code = run_cmd(f"python \"{train_script}\"")
+                if t_code == 0:
+                     log("[OK] Modelos generados exitosamente.", GREEN)
+                     repaired = True
+                else:
+                     log(f"[ERR] Fallo el entrenamiento: {t_err[:100]}...", RED)
+            else:
+                 log("[ERR] Script de entrenamiento no encontrado.", RED)
+
         if repaired:
-            time.sleep(5) # Wait for fixes to settle
+            time.sleep(2) # Wait for fixes to settle
             return True
             
         log("[ALERT] No se pudieron aplicar correcciones automáticas para los errores actuales.", RED)

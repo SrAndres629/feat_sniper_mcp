@@ -12,7 +12,7 @@ echo      NN N NN  EEEEE      XXX    UU   UU   SSSSS   PPPPPP
 echo      NN  NNN  EE        XX XX   UU   UU       SS  P
 echo      NN   NN  EEEEEEE  XX   XX   UUUUU    SSSSS   P
 echo.
-echo      [ MASTER AUDIT + AUTO-HEALING PROTOCOL v3.0 ]
+echo      [ MASTER AUDIT AND AUTO-HEALING PROTOCOL v3.0 ]
 echo ==============================================================================
 echo.
 
