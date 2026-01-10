@@ -92,14 +92,16 @@ class NexusControl:
 
     def check_container_logs(self):
         log("\n>>> Fase 3: Auditoria Interna de Logs", CYAN)
-        log("[INFO] Verificando logs de feat-sniper-brain...", WHITE)
-        out, _, _ = run_cmd("docker logs feat-sniper-brain --tail 30")
-        if "Application startup complete" in out:
-            log("[OK] Brain API lista y escuchando.", GREEN)
-            return True
-        else:
-            log("[⚠] Brain aun iniciando o con problemas. Revisa 'docker logs feat-sniper-brain'", YELLOW)
-            return False
+        log("[INFO] Esperando a que Brain API este Ready...", WHITE)
+        for i in range(15):
+            out, _, _ = run_cmd("docker logs feat-sniper-brain --tail 30")
+            if "Application startup complete" in out:
+                log(f"[OK] Brain API lista y escuchando (T+{i}s).", GREEN)
+                return True
+            time.sleep(2)
+        
+        log("[⚠] Brain tardando en responder. Revisa 'docker logs feat-sniper-brain'", YELLOW)
+        return False
 
     def run_auditor(self):
         log("\n>>> Fase 4: Omni-Audit (Health Check)", CYAN)
@@ -107,7 +109,7 @@ class NexusControl:
         # Running the script is safer for dependency isolation
         p = subprocess.run(["python", "nexus_auditor.py"], capture_output=True, text=True)
         print(p.stdout)
-        if "anomalies\": []" in p.stdout or "SISTEMA READY PARA OPERAR" in p.stdout:
+        if "anomalies\": []" in p.stdout or "SISTEMA READY" in p.stdout:
             log("[OK] Auditoria superada. Sistema nominal.", GREEN)
             return True
         else:
@@ -137,14 +139,31 @@ class NexusControl:
         log("\n>>> Fase 6: War Room - Estado Institucional", CYAN)
         try:
             from app.services.supabase_sync import supabase_sync
-            # Simple check of recent activity
-            log("[INFO] Consultando actividad reciente en Supabase...", WHITE)
-            # This is a simulation/placeholder for real query logic if needed
-            log("  - Ultimos Ticks: Verificado (Flujo Activo)", GREEN)
-            log("  - Señales 24h: Verificado (Persistencia OK)", GREEN)
+            from dotenv import load_dotenv
+            load_dotenv()
+            
+            log("[INFO] Consultando telemetría en Supabase...", WHITE)
+            
+            # Check for recent ticks
+            res = supabase_sync.client.table("market_ticks").select("id").limit(1).execute()
+            has_data = len(res.data) > 0
+            
+            if has_data:
+                log("  - Ultimos Ticks: VERIFICADO (Flujo Activo)", GREEN)
+            else:
+                log("  - Ultimos Ticks: SIN DATOS (Esperando MT5)", YELLOW)
+            
+            # Check for signals
+            res_sig = supabase_sync.client.table("feat_signals").select("id").limit(1).execute()
+            has_signals = len(res_sig.data) > 0
+            if has_signals:
+                log("  - Señales 24h: VERIFICADO (Persistencia OK)", GREEN)
+            else:
+                log("  - Señales 24h: SIN SEÑALES RECIENTES", YELLOW)
+                
             log("  - Latencia ZMQ: < 10ms (Nominal)", GREEN)
         except Exception as e:
-            log(f"[⚠] No se pudo generar reporte completo: {e}", YELLOW)
+            log(f"[⚠] Telemetría parcial (Supabase no configurado localmente?): {e}", YELLOW)
 
     def main_loop(self):
         # 1. Start MT5

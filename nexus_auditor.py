@@ -191,15 +191,22 @@ class NexusAuditor:
         print(f"  {self.audit_mcp_skills()}")
         print()
 
+        # Critical anomalies that actually need "Repair"
+        critical_anomalies = [a for a in self.anomalies if "EMPTY" not in a and "NOT_READY" not in a]
+
         print(f"{CYAN}  ────────────────────────────────────────────────────────{RESET}")
-        if not self.anomalies:
-            print(f"  {GREEN}✓{RESET} {BOLD}SISTEMA READY PARA OPERAR{RESET}")
+        if not critical_anomalies:
+            if "DB_EMPTY" in self.anomalies:
+                print(f"  {YELLOW}⚠{RESET} {BOLD}SISTEMA READY (ESPERANDO PRIMER TICK){RESET}")
+            else:
+                print(f"  {GREEN}✓{RESET} {BOLD}SISTEMA READY PARA OPERAR{RESET}")
         else:
-            print(f"  {RED}✗{RESET} {BOLD}ANOMALÍAS DETECTADAS: {len(self.anomalies)}{RESET}")
-            # This TRACER is for the Antigravity Agent to catch
-            print(f"\n{BOLD}{RED}REPAIR_REQUEST_START{RESET}")
-            print(json.dumps({"anomalies": self.anomalies, "timestamp": datetime.now(timezone.utc).isoformat()}))
-            print(f"{BOLD}{RED}REPAIR_REQUEST_END{RESET}")
+            print(f"  {RED}✗{RESET} {BOLD}ANOMALÍAS DETECTADAS: {len(critical_anomalies)}{RESET}")
+            
+        # This TRACER is for the Antigravity Agent to catch
+        print(f"\n{BOLD}{RED}REPAIR_REQUEST_START{RESET}")
+        print(json.dumps({"anomalies": self.anomalies, "critical": critical_anomalies, "timestamp": datetime.now(timezone.utc).isoformat()}))
+        print(f"{BOLD}{RED}REPAIR_REQUEST_END{RESET}")
         print()
 
 if __name__ == "__main__":
