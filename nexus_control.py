@@ -112,9 +112,15 @@ class NexusControl:
         log("\n>>> Fase 4: Omni-Audit (Health Check)", CYAN)
         # Import and run auditor logic or run script
         # Running the script is safer for dependency isolation
-        p = subprocess.run(["python", "nexus_auditor.py"], capture_output=True, text=True, encoding="utf-8")
+        # Run auditor with UTF-8 encoding force
+        p = subprocess.run(["python", "nexus_auditor.py"], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        
+        # ALWAYS print the output so the user sees the granular breakdown
         print(p.stdout)
         
+        if p.stderr:
+            log(f"[DEBUG] Stderr: {p.stderr}", YELLOW)
+
         # Robust parsing of REPAIR_REQUEST
         try:
             if "REPAIR_REQUEST_START" in p.stdout:

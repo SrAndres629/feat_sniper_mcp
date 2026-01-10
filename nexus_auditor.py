@@ -8,30 +8,33 @@ Checks: Config, Connectivity, Processes, Intelligence, and MCP Skills.
 Outputs "NEXUS_REPAIR_NEEDED" if anomalies are found to trigger Agent auto-healing.
 """
 
-import os
-import sys
-import socket
-import sqlite3
-import glob
-import subprocess
-import json
-from datetime import datetime, timezone
-import urllib.request
-import urllib.error
+import codecs
 
-# ANSI Colors for Visual Output
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-CYAN = "\033[96m"
-WHITE = "\033[97m"
-RESET = "\033[0m"
-BOLD = "\033[1m"
+# Force UTF-8 for stdout if possible, or handle replacement
+if sys.stdout.encoding != 'utf-8':
+    try:
+        sys.stdout = codecs.getwriter("utf-8")(sys.stdout.detach())
+    except Exception:
+        pass
 
-def ok(msg): return f"{GREEN}[OK] {RESET} {msg}"
-def err(msg): return f"{RED}[ERR]{RESET} {msg}"
-def warn(msg): return f"{YELLOW}[⚠] {RESET} {msg}"
-def info(msg): return f"{CYAN}[INF]{RESET} {msg}"
+# Fallback symbols if encoding fails
+USE_FANCY = True
+try:
+    "✅".encode(sys.stdout.encoding or 'ascii')
+except UnicodeEncodeError:
+    USE_FANCY = False
+
+def safe_print(msg):
+    try:
+        print(msg)
+    except UnicodeEncodeError:
+        # Strip non-ascii if print fails
+        print(msg.encode('ascii', 'ignore').decode('ascii'))
+
+def ok(msg): return f"{GREEN}[OK]{RESET} {msg}" if USE_FANCY else f"[OK] {msg}"
+def err(msg): return f"{RED}[ERR]{RESET} {msg}" if USE_FANCY else f"[ERR] {msg}"
+def warn(msg): return f"{YELLOW}[WARN]{RESET} {msg}" if USE_FANCY else f"[WARN] {msg}"
+def info(msg): return f"{CYAN}[INFO]{RESET} {msg}" if USE_FANCY else f"[INFO] {msg}"
 
 def load_env():
     """Loads .env into os.environ for local execution."""
