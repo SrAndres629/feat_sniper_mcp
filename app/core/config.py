@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     MT5_SERVER: Optional[str] = None
     MT5_PATH: Optional[str] = None  # Ruta al terminal64.exe si no es la por defecto
     
+    # Connectivity Ports
+    ZMQ_PORT: int = 5555
+    
     # API Settings
     API_HOST: str = "127.0.0.1"  # Security: Bind to localhost by default
     API_PORT: int = 8000
@@ -37,6 +40,10 @@ class Settings(BaseSettings):
     ENABLE_PROMETHEUS_METRICS: bool = True
     LATENCY_P99_THRESHOLD_MS: int = 200
     CORRELATION_ID_HEADER: str = "X-Correlation-ID"
+    
+    # Execution Control (Safety)
+    EXECUTION_ENABLED: bool = False  # Master Switch
+    SHADOW_MODE: bool = True         # Simulation Mode (Paper Trading)
     
     # Supabase & Cloud Nexus
     SUPABASE_URL: Optional[str] = None

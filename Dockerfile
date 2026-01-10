@@ -6,14 +6,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # =============================================================================
-# LAYER 1: HEAVY ML DEPENDENCIES (Cached - 3GB+, rarely changes)
-# PyTorch CPU + ChromaDB + XGBoost
-# =============================================================================
-COPY requirements_heavy.txt .
-RUN pip install --no-cache-dir -r requirements_heavy.txt
-
-# =============================================================================
-# LAYER 2: LIGHT DEPENDENCIES (Changes occasionally)
+# LAYER 1: DEPENDENCIES (Consolidated)
 # =============================================================================
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
