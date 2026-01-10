@@ -123,8 +123,11 @@ class NexusControl:
 
         # Robust parsing of REPAIR_REQUEST
         try:
-            if "REPAIR_REQUEST_START" in p.stdout:
-                tracer_str = p.stdout.split("REPAIR_REQUEST_START")[1].split("REPAIR_REQUEST_END")[0].strip()
+            import re
+            json_match = re.search(r'REPAIR_REQUEST_START\s*(\{.*?\})\s*REPAIR_REQUEST_END', p.stdout, re.DOTALL)
+            
+            if json_match:
+                tracer_str = json_match.group(1)
                 tracer = json.loads(tracer_str)
                 critical = tracer.get("critical", [])
                 
@@ -156,9 +159,8 @@ class NexusControl:
                     
                 log("!"*60 + "\n", RED)
                 return False
-
         except Exception as e:
-            log(f"[⚠] Error parsing tracer: {e}", YELLOW)
+            log(f"[DEBUG] JSON Parsed failed (using failsafe): {e}", YELLOW)
 
         if "SISTEMA READY" in p.stdout:
             log("[OK] Auditoria superada (Failsafe).", GREEN)
