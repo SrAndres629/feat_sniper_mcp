@@ -8,7 +8,26 @@ Checks: Config, Connectivity, Processes, Intelligence, and MCP Skills.
 Outputs "NEXUS_REPAIR_NEEDED" if anomalies are found to trigger Agent auto-healing.
 """
 
+import os
+import sys
+import socket
+import sqlite3
+import glob
+import subprocess
+import json
+from datetime import datetime, timezone
+import urllib.request
+import urllib.error
 import codecs
+
+# ANSI Colors for Visual Output
+GREEN = "\033[92m"
+RED = "\033[91m"
+YELLOW = "\033[93m"
+CYAN = "\033[96m"
+WHITE = "\033[97m"
+RESET = "\033[0m"
+BOLD = "\033[1m"
 
 # Force UTF-8 for stdout if possible, or handle replacement
 if sys.stdout.encoding != 'utf-8':
