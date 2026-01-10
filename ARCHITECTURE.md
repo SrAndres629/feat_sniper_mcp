@@ -1,146 +1,87 @@
-# FEAT Sniper NEXUS Architecture
+# 🏗️ FEAT NEXUS PRIME Architecture
 
 ## Overview
 
-FEAT Sniper NEXUS es una arquitectura institucional que separa el **motor de trading** (MT5/Windows) del **cerebro de IA** (Docker/Python), permitiendo memoria infinita y procesamiento ML sin afectar latencia de ejecución.
+FEAT NEXUS PRIME is an institutional-grade algorithmic trading architecture designed to decouple the **Execution Layer** (MT5/Windows) from the **Intelligence Cluster** (Docker/Python). It features infinite memory (RAG), high-frequency persistence (Supabase), and unified lifecycle orchestration.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                          ARQUITECTURA NEXUS                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  ┌──────────────────┐         ZMQ (5555)        ┌────────────────────────┐ │
-│  │    MT5 WINDOWS   │ ◄──────────────────────►  │    DOCKER BRAIN       │ │
-│  │                  │                           │                        │ │
-│  │  ┌────────────┐  │   Señales/Precios/FSM     │  ┌──────────────────┐  │ │
-│  │  │ UnifiedModel│──┼──────────────────────────┼──┤  MCP Server (SSE)│  │ │
-│  │  │   .mq5     │  │                           │  │   Port 8000      │  │ │
-│  │  └────────────┘  │                           │  └────────┬─────────┘  │ │
-│  │                  │                           │           │            │ │
-│  │  ┌────────────┐  │                           │  ┌────────▼─────────┐  │ │
-│  │  │  CFEAT     │  │                           │  │    RAG Memory    │  │ │
-│  │  │  CFSM      │  │                           │  │   (ChromaDB)     │  │ │
-│  │  │  CLiquidity│  │                           │  │   Persistent Vol │  │ │
-│  │  └────────────┘  │                           │  └──────────────────┘  │ │
-│  └──────────────────┘                           └────────────────────────┘ │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+## 📡 System Topology
 
-## Data Flow
+```mermaid
+graph TD
+    subgraph "WINDOWS HOST (Execution Layer)"
+        MT5["MetaTrader 5 Terminal"]
+        CC["nexus_control.py (Orchestrator)"]
+        MQL5["MQL5 Indicators (ZMQ Stream)"]
+    end
 
-1. **MT5 → Docker (ZMQ PUB/SUB)**
-   - `UnifiedModel_Main.mq5` calcula FEAT score, FSM state, liquidez
-   - Publica datos via ZMQ en puerto 5555
-   
-2. **Docker Processing**
-   - `ZMQ Bridge` recibe datos
-   - `RAG Memory` almacena patrones para aprendizaje
-   - `MCP Server` expone tools para agentes IA
+    subgraph "DOCKER CLUSTER (Intelligence Layer)"
+        Brain["feat-sniper-brain (FastMCP)"]
+        Dash["feat-sniper-dashboard (Next.js)"]
+        ZMQ["ZMQ Bridge (Sub 5555)"]
+        RAG["ChromaDB (Local Memory)"]
+    end
 
-3. **Docker → Agents (SSE)**
-   - Agentes (Claude, GPT, etc.) consultan via SSE en puerto 8000
-   - Tools disponibles: `remember`, `recall`, `forget`, `memory_stats`
+    subgraph "CLOUD LAYER (Persistence)"
+        DB["Supabase (Institutional Schema)"]
+    end
 
-## SSH Tunnel Access (Remote Memory)
-
-El puerto **8000** expone la API SSE del Agente.  
-Para acceso remoto seguro con "memoria ilimitada", usa un túnel SSH:
-
-```bash
-# Desde tu máquina local, crea túnel al servidor con Docker
-ssh -L 8000:localhost:8000 -L 5555:localhost:5555 user@remote-server
-
-# Ahora puedes conectar tu agente local a:
-# - SSE API: http://localhost:8000
-# - ZMQ: tcp://localhost:5555
+    MQL5 -- "Ticks/Signals (ZMQ)" --> ZMQ
+    ZMQ --> Brain
+    Brain -- "Audit/Signals" --> DB
+    Brain -- "Patterns" --> RAG
+    Dash -- "SSE" --> Brain
+    CC -- "Control" --> MT5
+    CC -- "Control" --> Brain
 ```
 
-Esto permite que cualquier agente IA (Claude, Qwen, etc.) acceda a la memoria RAG persistente como si estuviera local.
+## 🔄 The 4-Pillar Lifecycle
 
-## Quick Start
+### 1. The Bridge (MQL5 → ZMQ)
+- `UnifiedModel_Main.mq5`: High-frequency feature extraction (FEAT metrics).
+- `InstitutionalPVP.mq5`: Volume profile and liquidity analysis.
+- **Protocol**: Raw ZMQ streaming on Port 5555.
 
-### One-Click Setup (Windows)
-```batch
-start_nexus.bat
-```
+### 2. The Brain (FastMCP Server)
+- **Engine**: Python-based MCP server running in Docker.
+- **RAG Memory**: Local persistence for narrative and pattern storage via ChromaDB.
+- **Self-Healing**: Triggered by the Omni-Auditor for automated logic correction.
 
-### Manual Setup
-```bash
-# 1. Build and start
-docker compose up --build -d
+### 3. The Persistence (Supabase)
+- **Tick Logging**: High-frequency capture into `market_ticks`.
+- **Signal Audit**: End-to-end signal tracking in `feat_signals`.
+- **Learning**: `ml_inference_logs` store input features for future model retraining.
 
-# 2. Check logs
-docker logs feat-sniper-brain -f
+### 4. The Orchestration (`nexus_control.py`)
+- **Golden Start**: Sequential MT5 -> Docker -> Web boot.
+- **War Room Report**: Pre-ignition system health summary.
+- **Graceful Shutdown**: SIGINT handling for total system safety.
 
-# 3. Verify endpoints
-# SSE: http://localhost:8000
-# ZMQ: tcp://localhost:5555
-```
-
-## Project Structure
+## 📂 Project Structure
 
 ```
 feat_sniper_mcp/
-├── app/                          # Python backend
-│   ├── core/
-│   │   ├── mt5_conn.py          # MT5 connection (passive in Docker)
-│   │   ├── zmq_bridge.py        # ZMQ pub/sub handling
-│   │   └── config.py            # Settings
-│   ├── services/
-│   │   ├── rag_memory.py        # ChromaDB vector store
-│   │   └── supabase_sync.py     # Cloud sync
-│   └── skills/                   # Trading skills (market, execution, etc.)
+├── app/                          # Distributed Logic
+│   ├── core/                     # Infrastructure (ZMQ, SSE)
+│   ├── skills/                   # MCP Tools (Market, Execution, ML)
+│   ├── services/                 # Persistence (Supabase, ChromaDB)
+│   └── ml/                       # Local Training & Models
 │
-├── FEAT_Sniper_Master_Core/     # MQL5 indicator code
-│   ├── UnifiedModel_Main.mq5    # Main indicator
-│   └── Include/UnifiedModel/    # CFEAT, CFSM, CLiquidity modules
+├── FEAT_Sniper_Master_Core/      # MQL5 Physics
+│   ├── UnifiedModel_Main.mq5     # Main Extraction Logic
+│   └── Include/                  # CFEAT, CFSM, CLiquidity
 │
-├── mcp_server.py                # FastMCP entry point (SSE transport)
-├── docker-compose.yml           # Docker orchestration
-├── Dockerfile                   # Python image
-├── requirements.txt             # Python dependencies
-├── start_nexus.bat              # One-click startup (Windows)
-├── ARCHITECTURE.md              # This file
-└── _deprecated/                 # Archived obsolete files
+├── nexus_control.py              # SYSTEM ORCHESTRATOR
+├── nexus.bat                     # Main Ignition Switch
+├── stop_nexus.bat                # Emergency Stop
+├── nexus_auditor.py              # Omni-System Auditor
+└── dashboard/                    # Visual Cockpit (Next.js)
 ```
 
-## MCP Tools Available
-
-| Tool | Description |
-|------|-------------|
-| `remember(text, category)` | Store information in persistent RAG memory |
-| `recall(query, limit)` | Semantic search in memory |
-| `forget(category)` | Delete memories by category |
-| `memory_stats()` | Get memory statistics |
-| `get_market_snapshot(symbol)` | Current market state |
-| `execute_trade(...)` | Execute trading orders |
-| `get_account_status()` | Account metrics |
-
-## Volumes & Persistence
-
-| Volume | Path | Purpose |
-|--------|------|---------|
-| `chroma-data` | `/app/data/chroma` | RAG memory persistence (survives restarts) |
-
-## Environment Variables
-
-```env
-# .env file
-MT5_LOGIN=your_login
-MT5_PASSWORD=your_password
-MT5_SERVER=your_server
-CHROMA_PERSIST_DIR=/app/data/chroma
-DOCKER_MODE=true
-```
-
-## Ports
-
-| Port | Protocol | Service |
-|------|----------|---------|
-| 8000 | HTTP/SSE | MCP Server (AI Agents) |
-| 5555 | TCP/ZMQ | MT5 Bridge (Market Data) |
-| 9090 | HTTP | Prometheus Metrics |
+## 🌐 Connectivity & Security
+- **ZMQ Bridge**: Port 5555 (Encrypted via SSH if remote).
+- **FastMCP API**: Port 8000 (SSE Transport).
+- **Dashboard**: Port 3000.
+- **Supabase**: RLS (Row Level Security) enabled on all institutional tables.
 
 ---
-*Last updated: 2026-01-10*
+*Senior Architecture Document | MT5 Neural Sentinel | v2.25*
