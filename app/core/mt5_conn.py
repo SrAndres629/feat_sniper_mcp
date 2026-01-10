@@ -45,7 +45,12 @@ class MT5Connection:
     async def startup(self) -> bool:
         """
         Inicializa la conexión con el terminal MT5 e inicia el watchdog.
+        En Linux/Docker, entra en modo pasivo sin lanzar errores.
         """
+        if not MT5_AVAILABLE:
+            logger.info("Entorno Linux/Docker detectado. Saltando inicialización local de MT5. Esperando conexión ZMQ...")
+            return True
+            
         success = await self.execute(self._initialize_mt5)
         if success:
             self.start_watchdog()
@@ -125,7 +130,14 @@ class MT5Connection:
         """
         Punto de entrada maestro para ejecutar cualquier función de mt5.
         Instrumentado con OTel y Métricas de Latencia.
+        En Docker/Linux retorna None gracefully.
         """
+        # Bypass completo si MT5 no está disponible
+        if not MT5_AVAILABLE:
+            op_name = func.__name__ if hasattr(func, "__name__") else "mt5_call"
+            logger.debug(f"[Docker Mode] Operación '{op_name}' ignorada - MT5 no disponible.")
+            return None
+        
         from app.core.observability import obs_engine, tracer
         import time
 
@@ -151,8 +163,11 @@ class MT5Connection:
 
     def _locked_execution(self, func: Callable[..., T], *args, **kwargs) -> T:
         """Envuelve la ejecución de la función dentro del lock de MT5."""
+        # Este punto NUNCA debería alcanzarse si MT5 no está disponible
+        # debido al bypass en execute(), pero lo dejamos como failsafe.
         if not MT5_AVAILABLE:
-            raise RuntimeError("Operación MT5 solicitada pero la librería no está disponible.")
+            logger.error("[Failsafe] _locked_execution llamado sin MT5. Esto no debería pasar.")
+            return None
             
         with self._mt5_lock:
             # Una verificación extra de seguridad
