@@ -182,4 +182,17 @@ async def get_live_signals():
     return "Stream Active"
 
 if __name__ == "__main__":
-    mcp.run()
+    import os
+    import sys
+    
+    # Detectar si estamos en Docker/Linux (sin TTY) o en Windows (con TTY)
+    # En Docker usamos HTTP para que el servidor persista
+    # En Windows local usamos STDIO para integración directa con IDE
+    is_docker = not sys.stdin.isatty() or os.environ.get("DOCKER_MODE", "").lower() == "true"
+    
+    if is_docker:
+        logger.info("🐳 Modo Docker detectado - Iniciando servidor HTTP en puerto 8000...")
+        mcp.run(transport="http", host="0.0.0.0", port=8000)
+    else:
+        logger.info("🖥️ Modo Windows detectado - Iniciando servidor STDIO...")
+        mcp.run()
