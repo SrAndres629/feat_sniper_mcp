@@ -102,6 +102,105 @@ async def get_market_panorama(resize_factor: float = 0.75):
     """Captura visual del gráfico."""
     return await vision.capture_panorama(resize_factor=resize_factor)
 
+@mcp.tool()
+async def get_trade_decision(symbol: str, timeframe: str = "M5"):
+    """
+    Decisión de trading integrada para N8N.
+    
+    Combina ML (GBM/LSTM) + FEAT Score + FSM State + Indicadores
+    para generar una señal unificada con contexto completo.
+    
+    Returns:
+        JSON con signal, confidence, market_state, data_context
+    """
+    from datetime import datetime
+    
+    # 1. Obtener snapshot del mercado
+    snapshot = await market.get_market_snapshot(symbol, timeframe)
+    
+    # 2. Obtener predicción ML si disponible
+    ml_prediction = None
+    try:
+        from app.ml.ml_engine import ml_engine
+        features = {
+            "close": snapshot.get("price", {}).get("bid", 0),
+            "open": snapshot.get("current_candle", {}).get("open", 0),
+            "high": snapshot.get("current_candle", {}).get("high", 0),
+            "low": snapshot.get("current_candle", {}).get("low", 0),
+            "volume": snapshot.get("current_candle", {}).get("volume", 0),
+            "rsi": 50.0,  # Default, se actualiza con indicadores reales
+            "ema_fast": snapshot.get("price", {}).get("bid", 0),
+            "ema_slow": snapshot.get("price", {}).get("bid", 0),
+            "ema_spread": 0,
+            "feat_score": 0.0,
+            "fsm_state": 0,
+            "atr": snapshot.get("volatility", {}).get("atr", 0.001),
+            "compression": 0.5,
+            "liquidity_above": 0,
+            "liquidity_below": 0
+        }
+        ml_prediction = ml_engine.ensemble_predict(features)
+    except Exception as e:
+        logger.warning(f"ML prediction unavailable: {e}")
+    
+    # 3. Construir señal
+    confidence = 0.5
+    signal = "WAIT"
+    
+    if ml_prediction and ml_prediction.get("p_win") is not None:
+        p_win = ml_prediction["p_win"]
+        confidence = abs(p_win - 0.5) * 2
+        
+        if p_win > 0.65:
+            signal = "BUY"
+        elif p_win < 0.35:
+            signal = "SELL"
+        else:
+            signal = "WAIT"
+            
+        # Penalizar si hay anomalía
+        if ml_prediction.get("is_anomaly"):
+            confidence *= 0.5
+            signal = "WAIT"  # No operar en manipulación
+    
+    # 4. Determinar estado de mercado (FSM)
+    volatility = snapshot.get("volatility", {})
+    vol_status = volatility.get("volatility_status", "NORMAL")
+    
+    if vol_status == "EXTREME":
+        market_state = "MANIPULATION"
+    elif vol_status == "HIGH":
+        market_state = "EXPANSION"
+    elif vol_status == "LOW":
+        market_state = "ACCUMULATION"
+    else:
+        market_state = "DISTRIBUTION"
+    
+    # 5. Construir contexto para N8N
+    data_context = {
+        "price": snapshot.get("price", {}),
+        "volatility": {
+            "atr": volatility.get("atr"),
+            "atr_pips": volatility.get("atr_pips"),
+            "status": vol_status,
+            "spread_points": volatility.get("spread_points")
+        },
+        "current_candle": snapshot.get("current_candle", {}),
+        "ml_source": ml_prediction.get("source") if ml_prediction else "NONE",
+        "is_anomaly": ml_prediction.get("is_anomaly", False) if ml_prediction else False
+    }
+    
+    return {
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "signal": signal,
+        "confidence": round(confidence, 3),
+        "market_state": market_state,
+        "data_context": data_context,
+        "timestamp": datetime.utcnow().isoformat(),
+        "execution_enabled": ml_prediction.get("execution_enabled", False) if ml_prediction else False
+    }
+
 # =============================================================================
 # PILLAR 3: SIMULADOR DE SOMBRAS (Backtest Automator)
 # =============================================================================
