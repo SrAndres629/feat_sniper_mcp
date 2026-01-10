@@ -12,6 +12,10 @@ class SupabaseSync:
     """
     _client: Optional[Client] = None
 
+    @property
+    def client(self) -> Optional[Client]:
+        return self._client
+
     def __init__(self):
         self._initialize_client()
 

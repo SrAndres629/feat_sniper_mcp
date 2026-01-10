@@ -26,6 +26,10 @@ import signal
 import json
 import webbrowser
 from datetime import datetime, timezone
+from dotenv import load_dotenv
+
+# Force load .env before anything else
+load_dotenv()
 
 # Configuration
 MT5_PATH = r"C:\Program Files\LiteFinance MT5 Terminal\terminal64.exe"
@@ -94,27 +98,41 @@ class NexusControl:
         log("\n>>> Fase 3: Auditoria Interna de Logs", CYAN)
         log("[INFO] Esperando a que Brain API este Ready...", WHITE)
         for i in range(15):
-            out, _, _ = run_cmd("docker logs feat-sniper-brain --tail 30")
+            # Using service name with docker compose logs is safer
+            out, _, _ = run_cmd("docker compose logs mcp-brain --tail 30")
             if "Application startup complete" in out:
-                log(f"[OK] Brain API lista y escuchando (T+{i}s).", GREEN)
+                log(f"[OK] Brain API lista y escuchando (T+{i*2}s).", GREEN)
                 return True
             time.sleep(2)
         
-        log("[⚠] Brain tardando en responder. Revisa 'docker logs feat-sniper-brain'", YELLOW)
+        log("[⚠] Brain tardando en responder. Revisa 'docker compose logs mcp-brain'", YELLOW)
         return False
 
     def run_auditor(self):
         log("\n>>> Fase 4: Omni-Audit (Health Check)", CYAN)
         # Import and run auditor logic or run script
         # Running the script is safer for dependency isolation
-        p = subprocess.run(["python", "nexus_auditor.py"], capture_output=True, text=True)
+        p = subprocess.run(["python", "nexus_auditor.py"], capture_output=True, text=True, encoding="utf-8")
         print(p.stdout)
-        if "anomalies\": []" in p.stdout or "SISTEMA READY" in p.stdout:
-            log("[OK] Auditoria superada. Sistema nominal.", GREEN)
+        
+        # Robust parsing of REPAIR_REQUEST
+        try:
+            if "REPAIR_REQUEST_START" in p.stdout:
+                tracer_str = p.stdout.split("REPAIR_REQUEST_START")[1].split("REPAIR_REQUEST_END")[0].strip()
+                tracer = json.loads(tracer_str)
+                critical = tracer.get("critical", [])
+                if not critical:
+                    log("[OK] Auditoria superada. Sistema nominal.", GREEN)
+                    return True
+        except Exception as e:
+            log(f"[⚠] Error parsing tracer: {e}", YELLOW)
+
+        if "SISTEMA READY" in p.stdout:
+            log("[OK] Auditoria superada (Failsafe).", GREEN)
             return True
-        else:
-            log("[ERR] Anomalías detectadas en la auditoria.", RED)
-            return False
+            
+        log("[ERR] Anomalías detectadas en la auditoria.", RED)
+        return False
 
     def open_dashboard(self):
         log("\n>>> Fase 5: Visualización", CYAN)
@@ -145,21 +163,24 @@ class NexusControl:
             log("[INFO] Consultando telemetría en Supabase...", WHITE)
             
             # Check for recent ticks
-            res = supabase_sync.client.table("market_ticks").select("id").limit(1).execute()
-            has_data = len(res.data) > 0
-            
-            if has_data:
-                log("  - Ultimos Ticks: VERIFICADO (Flujo Activo)", GREEN)
+            if supabase_sync.client:
+                res = supabase_sync.client.table("market_ticks").select("id").limit(1).execute()
+                has_data = len(res.data) > 0
+                
+                if has_data:
+                    log("  - Ultimos Ticks: VERIFICADO (Flujo Activo)", GREEN)
+                else:
+                    log("  - Ultimos Ticks: SIN DATOS (Esperando MT5)", YELLOW)
+                
+                # Check for signals
+                res_sig = supabase_sync.client.table("feat_signals").select("id").limit(1).execute()
+                has_signals = len(res_sig.data) > 0
+                if has_signals:
+                    log("  - Señales 24h: VERIFICADO (Persistencia OK)", GREEN)
+                else:
+                    log("  - Señales 24h: SIN SEÑALES RECIENTES", YELLOW)
             else:
-                log("  - Ultimos Ticks: SIN DATOS (Esperando MT5)", YELLOW)
-            
-            # Check for signals
-            res_sig = supabase_sync.client.table("feat_signals").select("id").limit(1).execute()
-            has_signals = len(res_sig.data) > 0
-            if has_signals:
-                log("  - Señales 24h: VERIFICADO (Persistencia OK)", GREEN)
-            else:
-                log("  - Señales 24h: SIN SEÑALES RECIENTES", YELLOW)
+                log("  - Supabase: DESCONECTADO (Revisa .env)", RED)
                 
             log("  - Latencia ZMQ: < 10ms (Nominal)", GREEN)
         except Exception as e:
