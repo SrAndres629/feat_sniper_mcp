@@ -135,9 +135,6 @@ class NexusControl:
                     log("[OK] Auditoria superada. Sistema nominal.", GREEN)
                     return True
                 
-                # Granular Failure Report
-                log("\n" + "!"*60, RED)
-                log(">>> REPORTE DE FALLOS (Acción Requerida)", RED + BOLD)
                 
                 ANOMALY_MAP = {
                     "CONFIG_MISSING": "Faltan credenciales en .env (SUPABASE_URL/KEY)",
@@ -149,15 +146,21 @@ class NexusControl:
                     "NO_SKILLS": "MCP Server no cargó las skills (revisar mcp_server.py)."
                 }
 
+                log("!"*60, RED)
+                log(">>> REPORTE DE FALLOS (Acción Requerida)", RED + BOLD)
                 for code in critical:
-                    # Handle dynamic codes like CONFIG_MISSING_KEY
+                     # Handle dynamic codes like CONFIG_MISSING_KEY
                     desc = ANOMALY_MAP.get(code, "Error desconocido")
                     if "CONFIG_MISSING" in code and code not in ANOMALY_MAP:
                         desc = f"Configuración incompleta: {code.replace('CONFIG_MISSING_', '')}"
-                        
                     log(f"  [X] {code}: {desc}", YELLOW)
-                    
                 log("!"*60 + "\n", RED)
+
+                # TRIGGER AUTO-HEALING
+                if self.attempt_self_repair(critical):
+                    log("[INFO] Reparación exitosa. Re-auditando...", GREEN)
+                    return self.run_auditor() # Recursive retry
+                
                 return False
         except Exception as e:
             log(f"[DEBUG] JSON Parsed failed (using failsafe): {e}", YELLOW)
@@ -167,6 +170,33 @@ class NexusControl:
             return True
             
         log("[ERR] Fallo crítico en auditoría. Revisa el detalle arriba.", RED)
+        return False
+
+    def attempt_self_repair(self, anomalies):
+        """
+        NEXUS DEEP HEALER SKILL
+        Intenta solucionar anomalías conocidas automáticamente.
+        """
+        log("\n>>> INICIANDO PROTOCOLO DE AUTO-REPARACIÓN DEEP HEALER...", CYAN + BOLD)
+        repaired = False
+
+        if "MT5_OFFLINE" in anomalies:
+            log("[FIX] Detectado MT5 Caído. Reiniciando terminal...", YELLOW)
+            self.start_mt5()
+            repaired = True
+
+        if "ZMQ_NOT_READY" in anomalies and "MT5_OFFLINE" not in anomalies:
+            log("[FIX] ZMQ bloqueado. Intentando restart suave de MT5...", YELLOW)
+            run_cmd('taskkill /F /IM terminal64.exe /T')
+            time.sleep(2)
+            self.start_mt5()
+            repaired = True
+            
+        if repaired:
+            time.sleep(5) # Wait for fixes to settle
+            return True
+            
+        log("[ALERT] No se pudieron aplicar correcciones automáticas para los errores actuales.", RED)
         return False
 
     def open_dashboard(self):
