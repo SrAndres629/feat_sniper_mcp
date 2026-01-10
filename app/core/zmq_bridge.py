@@ -48,6 +48,7 @@ class ZMQBridge:
             try:
                 # Recibir mensaje de MT5
                 message = await self.socket.recv_string()
+                print(f"RAW ZMQ RECIBIDO: {message[:100]}...", flush=True)
                 data = json.loads(message)
                 
                 if self._callback:

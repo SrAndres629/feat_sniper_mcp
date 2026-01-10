@@ -11,8 +11,10 @@
 #property indicator_plots   0
 
 //+------------------------------------------------------------------+
-//| ENUMERATIONS                                                     |
+//| INCLUDES                                                         |
 //+------------------------------------------------------------------+
+#include <UnifiedModel\CInterop.mqh>
+
 enum ENUM_AGGREGATION_MODE {
    AGG_CLOSE,              // Close Price Only
    AGG_HIGH_LOW_DIST       // High-Low Distribution
@@ -142,6 +144,8 @@ datetime          g_lastHTFBar;
 datetime          g_lastSessionStart;
 double            g_tickSize;
 int               g_digits;
+CInterop          g_io;
+
 
 //+------------------------------------------------------------------+
 //| INITIALIZATION                                                   |
@@ -178,6 +182,9 @@ int OnInit() {
    g_context.score = 50.0;
    
    if(DebugMode) Print("[IPVP] Initialized. Symbol=", _Symbol, " HTF=", EnumToString(HTF_Timeframe));
+   
+   // ZMQ Initialization
+   g_io.SetEnabled(true);
    
    return INIT_SUCCEEDED;
 }
@@ -240,6 +247,9 @@ int OnCalculate(const int rates_total, const int prev_calculated,
    
    // Draw visuals
    DrawVisuals();
+   
+   // Export Data to ZMQ (ML Integration)
+   ExportToZMQ();
    
    // Performance logging
    if(DebugMode) {
@@ -781,5 +791,29 @@ void CreateLabel(string name, int x, int y, string text, color clr, int fontSize
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, fontSize);
    ObjectSetString(0, name, OBJPROP_FONT, "Consolas");
    ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+}
+
+//+------------------------------------------------------------------+
+//| EXPORT DATA TO ZMQ                                               |
+//+------------------------------------------------------------------+
+void ExportToZMQ() {
+   SBarDataExport data;
+   ZeroMemory(data);
+   
+   data.time   = TimeCurrent();
+   data.close  = iClose(_Symbol, _Period, 0);
+   data.volume = (double)iTickVolume(_Symbol, _Period, 0);
+   
+   // Metrics from context
+   data.compositeScore = g_context.score;
+   data.marketState    = EnumToString(g_context.state);
+   
+   // PVP Data
+   data.proximityScore = g_context.pvpHTF.poc; // Using POC as primary proximity reference
+   data.atZone         = (data.close >= g_context.pvpHTF.val && data.close <= g_context.pvpHTF.vah);
+   data.activeZoneType = EnumToString(g_context.shape);
+   
+   // Export
+   g_io.SendFeaturesZMQ(data, _Symbol);
 }
 //+------------------------------------------------------------------+

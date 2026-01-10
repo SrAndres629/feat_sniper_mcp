@@ -5,7 +5,7 @@ $SourceDir = "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Ma
 $MT5DataDir = "C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5"
 $CompilerPath = "C:\Program Files\LiteFinance MT5 Terminal\metaeditor64.exe"
 
-$DestIndicators = "$MT5DataDir\Indicators\FEAT_Sniper_Master"
+$DestIndicators = "$MT5DataDir\Indicators\FEAT_Sniper"
 $DestIncludes = "$MT5DataDir\Include\UnifiedModel"
 
 # --- 1. Sync Include Files ---
@@ -61,6 +61,9 @@ Invoke-IndicatorDeployment -FileName "UnifiedModel_Main.mq5"
 
 # --- 3. Compile PVP Module ---
 Invoke-IndicatorDeployment -FileName "InstitutionalPVP.mq5"
+
+# --- 4. Compile Diagnostic Ping ---
+Invoke-IndicatorDeployment -FileName "Ping.mq5"
 
 Write-Host "--- ALL DEPLOYMENTS COMPLETE ---" -ForegroundColor Yellow
 Write-Host "PLEASE REFRESH MT5 NAVIGATOR." -ForegroundColor Yellow

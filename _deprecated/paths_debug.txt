@@ -1,0 +1,33 @@
+﻿C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CInterop.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\ZmqMsg.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\ZmqMsg.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Mql.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\ZmqMsg.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Native.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CInterop.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\ZmqMsg.mqh(148,35) : error 246: parameter convertion type 'uchar[]' to 'const char[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\ZmqMsg.mqh : information: info    long libzmq::zmq_msg_gets(zmq_msg_t&,const char&[])
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh(352,23) : error 246: parameter convertion type 'char[]' to 'uchar[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh(354,30) : error 246: parameter convertion type 'char[]' to 'const uchar[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh(354,13) : error 199: wrong parameters count, 3 passed, but 2 requires
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info could be one of 5 function(s)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::setOption(int,const uchar&[],long)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::setOption(int,int)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::setOption(int,uint)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::setOption(int,long)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::setOption(int,ulong)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh(337,30) : error 246: parameter convertion type 'char[]' to 'uchar[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh(337,13) : error 199: wrong parameters count, 3 passed, but 2 requires
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info could be one of 5 function(s)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::getOption(int,uchar&[],long&)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::getOption(int,int&)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::getOption(int,uint&)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::getOption(int,long&)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh : information: info    bool SocketOptions::getOption(int,ulong&)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh(340,28) : error 246: parameter convertion type 'char[]' to 'const uchar[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh(340,13) : warning 94: implicit conversion from 'unknown' to 'string'
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh(188,22) : error 246: parameter convertion type 'char[]' to 'uchar[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh(199,22) : error 246: parameter convertion type 'char[]' to 'uchar[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh(210,22) : error 246: parameter convertion type 'char[]' to 'uchar[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh(221,22) : error 246: parameter convertion type 'char[]' to 'uchar[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh(233,42) : error 246: parameter convertion type 'uchar[]' to 'const char[] &' is not allowed
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh : information: info    int libzmq::zmq_socket_monitor(long,const char&[],int)

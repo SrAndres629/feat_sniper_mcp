@@ -17,6 +17,20 @@ import glob
 from datetime import datetime, timezone
 import urllib.request
 import urllib.error
+import subprocess
+
+# Add .env loading support for local execution
+def load_env():
+    env_path = os.path.join(os.getcwd(), ".env")
+    if os.path.exists(env_path):
+        with open(env_path, "r") as f:
+            for line in f:
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    if k not in os.environ:
+                        os.environ[k] = v
+
+load_env()
 
 # ANSI Colors
 GREEN = "\033[92m"
@@ -59,6 +73,21 @@ def check_zmq_bridge():
             return warn("ZMQ Bridge ...... Puerto 5555 No responde (esperando MT5)")
     except Exception as e:
         return err(f"ZMQ Bridge ...... Error: {e}")
+
+def check_mt5_terminal():
+    """Verify if MT5 is running on the host (Windows)."""
+    if os.name != 'nt':
+        return info("MT5 Terminal .... Saltado (Modo Docker/Linux)")
+    
+    try:
+        # Using tasklist via subprocess since psutil might not be there
+        output = subprocess.check_output('tasklist /FI "IMAGENAME eq terminal64.exe" /NH', shell=True).decode()
+        if "terminal64.exe" in output:
+            return ok("MT5 Terminal .... CORRIENDO (VIVO)")
+        else:
+            return err("MT5 Terminal .... NO DETECTADO (Cerrado?)")
+    except Exception:
+        return warn("MT5 Terminal .... No se pudo verificar (Permisos?)")
 
 def check_data_freshness():
     """SRE-Grade Sync Check: Measures LAG against Supabase (Schema Fixed)."""
@@ -158,15 +187,37 @@ def check_rag_memory():
     except Exception:
         return warn("RAG Memory ...... Error al acceder")
 
-def check_sse_api():
-    """Check SSE API health."""
-    try:
-        req = urllib.request.Request("http://127.0.0.1:8000/sse", method="GET")
-        req.add_header("Accept", "text/event-stream")
-        with urllib.request.urlopen(req, timeout=2) as response:
-            return ok("API Server ...... SSE Activo (Puerto 8000)")
     except Exception:
         return warn("API Server ...... Puerto 8000 No responde")
+
+def check_mcp_tools():
+    """Verify if MCP tools/skills are correctly registered (Local only)."""
+    if os.environ.get("DOCKER_MODE") == "true":
+        return info("MCP Tools ....... Saltado (Verificar en Host)")
+    
+    try:
+        # Import mcp_server safely
+        sys.path.append(os.getcwd())
+        from mcp_server import mcp
+        import asyncio
+        
+        async def get_tools():
+            return await mcp.get_tools()
+        
+        tools = asyncio.run(get_tools())
+        names = []
+        for t in tools:
+            if hasattr(t, "name"): names.append(t.name)
+            elif isinstance(t, str): names.append(t)
+            elif isinstance(t, dict): names.append(t.get("name"))
+            
+        skills = [n for n in names if n.startswith("skill_")]
+        if skills:
+            return ok(f"MCP Tools ....... {len(skills)} skills detectadas")
+        else:
+            return warn("MCP Tools ....... 0 skills detectadas (Check path)")
+    except Exception as e:
+        return warn(f"MCP Tools ....... No se pudo verificar: {e}")
 
 def main():
     print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════════╗{RESET}")
@@ -184,12 +235,14 @@ def main():
     
     print(f"{BOLD}  ─── Core Health ───{RESET}")
     print(f"  {check_zmq_bridge()}")
+    print(f"  {check_mt5_terminal()}")
     print(f"  {check_process_health()}")
     print(f"  {check_sse_api()}")
     print()
     
-    print(f"{BOLD}  ─── Intelligence ───{RESET}")
+    print(f"  {BOLD}─── Intelligence ───{RESET}")
     print(f"  {check_rag_memory()}")
+    print(f"  {check_mcp_tools()}")
     print()
     
     print(f"{CYAN}  ────────────────────────────────────────────────────────{RESET}")

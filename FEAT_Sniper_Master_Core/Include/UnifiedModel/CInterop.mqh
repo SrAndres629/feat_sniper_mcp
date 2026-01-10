@@ -70,12 +70,16 @@ private:
    Context *m_context;
    Socket  *m_socket;
    bool     m_zmqInitialised;
+   string   m_dataPath;
+   string   m_filename;
 
 public:
    CInterop();
    ~CInterop();
    
    void SetEnabled(bool e) { m_enabled = e; }
+   void SetDataPath(string path) { m_dataPath = path; }
+   void SetFilename(string name) { m_filename = name; }
    
    // Initialize ZMQ connection
    bool InitZMQ();
@@ -93,6 +97,8 @@ public:
 CInterop::CInterop() : m_enabled(true), m_zmqInitialised(false) {
    m_context = NULL;
    m_socket = NULL;
+   m_dataPath = "";
+   m_filename = "";
 }
 
 //+------------------------------------------------------------------+
@@ -110,27 +116,37 @@ bool CInterop::InitZMQ() {
    if(m_zmqInitialised) return true;
    
    // Create ZMQ Context
-   m_context = new Context();
+   if(m_context == NULL) {
+      m_context = new Context();
+   }
+   
    if(m_context == NULL) {
       Print("CInterop: Failed to create ZMQ Context");
       return false;
    }
 
    // Create PUB Socket (Streaming to Python)
-   m_socket = new Socket(*m_context, ZMQ_PUB);
+   // The instruction's snippet for this part was syntactically incorrect.
+   // Reconstructing based on intent to add a Print statement.
+   if(m_socket == NULL) {
+      Print("[ZMQ] Initializing for ", _Symbol); // Added Print statement
+      m_socket = new Socket(m_context, ZMQ_PUB);
+   }
+   
    if(m_socket == NULL) {
       Print("CInterop: Failed to create ZMQ Socket");
       return false;
    }
 
    // Connect to Docker brain
-   if(!m_socket->connect("tcp://localhost:5555")) {
-      Print("CInterop: Failed to connect to tcp://localhost:5555");
+   string addr = "tcp://localhost:5555";
+   if(m_socket != NULL && !(*m_socket).connect(addr)) { 
+      Print("CInterop: Failed to connect to ", addr);
       return false;
    }
    
    // Set Linger to 0 to avoid blocking on close
-   m_socket->setLinger(0);
+   if(m_socket != NULL) (*m_socket).setLinger(0);
 
    Print("CInterop: ZMQ Bridge Connected on Port 5555");
    m_zmqInitialised = true;
@@ -149,12 +165,21 @@ bool CInterop::SendFeaturesZMQ(SBarDataExport &data, string symbol) {
    string json = BuildJson(data, symbol);
    
    ZmqMsg request(json);
-   if(!m_socket->send(request, true)) { // Non-blocking send
-      Print("CInterop: ZMQ Send Failed");
-      return false;
+   // Non-blocking send
+   // The instruction's snippet for this part was syntactically incorrect.
+   // Reconstructing based on intent to add a Print statement and use the existing ZmqMsg.
+   bool success = false;
+   if(m_socket != NULL) {
+      success = (*m_socket).send(request, true); // Use the ZmqMsg 'request'
+   }
+
+   if(success) {
+      // Print("[ZMQ] Data sent for ", symbol); // Silent by default, uncomment for heavy debug
+   } else {
+      Print("[ZMQ] ERROR: Send failed for ", symbol);
    }
    
-   return true;
+   return success;
 }
 
 //+------------------------------------------------------------------+

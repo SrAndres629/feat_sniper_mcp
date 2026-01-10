@@ -28,9 +28,11 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-REM Run diagnostic inside container
-docker exec -it feat-sniper-brain python /app/nexus_status.py
-
+REM Run echo Ejecutando Auditoria Omni-Nexus...
+python nexus_control.py audit
+pause
+echo.
+echo   [INFO] Si hay anomalias, el Agente Antigravity las resolvera.
 echo.
 echo   Presiona cualquier tecla para cerrar...
 pause >nul

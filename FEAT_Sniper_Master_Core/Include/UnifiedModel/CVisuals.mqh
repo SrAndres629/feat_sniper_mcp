@@ -26,7 +26,7 @@ public:
    ~CVisuals();
 
    void Init(string symbol, int yOffset = 20);
-   void Update(CFEAT::SResult &feat, string state);
+   void Update(SFEATResult &feat, string state);
    void Clear();
 };
 
@@ -69,7 +69,7 @@ void CVisuals::Init(string symbol, int yOffset) {
    m_lblZone.Description("Zone: --");
 }
 
-void CVisuals::Update(CFEAT::SResult &feat, string state) {
+void CVisuals::Update(SFEATResult &feat, string state) {
    string scoreText = StringFormat("FEAT Score: %.1f", feat.compositeScore);
    m_lblScore.Description(scoreText);
    if(feat.compositeScore > 75) m_lblScore.Color(clrLime);

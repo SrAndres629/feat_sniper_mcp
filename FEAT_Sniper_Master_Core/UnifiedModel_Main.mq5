@@ -280,7 +280,7 @@ int OnCalculate(const int total, const int prev, const datetime &time[], const d
 
        // 7. Update HUD (Only for the last bar to avoid flicker)
        if (i == total - 1) {
-           CFEAT::SResult res = g_feat.GetResult();
+           SFEATResult res = g_feat.GetResult();
            g_vis.Update(res, g_fsm.GetStateString());
        }
 
@@ -300,56 +300,56 @@ int OnCalculate(const int total, const int prev, const datetime &time[], const d
           data.close = close[i];
           data.volume = (double)tick[i];
 
-          SEMAGroupMetrics mic = g_emas.GetMicroMetrics();
-          SEMAGroupMetrics opr = g_emas.GetOperationalMetrics();
-          SEMAGroupMetrics mac = g_emas.GetMacroMetrics();
-          SFanMetrics fan = g_emas.GetFanMetrics();
-          CFEAT::SResult feat = g_feat.GetResult();
-          SMultitemporalResult mtf = g_mtf.GetResult();
+           SEMAGroupMetrics mic = g_emas.GetMicroMetrics();
+           SEMAGroupMetrics opr = g_emas.GetOperationalMetrics();
+           SEMAGroupMetrics mac = g_emas.GetMacroMetrics();
+           SFanMetrics fan = g_emas.GetFanMetrics();
+           SFEATResult feat = g_feat.GetResult();
+           SMultitemporalResult mtf = g_mtf.GetResult();
 
-          data.microComp = mic.compression;
-          data.microSlope = mic.avgSlope;
-          data.microCurvature = feat.form.curvatureScore;
-          data.operComp = opr.compression;
-          data.operSlope = opr.avgSlope;
-          data.macroSlope = mac.avgSlope;
-          data.biasSlope = g_emas.GetBiasSlope();
+           data.microComp = mic.compression;
+           data.microSlope = mic.avgSlope;
+           data.microCurvature = feat.form.curvatureScore;
+           data.operComp = opr.compression;
+           data.operSlope = opr.avgSlope;
+           data.macroSlope = mac.avgSlope;
+           data.biasSlope = g_emas.GetBiasSlope();
 
-          data.layerSep12 = feat.space.fastMediumGap;
-          data.layerSep23 = feat.space.mediumSlowGap;
-          data.fanBullish = fan.bullishOrder;
-          data.fanBearish = !fan.bullishOrder;
+           data.layerSep12 = feat.space.fastMediumGap;
+           data.layerSep23 = feat.space.mediumSlowGap;
+           data.fanBullish = fan.bullishOrder;
+           data.fanBearish = !fan.bullishOrder;
 
-          data.hasBOS = feat.form.hasBOS;
-          data.hasCHoCH = feat.form.hasCHoCH;
-          data.hasHCH = feat.form.hasHCH;
-          data.isIntentCandle = feat.form.isIntentCandle;
-          data.curvatureScore = feat.form.curvatureScore;
-          data.compressionRatio = feat.form.compressionRatio;
+           data.hasBOS = feat.form.hasBOS;
+           data.hasCHoCH = feat.form.hasCHoCH;
+           data.hasHCH = feat.form.hasHCH;
+           data.isIntentCandle = feat.form.isIntentCandle;
+           data.curvatureScore = feat.form.curvatureScore;
+           data.compressionRatio = feat.form.compressionRatio;
 
-          data.atZone = feat.space.atZone;
-          data.proximityScore = feat.space.proximityScore;
-          data.activeZoneType = feat.space.activeZoneType;
+           data.atZone = feat.space.atZone;
+           data.proximityScore = feat.space.proximityScore;
+           data.activeZoneType = feat.space.activeZoneType;
 
-          data.velocity = feat.accel.velocity;
-          data.momentum = feat.accel.momentum;
-          data.deltaFlow = feat.accel.deltaFlow;
-          data.rsi = feat.accel.rsi;
-          data.macdHist = feat.accel.macdHist;
-          data.ao = feat.accel.ao;
-          data.ac = feat.accel.ac;
-          data.isInstitutional = feat.accel.isInstitutional;
-          data.isExhausted = feat.accel.isExhausted;
+           data.velocity = feat.accel.velocity;
+           data.momentum = feat.accel.momentum;
+           data.deltaFlow = feat.accel.deltaFlow;
+           data.rsi = feat.accel.rsi;
+           data.macdHist = feat.accel.macdHist;
+           data.ao = feat.accel.ao;
+           data.ac = feat.accel.ac;
+           data.isInstitutional = feat.accel.isInstitutional;
+           data.isExhausted = feat.accel.isExhausted;
 
-          data.isKillzone = feat.time.isKillzone;
-          data.isLondonKZ = (StringFind(feat.time.activeSession, "LONDON") >= 0);
-          data.isNYKZ = (StringFind(feat.time.activeSession, "NY") >= 0);
-          data.isAgainstH4 = false;
-          data.h4Direction = 0;
-          data.activeSession = feat.time.activeSession;
+           data.isKillzone = feat.time.isKillzone;
+           data.isLondonKZ = (StringFind(feat.time.activeSession, "LONDON") >= 0);
+           data.isNYKZ = (StringFind(feat.time.activeSession, "NY") >= 0);
+           data.isAgainstH4 = false;
+           data.h4Direction = 0;
+           data.activeSession = feat.time.activeSession;
 
-          data.marketState = g_fsm.GetStateString();
-          data.compositeScore = feat.compositeScore;
+           data.marketState = g_fsm.GetStateString();
+           data.compositeScore = feat.compositeScore;
 
           data.dominantTrend = mtf.dominantTrend;
           data.mtfConfluence = mtf.confluenceScore;

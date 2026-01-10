@@ -16,25 +16,16 @@ enum ENUM_MARKET_PHASE { PHASE_ACCUMULATION, PHASE_MANIPULATION, PHASE_DISTRIBUT
 enum ENUM_PHYSICS_INTERACTION { PHYS_NONE, PHYS_BOUNCE_WALL, PHYS_PIERCE_RIVER, PHYS_MAGNET_PULL };
 
 struct SEngineerReport {
-   // Vectors of Force
-   string               trend;            // "ALCISTA", "BAJISTA", "LATERAL"
-   string               pressure;         // "ALTA PRESION", "FRICCION", "FLUJO LIBRE"
-   string               rsiState;         // "SOBRE-COMPRA", "SOBRE-VENTA", "NEUTRO"
-   
-   // Physics State
+   string               trend;            
+   string               pressure;         
+   string               rsiState;         
    ENUM_MARKET_PHASE    phase;
-   string               energyState;      // "COMPRESION (Squeeze)", "EXPANSION (Abanico)"
-   string               structure;        // "BOS", "CHOCH"
-   
-   // Trajectory Map (A -> B)
-   string               criticalPath;     // "Zona A -> Zona B"
+   string               energyState;      
+   string               structure;        
+   string               criticalPath;     
    double               targetPrice;
-   
-   // Diagnosis
-   string               engineerOrder;    // "COMPRAR", "VENDER", "ESPERAR"
-   string               diagnosis;        // Imperative command text
-   
-   // Raw Metrics for ML
+   string               engineerOrder;    
+   string               diagnosis;        
    double               avgCurvature;
    double               compressionRatio;
    double               momentumVal;
@@ -47,21 +38,14 @@ enum ENUM_SESSION_STATE { STATE_KZ_LONDON, STATE_KZ_NY, STATE_LUNCH, STATE_ASIA,
 enum ENUM_ZONE_QUALITY { QUALITY_HIGH, QUALITY_MEDIUM, QUALITY_LOW };
 
 struct STacticianReport {
-   // Time
    string               currentTime;
    ENUM_SESSION_STATE   sessionState;
    bool                 isOperableTime;
-   
-   // Space
-   string               poiDetected;      // "FVG_M5", "OB_H1", etc.
-   string               locationRelative; // "PREMIUM", "DISCOUNT", "EQUILIBRIO"
+   string               poiDetected;      
+   string               locationRelative; 
    ENUM_ZONE_QUALITY    zoneQuality;
-   
-   // Verdict
-   string               action;           // "BUSCAR_GATILLO", "ESPERAR", "ABORTAR"
+   string               action;           
    string               reason;
-   
-   // Raw Metrics for ML
    double               distToZone;
    double               layerSeparation;
 };
@@ -70,7 +54,7 @@ struct STacticianReport {
 //| 3. SNIPER ROLE - EXECUTION                                       |
 //+------------------------------------------------------------------+
 struct SSniperOrder {
-   string               action;     // "BUY", "SELL", "WAIT"
+   string               action;     
    double               entryPrice;
    double               slPrice;
    double               tpPrice;
@@ -79,14 +63,12 @@ struct SSniperOrder {
 };
 
 struct SSniperReport {
-   string               decision;         // "DISPARAR", "ABORTAR"
-   double               confidence;       // 0-100%
+   string               decision;         
+   double               confidence;       
    string               finalReason;
    SSniperOrder         order;
-   double               velocity;         // Raw metric
+   double               velocity;         
    bool                 isInstitutional;
-   
-   // Raw Metrics for ML
    double               deltaFlow;
    double               rsi;
    double               macdHist;
@@ -95,6 +77,13 @@ struct SSniperReport {
    bool                 isExhausted;
 };
 
+// Global Structs for Compatibility
+struct STimeMetrics { bool isKillzone; string activeSession; };
+struct SAccelMetrics { double velocity; bool isInstitutional; double momentum; bool isExhausted; double deltaFlow; double rsi; double macdHist; double ao; double ac; };
+struct SFormMetrics { bool hasBOS; bool hasCHoCH; bool hasHCH; bool isIntentCandle; double curvatureScore; double compressionRatio; };
+struct SSpaceMetrics { bool atZone; double proximityScore; string activeZoneType; double fastMediumGap; double mediumSlowGap; };
+struct SFEATResult { SFormMetrics form; SSpaceMetrics space; SAccelMetrics accel; STimeMetrics time; double compositeScore; };
+
 //+------------------------------------------------------------------+
 //| MAIN FEAT CLASS                                                  |
 //+------------------------------------------------------------------+
@@ -102,17 +91,12 @@ class CFEAT {
 private:
    CEMAs*           m_ptrEmas;
    CLiquidity*      m_ptrLiq;
-   
-   // Internal State
    SEngineerReport  m_engineer;
    STacticianReport m_tactician;
    SSniperReport    m_sniper;
-   
    string           m_symbol;
    ENUM_TIMEFRAMES  m_timeframe;
    double           m_tickSize;
-   
-   // Indicators for ML
    int              m_rsiHandle;
    int              m_macdHandle;
    int              m_aoHandle;
@@ -120,7 +104,6 @@ private:
    double           m_prevVelocity;
    double           m_atr;
    
-   // Helpers
    void             RunEngineer(double close);
    void             RunTactician(datetime time, double close);
    void             RunSniper(double open, double close, double high, double low, double volume);
@@ -129,69 +112,16 @@ private:
 public:
    CFEAT();
    ~CFEAT();
-
    bool Init(string symbol, ENUM_TIMEFRAMES tf);
    void Deinit();
    void SetEMAs(CEMAs* e) { m_ptrEmas = e; }
    void SetLiquidity(CLiquidity* l) { m_ptrLiq = l; }
-
    bool Calculate(ENUM_TIMEFRAMES tf, datetime t, double open, double high, double low, double close, double volume);
-   
-   // Getters for Roles
    SEngineerReport  GetEngineer() const { return m_engineer; }
    STacticianReport GetTactician() const { return m_tactician; }
    SSniperReport    GetSniper() const { return m_sniper; }
-   
-   // Compatibility Getters for Old Code
    double           GetCompositeScore() const { return m_sniper.confidence; }
-   
-   // Legacy Getter structs maintained for main loop compatibility
-   struct STimeMetrics { bool isKillzone; string activeSession; };
-   struct SAccelMetrics { double velocity; bool isInstitutional; double momentum; bool isExhausted; double deltaFlow; double rsi; double macdHist; double ao; double ac; };
-   struct SFormMetrics { bool hasBOS; bool hasCHoCH; bool hasHCH; bool isIntentCandle; double curvatureScore; double compressionRatio; };
-   struct SSpaceMetrics { bool atZone; double proximityScore; string activeZoneType; double fastMediumGap; double mediumSlowGap; };
-   struct SResult { SFormMetrics form; SSpaceMetrics space; SAccelMetrics accel; STimeMetrics time; double compositeScore; };
-   
-   SResult GetResult() {
-      SResult r;
-      // SCORES
-      r.compositeScore = m_sniper.confidence;
-      
-      // TIME
-      r.time.isKillzone = m_tactician.isOperableTime;
-      r.time.activeSession = EnumToString(m_tactician.sessionState);
-      
-      // ACCEL
-      r.accel.velocity = m_sniper.velocity;
-      r.accel.isInstitutional = m_sniper.isInstitutional;
-      r.accel.momentum = m_engineer.momentumVal;
-      r.accel.deltaFlow = m_sniper.deltaFlow;
-      r.accel.rsi = m_sniper.rsi;
-      r.accel.macdHist = m_sniper.macdHist;
-      r.accel.ao = m_sniper.ao;
-      r.accel.ac = m_sniper.ac;
-      r.accel.isExhausted = m_sniper.isExhausted;
-
-      // FORM
-      r.form.hasBOS = (StringFind(m_engineer.structure, "BOS") >= 0);
-      r.form.hasCHoCH = (StringFind(m_engineer.structure, "CHOCH") >= 0);
-      r.form.isIntentCandle = m_sniper.isInstitutional;
-      r.form.curvatureScore = m_engineer.avgCurvature;
-      r.form.compressionRatio = m_engineer.compressionRatio;
-      
-      // SPACE
-      r.space.atZone = (m_tactician.poiDetected != "NONE");
-      r.space.activeZoneType = m_tactician.poiDetected;
-      r.space.proximityScore = (r.space.atZone ? 1.0 : 0.0);
-      r.space.fastMediumGap = m_tactician.layerSeparation;
-      
-      return r;
-   }
-   
-   SFormMetrics GetForm() { return GetResult().form; }
-   SSpaceMetrics GetSpace() { return GetResult().space; }
-   SAccelMetrics GetAccel() { return GetResult().accel; }
-   STimeMetrics GetTime() { return GetResult().time; }
+   SFEATResult      GetResult();
 };
 
 CFEAT::CFEAT() : m_ptrEmas(NULL), m_ptrLiq(NULL), m_prevMomentum(0), m_prevVelocity(0), m_atr(0) {
@@ -203,9 +133,7 @@ CFEAT::CFEAT() : m_ptrEmas(NULL), m_ptrLiq(NULL), m_prevMomentum(0), m_prevVeloc
    m_aoHandle = INVALID_HANDLE;
 }
 
-CFEAT::~CFEAT() {
-   Deinit();
-}
+CFEAT::~CFEAT() { Deinit(); }
 
 bool CFEAT::Init(string symbol, ENUM_TIMEFRAMES tf) {
    m_symbol = symbol;
@@ -218,11 +146,7 @@ bool CFEAT::InitIndicators() {
    m_rsiHandle = iRSI(m_symbol, m_timeframe, 14, PRICE_CLOSE);
    m_macdHandle = iMACD(m_symbol, m_timeframe, 12, 26, 9, PRICE_CLOSE);
    m_aoHandle = iAO(m_symbol, m_timeframe);
-   
-   if(m_rsiHandle == INVALID_HANDLE || m_macdHandle == INVALID_HANDLE || m_aoHandle == INVALID_HANDLE) {
-      return false;
-   }
-   return true;
+   return (m_rsiHandle != INVALID_HANDLE && m_macdHandle != INVALID_HANDLE && m_aoHandle != INVALID_HANDLE);
 }
 
 void CFEAT::Deinit() {
@@ -234,27 +158,45 @@ void CFEAT::Deinit() {
 bool CFEAT::Calculate(ENUM_TIMEFRAMES tf, datetime t, double open, double high, double low, double close, double volume) {
    if(m_ptrEmas == NULL || !m_ptrEmas.IsReady()) return false;
    m_atr = m_ptrEmas.GetATR();
-   
    RunEngineer(close);
    RunTactician(t, close);
    RunSniper(open, close, high, low, volume);
    return true;
 }
 
-//+------------------------------------------------------------------+
-//| 1. SENIOR ENGINEEER LOGIC                                        |
-//+------------------------------------------------------------------+
+SFEATResult CFEAT::GetResult() {
+   SFEATResult r;
+   r.compositeScore = m_sniper.confidence;
+   r.time.isKillzone = m_tactician.isOperableTime;
+   r.time.activeSession = EnumToString(m_tactician.sessionState);
+   r.accel.velocity = m_sniper.velocity;
+   r.accel.isInstitutional = m_sniper.isInstitutional;
+   r.accel.momentum = m_engineer.momentumVal;
+   r.accel.deltaFlow = m_sniper.deltaFlow;
+   r.accel.rsi = m_sniper.rsi;
+   r.accel.macdHist = m_sniper.macdHist;
+   r.accel.ao = m_sniper.ao;
+   r.accel.ac = m_sniper.ac;
+   r.accel.isExhausted = m_sniper.isExhausted;
+   r.form.hasBOS = (StringFind(m_engineer.structure, "BOS") >= 0);
+   r.form.hasCHoCH = (StringFind(m_engineer.structure, "CHOCH") >= 0);
+   r.form.isIntentCandle = m_sniper.isInstitutional;
+   r.form.curvatureScore = m_engineer.avgCurvature;
+   r.form.compressionRatio = m_engineer.compressionRatio;
+   r.space.atZone = (m_tactician.poiDetected != "NONE");
+   r.space.activeZoneType = m_tactician.poiDetected;
+   r.space.proximityScore = (r.space.atZone ? 1.0 : 0.0);
+   r.space.fastMediumGap = m_tactician.layerSeparation;
+   return r;
+}
+
 void CFEAT::RunEngineer(double close) {
-   // 1. Physics Layers (The Ribbons)
-   double gas = m_ptrEmas.GetWind();       // Micro (Yellow/Gas)
-   double water = m_ptrEmas.GetRiver();    // Operational (Orange/Water)
-   double wall = m_ptrEmas.GetWall();      // Structural (Green/Wall)
-   double bedrock = m_ptrEmas.GetMagnet(); // Macro (Blue/Bedrock)
-   
+   double gas = m_ptrEmas.GetWind();       
+   double water = m_ptrEmas.GetRiver();    
+   double wall = m_ptrEmas.GetWall();      
+   double bedrock = m_ptrEmas.GetMagnet(); 
    double wallSlope = m_ptrEmas.GetWallSlope();
    double gasSlope = m_ptrEmas.GetWindSlope();
-   
-   // 2. Vectors of Force (Trend & Pressure)
    if(wallSlope > 0.05) {
       m_engineer.trend = "ALCISTA (PISO)";
       m_engineer.pressure = (close > wall) ? "FLUJO LIBRE" : "FRICCION EN MURO";
@@ -266,45 +208,29 @@ void CFEAT::RunEngineer(double close) {
       m_engineer.pressure = "RUIDO TERMICO";
    }
    m_engineer.momentumVal = gasSlope;
-
-   // 3. RSI Correction
    double rsi = 50.0;
    double buff[1];
    if(m_rsiHandle != INVALID_HANDLE && CopyBuffer(m_rsiHandle, 0, 0, 1, buff)>0) rsi = buff[0];
    m_sniper.rsi = rsi;
-   
    if(rsi > 70) m_engineer.rsiState = (rsi > 80) ? "CRITICO > 80" : "SOBRE-COMPRA";
    else if(rsi < 30) m_engineer.rsiState = (rsi < 20) ? "CRITICO < 20" : "SOBRE-VENTA";
    else m_engineer.rsiState = "NEUTRO";
-
-   // 4. Energy State (Squeeze vs Expansion)
    SFanMetrics fan = m_ptrEmas.GetFanMetrics();
    m_engineer.compressionRatio = fan.compression;
    m_engineer.energyState = (fan.compression > 0.8) ? "COMPRESION (SQZ)" : "EXPANSION (ABANICO)";
-   
-   // 5. Critical Path (Trajectory Mapping A -> B)
    double target = 0;
    string targetName = "VACIO";
-   
-   // Identify A (Current) and B (Next Magnet)
-   bool wallBreached = (m_engineer.trend == "ALCISTA" && close < wall) || (m_engineer.trend == "BAJISTA" && close > wall);
-   
-   // Use Liquidity for precise targets
-   SLiquidityContext ctx;
    if(m_ptrLiq != NULL) {
-       ctx = m_ptrLiq.GetContext();
-       if(m_engineer.trend == "ALCISTA") {
-           // Target is next High Liquidity or Bedrock if below
+       SLiquidityContext ctx = m_ptrLiq.GetContext();
+       if(m_engineer.trend == "ALCISTA (PISO)") {
            if(ctx.nearestAbove.price > 0 && ctx.nearestAbove.price > close) {
                target = ctx.nearestAbove.price;
                targetName = ctx.nearestAbove.label;
            } else {
-               // Fallback to extended target
                target = close + (m_atr * 50); 
                targetName = "EXPANSION";
            }
-       } else if (m_engineer.trend == "BAJISTA") {
-           // Target is next Low Liquidity
+       } else if (m_engineer.trend == "BAJISTA (TECHO)") {
            if(ctx.nearestBelow.price > 0 && ctx.nearestBelow.price < close) {
                target = ctx.nearestBelow.price;
                targetName = ctx.nearestBelow.label;
@@ -314,17 +240,14 @@ void CFEAT::RunEngineer(double close) {
            }
        }
    }
-   
    m_engineer.targetPrice = target;
    if(target > 0) m_engineer.criticalPath = StringFormat("%.5f -> %s (%.5f)", close, targetName, target);
    else m_engineer.criticalPath = "ESPERANDO ESTRUCTURA";
-
-   // 6. Engineer's Order (Imperative)
    m_engineer.engineerOrder = "ESPERAR";
-   if(m_engineer.trend == "ALCISTA" && m_engineer.pressure == "FLUJO LIBRE") {
+   if(m_engineer.trend == "ALCISTA (PISO)" && m_engineer.pressure == "FLUJO LIBRE") {
        m_engineer.diagnosis = "El precio debe buscar liquidez superior.";
        m_engineer.engineerOrder = "COMPRAR EN PULLBACK";
-   } else if(m_engineer.trend == "BAJISTA" && m_engineer.pressure == "FLUJO LIBRE") {
+   } else if(m_engineer.trend == "BAJISTA (TECHO)" && m_engineer.pressure == "FLUJO LIBRE") {
        m_engineer.diagnosis = "Trayectoria obligatoria hacia zona inferior.";
        m_engineer.engineerOrder = "VENDER EN PULLBACK";
    } else {
@@ -333,26 +256,18 @@ void CFEAT::RunEngineer(double close) {
    }
 }
 
-//+------------------------------------------------------------------+
-//| 2. TACTICIAN LOGIC                                               |
-//+------------------------------------------------------------------+
 void CFEAT::RunTactician(datetime time, double close) {
    MqlDateTime dt;
    TimeToStruct(time, dt);
    m_tactician.currentTime = StringFormat("%02d:%02d", dt.hour, dt.min);
    m_tactician.isOperableTime = false;
-   
-   // Time Protocol
    if(dt.hour >= 2 && dt.hour < 5) { m_tactician.sessionState = STATE_KZ_LONDON; m_tactician.isOperableTime = true; }
    else if(dt.hour >= 7 && dt.hour < 11) { m_tactician.sessionState = STATE_KZ_NY; m_tactician.isOperableTime = true; }
    else if(dt.hour >= 0 && dt.hour < 9) m_tactician.sessionState = STATE_ASIA; 
    else if(dt.hour >= 12 && dt.hour < 14) m_tactician.sessionState = STATE_LUNCH;
    else m_tactician.sessionState = STATE_DEAD_ZONE;
-   
-   // Space Protocol
    m_tactician.poiDetected = "NONE";
    m_tactician.zoneQuality = QUALITY_LOW;
-   
    if(m_ptrLiq != NULL) {
       double minDist = DBL_MAX;
       int zoneIdx = -1;
@@ -363,9 +278,7 @@ void CFEAT::RunTactician(datetime time, double close) {
          if(close > z.top) dist = close - z.top; else if(close < z.bottom) dist = z.bottom - close;
          if(dist < minDist) { minDist = dist; zoneIdx = i; }
       }
-      
       m_tactician.distToZone = (minDist < DBL_MAX && m_atr > 0) ? minDist/m_atr : 999;
-      
       if(zoneIdx != -1 && minDist < m_atr * 2.0) { 
          SInstitutionalZone z = m_ptrLiq.GetZone(zoneIdx);
          if(z.type == ZONE_FVG) m_tactician.poiDetected = "FVG";
@@ -374,8 +287,6 @@ void CFEAT::RunTactician(datetime time, double close) {
          m_tactician.poiDetected += (z.isBullish ? "_BULL" : "_BEAR");
       }
    }
-   
-   // Verdict
    if(m_tactician.isOperableTime && m_tactician.poiDetected != "NONE") {
        m_tactician.action = "BUSCAR_GATILLO";
        m_tactician.reason = "Confluencia Espacio-Tiempo Confirmada.";
@@ -388,82 +299,51 @@ void CFEAT::RunTactician(datetime time, double close) {
    }
 }
 
-//+------------------------------------------------------------------+
-//| 3. SNIPER LOGIC                                                  |
-//+------------------------------------------------------------------+
 void CFEAT::RunSniper(double open, double close, double high, double low, double volume) {
    double body = MathAbs(close - open);
    double rsi = m_sniper.rsi;
-   
-   // 1. Acceleration & institutional Flow (ML Metrics)
    m_sniper.velocity = (m_atr > 0) ? (body / m_atr) : 0;
    m_sniper.isInstitutional = (m_sniper.velocity > 1.1); 
-   
    double direction = (close > open) ? 1.0 : -1.0;
    m_sniper.deltaFlow = direction * body * (volume / 1000.0) / (m_atr > 0 ? m_atr : 0.0001);
-   
-   // Exhaustion check
    m_sniper.isExhausted = (m_prevVelocity > 1.5 && m_sniper.velocity < 0.3 * m_prevVelocity);
    m_prevVelocity = m_sniper.velocity;
-
-   // 2. Decision Logic
    m_sniper.decision = "ESPERAR";
    m_sniper.confidence = 0;
-   
    bool tacticianOk = (m_tactician.action == "BUSCAR_GATILLO");
    bool engineerBuy = (m_engineer.engineerOrder == "COMPRAR EN PULLBACK");
    bool engineerSell = (m_engineer.engineerOrder == "VENDER EN PULLBACK");
-   
-   // High Probability Setup Confluence
    bool setupBuy = (engineerBuy && StringFind(m_tactician.poiDetected, "BULL") >= 0 && rsi < 75);
    bool setupSell = (engineerSell && StringFind(m_tactician.poiDetected, "BEAR") >= 0 && rsi > 25);
-   
    if(tacticianOk) {
       if(setupBuy && close > open && m_sniper.isInstitutional && m_sniper.deltaFlow > 0.5) {
           m_sniper.decision = "DISPARAR";
           m_sniper.order.action = "BUY";
           m_sniper.finalReason = "Aceleracion + Flujo + Zona Demanda.";
-          
-          // Confidence Calculation
           double conf = 70.0;
           if(m_tactician.zoneQuality == QUALITY_HIGH) conf += 15.0;
           if(m_sniper.deltaFlow > 2.0) conf += 10.0;
           m_sniper.confidence = MathMin(99.0, conf);
-          
           m_sniper.order.entryPrice = close;
-          // SL below zone or min 1.2 ATR
           double zoneLow = (m_ptrLiq != NULL) ? m_ptrLiq.GetContext().nearestBelow.price : low;
           m_sniper.order.slPrice = MathMin(low - (m_atr * 0.5), zoneLow - (m_atr * 0.2));
-          
           double risk = close - m_sniper.order.slPrice;
-          if(risk < m_atr * 1.0) { // Safety buffer
-              m_sniper.order.slPrice = close - (m_atr * 1.0);
-              risk = m_atr * 1.0;
-          }
-          
+          if(risk < m_atr * 1.0) { m_sniper.order.slPrice = close - (m_atr * 1.0); risk = m_atr * 1.0; }
           m_sniper.order.tpPrice = close + (risk * 2.5);
           m_sniper.order.riskReward = 2.5;
-          
       } else if(setupSell && close < open && m_sniper.isInstitutional && m_sniper.deltaFlow < -0.5) {
           m_sniper.decision = "DISPARAR";
           m_sniper.order.action = "SELL";
           m_sniper.finalReason = "Aceleracion + Flujo + Zona Oferta.";
-          
           double conf = 70.0;
           if(m_tactician.zoneQuality == QUALITY_HIGH) conf += 15.0;
           if(m_sniper.deltaFlow < -2.0) conf += 10.0;
           m_sniper.confidence = MathMin(99.0, conf);
-          
           m_sniper.order.entryPrice = close;
           double zoneHigh = (m_ptrLiq != NULL) ? m_ptrLiq.GetContext().nearestAbove.price : high;
           m_sniper.order.slPrice = MathMax(high + (m_atr * 0.5), zoneHigh + (m_atr * 0.2));
-          
           double risk = m_sniper.order.slPrice - close;
-          if(risk < m_atr * 1.0) {
-              m_sniper.order.slPrice = close + (m_atr * 1.0);
-              risk = m_atr * 1.0;
-          }
-          
+          if(risk < m_atr * 1.0) { m_sniper.order.slPrice = close + (m_atr * 1.0); risk = m_atr * 1.0; }
           m_sniper.order.tpPrice = close - (risk * 2.5);
           m_sniper.order.riskReward = 2.5;
       } else {

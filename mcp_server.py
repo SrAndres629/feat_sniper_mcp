@@ -41,10 +41,13 @@ from app.services.supabase_sync import supabase_sync
 async def app_lifespan(server: FastMCP):
     """Maneja el ciclo de vida institucional: MT5 + ZMQ Bridge."""
     logger.info("Iniciando infraestructura institucional...")
+    print("DEBUG: Entrando en app_lifespan", flush=True)
     await mt5_conn.startup()
+    print("DEBUG: mt5_conn.startup() COMPLETADO", flush=True)
     
     # Iniciar ZMQ Bridge para Streaming de baja latencia
     async def on_zmq_message(data):
+        print(f"TRACE: Recibido mensaje tipo {data.get('type')} - Simbolo: {data.get('symbol')}", flush=True)
         msg_type = data.get("type", "signal")
         
         if msg_type == "tick":
@@ -67,7 +70,9 @@ async def app_lifespan(server: FastMCP):
             import asyncio
             asyncio.create_task(supabase_sync.log_signal(data))
         
+    print(f"DEBUG: Intentando iniciar ZMQ Bridge en callback {on_zmq_message}", flush=True)
     await zmq_bridge.start(on_zmq_message)
+    print("DEBUG: ZMQ Bridge iniciado VOLANDO", flush=True)
     
     try:
         yield
