@@ -199,11 +199,21 @@ class NexusControl:
             repaired = True
 
         if "MODELS_MISSING" in anomalies:
-            log("[FIX] Modelos de IA faltantes. Iniciando entrenamiento de emergencia...", YELLOW)
-            # Check if training script exists
+            log("[FIX] Detectado NUEVO ACTIVO o Modelos faltantes. Iniciando PROTOCOLO GENESIS...", YELLOW)
+            
+            # 1. Seed History (Backfill)
+            seed_script = os.path.join(PROJECT_DIR, "seed_history.py")
+            if os.path.exists(seed_script):
+                log(f"[EXEC] python {seed_script} (Backfill Data)", WHITE)
+                s_out, s_err, s_code = run_cmd(f"python \"{seed_script}\"")
+                if s_code != 0:
+                     log(f"[ERR] Fallo la descarga de historia: {s_err[:100]}...", RED)
+                     return False
+            
+            # 2. Train Models
             train_script = os.path.join(PROJECT_DIR, "app", "ml", "train_models.py")
             if os.path.exists(train_script):
-                log(f"[EXEC] python {train_script}", WHITE)
+                log(f"[EXEC] python {train_script} (Training)", WHITE)
                 # Run training (this might take a while)
                 t_out, t_err, t_code = run_cmd(f"python \"{train_script}\"")
                 if t_code == 0:
@@ -273,9 +283,95 @@ class NexusControl:
         except Exception as e:
             log(f"[⚠] Telemetría parcial (Supabase no configurado localmente?): {e}", YELLOW)
 
+    def wait_for_signal(self):
+        """
+        PROTOCOLO DE SINCRONIZACIÓN INICIAL (Handshake)
+        Escucha el primer paquete de MT5 para autoconfigurar el activo.
+        """
+        import zmq
+        import re
+        
+        log("\n>>> Fase 1.5: Sincronización Activa Chart-to-Brain", CYAN)
+        log("[INFO] Esperando señal del gráfico (Arrastra el indicador)...", WHITE)
+        
+        context = zmq.Context()
+        socket = context.socket(zmq.SUB)
+        
+        try:
+            # Bind temporaralmente para capturar el handshake
+            socket.bind("tcp://0.0.0.0:5555")
+            socket.subscribe("")
+            
+            # Bloqueante: Espera el primer mensaje
+            msg = socket.recv_string()
+            data = json.loads(msg)
+            
+            detected_symbol = data.get("symbol")
+            if not detected_symbol:
+                log("[WARN] Mensaje recibido sin símbolo. Ignorando...", YELLOW)
+                return False
+                
+            log(f"[DETECTADO] Activo en Gráfico: {detected_symbol}", GREEN + BOLD)
+            
+            # Check if config needs update
+            from app.core.config import settings
+            current_symbol = settings.SYMBOL
+            
+            if detected_symbol != current_symbol:
+                log(f"[SWITCH] Cambio de contexto: {current_symbol} -> {detected_symbol}", YELLOW)
+                
+                # 1. Update .env
+                env_path = os.path.join(PROJECT_DIR, ".env")
+                if os.path.exists(env_path):
+                    with open(env_path, "r") as f:
+                        lines = f.readlines()
+                    
+                    with open(env_path, "w") as f:
+                        found = False
+                        for line in lines:
+                            if line.startswith("SYMBOL="):
+                                f.write(f"SYMBOL={detected_symbol}\n")
+                                found = True
+                            else:
+                                f.write(line)
+                        if not found:
+                            f.write(f"SYMBOL={detected_symbol}\n")
+                            
+                # 2. Hot-Swap Memory Config (for this process)
+                settings.SYMBOL = detected_symbol
+                
+                # 3. Check/Trigger Genesis per asset
+                model_path = os.path.join(PROJECT_DIR, "models", f"gbm_{detected_symbol}_v1.joblib")
+                if not os.path.exists(model_path):
+                    log(f"[GENESIS] Cerebro no encontrado para {detected_symbol}. Iniciando entrenamiento...", CYAN)
+                    
+                    # Call seed/train synchronously
+                    seed_script = os.path.join(PROJECT_DIR, "seed_history.py")
+                    train_script = os.path.join(PROJECT_DIR, "app", "ml", "train_models.py")
+                    
+                    run_cmd(f"python \"{seed_script}\"")
+                    run_cmd(f"python \"{train_script}\"")
+                    log(f"[OK] Genésis completado para {detected_symbol}", GREEN)
+                else:
+                    log(f"[OK] Cerebro ya existe para {detected_symbol}. Cargando...", GREEN)
+
+            else:
+                log(f"[OK] Sincronizado con {current_symbol}.", GREEN)
+                
+        except Exception as e:
+            log(f"[ERR] Fallo en handshake: {e}", RED)
+        finally:
+            # Release port for Docker
+            socket.close()
+            context.term()
+            time.sleep(1) # Give OS time to clear port
+
     def main_loop(self):
         # 1. Start MT5
         if not self.start_mt5(): return
+
+        # 1.5 Wait for Signal (Configura el sistema ANTES de lanzar Docker)
+        self.wait_for_signal()
 
         # 2. Start Docker
         if not self.start_docker(): return

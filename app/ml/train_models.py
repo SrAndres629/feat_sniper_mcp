@@ -23,6 +23,10 @@ MODELS_DIR = os.getenv("MODELS_DIR", "models")
 SEQ_LEN = int(os.getenv("SEQ_LEN", "32"))
 MIN_SAMPLES = int(os.getenv("MIN_SAMPLES", "1000"))
 
+from app.core.config import settings
+SYMBOL = settings.SYMBOL
+
+
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL),
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -173,7 +177,7 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
             
     # Guardar mejor modelo con scaler
     os.makedirs(MODELS_DIR, exist_ok=True)
-    model_path = os.path.join(MODELS_DIR, "gbm_v1.joblib")
+    model_path = os.path.join(MODELS_DIR, f"gbm_{SYMBOL}_v1.joblib")
     
     joblib.dump({
         "model": best_model,
@@ -354,7 +358,7 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
             
     # Guardar modelo
     model.load_state_dict(best_state)
-    model_path = os.path.join(MODELS_DIR, "lstm_v1.pt")
+    model_path = os.path.join(MODELS_DIR, f"lstm_{SYMBOL}_v1.pt")
     
     torch.save({
         "model_state": best_state,

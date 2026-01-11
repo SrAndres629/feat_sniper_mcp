@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     MT5_SERVER: Optional[str] = None
     MT5_PATH: Optional[str] = None  # Ruta al terminal64.exe si no es la por defecto
     
+    # Asset Configuration
+    SYMBOL: str = "BTCUSD"
+    
     # Connectivity Ports
     ZMQ_PORT: int = 5555
     

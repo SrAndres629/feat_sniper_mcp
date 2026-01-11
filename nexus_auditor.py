@@ -291,18 +291,25 @@ class NexusAuditor:
 
     def audit_ml_models(self):
         """Verify Intelligence Assets."""
-        models = ["gbm_v1.joblib", "lstm_v1.pt"]
+        from app.core.config import settings
+        SYMBOL = settings.SYMBOL
+        
+        required = [f"gbm_{SYMBOL}_v1.joblib", f"lstm_{SYMBOL}_v1.pt"]
         model_dir = "models" # Relative to root
         
+        # Also check /app/models
+        if not os.path.exists(model_dir) and os.path.exists("/app/models"):
+             model_dir = "/app/models"
+
         found_all = True
         missing = []
-        for m in models:
+        for m in required:
             if not os.path.exists(os.path.join(model_dir, m)):
                 found_all = False
                 missing.append(m)
         
         if found_all:
-            return ok(f"IA Core ........ {len(models)} Modelos Cargados")
+            return ok(f"IA Core ........ {len(required)} Modelos Cargados ({SYMBOL})")
         else:
             self.anomalies.append("MODELS_MISSING")
             return warn(f"IA Core ........ Faltan: {', '.join(missing)}")
