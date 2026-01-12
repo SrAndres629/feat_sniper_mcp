@@ -1099,6 +1099,44 @@ async def feat_analyze_forma(
 
 @mcp.tool()
 @pulse_observer
+async def feat_analyze_forma_advanced(
+    h4_candles: list = None,
+    h1_candles: list = None,
+    m15_candles: list = None,
+    chrono_features: dict = None
+):
+    """
+    🏗️ FEAT Module F ADVANCED: Estructura Chrono-Aware
+    
+    Integra contexto temporal para validar BOS/CHoCH:
+    - Detecta trampas de Lunes (INDUCTION)
+    - SWEEP detection (mechas sin cierre)
+    - Spring/Upthrust Wyckoff
+    """
+    from app.skills.feat_forma import analyze_forma
+    return analyze_forma(h4_candles, h1_candles, m15_candles, None, chrono_features)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_generate_structure_features(
+    h4_candles: list = None,
+    h1_candles: list = None,
+    m15_candles: list = None,
+    chrono_features: dict = None
+):
+    """
+    🧠 FEAT STRUCTURE ML: Genera features numéricas de estructura.
+    
+    Output listo para red neuronal: alignment_score, trend flags, event flags.
+    """
+    from app.skills.feat_forma import generate_structure_features
+    return generate_structure_features(h4_candles, h1_candles, m15_candles, chrono_features)
+
+
+
+@mcp.tool()
+@pulse_observer
 async def feat_map_espacio(
     candles: list,
     current_price: float,
