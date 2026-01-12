@@ -9,12 +9,16 @@ Pipeline:
 """
 
 import os
+import sys
 import csv
 import logging
 import joblib
 import numpy as np
 from typing import Tuple, List, Optional
 from datetime import datetime
+
+# Add project root to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()

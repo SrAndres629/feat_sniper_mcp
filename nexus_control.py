@@ -32,7 +32,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configuration
-MT5_PATH = r"C:\Program Files\LiteFinance MT5 Terminal\terminal64.exe"
+MT5_PATH = os.getenv("MT5_PATH", r"C:\Program Files\LiteFinance MT5 Terminal\terminal64.exe")
 PROJECT_DIR = os.getcwd()
 LOG_TAIL_LINES = 20
 
@@ -242,10 +242,10 @@ class NexusControl:
         log("="*60, YELLOW)
         
         log("[INFO] Bajando contenedores Docker...", WHITE)
-        run_cmd("docker compose down")
+        subprocess.run("docker compose down", shell=True)
         
         log("[INFO] Cerrando MetaTrader 5...", WHITE)
-        run_cmd('taskkill /F /IM terminal64.exe /T')
+        subprocess.run('taskkill /F /IM terminal64.exe /T', shell=True, capture_output=True)
         
         log("[OK] Sistema cerrado correctamente. Datos persistidos.", GREEN)
         sys.exit(0)
@@ -303,7 +303,8 @@ class NexusControl:
             socket.subscribe("")
             
             # Bloqueante: Espera el primer mensaje
-            msg = socket.recv_string()
+            msg_bytes = socket.recv()
+            msg = msg_bytes.decode('utf-8', errors='replace')
             data = json.loads(msg)
             
             detected_symbol = data.get("symbol")
@@ -323,10 +324,10 @@ class NexusControl:
                 # 1. Update .env
                 env_path = os.path.join(PROJECT_DIR, ".env")
                 if os.path.exists(env_path):
-                    with open(env_path, "r") as f:
+                    with open(env_path, "r", encoding="utf-8") as f:
                         lines = f.readlines()
                     
-                    with open(env_path, "w") as f:
+                    with open(env_path, "w", encoding="utf-8") as f:
                         found = False
                         for line in lines:
                             if line.startswith("SYMBOL="):

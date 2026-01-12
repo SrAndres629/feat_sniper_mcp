@@ -290,14 +290,17 @@ class NexusAuditor:
 
 
     def audit_ml_models(self):
-        """Verify Intelligence Assets."""
-        from app.core.config import settings
-        SYMBOL = settings.SYMBOL
+        """Verify Intelligence Assets dynamically based on settings."""
+        try:
+            from app.core.config import settings
+            SYMBOL = settings.SYMBOL
+        except ImportError:
+            # Fallback if app is not in path
+            SYMBOL = "BTCUSD"
         
         required = [f"gbm_{SYMBOL}_v1.joblib", f"lstm_{SYMBOL}_v1.pt"]
-        model_dir = "models" # Relative to root
+        model_dir = "models"
         
-        # Also check /app/models
         if not os.path.exists(model_dir) and os.path.exists("/app/models"):
              model_dir = "/app/models"
 
