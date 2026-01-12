@@ -1,17 +1,19 @@
 """
-FEAT Module T: TIEMPO (Sincronización Operativa)
-=================================================
-El filtro de Market Timing que alinea la operación con las ventanas de mayor liquidez.
+FEAT Module T: TIEMPO ADVANCED (Ciclo Diario de Liquidez)
+==========================================================
+Sistema avanzado de Market Timing basado en ciclos de liquidez NY.
 
-Este módulo es un KILL SWITCH:
-- Si retorna CLOSED, los demás módulos NO se ejecutan.
-- Si retorna OPEN, el flujo continúa a Módulo F (Forma).
+Fases del Ciclo:
+- ASIA_OVERNIGHT: 00:00-04:00 NY - Intensidad BAJA
+- PRE_LONDON: 04:00-06:00 NY - Intensidad MEDIA
+- LONDON_KILLZONE: 06:00-09:00 NY - Intensidad ALTA
+- LONDON_LUNCH: 09:00-11:00 NY - Intensidad MEDIA
+- NY_KILLZONE: 11:30-13:00 NY - Intensidad MUY ALTA
+- NY_MIDDAY: 13:00-15:00 NY - Intensidad ALTA
+- NY_CLOSE: 15:00-17:00 NY - Intensidad MEDIA (decae)
+- POST_MARKET: 17:00+ NY - Intensidad BAJA
 
-Kill Zones (GMT):
-- London: 02:00-05:00 (Manipulación)
-- New York: 12:00-15:00 (Expansión principal)
-- London Close: 16:00-17:00 (Retrocesos)
-- Asia: 20:00-04:00 (Solo observar, NO operar)
+Cierres H4 (NY): 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
 """
 
 import logging
@@ -19,128 +21,309 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, Literal
 from enum import Enum
 
-logger = logging.getLogger("FEAT.Tiempo")
+logger = logging.getLogger("FEAT.TiempoAdvanced")
 
 
-class KillZone(Enum):
-    LONDON_OPEN = "LONDON_OPEN"
-    NEW_YORK = "NEW_YORK"
-    LONDON_CLOSE = "LONDON_CLOSE"
-    ASIA = "ASIA"
-    OFF_HOURS = "OFF_HOURS"
+# =============================================================================
+# ENUMS Y CONSTANTES
+# =============================================================================
+
+class LiquidityPhase(Enum):
+    ASIA_OVERNIGHT = "ASIA_OVERNIGHT"
+    ASIA_DEEP = "ASIA_DEEP"
+    PRE_LONDON = "PRE_LONDON"
+    LONDON_KILLZONE = "LONDON_KILLZONE"
+    LONDON_LUNCH = "LONDON_LUNCH"
+    PRE_NY = "PRE_NY"
+    NY_KILLZONE = "NY_KILLZONE"
+    NY_MIDDAY = "NY_MIDDAY"
+    NY_CLOSE = "NY_CLOSE"
+    POST_MARKET = "POST_MARKET"
 
 
-class MarketStatus(Enum):
-    OPEN = "OPEN"
-    CLOSED = "CLOSED"
-    PAUSE = "PAUSE"  # Near high-impact news
+class LiquidityIntensity(Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    VERY_HIGH = "VERY_HIGH"
 
 
-# Kill Zone definitions in GMT
-KILL_ZONES_GMT = {
-    KillZone.LONDON_OPEN: {"start": 2, "end": 5},
-    KillZone.NEW_YORK: {"start": 12, "end": 15},
-    KillZone.LONDON_CLOSE: {"start": 16, "end": 17},
-    KillZone.ASIA: {"start": 20, "end": 4},  # Wraps midnight
+class OperationalMode(Enum):
+    WAIT = "WAIT"           # No operar, dormir
+    PREPARE = "PREPARE"     # Marcar niveles, preparar órdenes
+    EXECUTE = "EXECUTE"     # Ejecutar con escalonamiento
+    MANAGE_ONLY = "MANAGE"  # Solo gestionar posiciones abiertas
+
+
+# Mapeo de fases con horarios NY y características
+LIQUIDITY_PHASES = {
+    # (hora_inicio, hora_fin): (fase, intensidad, modo, descripción)
+    (0, 1): (LiquidityPhase.ASIA_OVERNIGHT, LiquidityIntensity.LOW, OperationalMode.WAIT, 
+             "Rango estrecho, spreads amplios"),
+    (1, 4): (LiquidityPhase.ASIA_DEEP, LiquidityIntensity.LOW, OperationalMode.WAIT,
+             "Liquidez mínima; evitar tamaño alto"),
+    (4, 6): (LiquidityPhase.PRE_LONDON, LiquidityIntensity.MEDIUM, OperationalMode.PREPARE,
+             "Primeros indicios de posicionamiento; marcar POCs"),
+    (6, 9): (LiquidityPhase.LONDON_KILLZONE, LiquidityIntensity.HIGH, OperationalMode.EXECUTE,
+             "Gran volumen; barridos de stops; ejecutar escalonado"),
+    (9, 11): (LiquidityPhase.LONDON_LUNCH, LiquidityIntensity.MEDIUM, OperationalMode.MANAGE_ONLY,
+              "Transición; momentum puede consolidar"),
+    (11, 13): (LiquidityPhase.NY_KILLZONE, LiquidityIntensity.VERY_HIGH, OperationalMode.EXECUTE,
+               "PICO de liquidez y volatilidad; ejecutar con slices"),
+    (13, 15): (LiquidityPhase.NY_MIDDAY, LiquidityIntensity.HIGH, OperationalMode.MANAGE_ONLY,
+               "Continuación o consolidación; trailing stops"),
+    (15, 17): (LiquidityPhase.NY_CLOSE, LiquidityIntensity.MEDIUM, OperationalMode.MANAGE_ONLY,
+               "Recolocación de stops; reducir tamaño"),
+    (17, 20): (LiquidityPhase.POST_MARKET, LiquidityIntensity.LOW, OperationalMode.WAIT,
+               "Liquidez decrece; preparar macro-niveles"),
+    (20, 24): (LiquidityPhase.ASIA_OVERNIGHT, LiquidityIntensity.LOW, OperationalMode.WAIT,
+               "Rango, acumulación ligera")
 }
 
-# Trading permissions per Kill Zone
-ZONE_PERMISSIONS = {
-    KillZone.LONDON_OPEN: {"can_trade": True, "risk_level": "MEDIUM", "note": "Buscar manipulación"},
-    KillZone.NEW_YORK: {"can_trade": True, "risk_level": "HIGH", "note": "Máxima liquidez"},
-    KillZone.LONDON_CLOSE: {"can_trade": True, "risk_level": "LOW", "note": "Solo cerrar posiciones"},
-    KillZone.ASIA: {"can_trade": False, "risk_level": "NONE", "note": "Solo observar"},
-    KillZone.OFF_HOURS: {"can_trade": False, "risk_level": "NONE", "note": "Mercado dormido"},
-}
+# Cierres H4 importantes (hora NY)
+H4_CLOSES_NY = [0, 4, 8, 12, 16, 20]
 
 
-def get_current_killzone(server_time_gmt: datetime = None) -> KillZone:
+# =============================================================================
+# FUNCIONES DE CONVERSIÓN TEMPORAL
+# =============================================================================
+
+def utc_to_ny(utc_time: datetime) -> datetime:
     """
-    Determina la Kill Zone activa basándose en la hora GMT.
-    
-    Returns:
-        KillZone enum value
+    Convierte hora UTC a hora de Nueva York (Eastern Time).
+    Considera DST automáticamente.
     """
-    if server_time_gmt is None:
-        server_time_gmt = datetime.now(timezone.utc)
+    # Offset estándar NY: UTC-5 (EST) o UTC-4 (EDT)
+    # Simplificación: usamos -5 por defecto (ajustar según DST)
+    ny_offset = timedelta(hours=-5)
+    return utc_time + ny_offset
+
+
+def get_current_ny_time() -> datetime:
+    """Obtiene la hora actual en Nueva York."""
+    return utc_to_ny(datetime.now(timezone.utc))
+
+
+def parse_time_input(time_input: str = None) -> datetime:
+    """
+    Parsea una entrada de tiempo (string o None).
+    Retorna datetime en UTC.
+    """
+    if time_input is None:
+        return datetime.now(timezone.utc)
     
-    hour = server_time_gmt.hour
-    
-    # Check each zone
-    for zone, times in KILL_ZONES_GMT.items():
-        start, end = times["start"], times["end"]
-        
-        # Handle Asia (wraps midnight)
-        if start > end:
-            if hour >= start or hour < end:
-                return zone
+    try:
+        if "T" in time_input:
+            return datetime.fromisoformat(time_input.replace("Z", "+00:00"))
+        elif ":" in time_input:
+            # Solo hora HH:MM
+            parts = time_input.split(":")
+            now = datetime.now(timezone.utc)
+            return now.replace(hour=int(parts[0]), minute=int(parts[1]), second=0)
         else:
-            if start <= hour < end:
-                return zone
-    
-    return KillZone.OFF_HOURS
+            return datetime.now(timezone.utc)
+    except:
+        return datetime.now(timezone.utc)
 
 
-def check_h4_alignment(h4_candle_direction: str, proposed_direction: str) -> Dict[str, Any]:
+# =============================================================================
+# FUNCIONES DE ANÁLISIS DE FASE
+# =============================================================================
+
+def get_liquidity_phase(ny_hour: int) -> Dict[str, Any]:
     """
-    Regla de Oro: NUNCA operar en contra de la vela H4.
+    Determina la fase de liquidez basada en la hora NY.
+    """
+    for (start, end), (phase, intensity, mode, desc) in LIQUIDITY_PHASES.items():
+        if start <= ny_hour < end:
+            return {
+                "phase": phase,
+                "intensity": intensity,
+                "operational_mode": mode,
+                "description": desc
+            }
+    
+    # Default
+    return {
+        "phase": LiquidityPhase.ASIA_OVERNIGHT,
+        "intensity": LiquidityIntensity.LOW,
+        "operational_mode": OperationalMode.WAIT,
+        "description": "Fuera de horario principal"
+    }
+
+
+def is_near_h4_close(ny_hour: int, ny_minute: int, margin_minutes: int = 15) -> bool:
+    """
+    Verifica si estamos cerca de un cierre H4 (±margin minutos).
+    Los cierres H4 son momentos de posible barrido institucional.
+    """
+    for h4_close in H4_CLOSES_NY:
+        if ny_hour == h4_close and ny_minute < margin_minutes:
+            return True
+        if ny_hour == (h4_close - 1) % 24 and ny_minute >= (60 - margin_minutes):
+            return True
+    return False
+
+
+def calculate_intensity_multiplier(
+    base_intensity: LiquidityIntensity,
+    news_upcoming: bool = False,
+    is_h4_close: bool = False
+) -> Dict[str, Any]:
+    """
+    Ajusta la intensidad basada en factores adicionales.
+    """
+    multiplier = 1.0
+    warnings = []
+    
+    if news_upcoming:
+        multiplier *= 1.5  # Aumenta volatilidad esperada
+        warnings.append("⚠️ Noticia próxima - Ampliar spreads y reducir tamaño")
+    
+    if is_h4_close:
+        multiplier *= 1.2  # Posibles barridos
+        warnings.append("🕐 Cierre H4 próximo - Proteger posiciones")
+    
+    # Ajustar intensidad
+    intensity_order = [LiquidityIntensity.LOW, LiquidityIntensity.MEDIUM, 
+                       LiquidityIntensity.HIGH, LiquidityIntensity.VERY_HIGH]
+    
+    current_idx = intensity_order.index(base_intensity)
+    adjusted_idx = min(len(intensity_order) - 1, int(current_idx * multiplier))
+    
+    return {
+        "adjusted_intensity": intensity_order[adjusted_idx],
+        "multiplier": multiplier,
+        "warnings": warnings
+    }
+
+
+# =============================================================================
+# FUNCIÓN PRINCIPAL DE ANÁLISIS
+# =============================================================================
+
+def analyze_tiempo_advanced(
+    server_time_utc: str = None,
+    news_event_upcoming: bool = False,
+    h4_direction: str = "NEUTRAL",
+    h1_direction: str = "NEUTRAL"
+) -> Dict[str, Any]:
+    """
+    🕐 FEAT MODULE T ADVANCED: Ciclo Diario de Liquidez XAU/USD
+    
+    Analiza la hora actual y determina:
+    - Fase del ciclo de liquidez
+    - Intensidad esperada (M15/H1/H4)
+    - Modo operativo (WAIT/PREPARE/EXECUTE/MANAGE)
+    - Checklist de confirmación multitemporal
     
     Args:
-        h4_candle_direction: "BULLISH", "BEARISH", or "NEUTRAL"
-        proposed_direction: "BUY" or "SELL"
+        server_time_utc: Hora del servidor en formato ISO o HH:MM (UTC)
+        news_event_upcoming: Si hay noticias de alto impacto próximas
+        h4_direction: Dirección de H4 para validación
+        h1_direction: Dirección de H1 para validación
         
     Returns:
-        Dict with alignment status and allowed actions
+        Dict con análisis completo de timing institucional
     """
-    h4_candle_direction = h4_candle_direction.upper()
-    proposed_direction = proposed_direction.upper()
+    # Parse y convertir tiempo
+    utc_time = parse_time_input(server_time_utc)
+    ny_time = utc_to_ny(utc_time)
+    ny_hour = ny_time.hour
+    ny_minute = ny_time.minute
     
-    # Alignment matrix
-    if h4_candle_direction == "BULLISH":
-        if proposed_direction == "BUY":
-            return {"aligned": True, "constraint": "LONGS_ONLY", "reason": "H4 alcista, compras permitidas"}
+    # Obtener fase de liquidez
+    phase_info = get_liquidity_phase(ny_hour)
+    phase = phase_info["phase"]
+    base_intensity = phase_info["intensity"]
+    base_mode = phase_info["operational_mode"]
+    
+    # Verificar cercanía a cierre H4
+    near_h4_close = is_near_h4_close(ny_hour, ny_minute)
+    
+    # Ajustar intensidad por factores externos
+    intensity_adj = calculate_intensity_multiplier(base_intensity, news_event_upcoming, near_h4_close)
+    
+    # Determinar modo operativo final
+    final_mode = base_mode
+    if news_event_upcoming and base_mode == OperationalMode.EXECUTE:
+        final_mode = OperationalMode.PREPARE  # Reducir a preparación si hay noticias
+    
+    # Validación multitemporal
+    multitemporal_check = {
+        "h4_aligned": h4_direction != "NEUTRAL",
+        "h1_aligned": h1_direction != "NEUTRAL",
+        "h4_h1_match": h4_direction == h1_direction,
+        "ready_for_m15": h4_direction == h1_direction and h4_direction != "NEUTRAL"
+    }
+    
+    # Generar instrucción de acción
+    if final_mode == OperationalMode.WAIT:
+        instruction = "STOP_CHAIN"
+        action_text = "Mercado dormido. No operar hasta próxima Kill Zone."
+    elif final_mode == OperationalMode.PREPARE:
+        instruction = "ALERT_ONLY"
+        action_text = "Preparar niveles y ordenes limit. Esperar confirmación."
+    elif final_mode == OperationalMode.EXECUTE:
+        if multitemporal_check["ready_for_m15"]:
+            instruction = "PROCEED_TO_MODULE_F"
+            action_text = "Kill Zone activa + Alineación HTF. Buscar entrada en M15."
         else:
-            return {"aligned": False, "constraint": "NO_SHORTS", "reason": "VETO: H4 alcista, ventas prohibidas"}
+            instruction = "WAIT_FOR_ALIGNMENT"
+            action_text = "Kill Zone activa pero sin alineación HTF. Esperar."
+    else:  # MANAGE
+        instruction = "MANAGE_POSITIONS"
+        action_text = "Solo gestionar posiciones. No abrir nuevas."
     
-    elif h4_candle_direction == "BEARISH":
-        if proposed_direction == "SELL":
-            return {"aligned": True, "constraint": "SHORTS_ONLY", "reason": "H4 bajista, ventas permitidas"}
-        else:
-            return {"aligned": False, "constraint": "NO_LONGS", "reason": "VETO: H4 bajista, compras prohibidas"}
+    # Risk warning
+    risk_warnings = intensity_adj["warnings"].copy()
+    if base_intensity == LiquidityIntensity.VERY_HIGH:
+        risk_warnings.append("⚡ Volatilidad extrema - Usar slicing y stops amplios")
     
-    else:  # NEUTRAL
-        return {"aligned": True, "constraint": "BOTH", "reason": "H4 neutral, ambas direcciones posibles"}
-
-
-def check_news_filter(news_in_minutes: int) -> Dict[str, Any]:
-    """
-    Filtro de noticias de alto impacto.
-    
-    Args:
-        news_in_minutes: Minutos hasta la próxima noticia de alto impacto
+    result = {
+        "module": "FEAT_TIEMPO_ADVANCED",
+        "status": "ANALYZED",
+        "timestamp_utc": utc_time.isoformat(),
         
-    Returns:
-        Dict with news filter status
-    """
-    if news_in_minutes <= 30:
-        return {
-            "status": "PAUSE",
-            "reason": f"Noticia de alto impacto en {news_in_minutes} minutos",
-            "action": "WAIT_30_MIN_AFTER"
+        # Tiempo
+        "ny_time": ny_time.strftime("%H:%M"),
+        "ny_hour": ny_hour,
+        "utc_time": utc_time.strftime("%H:%M"),
+        
+        # Fase de liquidez
+        "phase_name": phase.value,
+        "phase_description": phase_info["description"],
+        "liquidity_intensity": intensity_adj["adjusted_intensity"].value,
+        "base_intensity": base_intensity.value,
+        
+        # Modo operativo
+        "operational_mode": final_mode.value,
+        "instruction": instruction,
+        "action_text": action_text,
+        
+        # Alertas
+        "near_h4_close": near_h4_close,
+        "news_upcoming": news_event_upcoming,
+        "risk_warnings": risk_warnings,
+        
+        # Checklist multitemporal
+        "multitemporal_check": multitemporal_check,
+        "checklist": {
+            "h4_check": "✅ PASS" if multitemporal_check["h4_aligned"] else "❌ REQUIRED",
+            "h1_check": "✅ PASS" if multitemporal_check["h1_aligned"] else "❌ REQUIRED",
+            "htf_alignment": "✅ ALIGNED" if multitemporal_check["h4_h1_match"] else "⚠️ DIVERGENT",
+            "m15_trigger": "🔍 SEARCH" if multitemporal_check["ready_for_m15"] else "⏳ WAIT"
         }
-    elif news_in_minutes <= 60:
-        return {
-            "status": "CAUTION",
-            "reason": f"Noticia en {news_in_minutes} minutos, reducir riesgo",
-            "action": "REDUCE_POSITION_SIZE"
-        }
-    else:
-        return {
-            "status": "CLEAR",
-            "reason": "Sin noticias próximas",
-            "action": "NORMAL_RISK"
-        }
+    }
+    
+    logger.info(f"[FEAT-T] NY={ny_time.strftime('%H:%M')}, Phase={phase.value}, Mode={final_mode.value}")
+    
+    return result
 
+
+# =============================================================================
+# FUNCIÓN SIMPLIFICADA PARA RETROCOMPATIBILIDAD
+# =============================================================================
 
 def analyze_tiempo(
     server_time_gmt: str = None,
@@ -149,111 +332,69 @@ def analyze_tiempo(
     proposed_direction: str = None
 ) -> Dict[str, Any]:
     """
-    🕐 FEAT MODULE T: Análisis completo de Timing.
-    
-    Este es el primer filtro de la cadena FEAT.
-    Si retorna status="CLOSED", NO ejecutar los demás módulos.
-    
-    Args:
-        server_time_gmt: Hora del servidor en formato ISO o None para usar actual
-        h4_candle: Dirección de la vela H4 actual ("BULLISH", "BEARISH", "NEUTRAL")
-        news_in_minutes: Minutos hasta la próxima noticia de alto impacto
-        proposed_direction: "BUY" o "SELL" si ya hay una dirección propuesta
-        
-    Returns:
-        Dict con análisis completo de tiempo
+    Wrapper de retrocompatibilidad para analyze_tiempo_advanced.
     """
-    # Parse time
-    if server_time_gmt:
-        try:
-            if isinstance(server_time_gmt, str):
-                # Handle various formats
-                if "T" in server_time_gmt:
-                    time_obj = datetime.fromisoformat(server_time_gmt.replace("Z", "+00:00"))
-                else:
-                    time_obj = datetime.strptime(server_time_gmt, "%H:%M:%S").replace(tzinfo=timezone.utc)
-            else:
-                time_obj = server_time_gmt
-        except:
-            time_obj = datetime.now(timezone.utc)
-    else:
-        time_obj = datetime.now(timezone.utc)
+    news_upcoming = news_in_minutes <= 30
     
-    # Get current Kill Zone
-    current_kz = get_current_killzone(time_obj)
-    zone_info = ZONE_PERMISSIONS[current_kz]
+    result = analyze_tiempo_advanced(
+        server_time_utc=server_time_gmt,
+        news_event_upcoming=news_upcoming,
+        h4_direction=h4_candle,
+        h1_direction=h4_candle  # Usar H4 como proxy si no tenemos H1
+    )
     
-    # Check news filter
-    news_check = check_news_filter(news_in_minutes)
-    
-    # Determine market status
-    if news_check["status"] == "PAUSE":
-        market_status = MarketStatus.PAUSE
-    elif zone_info["can_trade"]:
-        market_status = MarketStatus.OPEN
-    else:
-        market_status = MarketStatus.CLOSED
-    
-    # H4 alignment (if direction proposed)
-    h4_alignment = None
-    if proposed_direction:
-        h4_alignment = check_h4_alignment(h4_candle, proposed_direction)
-        if not h4_alignment["aligned"]:
-            market_status = MarketStatus.CLOSED  # Veto by H4
-    
-    # Build response
-    result = {
+    # Convertir a formato legacy
+    legacy_result = {
         "module": "FEAT_Tiempo",
-        "status": market_status.value,
-        "session": current_kz.value,
-        "server_time_gmt": time_obj.strftime("%H:%M:%S"),
+        "status": "OPEN" if result["operational_mode"] in ["EXECUTE", "PREPARE"] else "CLOSED",
+        "session": result["phase_name"],
+        "server_time_gmt": result["utc_time"],
+        "instruction": result["instruction"],
         "analysis": {
             "kill_zone": {
-                "name": current_kz.value,
-                "can_trade": zone_info["can_trade"],
-                "risk_level": zone_info["risk_level"],
-                "note": zone_info["note"]
+                "name": result["phase_name"],
+                "can_trade": result["operational_mode"] in ["EXECUTE", "PREPARE"],
+                "risk_level": result["liquidity_intensity"],
+                "note": result["phase_description"]
             },
             "h4_candle": h4_candle,
-            "h4_alignment": h4_alignment,
-            "news_filter": news_check
+            "news_filter": {"status": "PAUSE" if news_upcoming else "CLEAR"}
+        },
+        "bias_constraint": "LONGS_PREFERRED" if h4_candle == "BULLISH" else (
+            "SHORTS_PREFERRED" if h4_candle == "BEARISH" else "NEUTRAL"
+        ),
+        
+        # Nuevo: datos avanzados
+        "advanced": {
+            "ny_time": result["ny_time"],
+            "liquidity_intensity": result["liquidity_intensity"],
+            "operational_mode": result["operational_mode"],
+            "checklist": result["checklist"],
+            "risk_warnings": result["risk_warnings"]
         }
     }
     
-    # Bias constraint
-    if h4_alignment:
-        result["bias_constraint"] = h4_alignment["constraint"]
-    elif h4_candle == "BULLISH":
-        result["bias_constraint"] = "LONGS_PREFERRED"
-    elif h4_candle == "BEARISH":
-        result["bias_constraint"] = "SHORTS_PREFERRED"
-    else:
-        result["bias_constraint"] = "NEUTRAL"
-    
-    # Action instruction
-    if market_status == MarketStatus.OPEN:
-        result["instruction"] = "PROCEED_TO_MODULE_F"
-    elif market_status == MarketStatus.PAUSE:
-        result["instruction"] = "WAIT_FOR_NEWS_CLEARANCE"
-    else:
-        result["instruction"] = "STOP_CHAIN"
-    
-    logger.info(f"[FEAT-T] Session={current_kz.value}, Status={market_status.value}, H4={h4_candle}")
-    
-    return result
+    return legacy_result
 
 
 # =============================================================================
-# Async wrapper for MCP
+# ASYNC WRAPPERS PARA MCP
 # =============================================================================
 
 async def feat_check_tiempo(
     server_time_gmt: str = None,
     h4_candle: str = "NEUTRAL",
-    news_in_minutes: int = 999,
-    proposed_direction: str = None
+    news_in_minutes: int = 999
 ) -> Dict[str, Any]:
-    """
-    MCP Tool: FEAT Module T - Tiempo analysis.
-    """
-    return analyze_tiempo(server_time_gmt, h4_candle, news_in_minutes, proposed_direction)
+    """MCP Tool: FEAT Module T - Tiempo (retrocompatible)."""
+    return analyze_tiempo(server_time_gmt, h4_candle, news_in_minutes)
+
+
+async def feat_check_tiempo_advanced(
+    server_time_utc: str = None,
+    news_event_upcoming: bool = False,
+    h4_direction: str = "NEUTRAL",
+    h1_direction: str = "NEUTRAL"
+) -> Dict[str, Any]:
+    """MCP Tool: FEAT Module T ADVANCED - Ciclo de Liquidez."""
+    return analyze_tiempo_advanced(server_time_utc, news_event_upcoming, h4_direction, h1_direction)

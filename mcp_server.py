@@ -1045,6 +1045,27 @@ async def feat_check_tiempo(
 
 @mcp.tool()
 @pulse_observer
+async def feat_check_tiempo_advanced(
+    server_time_utc: str = None,
+    news_event_upcoming: bool = False,
+    h4_direction: str = "NEUTRAL",
+    h1_direction: str = "NEUTRAL"
+):
+    """
+    🕐 FEAT Module T ADVANCED: Ciclo Diario de Liquidez XAU/USD
+    
+    Analiza fases de liquidez institucional por hora:
+    - ASIA_OVERNIGHT, PRE_LONDON, LONDON_KILLZONE, NY_KILLZONE, etc.
+    - Intensidad: LOW/MEDIUM/HIGH/VERY_HIGH
+    - Modos: WAIT/PREPARE/EXECUTE/MANAGE
+    """
+    from app.skills.feat_tiempo import analyze_tiempo_advanced
+    return analyze_tiempo_advanced(server_time_utc, news_event_upcoming, h4_direction, h1_direction)
+
+
+
+@mcp.tool()
+@pulse_observer
 async def feat_analyze_forma(
     h4_candles: list = None,
     h1_candles: list = None,
