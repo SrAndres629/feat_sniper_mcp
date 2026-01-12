@@ -1152,6 +1152,39 @@ async def feat_map_espacio(
 
 @mcp.tool()
 @pulse_observer
+async def feat_map_espacio_advanced(
+    candles: list,
+    current_price: float,
+    market_structure: str = "NEUTRAL",
+    chrono_features: dict = None
+):
+    """
+    📍 FEAT Module E ADVANCED: Zonas Chrono-Aware
+    
+    Integra contexto temporal para validar calidad de zonas:
+    - Zonas de Kill Zone tienen +20% score
+    - Zonas de Lunes (INDUCTION) tienen -40% score
+    """
+    from app.skills.feat_espacio import analyze_espacio
+    return analyze_espacio(candles, current_price, market_structure, "H1", chrono_features)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_generate_liquidity_features(
+    candles: list,
+    current_price: float,
+    chrono_features: dict = None
+):
+    """
+    🧠 FEAT LIQUIDITY ML: Genera features de zonas para red neuronal.
+    """
+    from app.skills.feat_espacio import generate_liquidity_features
+    return generate_liquidity_features(candles, current_price, chrono_features)
+
+
+@mcp.tool()
+@pulse_observer
 async def feat_validate_aceleracion(
     recent_candles: list,
     poi_status: str = "NEUTRAL",
@@ -1163,6 +1196,40 @@ async def feat_validate_aceleracion(
     """
     from app.skills.feat_aceleracion import analyze_aceleracion
     return analyze_aceleracion(recent_candles, poi_status, proposed_direction)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_validate_aceleracion_advanced(
+    recent_candles: list,
+    proposed_direction: str = None,
+    chrono_features: dict = None
+):
+    """
+    ⚡ FEAT Module A ADVANCED: Momentum Chrono-Aware
+    
+    Execution probability ajustada por ciclo temporal:
+    - Kill Zone: +15% momentum score
+    - INDUCTION (Lunes): -30% momentum score
+    - Fakeout y Exhaustion detection
+    """
+    from app.skills.feat_aceleracion import analyze_aceleracion
+    return analyze_aceleracion(recent_candles, "NEUTRAL", proposed_direction, 14, chrono_features)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_generate_momentum_features(
+    recent_candles: list,
+    proposed_direction: str = None,
+    chrono_features: dict = None
+):
+    """
+    🧠 FEAT MOMENTUM ML: Genera features de momentum para red neuronal.
+    """
+    from app.skills.feat_aceleracion import generate_momentum_features
+    return generate_momentum_features(recent_candles, proposed_direction, chrono_features)
+
 
 
 @mcp.tool()
