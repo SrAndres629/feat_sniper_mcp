@@ -1,223 +1,305 @@
 """
-FEAT Full Chain Orchestrator
-============================
-Ejecuta la cadena completa FEAT en secuencia:
-T (Tiempo) -> F (Forma) -> E (Espacio) -> A (Aceleración) -> EXECUTE
+FEAT CHAIN INSTITUCIONAL: Orquestador Completo
+================================================
+Integra todos los módulos MIP en una sola cadena de decisión.
 
-Si cualquier módulo retorna STOP, la cadena se detiene (Kill Switch).
+Flujo:
+1. TIEMPO → Session phase, fixes, alignment D1/H4/H1
+2. FORMA → BOS/CHoCH, sweeps, structure
+3. ESPACIO → FVG, OB, Premium/Discount
+4. ACELERACIÓN → Momentum, fakeout, volume
+5. FUSION → MultiTimeLearningManager weighted decision
+6. LIQUIDITY → DoM preflight check
+7. EXECUTION → Twin-Engine (Scalp + Swing)
+
+Cada paso tiene probabilidad de éxito. 
+El sistema NO tiene "kill switches" - solo multiplica probabilidades.
 """
 
 import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
+import asyncio
 
-from app.skills.feat_tiempo import analyze_tiempo
-from app.skills.feat_forma import analyze_forma
-from app.skills.feat_espacio import analyze_espacio
-from app.skills.feat_aceleracion import analyze_aceleracion
-
-logger = logging.getLogger("FEAT.Chain")
+logger = logging.getLogger("FEAT.ChainInstitucional")
 
 
-def execute_feat_chain(
-    server_time_gmt: str = None,
+async def execute_feat_chain_institucional(
+    symbol: str = "XAUUSD",
+    server_time_utc: str = None,
+    d1_direction: str = "NEUTRAL",
+    h4_direction: str = "NEUTRAL",
+    h1_direction: str = "NEUTRAL",
     h4_candles: List[Dict] = None,
     h1_candles: List[Dict] = None,
     m15_candles: List[Dict] = None,
     m5_candles: List[Dict] = None,
     current_price: float = None,
-    symbol: str = "XAUUSD",
-    news_in_minutes: int = 999
+    has_sweep: bool = False,
+    news_upcoming: bool = False
 ) -> Dict[str, Any]:
     """
-    🔗 FEAT FULL CHAIN: Ejecuta la lógica completa de trading institucional.
+    🏛️ FEAT CHAIN INSTITUCIONAL: Orquesta T→F→E→A→Fusion→Liquidity→Execution.
     
-    Flujo:
-    1. CHECK T (Tiempo): ¿Es hora de operar?
-    2. CHECK F (Forma): ¿Cuál es la tendencia?
-    3. CHECK E (Espacio): ¿El precio está en un POI?
-    4. CHECK A (Aceleración): ¿Hay confirmación de entrada?
-    5. EXECUTE: Generar señal de trading
-    
-    Returns:
-        Dict con resultado completo de la cadena FEAT
+    NO hay kill switches - cada módulo aporta probabilidad.
+    El resultado final es un score de 0.0 a 1.0.
     """
-    chain_result = {
-        "chain": "FEAT_COMPLETE",
+    from app.skills.feat_tiempo import analyze_tiempo_institucional
+    from app.skills.feat_forma import analyze_forma
+    from app.skills.feat_espacio import analyze_espacio
+    from app.skills.feat_aceleracion import analyze_aceleracion
+    from app.ml.multi_time_learning import mtf_manager
+    
+    result = {
+        "module": "FEAT_CHAIN_INSTITUCIONAL",
         "symbol": symbol,
         "timestamp": datetime.now(timezone.utc).isoformat(),
-        "modules_executed": [],
-        "chain_status": "RUNNING"
+        "chain_stages": {},
+        "ml_features": {},
+        "final_decision": None
     }
     
-    # Determine H4 direction from candles
-    h4_direction = "NEUTRAL"
-    if h4_candles and len(h4_candles) > 0:
-        last_h4 = h4_candles[-1]
-        if last_h4["close"] > last_h4["open"]:
-            h4_direction = "BULLISH"
-        elif last_h4["close"] < last_h4["open"]:
-            h4_direction = "BEARISH"
+    cumulative_probability = 1.0
+    chain_log = []
+    all_ml_features = {}
     
     # =========================================================================
-    # MODULE T: TIEMPO
+    # STAGE 1: TIEMPO INSTITUCIONAL
     # =========================================================================
-    tiempo_result = analyze_tiempo(
-        server_time_gmt=server_time_gmt,
-        h4_candle=h4_direction,
-        news_in_minutes=news_in_minutes
-    )
-    chain_result["modules_executed"].append({
-        "module": "T_TIEMPO",
-        "status": tiempo_result["status"],
-        "session": tiempo_result.get("session"),
-        "instruction": tiempo_result["instruction"]
-    })
-    
-    # Kill Switch T
-    if tiempo_result["status"] != "OPEN":
-        chain_result["chain_status"] = "STOPPED_AT_TIEMPO"
-        chain_result["final_decision"] = "NO_TRADE"
-        chain_result["reason"] = tiempo_result["instruction"]
-        logger.info(f"[FEAT-CHAIN] Stopped at T: {tiempo_result['instruction']}")
-        return chain_result
-    
-    proposed_direction = "BUY" if h4_direction == "BULLISH" else "SELL" if h4_direction == "BEARISH" else None
-    
-    # =========================================================================
-    # MODULE F: FORMA
-    # =========================================================================
-    forma_result = analyze_forma(
-        h4_candles=h4_candles,
-        h1_candles=h1_candles,
-        m15_candles=m15_candles,
-        current_price=current_price
-    )
-    chain_result["modules_executed"].append({
-        "module": "F_FORMA",
-        "bias": forma_result.get("bias_conclusion"),
-        "h4_trend": forma_result["analysis"].get("H4", {}).get("trend"),
-        "h1_trend": forma_result["analysis"].get("H1", {}).get("trend"),
-        "instruction": forma_result["instruction"]
-    })
-    
-    # Kill Switch F
-    if forma_result["instruction"] not in ["PROCEED_TO_MODULE_E"]:
-        chain_result["chain_status"] = "WAITING_AT_FORMA"
-        chain_result["final_decision"] = "WAIT"
-        chain_result["reason"] = forma_result["instruction"]
-        logger.info(f"[FEAT-CHAIN] Waiting at F: {forma_result['instruction']}")
-        return chain_result
-    
-    market_structure = forma_result.get("bias_conclusion", "NEUTRAL")
+    try:
+        tiempo = analyze_tiempo_institucional(
+            server_time_utc, d1_direction, h4_direction, h1_direction, has_sweep, news_upcoming
+        )
+        
+        tiempo_prob = tiempo["risk"]["combined_risk_multiplier"]
+        cumulative_probability *= tiempo_prob
+        
+        result["chain_stages"]["1_TIEMPO"] = {
+            "status": "OK",
+            "session": tiempo["session"]["phase"],
+            "alignment": tiempo["alignment"]["alignment_type"],
+            "probability": round(tiempo_prob, 3),
+            "templates": tiempo["templates"]["best_template"]["template"]
+        }
+        
+        all_ml_features.update(tiempo.get("ml_features", {}))
+        chain_log.append(f"T: {tiempo['session']['phase']} prob={tiempo_prob:.2f}")
+        
+        chrono_features = tiempo
+    except Exception as e:
+        logger.error(f"[CHAIN] Stage 1 (TIEMPO) failed: {e}")
+        result["chain_stages"]["1_TIEMPO"] = {"status": "ERROR", "error": str(e)}
+        chrono_features = None
+        cumulative_probability *= 0.5
     
     # =========================================================================
-    # MODULE E: ESPACIO
+    # STAGE 2: FORMA (Structure)
     # =========================================================================
-    analysis_candles = h1_candles if h1_candles else m15_candles or []
-    espacio_result = analyze_espacio(
-        candles=analysis_candles,
-        current_price=current_price,
-        market_structure=market_structure,
-        timeframe="H1"
-    )
-    chain_result["modules_executed"].append({
-        "module": "E_ESPACIO",
-        "fresh_zones": espacio_result["analysis"].get("total_fresh_zones", 0),
-        "target_zone": espacio_result.get("target_zone"),
-        "instruction": espacio_result["instruction"]
-    })
-    
-    # Kill Switch E
-    if "PROCEED_TO_MODULE_A" not in espacio_result["instruction"]:
-        chain_result["chain_status"] = "WAITING_AT_ESPACIO"
-        chain_result["final_decision"] = "WAIT"
-        chain_result["reason"] = espacio_result["instruction"]
-        logger.info(f"[FEAT-CHAIN] Waiting at E: {espacio_result['instruction']}")
-        return chain_result
-    
-    # =========================================================================
-    # MODULE A: ACELERACIÓN
-    # =========================================================================
-    recent_candles = m5_candles[-10:] if m5_candles else m15_candles[-10:] if m15_candles else []
-    aceleracion_result = analyze_aceleracion(
-        recent_candles=recent_candles,
-        poi_status="PRICE_INSIDE_POI",
-        proposed_direction=proposed_direction
-    )
-    chain_result["modules_executed"].append({
-        "module": "A_ACELERACION",
-        "momentum_score": aceleracion_result["analysis"].get("momentum_score"),
-        "momentum_type": aceleracion_result["analysis"].get("momentum_type"),
-        "instruction": aceleracion_result["instruction"]
-    })
-    
-    # Kill Switch A
-    if aceleracion_result["instruction"] not in ["EXECUTE_TRADE", "PREPARE_ENTRY_ON_RETRACEMENT"]:
-        chain_result["chain_status"] = "STOPPED_AT_ACELERACION"
-        chain_result["final_decision"] = "NO_TRADE"
-        chain_result["reason"] = aceleracion_result["instruction"]
-        logger.info(f"[FEAT-CHAIN] Stopped at A: {aceleracion_result['instruction']}")
-        return chain_result
+    try:
+        forma = analyze_forma(h4_candles, h1_candles, m15_candles, current_price, chrono_features)
+        
+        forma_prob = forma.get("alignment_score", 0.5)
+        cumulative_probability *= forma_prob
+        
+        result["chain_stages"]["2_FORMA"] = {
+            "status": "OK",
+            "bias": forma["bias_conclusion"],
+            "h4_trend": forma["analysis"].get("H4", {}).get("trend"),
+            "h1_trend": forma["analysis"].get("H1", {}).get("trend"),
+            "probability": round(forma_prob, 3)
+        }
+        
+        all_ml_features.update(forma.get("ml_features", {}))
+        chain_log.append(f"F: {forma['bias_conclusion']} prob={forma_prob:.2f}")
+        
+        market_structure = forma["analysis"].get("H4", {}).get("trend", "NEUTRAL")
+    except Exception as e:
+        logger.error(f"[CHAIN] Stage 2 (FORMA) failed: {e}")
+        result["chain_stages"]["2_FORMA"] = {"status": "ERROR", "error": str(e)}
+        market_structure = "NEUTRAL"
+        cumulative_probability *= 0.5
     
     # =========================================================================
-    # EXECUTE: GENERATE TRADE SIGNAL
+    # STAGE 3: ESPACIO (Zones)
     # =========================================================================
-    target_zone = espacio_result.get("target_zone", {})
-    structural_low = forma_result["analysis"].get("H4", {}).get("structural_points", {}).get("last_valid_low")
-    structural_high = forma_result["analysis"].get("H4", {}).get("structural_points", {}).get("last_valid_high")
+    try:
+        espacio = analyze_espacio(
+            h1_candles or m15_candles, current_price, market_structure, "H1", chrono_features
+        )
+        
+        espacio_prob = espacio.get("guidance", {}).get("combined_probability", 0.5)
+        cumulative_probability *= espacio_prob
+        
+        result["chain_stages"]["3_ESPACIO"] = {
+            "status": "OK",
+            "premium_discount": espacio["analysis"]["premium_discount"]["zone"],
+            "zones_hq": espacio["analysis"]["zones_detected"]["high_quality"],
+            "price_in_zone": espacio["price_in_zone"],
+            "probability": round(espacio_prob, 3)
+        }
+        
+        all_ml_features.update(espacio.get("ml_features", {}))
+        chain_log.append(f"E: {espacio['analysis']['premium_discount']['zone']} prob={espacio_prob:.2f}")
+        
+        poi_status = "IN_ZONE" if espacio["price_in_zone"] else "WAITING"
+    except Exception as e:
+        logger.error(f"[CHAIN] Stage 3 (ESPACIO) failed: {e}")
+        result["chain_stages"]["3_ESPACIO"] = {"status": "ERROR", "error": str(e)}
+        poi_status = "NEUTRAL"
+        cumulative_probability *= 0.5
     
-    # Calculate SL based on structure
-    if proposed_direction == "BUY":
-        sl_price = structural_low if structural_low else (current_price * 0.998)
-        tp1_price = target_zone.get("top", current_price * 1.002)
-        tp2_price = structural_high if structural_high else (current_price * 1.005)
-    else:  # SELL
-        sl_price = structural_high if structural_high else (current_price * 1.002)
-        tp1_price = target_zone.get("bottom", current_price * 0.998)
-        tp2_price = structural_low if structural_low else (current_price * 0.995)
+    # =========================================================================
+    # STAGE 4: ACELERACIÓN (Momentum)
+    # =========================================================================
+    try:
+        proposed_direction = d1_direction if d1_direction != "NEUTRAL" else h4_direction
+        
+        aceleracion = analyze_aceleracion(
+            m5_candles or m15_candles, poi_status, proposed_direction, 14, chrono_features
+        )
+        
+        aceleracion_prob = aceleracion.get("execution_probability", 0.5)
+        cumulative_probability *= aceleracion_prob
+        
+        result["chain_stages"]["4_ACELERACION"] = {
+            "status": "OK",
+            "momentum_type": aceleracion["analysis"]["momentum_type"],
+            "momentum_score": aceleracion["analysis"]["momentum_score"],
+            "is_fakeout": aceleracion["analysis"]["fakeout_check"].get("is_fakeout", False),
+            "probability": round(aceleracion_prob, 3)
+        }
+        
+        all_ml_features.update(aceleracion.get("ml_features", {}))
+        chain_log.append(f"A: {aceleracion['analysis']['momentum_type']} prob={aceleracion_prob:.2f}")
+    except Exception as e:
+        logger.error(f"[CHAIN] Stage 4 (ACELERACION) failed: {e}")
+        result["chain_stages"]["4_ACELERACION"] = {"status": "ERROR", "error": str(e)}
+        cumulative_probability *= 0.5
     
-    confidence = aceleracion_result.get("confidence", "MEDIUM")
-    momentum_score = aceleracion_result["analysis"].get("momentum_score", 50)
+    # =========================================================================
+    # STAGE 5: FUSION LAYER (MTF Integration)
+    # =========================================================================
+    try:
+        # Build signals dict for MTF manager
+        signals = {
+            "D1": 0.5 + (0.3 if d1_direction == "BULLISH" else (-0.3 if d1_direction == "BEARISH" else 0)),
+            "H4": 0.5 + (0.3 if h4_direction == "BULLISH" else (-0.3 if h4_direction == "BEARISH" else 0)),
+            "H1": 0.5 + (0.3 if h1_direction == "BULLISH" else (-0.3 if h1_direction == "BEARISH" else 0)),
+            "M15": cumulative_probability,
+            "M5": cumulative_probability
+        }
+        
+        # Assume neutral Hurst for now (can be calculated from data)
+        hurst_map = {"D1": 0.55, "H4": 0.55, "H1": 0.50, "M15": 0.50, "M5": 0.50}
+        
+        fusion_prob = mtf_manager.resolve_conflicts(signals, hurst_map)
+        
+        result["chain_stages"]["5_FUSION"] = {
+            "status": "OK",
+            "weights": mtf_manager.get_fractal_weights(hurst_map),
+            "fused_probability": round(fusion_prob, 3)
+        }
+        
+        chain_log.append(f"FUSION: prob={fusion_prob:.2f}")
+    except Exception as e:
+        logger.error(f"[CHAIN] Stage 5 (FUSION) failed: {e}")
+        result["chain_stages"]["5_FUSION"] = {"status": "ERROR", "error": str(e)}
+        fusion_prob = cumulative_probability
     
-    chain_result["chain_status"] = "COMPLETED"
-    chain_result["final_decision"] = "EXECUTE_TRADE"
-    chain_result["trade_params"] = {
-        "symbol": symbol,
-        "order_type": f"{proposed_direction}_LIMIT" if confidence == "MEDIUM" else f"{proposed_direction}_MARKET",
-        "direction": proposed_direction,
-        "entry_price": target_zone.get("midpoint", current_price),
-        "stop_loss": round(sl_price, 2),
-        "take_profit_1": round(tp1_price, 2),
-        "take_profit_2": round(tp2_price, 2),
-        "lot_size_risk_percentage": 1.0 if confidence == "HIGH" else 0.5,
-        "confidence_score": momentum_score,
-        "reasoning": f"Tendencia H4 {h4_direction} (F), POI {target_zone.get('type', 'ZONE')} (E), Momentum {aceleracion_result['analysis'].get('momentum_type')} (A) en {tiempo_result.get('session')} (T)."
+    # =========================================================================
+    # STAGE 6: LIQUIDITY PREFLIGHT
+    # =========================================================================
+    try:
+        from app.skills.liquidity import check_liquidity_preflight
+        
+        liquidity_ok = await check_liquidity_preflight(symbol)
+        liquidity_penalty = 1.0 if liquidity_ok else 0.3
+        
+        result["chain_stages"]["6_LIQUIDITY"] = {
+            "status": "OK" if liquidity_ok else "LOW",
+            "institutional_grade": liquidity_ok,
+            "penalty": liquidity_penalty
+        }
+        
+        chain_log.append(f"LIQ: {'✅' if liquidity_ok else '⚠️'}")
+    except Exception as e:
+        logger.warning(f"[CHAIN] Stage 6 (LIQUIDITY) failed: {e}")
+        result["chain_stages"]["6_LIQUIDITY"] = {"status": "SKIP", "note": "DoM not available"}
+        liquidity_penalty = 1.0
+    
+    # =========================================================================
+    # FINAL DECISION
+    # =========================================================================
+    final_probability = fusion_prob * liquidity_penalty
+    final_probability = max(0.0, min(1.0, final_probability))
+    
+    # Determine action
+    if final_probability >= 0.70:
+        action = "EXECUTE_TWIN"
+        size = "FULL"
+    elif final_probability >= 0.55:
+        action = "EXECUTE_SCALP"
+        size = "HALF"
+    elif final_probability >= 0.40:
+        action = "PREPARE"
+        size = "QUARTER"
+    else:
+        action = "WAIT"
+        size = "NONE"
+    
+    # Direction
+    final_direction = proposed_direction if proposed_direction != "NEUTRAL" else "NEUTRAL"
+    
+    result["final_decision"] = {
+        "action": action,
+        "direction": final_direction,
+        "probability": round(final_probability, 3),
+        "size": size,
+        "chain_log": chain_log
     }
     
-    logger.info(f"[FEAT-CHAIN] ✅ EXECUTE: {proposed_direction} @ {current_price}, Confidence={momentum_score}")
+    result["ml_features"] = all_ml_features
     
-    return chain_result
+    # Trade params for execution
+    if action in ["EXECUTE_TWIN", "EXECUTE_SCALP"]:
+        result["trade_params"] = {
+            "symbol": symbol,
+            "direction": final_direction,
+            "entry_price": current_price,
+            "size_multiplier": 1.0 if size == "FULL" else (0.5 if size == "HALF" else 0.25),
+            "use_twin_engine": action == "EXECUTE_TWIN",
+            "chrono_context": {
+                "session": result["chain_stages"].get("1_TIEMPO", {}).get("session"),
+                "template": result["chain_stages"].get("1_TIEMPO", {}).get("templates")
+            }
+        }
+    
+    logger.info(f"[FEAT-CHAIN] {action} {final_direction} prob={final_probability:.2f} | {' → '.join(chain_log)}")
+    
+    return result
 
 
 # =============================================================================
-# Async wrapper for MCP
+# ASYNC MCP WRAPPER
 # =============================================================================
 
-async def feat_full_chain(
-    server_time_gmt: str = None,
+async def feat_full_chain_institucional(
+    symbol: str = "XAUUSD",
+    server_time_utc: str = None,
+    d1_direction: str = "NEUTRAL",
+    h4_direction: str = "NEUTRAL",
+    h1_direction: str = "NEUTRAL",
     h4_candles: List[Dict] = None,
     h1_candles: List[Dict] = None,
     m15_candles: List[Dict] = None,
     m5_candles: List[Dict] = None,
     current_price: float = None,
-    symbol: str = "XAUUSD",
-    news_in_minutes: int = 999
+    has_sweep: bool = False,
+    news_upcoming: bool = False
 ) -> Dict[str, Any]:
-    """
-    MCP Tool: Execute complete FEAT chain analysis.
-    """
-    return execute_feat_chain(
-        server_time_gmt, h4_candles, h1_candles, m15_candles, m5_candles,
-        current_price, symbol, news_in_minutes
+    """MCP Tool: Full institutional chain."""
+    return await execute_feat_chain_institucional(
+        symbol, server_time_utc, d1_direction, h4_direction, h1_direction,
+        h4_candles, h1_candles, m15_candles, m5_candles, current_price,
+        has_sweep, news_upcoming
     )

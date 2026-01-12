@@ -1273,15 +1273,53 @@ async def feat_full_chain(
     Si cualquier módulo falla, la cadena se detiene (Kill Switch).
     Retorna señal de trading si todo pasa.
     """
-    from app.skills.feat_chain import execute_feat_chain
-    return execute_feat_chain(
+    from app.skills.feat_chain import execute_feat_chain_institucional
+    return await execute_feat_chain_institucional(
+        symbol=symbol,
         h4_candles=h4_candles,
         h1_candles=h1_candles,
         m15_candles=m15_candles,
         m5_candles=m5_candles,
-        current_price=current_price,
-        symbol=symbol
+        current_price=current_price
     )
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_full_chain_institucional(
+    symbol: str = "XAUUSD",
+    server_time_utc: str = None,
+    d1_direction: str = "NEUTRAL",
+    h4_direction: str = "NEUTRAL",
+    h1_direction: str = "NEUTRAL",
+    h4_candles: list = None,
+    h1_candles: list = None,
+    m15_candles: list = None,
+    m5_candles: list = None,
+    current_price: float = None,
+    has_sweep: bool = False,
+    news_upcoming: bool = False
+):
+    """
+    🏛️ FEAT CHAIN INSTITUCIONAL: Pipeline completo MIP.
+    
+    6 Stages:
+    1. TIEMPO → Session, fixes, D1/H4/H1 alignment
+    2. FORMA → BOS/CHoCH, sweeps, structure  
+    3. ESPACIO → FVG, OB, Premium/Discount
+    4. ACELERACIÓN → Momentum, fakeout, volume
+    5. FUSION → MTF weighted probability
+    6. LIQUIDITY → DoM preflight
+    
+    Retorna probabilidad 0.0-1.0 y trade_params si >0.55
+    """
+    from app.skills.feat_chain import execute_feat_chain_institucional
+    return await execute_feat_chain_institucional(
+        symbol, server_time_utc, d1_direction, h4_direction, h1_direction,
+        h4_candles, h1_candles, m15_candles, m5_candles, current_price,
+        has_sweep, news_upcoming
+    )
+
 
 
 # =============================================================================
