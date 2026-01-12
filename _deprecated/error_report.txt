@@ -1,5 +1,0 @@
-Total Errors/Warnings: 2
-------------------------------
-
-FILE: Mql.mqh (1 issues)
-  - information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Error.mqh

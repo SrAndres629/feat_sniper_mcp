@@ -28,6 +28,7 @@ models/
 *.log
 logs/
 *.txt.log
+*.txt
 
 # IDE & OS
 .DS_Store
@@ -41,10 +42,21 @@ node_modules/
 .next/
 dashboard/.next/
 FEAT_Sniper_Master_Core/**/*.ex5
-FEAT_Sniper_Master_Core/**/*.mqh
 FEAT_Sniper_Master_Core/**/*.log
-FEAT_Sniper_Master_Core/Include/
-FEAT_Sniper_Master_Core/Files/
 FEAT_Sniper_Master_Core/Logs/
 FEAT_Sniper_Master_Core/MQL5/Logs/
 
+# System Junk & Binaries (Anti-Crash)
+*.lnk
+*.zip
+*.rar
+*.exe
+*.dll
+*.so
+*.bin
+*.pdf
+*.jpg
+*.png
+*.mp4
+*.joblib
+*.pt
