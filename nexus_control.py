@@ -15,6 +15,7 @@ Usage:
 
 import os
 import sys
+import socket
 import subprocess
 import time
 import signal
@@ -100,8 +101,7 @@ def kill_other_instances():
             continue
 
 def check_port(port):
-    import socket
-    with socket.socket(socket.socket.AF_INET, socket.SOCK_STREAM) as s:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.settimeout(0.5)
         return s.connect_ex(('127.0.0.1', port)) == 0
 
@@ -166,9 +166,17 @@ class NexusControl:
             log("[ERR] Docker Engine no está corriendo. Por favor inicia Docker Desktop.", RED)
             return False
             
-        log("[INFO] Levantando servicios configurados...", WHITE)
-        # Remove --build by default as requested by user batch policy
-        _, _, code = run_cmd("docker compose up -d", live=True)
+        log("[INFO] Levantando servicios...", WHITE)
+        
+        # Smart rebuild: Only rebuild if source code changed
+        needs_rebuild = self._check_needs_rebuild()
+        
+        if needs_rebuild:
+            log("[INFO] Cambios detectados en código fuente. Reconstruyendo contenedor...", YELLOW)
+            _, _, code = run_cmd("docker compose up -d --build", live=True)
+        else:
+            log("[INFO] Sin cambios detectados. Usando contenedor existente.", GREEN)
+            _, _, code = run_cmd("docker compose up -d", live=True)
         
         if code != 0:
             log("[ERR] Fallo al iniciar contenedores mediante Docker Compose.", RED)
@@ -176,6 +184,42 @@ class NexusControl:
             
         log("[OK] Infraestructura desplegada.", GREEN)
         return True
+    
+    def _check_needs_rebuild(self):
+        """Detecta si hay cambios en el código fuente desde el último build."""
+        import hashlib
+        import glob
+        
+        cache_file = os.path.join(PROJECT_DIR, ".docker_build_hash")
+        
+        # Compute hash of key source files
+        source_patterns = ["app/**/*.py", "mcp_server.py", "requirements.txt", "Dockerfile"]
+        current_hash = hashlib.md5()
+        
+        for pattern in source_patterns:
+            for filepath in glob.glob(os.path.join(PROJECT_DIR, pattern), recursive=True):
+                try:
+                    with open(filepath, "rb") as f:
+                        current_hash.update(f.read())
+                except:
+                    pass
+        
+        new_hash = current_hash.hexdigest()
+        
+        # Compare with cached hash
+        try:
+            with open(cache_file, "r") as f:
+                old_hash = f.read().strip()
+            if old_hash == new_hash:
+                return False  # No rebuild needed
+        except FileNotFoundError:
+            pass  # First run, needs rebuild
+        
+        # Save new hash
+        with open(cache_file, "w") as f:
+            f.write(new_hash)
+        
+        return True  # Rebuild needed
 
     def check_container_logs(self):
         log("\n>>> Fase 3: Auditoria Interna de Logs", CYAN)

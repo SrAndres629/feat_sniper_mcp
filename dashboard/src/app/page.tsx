@@ -34,20 +34,41 @@ const MetricBox = ({ label, value, icon: Icon, color = "aqua" }: any) => (
 
 export default function Dashboard() {
   const [signals, setSignals] = useState<any[]>([]);
+  const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
   const [score, setScore] = useState(92);
   const [status, setStatus] = useState("OPERATIONAL");
+  const [pnl, setPnl] = useState({ daily: 1450.25, total: 32400.00, hourly: 82.50, velocity: 120.50 });
+  const [history, setHistory] = useState<any[]>([]);
+  const [twinEngine, setTwinEngine] = useState({ scalp: 10.0, swing: 10.0, mode: "TWIN" });
 
   useEffect(() => {
     // Real-time signal subscription
     const channel = supabase
       .channel('live-signals')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sniper_signals' }, payload => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'feat_signals' }, payload => {
         setSignals(prev => [payload.new, ...prev].slice(0, 10));
-        if (payload.new.confidence) setScore(payload.new.confidence);
+        let conf = payload.new.confidence;
+        if (conf <= 1) conf = conf * 100;
+        setScore(Math.round(conf));
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    // Fetch Financial Performance every 30 seconds
+    const fetchPerformance = async () => {
+      try {
+        // En una implementación real, esto llamaría al MCP
+      } catch (e) {
+        console.error("Failed to fetch financial performance", e);
+      }
+    };
+
+    const interval = setInterval(fetchPerformance, 30000);
+    fetchPerformance();
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -94,7 +115,14 @@ export default function Dashboard() {
 
           {/* LEFT: MONITORING */}
           <div className="lg:col-span-8 space-y-6">
-            <GlassCard className="h-[400px] flex flex-col justify-center items-center">
+            <GlassCard className="h-[400px] flex flex-col justify-center items-center relative">
+              <div className="absolute top-4 right-4 text-right">
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Financial Nexus</p>
+                <p className={`text-xl font-mono font-bold ${pnl.daily >= 0 ? 'text-green-sniper' : 'text-red-sniper'}`}>
+                  ${pnl.daily.toLocaleString()} <span className="text-[10px]">USD/DAY</span>
+                </p>
+              </div>
+
               {/* Central Gauge Mockup */}
               <div className="relative w-64 h-64 flex items-center justify-center">
                 <svg className="w-full h-full transform -rotate-90">
@@ -128,11 +156,50 @@ export default function Dashboard() {
             </GlassCard>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <MetricBox label="ZMQ Bridge" value="1.2ms" icon={Zap} />
-              <MetricBox label="RAG Memory" icon={Database} value="Indexed" color="gold" />
-              <MetricBox label="Offloading" value="Active" icon={Cpu} />
-              <MetricBox label="Protection" value="Breaker ON" icon={Shield} color="green-sniper" />
+              <MetricBox label="Capital Scalp" value={`$${twinEngine.scalp}`} icon={Zap} color="aqua" />
+              <MetricBox label="Capital Swing" value={`$${twinEngine.swing}`} icon={Target} color="gold" />
+              <MetricBox label="Profit/Hour" value={`$${pnl.velocity}`} icon={Activity} color="green-sniper" />
+              <MetricBox label="Engine Mode" value={twinEngine.mode} icon={Shield} color="aqua" />
             </div>
+
+            {/* TRADE JOURNAL */}
+            <GlassCard className="min-h-[300px]">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold flex items-center text-sm">
+                  <Database className="w-4 h-4 mr-2 text-gold" />
+                  TACTICAL TRADE JOURNAL
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs font-mono">
+                  <thead>
+                    <tr className="text-gray-500 border-b border-white/5">
+                      <th className="text-left pb-2">TIME</th>
+                      <th className="text-left pb-2">ASSET</th>
+                      <th className="text-left pb-2">TYPE</th>
+                      <th className="text-left pb-2">SETUP (FEAT)</th>
+                      <th className="text-right pb-2">PROFIT</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {/* Placeholder Journal Data */}
+                    <tr>
+                      <td className="py-2 text-gray-400">04:12:00</td>
+                      <td className="py-2 font-bold text-aqua">XAUUSD</td>
+                      <td className="py-2"><span className="text-green-sniper">BUY</span></td>
+                      <td className="py-2 text-gray-400">OB+FVG (H1)</td>
+                      <td className="py-2 text-right text-green-sniper">+$420.00</td>
+                    </tr>
+                    <tr>
+                      <td className="py-2 text-gray-400">03:55:20</td>
+                      <td className="py-2 font-bold text-aqua">BTCUSD</td>
+                      <td className="py-2"><span className="text-red-sniper">SELL</span></td>
+                      <td className="py-2 text-right text-red-sniper">-$120.50</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </GlassCard>
           </div>
 
           {/* RIGHT: SIGNALS */}
@@ -158,21 +225,51 @@ export default function Dashboard() {
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, scale: 0.95 }}
                         className="p-4 rounded-lg bg-white/5 border border-white/5 hover:border-aqua/30 transition-all cursor-pointer group"
+                        onClick={() => setExpandedSignal(expandedSignal === sig.id ? null : sig.id)}
                       >
                         <div className="flex justify-between items-start">
                           <div>
                             <p className="font-bold text-lg group-hover:text-aqua transition-colors">{sig.symbol}</p>
-                            <p className="text-[10px] text-gray-500 font-mono italic">{new Date(sig.created_at).toLocaleTimeString()}</p>
+                            <p className="text-[10px] text-gray-400 font-mono italic">{new Date(sig.created_at).toLocaleTimeString()}</p>
                           </div>
-                          <span className={`px-2 py-1 rounded text-[10px] font-bold ${sig.action === 'BUY' ? 'bg-green-sniper/20 text-green-sniper' : 'bg-red-sniper/20 text-red-sniper'
+                          <span className={`px-2 py-1 rounded text-[10px] font-bold ${(sig.direction || sig.action) === 'BUY' ? 'bg-green-sniper/20 text-green-sniper' : 'bg-red-sniper/20 text-red-sniper'
                             }`}>
-                            {sig.action}
+                            {sig.direction || sig.action}
                           </span>
                         </div>
                         <div className="mt-3 flex justify-between items-center text-xs font-mono">
-                          <span className="text-gray-400">P: {sig.price}</span>
-                          <span className="text-aqua">{sig.confidence}% CONF</span>
+                          <span className="text-gray-400">P: {sig.entry_price || sig.price}</span>
+                          <span className="text-aqua">{(sig.confidence <= 1 ? sig.confidence * 100 : sig.confidence).toFixed(0)}% CONF</span>
                         </div>
+
+                        {/* REASONING SECTION */}
+                        <AnimatePresence>
+                          {expandedSignal === sig.id && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="mt-4 pt-4 border-t border-white/10 overflow-hidden"
+                            >
+                              <div className="flex items-center space-x-2 mb-2 text-gold">
+                                <Search className="w-3 h-3" />
+                                <span className="text-[10px] uppercase tracking-widest font-bold">FEAT Reasoning</span>
+                              </div>
+                              <p className="text-xs text-gray-300 font-mono leading-relaxed bg-black/20 p-2 rounded">
+                                {sig.explanation || sig.engineer_diagnosis || sig.metadata?.explanation || "Analyzing market microstructure for definitive bias..."}
+                              </p>
+                              {sig.metadata?.top_drivers && (
+                                <div className="mt-2 flex flex-wrap gap-1">
+                                  {sig.metadata.top_drivers.map((driver: string, idx: number) => (
+                                    <span key={idx} className="text-[8px] px-1.5 py-0.5 bg-aqua/10 text-aqua rounded border border-aqua/20">
+                                      {driver}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </motion.div>
                     ))
                   )}

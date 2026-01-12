@@ -179,7 +179,13 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
             exec_price = price
         else:
             tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
-            exec_price = tick.ask if action == "BUY" else tick.bid
+            # Sniper 2.0: Optimization - If suggest buy at 2000.5, we place limit at 2000.0 (better price)
+            # This is done by the caller/agent, but we ensure the price is used if provided.
+            if price and price > 0:
+                exec_price = price
+                order_type = ACTION_TO_MT5_TYPE.get(f"{action}_LIMIT", ACTION_TO_MT5_TYPE.get(action))
+            else:
+                exec_price = tick.ask if action == "BUY" else tick.bid
 
         # Detectar Filling Mode
         filling_mode = mt5.ORDER_FILLING_RETURN
@@ -260,3 +266,108 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
                 volume=result.volume
             )
         )
+
+# =============================================================================
+# TWIN-ENGINE HYBRID EXECUTION
+# =============================================================================
+
+async def execute_twin_trade(signal: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Protocolo Twin-Entry: Abre 2 órdenes simultáneas con diferentes objetivos.
+    - Orden A (Scalp): TP corto ($2 target), Magic = MAGIC_SCALP
+    - Orden B (Swing): TP largo ($10+ target), Magic = MAGIC_SWING
+    """
+    from app.core.config import settings
+    from app.services.risk_engine import risk_engine
+    
+    symbol = signal.get("symbol", "XAUUSD")
+    direction = signal.get("direction", "BUY").upper()
+    confidence = signal.get("confidence", 0)
+    
+    # Verificar si podemos abrir dual trade
+    allocation = await risk_engine.get_capital_allocation()
+    
+    results = {
+        "scalp_ticket": None,
+        "swing_ticket": None,
+        "mode": "TWIN" if allocation["can_dual"] else "SCALP_ONLY",
+        "allocation": allocation
+    }
+    
+    # Obtener precio actual y calcular TPs
+    tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
+    symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
+    
+    if not tick or not symbol_info:
+        return {"status": "error", "message": "Failed to get market data"}
+    
+    point = symbol_info.point
+    tick_value = symbol_info.trade_tick_value
+    
+    # Calcular pips para $2 y $10 profit con 0.01 lotes
+    # Profit = Pips * Tick_Value * Volume
+    # Pips = Target_USD / (Tick_Value * Volume)
+    scalp_pips = int(settings.SCALP_TARGET_USD / (tick_value * 0.01)) if tick_value > 0 else 200
+    swing_pips = int(settings.SWING_TARGET_USD / (tick_value * 0.01)) if tick_value > 0 else 1000
+    
+    # SL ajustado para micro cuenta (~15-20 pips)
+    sl_pips = 20
+    
+    exec_price = tick.ask if direction == "BUY" else tick.bid
+    
+    if direction == "BUY":
+        scalp_tp = exec_price + (scalp_pips * point)
+        swing_tp = exec_price + (swing_pips * point)
+        sl = exec_price - (sl_pips * point)
+    else:
+        scalp_tp = exec_price - (scalp_pips * point)
+        swing_tp = exec_price - (swing_pips * point)
+        sl = exec_price + (sl_pips * point)
+    
+    # --- ORDEN A: SCALP (El Sueldo) ---
+    scalp_request = {
+        "action": mt5.TRADE_ACTION_DEAL,
+        "symbol": symbol,
+        "volume": 0.01,
+        "type": mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL,
+        "price": exec_price,
+        "sl": sl,
+        "tp": scalp_tp,
+        "deviation": 20,
+        "magic": settings.MAGIC_SCALP,
+        "comment": "TWIN_SCALP",
+        "type_time": mt5.ORDER_TIME_GTC,
+        "type_filling": mt5.ORDER_FILLING_RETURN,
+    }
+    
+    scalp_result = await mt5_conn.execute(mt5.order_send, scalp_request)
+    if scalp_result and scalp_result.retcode == mt5.TRADE_RETCODE_DONE:
+        results["scalp_ticket"] = scalp_result.order
+        logger.info(f"🎯 SCALP ENTRY: Ticket {scalp_result.order} | TP: ${settings.SCALP_TARGET_USD}")
+    
+    # --- ORDEN B: SWING (La Riqueza) --- Solo si hay margen
+    if allocation["can_dual"]:
+        swing_request = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol,
+            "volume": 0.01,
+            "type": mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL,
+            "price": exec_price,
+            "sl": sl,
+            "tp": swing_tp,
+            "deviation": 20,
+            "magic": settings.MAGIC_SWING,
+            "comment": "TWIN_SWING",
+            "type_time": mt5.ORDER_TIME_GTC,
+            "type_filling": mt5.ORDER_FILLING_RETURN,
+        }
+        
+        swing_result = await mt5_conn.execute(mt5.order_send, swing_request)
+        if swing_result and swing_result.retcode == mt5.TRADE_RETCODE_DONE:
+            results["swing_ticket"] = swing_result.order
+            logger.info(f"🚀 SWING ENTRY: Ticket {swing_result.order} | TP: ${settings.SWING_TARGET_USD}")
+    else:
+        logger.warning("⚠️ SURVIVAL MODE: Only Scalp opened due to margin constraints")
+    
+    results["status"] = "success" if results["scalp_ticket"] else "failed"
+    return results

@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     API_PORT: int = 8000
     DEBUG: bool = False
     N8N_API_KEY: Optional[str] = None
+    N8N_WEBHOOK_URL: Optional[str] = None
     
     # Version 2.0 Institutional Extensions
     ML_MODEL_PATH: Optional[str] = "models/setup_classifier.pkl"
@@ -38,6 +39,16 @@ class Settings(BaseSettings):
     MAX_OPEN_POSITIONS: int = 20  # Increased for multi-asset strategies
     MAX_CORRELATION_LIMIT: float = 0.65 
     VOLATILITY_ADAPTIVE_LOTS: bool = True
+    ATR_TRAILING_MULTIPLIER: float = 1.5
+    PHANTOM_MODE_ENABLED: bool = True
+    
+    # Twin-Engine Hybrid Strategy
+    MAGIC_SCALP: int = 234001
+    MAGIC_SWING: int = 234002
+    EQUITY_UNLOCK_THRESHOLD: float = 50.0  # USD to unlock 3rd position
+    SCALP_TARGET_USD: float = 2.0
+    SWING_TARGET_USD: float = 10.0
+    INITIAL_CAPITAL: float = 20.0
     
     # Institutional Telemetry 2.0
     ENABLE_PROMETHEUS_METRICS: bool = True

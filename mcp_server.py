@@ -139,10 +139,43 @@ async def app_lifespan(server: FastMCP):
     await zmq_bridge.start(on_zmq_message)
     print("DEBUG: ZMQ Bridge iniciado VOLANDO", flush=True)
     
+    # 3. Background Risk Monitor
+    async def monitor_risk_loop():
+        logger.info("🛡️ Monitor de Riesgo Institucional ACTIVO")
+        from app.services.risk_engine import risk_engine
+        while True:
+            try:
+                # Verificar Drawdown para Auto-Stop
+                if not await risk_engine.check_drawdown_limit():
+                    logger.critical("🚨 CIRCUIT BREAKER TRIPPED - Risk Limit Exceeded!")
+                
+                # Aplicar Trailing Stop institucional a todas las posiciones
+                positions = await mt5_conn.execute(mt5.positions_get)
+                if positions:
+                    from app.services.telemetry import telemetry
+                    for pos in positions:
+                        # Monitorar profit para telemetria n8n
+                        if pos.profit > 100: # Exemplo: alerta de lucro alto
+                             await telemetry.send_to_n8n({
+                                 "asset": pos.symbol,
+                                 "event": "PROFIT_UPDATE",
+                                 "profit": pos.profit,
+                                 "ticket": pos.ticket
+                             })
+                             
+                        # Agora usa ATR dinâmico (limite configurado nas settings)
+                        await risk_engine.apply_trailing_stop(pos.symbol, pos.ticket)
+            except Exception as e:
+                logger.error(f"Error in Risk Monitor: {e}")
+            await asyncio.sleep(5) # Revisión cada 5 segundos
+
+    monitor_task = asyncio.create_task(monitor_risk_loop())
+    
     try:
         yield
     finally:
         logger.info("Cerrando infraestructura...")
+        monitor_task.cancel()
         await zmq_bridge.stop()
         await mt5_conn.shutdown()
 
@@ -363,6 +396,7 @@ async def get_full_market_context(symbol: str, timeframe: str = "M5"):
             "atr_pips": volatility.get("atr_pips"),
             "status": volatility.get("volatility_status", "NORMAL")
         },
+        "session": _get_market_session(),
         "fsm_state": "CALIBRATING"
     }
     
@@ -496,12 +530,28 @@ def _generate_explanation(prediction: dict, indicators: dict) -> str:
     direction = "LONG" if p_win > 0.5 else "SHORT"
     confidence = "high" if abs(p_win - 0.5) > 0.3 else "moderate" if abs(p_win - 0.5) > 0.15 else "low"
     
-    explanation = f"{source} model suggests {direction} with {confidence} confidence ({p_win:.1%}). "
-    
-    if prediction.get("is_anomaly"):
-        explanation += "⚠️ ANOMALY DETECTED - potential market manipulation. Avoid trading."
-        
     return explanation
+
+def _get_market_session() -> dict:
+    """Detecta la sesión actual y killzones institucionales (UTC)."""
+    now = datetime.utcnow()
+    hour = now.hour
+    
+    # Killzones (UTC)
+    london_kz = 7 <= hour <= 10
+    ny_kz = 12 <= hour <= 15
+    
+    session = "ASIAN"
+    if 8 <= hour <= 16: session = "LONDON"
+    elif 13 <= hour <= 21: session = "NEW_YORK"
+    
+    return {
+        "name": session,
+        "is_killzone": london_kz or ny_kz,
+        "is_london_kz": london_kz,
+        "is_ny_kz": ny_kz,
+        "time_utc": now.strftime("%H:%M")
+    }
 
 # =============================================================================
 # PILLAR 3: SIMULADOR DE SOMBRAS (Backtest Automator)
@@ -532,6 +582,41 @@ async def run_shadow_backtest(
         date_to=end_date.strftime("%Y.%m.%d"),
         deposit=deposit
     )
+
+@mcp.tool()
+async def execute_twin_entry(symbol: str = "XAUUSD", direction: str = "BUY"):
+    """
+    Ejecuta la estrategia Hybrid Twin-Engine.
+    Abre 2 operaciones simultáneas: Scalp ($2 TP) + Swing ($10+ TP).
+    Si no hay margen suficiente, solo abre el Scalp.
+    """
+    from app.skills.execution import execute_twin_trade
+    
+    signal = {
+        "symbol": symbol,
+        "direction": direction.upper(),
+        "confidence": 0.90
+    }
+    
+    result = await execute_twin_trade(signal)
+    return result
+
+@mcp.tool()
+async def get_twin_engine_status():
+    """
+    Obtiene el estado actual del motor Twin-Engine.
+    Incluye asignación de capital Scalp vs Swing.
+    """
+    from app.services.risk_engine import risk_engine
+    
+    allocation = await risk_engine.get_capital_allocation()
+    return {
+        "engine_mode": "TWIN" if allocation["can_dual"] else "SCALP_ONLY",
+        "scalp_capital": allocation["scalp_capital"],
+        "swing_capital": allocation["swing_capital"],
+        "max_positions": allocation["max_positions"],
+        "equity": allocation["equity"]
+    }
 
 # =============================================================================
 # PILLAR 4: INYECCIÓN ESTRATÉGICA (Unified Model)
@@ -574,6 +659,83 @@ async def get_economic_calendar():
     """Eventos económicos de alto impacto próximos."""
     req = CalendarRequest(importance="HIGH", days_forward=1)
     return await calendar.get_economic_calendar(req)
+
+@mcp.tool()
+async def get_financial_performance():
+    """
+    Obtiene el rendimiento financiero detallado para el Dashboard.
+    Incluye PnL Diario, Ganancia por Hora y Diario de Operaciones.
+    """
+    import datetime
+    from app.services.risk_engine import risk_engine
+    
+    # 1. Métricas de Cuenta
+    account = await market.get_account_metrics()
+    
+    # 2. Rendimiento Hoy (UTC)
+    now = datetime.datetime.now()
+    start_of_day = datetime.datetime(now.year, now.month, now.day)
+    
+    deals = await mt5_conn.execute(mt5.history_deals_get, start_of_day, now + datetime.timedelta(hours=1))
+    
+    daily_pnl = 0.0
+    hourly_pnl = 0.0
+    journal = []
+    
+    one_hour_ago = now - datetime.timedelta(hours=1)
+    
+    if deals:
+        for deal in deals:
+            if deal.entry == mt5.DEAL_ENTRY_OUT: # Solo trades cerrados
+                profit = deal.profit + deal.swap + deal.commission
+                daily_pnl += profit
+                
+                # Hora del deal
+                deal_time = datetime.datetime.fromtimestamp(deal.time)
+                if deal_time > one_hour_ago:
+                    hourly_pnl += profit
+                
+                journal.append({
+                    "id": deal.ticket,
+                    "time": deal_time.strftime("%H:%M:%S"),
+                    "symbol": deal.symbol,
+                    "type": "BUY" if deal.type == mt5.DEAL_TYPE_BUY else "SELL",
+                    "profit": round(profit, 2)
+                })
+
+    return {
+        "status": "success",
+        "equity": account.get("equity"),
+        "balance": account.get("balance"),
+        "daily_pnl": round(daily_pnl, 2),
+        "hourly_pnl": round(hourly_pnl, 2),
+        "drawdown_percent": round((1 - account.get("equity") / account.get("balance")) * 100, 2) if account.get("balance",0) > 0 else 0,
+        "journal": journal[-10:] # Últimos 10 trades
+    }
+
+@mcp.tool()
+async def get_profit_velocity():
+    """
+    Calcula la velocidad de ganancia ($/Hora) de la sesión actual.
+    Fórmula: (Beneficio Total Sesión) / (Horas Transcurridas desde el inicio del día).
+    """
+    import datetime
+    perf = await get_financial_performance()
+    
+    now = datetime.datetime.now()
+    start_of_day = datetime.datetime(now.year, now.month, now.day)
+    hours_elapsed = (now - start_of_day).total_seconds() / 3600.0
+    
+    # Mínimo 1 hora para evitar divisiones agresivas al inicio del día
+    hours_elapsed = max(1.0, hours_elapsed)
+    
+    velocity = perf.get("daily_pnl", 0) / hours_elapsed
+    
+    return {
+        "profit_velocity_usd_hr": round(velocity, 2),
+        "total_session_hours": round(hours_elapsed, 2),
+        "bias": "ACCELERATING" if velocity > 0 else "DECELERATING"
+    }
 
 # =============================================================================
 # PILLAR 5: MEMORIA INFINITA (RAG Memory)

@@ -47,19 +47,29 @@ class SupabaseSync:
         if not self._client:
             return
 
+        # Institutional Normalization: 0-100 to 0.0-1.0
+        conf = data.get("confidence", 0)
+        if conf > 1: conf = conf / 100.0
+        
+        p_win = data.get("p_win", 0.5)
+        if p_win > 1: p_win = p_win / 100.0
+
         payload = {
             "symbol": data.get("symbol", "UNKNOWN"),
             "timeframe": data.get("timeframe", "UNKNOWN"),
-            "action": data.get("action", "WAIT"),
-            "price": data.get("price", 0),
-            "confidence": data.get("confidence", 0),
-            "engineer_diagnosis": data.get("reason", ""),
-            "metadata": data
+            "direction": data.get("action", "WAIT"),
+            "entry_price": data.get("price", 0),
+            "confidence": float(conf),
+            "explanation": data.get("reason", ""),
+            "ml_source": data.get("source", "GBM+LSTM"),
+            "p_win": float(p_win),
+            "top_drivers": data.get("top_drivers", []),
+            "execution_enabled": data.get("execution_enabled", False)
         }
         
         import anyio
         await anyio.to_thread.run_sync(
-            lambda: self._client.table("sniper_signals").insert(payload).execute()
+            lambda: self._client.table("feat_signals").insert(payload).execute()
         )
         logger.info(f"📤 Signal synced with Supabase: {payload['symbol']} {payload['action']}")
 
