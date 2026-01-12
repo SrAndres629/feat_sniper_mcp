@@ -3,17 +3,24 @@ from typing import Dict, Any, Optional
 from supabase import create_client, Client
 from app.core.config import settings
 
+from app.core.observability import resilient
+
 logger = logging.getLogger("MT5_Bridge.SupabaseSync")
 
 class SupabaseSync:
-    """
-    Gestor de sincronización con Supabase para el ecosistema NEXUS.
-    Centraliza el logging de señales y trades en la nube.
+    """Master Cloud Persistence Manager for the NEXUS Ecosystem.
+    
+    Orchestrates signal logging, institutional tick auditing, and performance
+    tracking with built-in circuit breakers for cloud-latency resilience.
+    
+    Attributes:
+        _client: Supabase client instance.
     """
     _client: Optional[Client] = None
 
     @property
     def client(self) -> Optional[Client]:
+        """Provides access to the raw Supabase client."""
         return self._client
 
     def __init__(self):
@@ -30,79 +37,97 @@ class SupabaseSync:
         except Exception as e:
             logger.error(f"Error inicializando Supabase: {e}")
 
-    async def log_signal(self, data: Dict[str, Any]):
-        """Registra una señal del Sniper en Supabase."""
+    @resilient(max_retries=2, failure_threshold=5, recovery_timeout=60)
+    async def log_signal(self, data: Dict[str, Any]) -> None:
+        """Synchronizes a Sniper signal to the cloud.
+        
+        Args:
+            data: Signal raw data and engineered reason.
+        """
         if not self._client:
             return
 
-        try:
-            # Adaptar datos al esquema de la tabla sniper_signals
-            payload = {
-                "symbol": data.get("symbol", "UNKNOWN"),
-                "timeframe": data.get("timeframe", "UNKNOWN"),
-                "action": data.get("action", "WAIT"),
-                "price": data.get("price", 0),
-                "confidence": data.get("confidence", 0),
-                "engineer_diagnosis": data.get("reason", ""),
-                "metadata": data
-            }
-            
-            # Operación síncrona enviada a hilo para no bloquear el loop
-            import anyio
-            await anyio.to_thread.run_sync(
-                lambda: self._client.table("sniper_signals").insert(payload).execute()
-            )
-            logger.info(f"📤 Señal sincronizada con Supabase: {payload['symbol']} {payload['action']}")
-        except Exception as e:
-            logger.error(f"Error sincronizando señal con Supabase: {e}")
+        payload = {
+            "symbol": data.get("symbol", "UNKNOWN"),
+            "timeframe": data.get("timeframe", "UNKNOWN"),
+            "action": data.get("action", "WAIT"),
+            "price": data.get("price", 0),
+            "confidence": data.get("confidence", 0),
+            "engineer_diagnosis": data.get("reason", ""),
+            "metadata": data
+        }
+        
+        import anyio
+        await anyio.to_thread.run_sync(
+            lambda: self._client.table("sniper_signals").insert(payload).execute()
+        )
+        logger.info(f"📤 Signal synced with Supabase: {payload['symbol']} {payload['action']}")
 
-
-    async def log_tick(self, data: Dict[str, Any]):
-        """Registra un tick de mercado en la tabla market_ticks (Institutional)."""
+    @resilient(max_retries=1, failure_threshold=10)
+    async def log_tick(self, data: Dict[str, Any]) -> None:
+        """Asynchronously logs an institutional market tick.
+        
+        Optimized for high frequency with loose circuit breaker thresholds.
+        """
         if not self._client:
             return
 
-        try:
-            # Adaptar datos al esquema market_ticks
-            # Campos esperados: symbol, bid, ask, volume, tick_time
-            payload = {
-                "symbol": data.get("symbol", "UNKNOWN"),
-                "bid": float(data.get("bid", data.get("close", 0))),
-                "ask": float(data.get("ask", data.get("close", 0))),
-                "volume": float(data.get("volume", 0)),
-                "tick_time": data.get("tick_time") or data.get("time")
-            }
-            
-            # Quitar nulos
-            payload = {k: v for k, v in payload.items() if v is not None}
-            
-            import anyio
-            await anyio.to_thread.run_sync(
-                lambda: self._client.table("market_ticks").insert(payload).execute()
-            )
-            # logger.debug(f"Tick sync: {payload['symbol']} @ {payload['bid']}")
-        except Exception as e:
-            logger.error(f"Error sincronizando tick con Supabase: {e}")
+        payload = {
+            "symbol": data.get("symbol", "UNKNOWN"),
+            "bid": float(data.get("bid", data.get("close", 0))),
+            "ask": float(data.get("ask", data.get("close", 0))),
+            "volume": float(data.get("volume", 0)),
+            "tick_time": data.get("tick_time") or data.get("time")
+        }
+        
+        payload = {k: v for k, v in payload.items() if v is not None}
+        
+        import anyio
+        await anyio.to_thread.run_sync(
+            lambda: self._client.table("market_ticks").insert(payload).execute()
+        )
 
-    async def update_performance(self, model_id: str, metrics: Dict[str, Any]):
-        """Actualiza métricas de performance del modelo ML en la nube."""
+    @resilient(max_retries=3)
+    async def update_performance(self, model_id: str, metrics: Dict[str, Any]) -> None:
+        """Updates ML model performance track-record."""
         if not self._client:
             return
             
-        try:
-            import anyio
-            await anyio.to_thread.run_sync(
-                lambda: self._client.table("model_performance").insert({
-                    "model_id": model_id,
-                    "symbol": metrics.get("symbol", "ALL"),
-                    "win_rate": metrics.get("win_rate", 0),
-                    "profit_factor": metrics.get("profit_factor", 0),
-                    "sharpe_ratio": metrics.get("sharpe", 0),
-                    "hyperparameters": metrics
-                }).execute()
-            )
-        except Exception as e:
-            logger.error(f"Error actualizando performance en Supabase: {e}")
+        import anyio
+        await anyio.to_thread.run_sync(
+            lambda: self._client.table("model_performance").insert({
+                "model_id": model_id,
+                "symbol": metrics.get("symbol", "ALL"),
+                "win_rate": metrics.get("win_rate", 0),
+                "profit_factor": metrics.get("profit_factor", 0),
+                "sharpe_ratio": metrics.get("sharpe", 0),
+                "hyperparameters": metrics
+            }).execute()
+        )
+
+    @resilient(max_retries=2)
+    async def log_activity(self, event: str, level: str = "INFO", details: Optional[Dict] = None) -> None:
+        """Logs high-level bot activity events.
+        
+        Args:
+            event: Event description.
+            level: INFO, WARNING, ERROR, CRITICAL.
+            details: Structured JSON metadata.
+        """
+        if not self._client:
+            return
+            
+        payload = {
+            "event": event,
+            "level": level,
+            "details": details or {},
+            "phase": "AUTONOMOUS_EVOLUTION_V5"
+        }
+        
+        import anyio
+        await anyio.to_thread.run_sync(
+            lambda: self._client.table("bot_activity_log").insert(payload).execute()
+        )
 
 # Instancia global
 supabase_sync = SupabaseSync()

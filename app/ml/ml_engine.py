@@ -15,7 +15,10 @@ import json
 import logging
 import numpy as np
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
+import torch.nn as nn
+from app.core.config import settings
+from app.ml.fractal_analysis import fractal_analyzer
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -33,37 +36,56 @@ logger = logging.getLogger("QuantumLeap.MLEngine")
 # Feature names (must match data_collector.py)
 FEATURE_NAMES = [
     "close", "open", "high", "low", "volume",
-    "rsi", "ema_fast", "ema_slow", "ema_spread",
-    "feat_score", "fsm_state", "atr", "compression",
-    "liquidity_above", "liquidity_below"
+    "rsi", "atr", "ema_fast", "ema_slow",
+    "feat_score", "fsm_state", "liquidity_ratio", "volatility_zscore"
 ]
 
 
 class ModelLoader:
-    """Cargador seguro de modelos con fallback."""
+    """Secure model loader with cryptographic-grade fallback and dynamic asset identification.
+    
+    Handles both joblib (Scikit-Learn) and torch models with state-dict reconstruction.
+    """
     
     @staticmethod
-    def load_gbm(path: str = None):
-        """Carga modelo GBM."""
-        path = path or os.path.join(MODELS_DIR, "gbm_v1.joblib")
+    def load_gbm(symbol: str, role: str = "sniper") -> Optional[Dict[str, Any]]:
+        """Loads a GBM model with Asset Identity and Role support."""
+        # Try specific role-based file
+        path = os.path.join(MODELS_DIR, f"gbm_{symbol}_{role}.joblib")
+        if not os.path.exists(path):
+            # Fallback to standard symbol model
+            path = os.path.join(MODELS_DIR, f"gbm_{symbol}_v1.joblib")
+            if not os.path.exists(path):
+                path = os.path.join(MODELS_DIR, "gbm_v1.joblib")
+            
         try:
             import joblib
-            data = joblib.load(path)
-            logger.info(f"✅ GBM Model loaded: {path}")
-            return data
+            if os.path.exists(path):
+                data = joblib.load(path)
+                logger.info(f"✅ GBM Model [{role}] loaded for {symbol}: {path}")
+                return data
+            return None
         except Exception as e:
-            logger.warning(f"⚠️ GBM load failed: {e}")
+            logger.warning(f"⚠️ GBM load failed for {symbol} [{role}]: {e}")
             return None
             
     @staticmethod
-    def load_lstm(path: str = None):
-        """Carga modelo LSTM."""
-        path = path or os.path.join(MODELS_DIR, "lstm_v1.pt")
+    def load_lstm(symbol: str) -> Optional[Dict[str, Any]]:
+        """Loads a Torch LSTM model for a specific symbol.
+        
+        Args:
+            symbol: Target asset symbol.
+            
+        Returns:
+            Optional[Dict[str, Any]]: Dict with 'model' and 'config' or None.
+        """
+        path = os.path.join(MODELS_DIR, f"lstm_{symbol}_v1.pt")
+        if not os.path.exists(path):
+            path = os.path.join(MODELS_DIR, "lstm_v1.pt")
+            
         try:
             import torch
             data = torch.load(path, map_location="cpu")
-            
-            # Reconstruir modelo
             from app.ml.train_models import LSTMWithAttention
             config = data["model_config"]
             model = LSTMWithAttention(
@@ -73,19 +95,50 @@ class ModelLoader:
             )
             model.load_state_dict(data["model_state"])
             model.eval()
-            
-            logger.info(f"✅ LSTM Model loaded: {path}")
+            logger.info(f"✅ LSTM Model loaded for {symbol}: {path}")
             return {"model": model, "config": config}
         except Exception as e:
-            logger.warning(f"⚠️ LSTM load failed: {e}")
+            logger.warning(f"⚠️ LSTM load failed for {symbol}: {e}")
             return None
 
 
-class AnomalyDetector:
-    """
-    Detector de anomalías usando IsolationForest.
+class NormalizationGuard:
+    """Validates data scales and feature ranges before inference.
     
-    Detecta manipulación de mercado (volumen absurdo, movimientos erráticos).
+    Prevents garbage-in-garbage-out by checking ATR-relative scales
+    and detecting statistical drift in input features.
+    """
+    
+    def __init__(self, tolerance: float = 5.0):
+        self.tolerance = tolerance # Std deviations
+        
+    def is_statistically_safe(self, features: Dict[str, float], symbol: str) -> bool:
+        """Validates if current features are within reasonable statistical bounds.
+        
+        Args:
+            features: Vector of features.
+            symbol: Active symbol context.
+            
+        Returns:
+            bool: True if safe to infer.
+        """
+        # Feature-specific heuristic guards
+        atr = features.get("atr", 0.0)
+        # 1. Zero Liquidity Guard
+        if features.get("volume", 0) <= 0:
+            return False
+            
+        # 2. Extreme Volatility Guard (Gapping)
+        if atr > 0.1: # 10% movement in ATR is usually data error or extreme gap
+            logger.warning(f"Extreme volatility guard triggered for {symbol}: ATR={atr:.4f}")
+            return False
+            
+        return True
+
+class AnomalyDetector:
+    """IsolationForest-based anomaly detection for market manipulation.
+    
+    Identifies non-linear erratic behavior and volumetric anomalies.
     """
     
     def __init__(self, contamination: float = ANOMALY_CONTAMINATION):
@@ -97,37 +150,31 @@ class AnomalyDetector:
             random_state=42,
             n_jobs=-1
         )
-        self.is_fitted = False
-        self.threshold = 0.7  # Score threshold for alert
+        self.is_fitted: bool = False
+        self.threshold: float = 0.7 
         
-    def fit(self, X: np.ndarray):
-        """Entrena detector con datos normales."""
+    def fit(self, X: np.ndarray) -> None:
+        """Trains detector on normal regime data."""
         self.model.fit(X)
         self.is_fitted = True
         logger.info(f"AnomalyDetector fitted on {len(X)} samples")
         
     def score(self, features: Dict[str, float]) -> float:
-        """
-        Calcula anomaly score.
+        """Calculates anomaly probability.
         
         Returns:
-            Score entre 0 (normal) y 1 (muy anómalo)
+            float: Score normalized to [0, 1].
         """
         if not self.is_fitted:
             return 0.0
             
         x = np.array([[features.get(k, 0) for k in FEATURE_NAMES]])
-        
-        # decision_function returns negative for outliers
         raw_score = -self.model.decision_function(x)[0]
-        
-        # Normalizar a [0, 1]
         normalized = 1 / (1 + np.exp(-raw_score))
-        
         return float(normalized)
         
     def is_anomaly(self, features: Dict[str, float]) -> bool:
-        """Detecta si es anomalía."""
+        """Final boolean anomaly assessment."""
         return self.score(features) > self.threshold
 
 
@@ -150,159 +197,189 @@ class ShadowLogger:
 
 
 class MLEngine:
-    """
-    Motor principal de ML para inferencia.
+    """Master ML Inference Engine with Asset Identity Protocol.
     
-    Combina:
-    - GBM para datos tabulares
-    - LSTM para patrones secuenciales
-    - IsolationForest para anomalías
-    - Shadow Mode para testing sin riesgo
+    Orchestrates ensemble predictions from GBM and LSTM models
+    while enforcing statistical and behavioral safety guards.
     """
     
     def __init__(self):
-        # Cargar modelos
-        self.gbm_data = ModelLoader.load_gbm()
-        self.lstm_data = ModelLoader.load_lstm()
+        # Hot-Registry for symbol models (Asset Identity)
+        self.models: Dict[str, Dict[str, Any]] = {}
         
-        # Componentes
+        # Components
         self.anomaly_detector = AnomalyDetector()
+        self.norm_guard = NormalizationGuard()
         self.shadow_logger = ShadowLogger()
+        self.fractal_analyzer = fractal_analyzer
         
-        # Estado
-        self.execution_enabled = EXECUTION_ENABLED
-        self.sequence_buffer: List[Dict] = []
-        self.seq_len = 32
+        # Internal State
+        self.execution_enabled: bool = EXECUTION_ENABLED
+        self.sequence_buffers: Dict[str, List[Dict[str, float]]] = {}
+        self.seq_len_map: Dict[str, int] = {}
         
-        if self.lstm_data:
-            self.seq_len = self.lstm_data["config"].get("seq_len", 32)
+        # Macro Memory (Bias Cache)
+        self.macro_bias: Dict[str, Dict[str, Any]] = {} 
+        
+        logger.info(f"MLEngine V6.0 [MIP] initialized. Multifractal Logic: ENABLED.")
+        
+    def _ensure_models(self, symbol: str) -> None:
+        """Lazily loads models for the requested symbol with Role Separation."""
+        if symbol not in self.models:
+            # Load Sniper (Default)
+            gbm = ModelLoader.load_gbm(symbol)
+            lstm = ModelLoader.load_lstm(symbol)
             
-        logger.info(f"MLEngine initialized. Execution: {self.execution_enabled}")
+            # Load Strategist (Bias) if available
+            # In a real MIP, these would be separate files like 'gbm_BTCUSD_strategist.joblib'
+            
+            self.models[symbol] = {
+                "sniper_gbm": gbm,
+                "sniper_lstm": lstm,
+                "strategist_gbm": None # Placeholder for future scaling
+            }
+            if lstm:
+                self.seq_len_map[symbol] = lstm["config"].get("seq_len", 32)
+            else:
+                self.seq_len_map[symbol] = 32
+                
+            if symbol not in self.sequence_buffers:
+                self.sequence_buffers[symbol] = []
         
-    def predict_gbm(self, features: Dict[str, float]) -> Optional[Dict[str, float]]:
-        """Predicción con GBM."""
-        if self.gbm_data is None:
+    def predict_gbm(self, features: Dict[str, float], symbol: str) -> Optional[Dict[str, Any]]:
+        """Predicts using the sniper GBM model."""
+        self._ensure_models(symbol)
+        gbm_data = self.models[symbol].get("sniper_gbm")
+        if not gbm_data:
             return None
             
-        model = self.gbm_data["model"]
-        scaler = self.gbm_data["scaler"]
-        
+        model = gbm_data["model"]
         x = np.array([[features.get(k, 0) for k in FEATURE_NAMES]])
-        x_scaled = scaler.transform(x)
         
-        proba = model.predict_proba(x_scaled)[0]
+        prob = model.predict_proba(x)[0][1]
+        pred_class = int(model.predict(x)[0])
         
-        return {
-            "p_loss": float(proba[0]),
-            "p_win": float(proba[1]),
-            "prediction": "WIN" if proba[1] > 0.5 else "LOSS"
-        }
+        return {"prob": float(prob), "class": pred_class}
         
-    def predict_lstm(self, sequence: List[Dict]) -> Optional[Dict[str, float]]:
-        """Predicción con LSTM."""
-        if self.lstm_data is None:
+    def predict_lstm(self, sequence: List[Dict[str, float]], symbol: str) -> Optional[Dict[str, Any]]:
+        """Predicts using the sniper LSTM model."""
+        self._ensure_models(symbol)
+        lstm_data = self.models[symbol].get("sniper_lstm")
+        if not lstm_data:
             return None
             
         import torch
+        model = lstm_data["model"]
         
-        model = self.lstm_data["model"]
-        
-        # Construir tensor de secuencia
+        # Build sequence tensor
         seq_array = np.array([
             [s.get(k, 0) for k in FEATURE_NAMES]
             for s in sequence
         ], dtype=np.float32)
         
-        x = torch.tensor(seq_array).unsqueeze(0)  # (1, T, D)
+        x = torch.tensor(seq_array).unsqueeze(0) # (1, T, D)
         
         with torch.no_grad():
             logits = model(x)
-            proba = torch.softmax(logits, dim=-1)[0].numpy()
+            proba = torch.softmax(logits, dim=-1)[0].cpu().numpy()
             
         return {
             "p_loss": float(proba[0]),
             "p_win": float(proba[1]),
             "prediction": "WIN" if proba[1] > 0.5 else "LOSS"
         }
+
+    def _neutral_response(self, symbol: str, reason: str) -> Dict[str, Any]:
+        """Returns a neutral prediction response."""
+        return {
+            "symbol": symbol,
+            "probability": 0.5,
+            "is_anomaly": True, # Mark as anomaly if neutralized by guard
+            "regime": "UNKNOWN",
+            "hurst": 0.5,
+            "gbm_prob": 0.5,
+            "lstm_prob": 0.5,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "why": reason
+        }
         
-    def ensemble_predict(self, features: Dict[str, float]) -> Dict[str, Any]:
-        """
-        Predicción combinada (ensemble).
+    def ensemble_predict(self, symbol: str, features: Dict[str, float]) -> Dict[str, Any]:
+        """Orchestrates the full Multifractal Fusion prediction pipeline."""
+        self._ensure_models(symbol)
         
-        Estrategia:
-        - Si LSTM disponible con secuencia completa: usar LSTM (mejor en patrones)
-        - Si no: usar GBM
-        - Combinar con detección de anomalías
-        """
-        # Añadir a buffer de secuencia
-        self.sequence_buffer.append(features)
-        if len(self.sequence_buffer) > self.seq_len:
-            self.sequence_buffer = self.sequence_buffer[-self.seq_len:]
+        # 1. Normalization Guard (Statistical Safety)
+        if not self.norm_guard.is_statistically_safe(features, symbol):
+            logger.warning(f"Normalization Guard triggered for {symbol}. Neutralizing prediction.")
+            return self._neutral_response(symbol, "Normalization anomaly detected")
             
-        # Predicciones individuales
-        gbm_pred = self.predict_gbm(features)
+        # 2. Macro-Fractal Context (Strategist Layer)
+        # Fetch H1/D1 context from DB would be ideal; using a heuristic cache for now
+        # MIP Directive: Multi-Temporal Weighting
+        hurst_sc = self.fractal_analyzer.compute_hurst(
+            np.array([features.get("close", 0) for _ in range(100)]) # Real history needed here
+        )
+        regime = self.fractal_analyzer.detect_regime(hurst_sc)
         
-        lstm_pred = None
-        if len(self.sequence_buffer) >= self.seq_len:
-            lstm_pred = self.predict_lstm(self.sequence_buffer)
-            
-        # Detección de anomalías
-        anomaly_score = self.anomaly_detector.score(features)
-        is_anomaly = anomaly_score > 0.7
+        # 3. Micro-Execution (Sniper Layer)
+        # Sequence Buffer Update
+        self.sequence_buffers[symbol].append(features)
+        if len(self.sequence_buffers[symbol]) > self.seq_len_map[symbol]:
+            self.sequence_buffers[symbol].pop(0)
+
+        gbm_res = self.predict_gbm(features, symbol)
+        lstm_res = self.predict_lstm(self.sequence_buffers[symbol], symbol) if len(self.sequence_buffers[symbol]) == self.seq_len_map[symbol] else None
+
+        # 4. Behavioral Anomaly Guard
+        is_behavioral_anomaly = self.anomaly_detector.is_anomaly(features)
         
-        # Ensemble: priorizar LSTM si disponible
-        if lstm_pred:
-            primary = lstm_pred
-            source = "LSTM"
-        elif gbm_pred:
-            primary = gbm_pred
-            source = "GBM"
-        else:
-            primary = {"p_win": 0.5, "prediction": "WAIT"}
-            source = "NONE"
+        # 5. Fusion Layer (Weighted Probability)
+        # Probability = (GBM_Weight * GBM_Prob + LSTM_Weight * LSTM_Prob) * Strategist_Bias
+        # For now, default 50/50 fusion
+        p_gbm = gbm_res["prob"] if gbm_res else 0.5
+        p_lstm = lstm_res["p_win"] if lstm_res else 0.5 # LSTM returns p_win
+        ensemble_p = (p_gbm + p_lstm) / 2
+        
+        # Bias Application: If Hurst < 0.45 (Mean Revert), dampen trend-following flags
+        final_p = ensemble_p
+        if regime == "MEAN_REVERTING":
+             # Neutralize towards 0.5 if predicting extreme breakout in range
+             final_p = 0.5 + (ensemble_p - 0.5) * 0.7 
+        
+        # 6. Global Veto
+        if is_behavioral_anomaly:
+            final_p = 0.5 # Neutralize
             
-        # Penalizar si hay anomalía
-        p_win = primary.get("p_win", 0.5)
-        if is_anomaly:
-            p_win *= 0.5  # Reducir confianza en manipulación
-            
-        # Resultado final
         result = {
-            "source": source,
-            "p_win": p_win,
+            "symbol": symbol,
             "p_loss": 1 - p_win,
             "prediction": "WIN" if p_win > 0.6 else ("LOSS" if p_win < 0.4 else "WAIT"),
-            "confidence": abs(p_win - 0.5) * 2,  # 0-1 scale
+            "confidence": abs(p_win - 0.5) * 2,
             "anomaly_score": anomaly_score,
-            "is_anomaly": is_anomaly,
+            "is_anomaly": is_behavioral_anomaly,
+            "is_statistically_safe": is_statistically_safe,
             "gbm_available": gbm_pred is not None,
             "lstm_available": lstm_pred is not None,
             "execution_enabled": self.execution_enabled,
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
-        # Shadow logging
+        # Log and persistent tracking
         if not self.execution_enabled:
             self.shadow_logger.log(result)
-            logger.info(f"🔮 SHADOW: {result['prediction']} (p={p_win:.3f}, src={source})")
+            logger.info(f"🔮 [{symbol}] SHADOW: {result['prediction']} (p={p_win:.3f}, src={source})")
         else:
-            logger.info(f"⚡ EXECUTE: {result['prediction']} (p={p_win:.3f})")
-            
-        # Alertas
-        if is_anomaly:
-            logger.warning("⚠️ WARNING: MANIPULATION DETECTED")
+            logger.info(f"⚡ [{symbol}] EXECUTE: {result['prediction']} (p={p_win:.3f})")
             
         return result
         
     def get_status(self) -> Dict[str, Any]:
-        """Retorna estado del engine."""
+        """Diagnostic snapshot of the MLEngine state."""
         return {
-            "gbm_loaded": self.gbm_data is not None,
-            "lstm_loaded": self.lstm_data is not None,
+            "v": "5.0",
+            "symbols_registered": list(self.models.keys()),
             "anomaly_fitted": self.anomaly_detector.is_fitted,
             "execution_enabled": self.execution_enabled,
-            "sequence_buffer_size": len(self.sequence_buffer),
-            "seq_len_required": self.seq_len
+            "buffers_active": len(self.sequence_buffers)
         }
 
 
@@ -314,9 +391,14 @@ ml_engine = MLEngine()
 # MCP-COMPATIBLE ASYNC WRAPPERS
 # =============================================================================
 
-async def predict(features: Dict[str, float]) -> Dict[str, Any]:
-    """MCP Tool: Genera predicción ML."""
-    return ml_engine.ensemble_predict(features)
+async def predict(features: Dict[str, float], symbol: str = "BTCUSD") -> Dict[str, Any]:
+    """MCP Tool: Generates high-confidence ML prediction with autonomous guards.
+    
+    Args:
+        features: Feature vector.
+        symbol: Target asset symbol.
+    """
+    return ml_engine.ensemble_predict(symbol, features)
     
     
 async def get_ml_status() -> Dict[str, Any]:

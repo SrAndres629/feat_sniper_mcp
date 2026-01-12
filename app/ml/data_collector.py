@@ -12,10 +12,12 @@ Optimizaciones:
 import os
 import sqlite3
 import logging
-from datetime import datetime
-from typing import Dict, List, Optional
 from contextlib import contextmanager
 import threading
+from typing import Any, Dict, List, Optional, Tuple
+import pandas as pd
+import numpy as np
+from datetime import datetime, timezone, timedelta
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -32,13 +34,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("QuantumLeap.DataCollector")
 
-# Feature names for consistency
-FEATURE_NAMES = [
+FEATURE_NAMES: List[str] = [
     "close", "open", "high", "low", "volume",
-    "rsi", "ema_fast", "ema_slow", "ema_spread",
-    "feat_score", "fsm_state", "atr", "compression",
-    "liquidity_above", "liquidity_below"
+    "rsi", "atr", "ema_fast", "ema_slow",
+    "feat_score", "fsm_state", "liquidity_ratio", "volatility_zscore"
 ]
+
+TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]
+TIMEFRAME_MAP = {
+    "M1": 1, "M5": 5, "M15": 15, "M30": 30,
+    "H1": 60, "H4": 240, "D1": 1440, "W1": 10080
+}
 
 
 class SQLiteWALConnection:
@@ -53,7 +59,8 @@ class SQLiteWALConnection:
         self._ensure_directory()
         self._init_db()
         
-    def _ensure_directory(self):
+    def _ensure_directory(self) -> None:
+        """Creates data directory if non-existent."""
         os.makedirs(os.path.dirname(self.db_path) or ".", exist_ok=True)
         
     @contextmanager
@@ -65,71 +72,45 @@ class SQLiteWALConnection:
                 check_same_thread=False,
                 timeout=30.0
             )
-            # WAL mode for concurrent access
             self._local.conn.execute("PRAGMA journal_mode=WAL")
             self._local.conn.execute("PRAGMA synchronous=NORMAL")
-            self._local.conn.execute("PRAGMA cache_size=10000")
+            self._local.conn.execute("PRAGMA cache_size=20000") # Higher for MTF
             self._local.conn.execute("PRAGMA temp_store=MEMORY")
             self._local.conn.row_factory = sqlite3.Row
             
         try:
             yield self._local.conn
         except Exception as e:
-            self._local.conn.rollback()
+            if hasattr(self._local, 'conn') and self._local.conn:
+                self._local.conn.rollback()
             raise e
             
     def _init_db(self):
-        """Initialize database schema."""
+        """Initialize database schema from institutional_schema.sql."""
+        schema_path = os.path.join(os.getcwd(), "app", "db", "institutional_schema.sql")
+        
         with self.get_connection() as conn:
-            # Tabla de ticks raw (sin etiquetar)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS ticks (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    tick_time TEXT NOT NULL,
-                    symbol TEXT NOT NULL,
-                    close REAL, open REAL, high REAL, low REAL, volume REAL,
-                    rsi REAL, ema_fast REAL, ema_slow REAL, ema_spread REAL,
-                    feat_score REAL, fsm_state REAL, atr REAL, compression REAL,
-                    liquidity_above REAL, liquidity_below REAL,
-                    label INTEGER DEFAULT NULL,
-                    labeled_at TEXT DEFAULT NULL
-                )
-            """)
-            
-            # Índices para queries rápidas
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_ticks_symbol_ts 
-                ON ticks(symbol, tick_time DESC)
-            """)
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_ticks_unlabeled 
-                ON ticks(label) WHERE label IS NULL
-            """)
-            
-            # Tabla de training samples (etiquetados)
-            conn.execute("""
-                CREATE TABLE IF NOT EXISTS training_samples (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    tick_id INTEGER REFERENCES ticks(id),
-                    tick_time TEXT NOT NULL,
-                    symbol TEXT NOT NULL,
-                    close REAL, open REAL, high REAL, low REAL, volume REAL,
-                    rsi REAL, ema_fast REAL, ema_slow REAL, ema_spread REAL,
-                    feat_score REAL, fsm_state REAL, atr REAL, compression REAL,
-                    liquidity_above REAL, liquidity_below REAL,
-                    label INTEGER NOT NULL,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            """)
-            
-            # Índice para training
-            conn.execute("""
-                CREATE INDEX IF NOT EXISTS idx_training_ts 
-                ON training_samples(tick_time)
-            """)
-            
+            if os.path.exists(schema_path):
+                with open(schema_path, "r") as f:
+                    conn.executescript(f.read())
+                logger.info("✅ Institutional schema applied.")
+            else:
+                # Failsafe basic schema
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS market_data (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        tick_time TIMESTAMP NOT NULL,
+                        symbol TEXT NOT NULL,
+                        timeframe TEXT NOT NULL,
+                        close REAL, open REAL, high REAL, low REAL, volume REAL,
+                        rsi REAL, atr REAL, ema_fast REAL, ema_slow REAL,
+                        fsm_state INTEGER, feat_score REAL,
+                        label INTEGER DEFAULT NULL,
+                        labeled_at TIMESTAMP DEFAULT NULL,
+                        UNIQUE(tick_time, symbol, timeframe)
+                    )
+                """)
             conn.commit()
-            logger.info(f"✅ Database initialized: {self.db_path}")
 
 
 class OracleLabeler:
@@ -144,75 +125,88 @@ class OracleLabeler:
         self.lookahead = lookahead
         self.threshold = threshold
         
-    def process_pending_labels(self, symbol: str) -> int:
-        """
-        Etiqueta ticks pendientes que ya tienen suficiente historia futura.
-        Usa SQL para eficiencia - no carga todo en RAM.
+    def process_pending_labels(self, symbol: str, timeframe: str = "M1") -> int:
+        """Labels pending records using bulk SQL operations."""
+        now = datetime.now(timezone.utc).isoformat()
+        
+        with self.db.get_connection() as conn:
+            update_query = """
+                UPDATE market_data
+                SET 
+                    label = CASE 
+                        WHEN ((SELECT close FROM market_data m2 
+                               WHERE m2.symbol = market_data.symbol 
+                               AND m2.timeframe = market_data.timeframe
+                               AND m2.id = market_data.id + :lookahead) - close) / close > :threshold 
+                        THEN 1 ELSE 0 
+                    END,
+                    labeled_at = :now
+                WHERE symbol = :symbol
+                AND timeframe = :tf
+                AND label IS NULL
+                AND EXISTS (
+                    SELECT 1 FROM market_data m2 
+                    WHERE m2.symbol = market_data.symbol 
+                    AND m2.timeframe = market_data.timeframe
+                    AND m2.id = market_data.id + :lookahead
+                )
+            """
+            cursor = conn.execute(update_query, {
+                "symbol": symbol,
+                "tf": timeframe,
+                "lookahead": self.lookahead,
+                "threshold": self.threshold,
+                "now": now
+            })
+            conn.commit()
+            return cursor.rowcount
+
+class Resampler:
+    """Engine for Multi-Timeframe (MTF) Candle Aggregation."""
+    
+    def __init__(self, symbol: str):
+        self.symbol = symbol
+        self.buffers: Dict[str, List[Dict]] = {tf: [] for tf in TIMEFRAMES if tf != "M1"}
+        self.current_candles: Dict[str, Dict] = {}
+
+    def push_tick(self, m1_candle: Dict) -> List[Tuple[str, Dict]]:
+        """Aggregates M1 candles into larger timeframes.
         
         Returns:
-            Número de muestras etiquetadas
+            List[Tuple[str, Dict]]: List of completed candles (timeframe, data).
         """
-        with self.db.get_connection() as conn:
-            # Encontrar ticks sin etiquetar que ya tienen N velas futuras
-            query = """
-                SELECT t1.id, t1.tick_time, t1.close as entry_price,
-                       (SELECT close FROM ticks t2 
-                        WHERE t2.symbol = t1.symbol 
-                        AND t2.id = t1.id + :lookahead) as future_price
-                FROM ticks t1
-                WHERE t1.symbol = :symbol
-                AND t1.label IS NULL
-                AND EXISTS (
-                    SELECT 1 FROM ticks t2 
-                    WHERE t2.symbol = t1.symbol 
-                    AND t2.id = t1.id + :lookahead
-                )
-                LIMIT 1000
-            """
+        completed = []
+        m1_time = pd.to_datetime(m1_candle["tick_time"])
+        
+        for tf in self.buffers.keys():
+            minutes = TIMEFRAME_MAP[tf]
+            # Calculate the start of the timeframe window
+            window_start = m1_time.floor(f"{minutes}T")
             
-            pending = conn.execute(query, {
-                "symbol": symbol,
-                "lookahead": self.lookahead
-            }).fetchall()
-            
-            labeled_count = 0
-            now = datetime.utcnow().isoformat()
-            
-            for row in pending:
-                if row["future_price"] is None:
-                    continue
-                    
-                # Calcular PnL
-                pnl = (row["future_price"] - row["entry_price"]) / row["entry_price"]
-                label = 1 if pnl > self.threshold else 0
+            if tf not in self.current_candles or self.current_candles[tf]["time"] != window_start:
+                # If window changed, the previous one is completed
+                if tf in self.current_candles:
+                    completed.append((tf, self.current_candles[tf]))
                 
-                # Actualizar tick con label
-                conn.execute("""
-                    UPDATE ticks 
-                    SET label = :label, labeled_at = :now
-                    WHERE id = :id
-                """, {"label": label, "now": now, "id": row["id"]})
+                # Start new candle
+                self.current_candles[tf] = {
+                    "time": window_start,
+                    "tick_time": window_start.isoformat(),
+                    "open": m1_candle["open"],
+                    "high": m1_candle["high"],
+                    "low": m1_candle["low"],
+                    "close": m1_candle["close"],
+                    "volume": m1_candle["volume"]
+                }
+            else:
+                # Update existing candle
+                curr = self.current_candles[tf]
+                curr["high"] = max(curr["high"], m1_candle["high"])
+                curr["low"] = min(curr["low"], m1_candle["low"])
+                curr["close"] = m1_candle["close"]
+                curr["volume"] += m1_candle["volume"]
                 
-                # Copiar a training_samples para acceso rápido
-                conn.execute("""
-                    INSERT INTO training_samples 
-                    (tick_id, tick_time, symbol, close, open, high, low, volume,
-                     rsi, ema_fast, ema_slow, ema_spread, feat_score, fsm_state,
-                     atr, compression, liquidity_above, liquidity_below, label)
-                    SELECT id, tick_time, symbol, close, open, high, low, volume,
-                           rsi, ema_fast, ema_slow, ema_spread, feat_score, fsm_state,
-                           atr, compression, liquidity_above, liquidity_below, :label
-                    FROM ticks WHERE id = :id
-                """, {"label": label, "id": row["id"]})
-                
-                labeled_count += 1
-                
-            conn.commit()
-            
-            if labeled_count > 0:
-                logger.info(f"Oracle labeled {labeled_count} samples for {symbol}")
-                
-            return labeled_count
+        return completed
 
 
 class DataCollector:
@@ -223,12 +217,13 @@ class DataCollector:
     def __init__(self, db_path: str = DB_PATH):
         self.db = SQLiteWALConnection(db_path)
         self.oracle = OracleLabeler(self.db)
+        self.resamplers: Dict[str, Resampler] = {}
         self.batch: List[Dict] = []
         self.samples_collected = 0
         self._lock = threading.Lock()
         
-    def compute_features(self, candle: Dict, indicators: Dict) -> Dict[str, float]:
-        """Construye vector de features X."""
+    def compute_features(self, candle: Dict[str, Any], indicators: Dict[str, Any]) -> Dict[str, float]:
+        """Core feature engineering vectorizer for MIP."""
         return {
             "close": float(candle.get("close", 0)),
             "open": float(candle.get("open", 0)),
@@ -236,59 +231,73 @@ class DataCollector:
             "low": float(candle.get("low", 0)),
             "volume": float(candle.get("volume", 0)),
             "rsi": float(indicators.get("rsi", 50.0)),
+            "atr": float(indicators.get("atr", 0.001)),
             "ema_fast": float(indicators.get("ema_fast", candle.get("close", 0))),
             "ema_slow": float(indicators.get("ema_slow", candle.get("close", 0))),
-            "ema_spread": float(
-                indicators.get("ema_fast", 0) - indicators.get("ema_slow", 0)
-            ),
+            "fsm_state": int(indicators.get("fsm_state", 0)),
             "feat_score": float(indicators.get("feat_score", 0.0)),
-            "fsm_state": float(indicators.get("fsm_state", 0)),
-            "atr": float(indicators.get("atr", 0.001)),
-            "compression": float(indicators.get("compression", 0.5)),
-            "liquidity_above": float(indicators.get("liquidity_above", 0)),
-            "liquidity_below": float(indicators.get("liquidity_below", 0))
+            "liquidity_ratio": float(indicators.get("liquidity_ratio", 1.0)),
+            "volatility_zscore": float(indicators.get("volatility_zscore", 0.0))
         }
         
-    def collect(self, symbol: str, candle: Dict, indicators: Dict):
-        """
-        Añade tick al batch. Flush automático cuando alcanza BATCH_SIZE.
-        """
+    def collect(self, symbol: str, candle: Dict[str, Any], indicators: Dict[str, Any], timeframe: str = "M1") -> None:
+        """Captures a new tick/candle and triggers resampling if M1."""
         features = self.compute_features(candle, indicators)
-        tick_time = candle.get("time") or datetime.utcnow().isoformat()
+        tick_time = candle.get("time") or datetime.now(timezone.utc).isoformat()
         
         record = {
             "tick_time": tick_time,
             "symbol": symbol,
+            "timeframe": timeframe,
             **features
         }
         
         with self._lock:
             self.batch.append(record)
             
+            # Resampling Logic
+            if timeframe == "M1":
+                if symbol not in self.resamplers:
+                    self.resamplers[symbol] = Resampler(symbol)
+                
+                completed_tf_candles = self.resamplers[symbol].push_tick(record)
+                for tf, tf_candle in completed_tf_candles:
+                    # For larger timeframes, indicators would ideally be re-calculated here
+                    # or passed from a higher-level logic. For now, we store basic OHLC.
+                    # In a full MIP, indicators would be calculated on 'tf_candle'.
+                    self.batch.append({
+                        "symbol": symbol,
+                        "timeframe": tf,
+                        **tf_candle,
+                        # Placeholders for TF indicators
+                        "rsi": 50.0, "atr": 0.001, "ema_fast": tf_candle["close"], 
+                        "ema_slow": tf_candle["close"], "fsm_state": 0, "feat_score": 0.0,
+                        "liquidity_ratio": 1.0, "volatility_zscore": 0.0
+                    })
+
             if len(self.batch) >= BATCH_SIZE:
                 self._flush_batch()
                 
     def _flush_batch(self):
-        """Inserta batch en SQLite."""
+        """Inserta batch en la nueva tabla market_data."""
         if not self.batch:
             return
             
         with self.db.get_connection() as conn:
             conn.executemany("""
-                INSERT INTO ticks (
-                    tick_time, symbol, close, open, high, low, volume,
-                    rsi, ema_fast, ema_slow, ema_spread, feat_score, fsm_state,
-                    atr, compression, liquidity_above, liquidity_below
+                INSERT OR IGNORE INTO market_data (
+                    tick_time, symbol, timeframe, close, open, high, low, volume,
+                    rsi, atr, ema_fast, ema_slow, fsm_state, feat_score,
+                    liquidity_ratio, volatility_zscore
                 ) VALUES (
-                    :tick_time, :symbol, :close, :open, :high, :low, :volume,
-                    :rsi, :ema_fast, :ema_slow, :ema_spread, :feat_score, :fsm_state,
-                    :atr, :compression, :liquidity_above, :liquidity_below
+                    :tick_time, :symbol, :timeframe, :close, :open, :high, :low, :volume,
+                    :rsi, :atr, :ema_fast, :ema_slow, :fsm_state, :feat_score,
+                    :liquidity_ratio, :volatility_zscore
                 )
             """, self.batch)
             conn.commit()
             
         self.samples_collected += len(self.batch)
-        logger.debug(f"Flushed {len(self.batch)} ticks (total: {self.samples_collected})")
         self.batch = []
         
         # Procesar etiquetas pendientes
@@ -303,25 +312,20 @@ class DataCollector:
             self._flush_batch()
             
     def get_stats(self) -> Dict:
-        """Estadísticas de recolección."""
+        """Estadísticas de recolección multitemporal."""
+        stats = {"total_samples": self.samples_collected}
         with self.db.get_connection() as conn:
-            total_ticks = conn.execute("SELECT COUNT(*) FROM ticks").fetchone()[0]
-            labeled_ticks = conn.execute(
-                "SELECT COUNT(*) FROM ticks WHERE label IS NOT NULL"
-            ).fetchone()[0]
-            training_samples = conn.execute(
-                "SELECT COUNT(*) FROM training_samples"
+            for tf in TIMEFRAMES:
+                count = conn.execute(
+                    "SELECT COUNT(*) FROM market_data WHERE timeframe = ?", (tf,)
+                ).fetchone()[0]
+                stats[f"count_{tf}"] = count
+            
+            stats["labeled"] = conn.execute(
+                "SELECT COUNT(*) FROM market_data WHERE label IS NOT NULL"
             ).fetchone()[0]
             
-        return {
-            "total_ticks": total_ticks,
-            "labeled_ticks": labeled_ticks,
-            "training_samples": training_samples,
-            "pending_batch": len(self.batch),
-            "db_path": self.db.db_path,
-            "lookahead": self.oracle.lookahead,
-            "threshold": self.oracle.threshold
-        }
+        return stats
         
     def export_training_csv(self, path: str = None) -> str:
         """Exporta training_samples a CSV para compatibilidad."""

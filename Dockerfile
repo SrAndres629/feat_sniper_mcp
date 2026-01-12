@@ -17,8 +17,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # =============================================================================
 COPY . .
 
-# Create necessary directories
-RUN mkdir -p /app/data /app/models
+# Create a non-root user to run the app
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Create necessary directories and set ownership
+RUN mkdir -p /app/data /app/models && chown -R appuser:appuser /app
+
+# Switch to non-root user
+USER appuser
 
 # Expose SSE and ZMQ ports
 EXPOSE 8000 5555

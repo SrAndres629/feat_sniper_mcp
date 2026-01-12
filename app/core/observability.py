@@ -1,14 +1,105 @@
 import time
+import asyncio
 import logging
-from typing import Optional
+import functools
+from enum import Enum
+from typing import Optional, Callable, Any, Dict
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
 from opentelemetry import trace
+from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-from opentelemetry.sdk.resources import SERVICE_NAME, Resource
 
 # Logger configuration
 logger = logging.getLogger("MT5_Bridge.Observability")
+
+class CircuitState(Enum):
+    CLOSED = "CLOSED"
+    OPEN = "OPEN"
+    HALF_OPEN = "HALF_OPEN"
+
+def resilient(
+    max_retries: int = 3, 
+    failure_threshold: int = 5, 
+    recovery_timeout: int = 30
+):
+    """
+    Decorador de grado industrial para resiliencia (Circuit Breaker + Retries).
+    
+    Args:
+        max_retries: Reintentos inmediatos con jitter.
+        failure_threshold: Fallos necesarios para abrir el circuito.
+        recovery_timeout: Segundos antes de pasar a HALF_OPEN.
+    """
+    def decorator(func: Callable):
+        state = {
+            "status": CircuitState.CLOSED,
+            "failures": 0,
+            "last_failure_time": 0.0
+        }
+        
+        if asyncio.iscoroutinefunction(func):
+            @functools.wraps(func)
+            async def wrapper(*args, **kwargs):
+                if state["status"] == CircuitState.OPEN:
+                    if time.time() - state["last_failure_time"] > recovery_timeout:
+                        state["status"] = CircuitState.HALF_OPEN
+                        logger.info(f"Circuit HALF_OPEN for {func.__name__}")
+                    else:
+                        raise RuntimeError(f"Circuit is OPEN for {func.__name__}. Fast-failing.")
+
+                last_exception = None
+                for attempt in range(max_retries + 1):
+                    try:
+                        result = await func(*args, **kwargs)
+                        # Reset on success
+                        state["status"] = CircuitState.CLOSED
+                        state["failures"] = 0
+                        return result
+                    except Exception as e:
+                        last_exception = e
+                        state["failures"] += 1
+                        state["last_failure_time"] = time.time()
+                        
+                        if state["failures"] >= failure_threshold:
+                            state["status"] = CircuitState.OPEN
+                            logger.error(f"Circuit OPENED for {func.__name__} after {state['failures']} failures.")
+                        
+                        if attempt < max_retries:
+                            wait = (2 ** attempt) + (time.time() % 1) # Exponential with jitter
+                            logger.warning(f"Retry {attempt+1}/{max_retries} for {func.__name__} in {wait:.2f}s")
+                            await asyncio.sleep(wait)
+                
+                raise last_exception
+            return wrapper
+        else:
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                # Synchronous version
+                if state["status"] == CircuitState.OPEN:
+                    if time.time() - state["last_failure_time"] > recovery_timeout:
+                        state["status"] = CircuitState.HALF_OPEN
+                    else:
+                        raise RuntimeError(f"Circuit is OPEN for {func.__name__}")
+                
+                last_exception = None
+                for attempt in range(max_retries + 1):
+                    try:
+                        result = func(*args, **kwargs)
+                        state["status"] = CircuitState.CLOSED
+                        state["failures"] = 0
+                        return result
+                    except Exception as e:
+                        last_exception = e
+                        state["failures"] += 1
+                        state["last_failure_time"] = time.time()
+                        if state["failures"] >= failure_threshold:
+                            state["status"] = CircuitState.OPEN
+                        if attempt < max_retries:
+                            time.sleep(2 ** attempt)
+                raise last_exception
+            return wrapper
+    return decorator
 
 # --- PROMETHEUS METRICS ---
 # Latency in seconds

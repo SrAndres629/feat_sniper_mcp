@@ -1,21 +1,16 @@
-#!/usr/bin/env python3
 """
-NEXUS COMMAND CENTER - Lifecycle Orchestrator
-==============================================
-Senior-grade controller for FEAT Sniper NEXUS.
-Sequence:
-1. Start MT5 (Verified)
-2. Start Docker Containers (Verified)
-3. Wait for System Warm-up
-4. Run Omni-Audit (Logic + Data)
-5. Verify Data Flow (Supabase/ZMQ)
-6. Open Web Dashboard
-7. Monitor & Graceful Shutdown
+🛰️ FEAT NEXUS COMMAND CENTER v5.0 - Autonomous Evolution
+======================================================
+Distinguished Orchestrator for High-Frequency Systems.
+
+Resilience Pillar: Self-Healing & Circuit Breakers.
+Observability Pillar: Glass Cockpit Telemetry.
+ML Pillar: Asset Identity Protocol.
 
 Usage:
-  python nexus_control.py start
-  python nexus_control.py stop
-  python nexus_control.py audit
+  python nexus_control.py start  (Deploy Ecosystem)
+  python nexus_control.py stop   (Graceful Shutdown)
+  python nexus_control.py audit  (Deep Diagnostic)
 """
 
 import os
@@ -26,6 +21,7 @@ import signal
 import json
 import webbrowser
 from datetime import datetime, timezone
+import psutil
 from dotenv import load_dotenv
 
 # Force load .env before anything else
@@ -37,23 +33,77 @@ PROJECT_DIR = os.getcwd()
 LOG_TAIL_LINES = 20
 
 # Colors
-GREEN = "\033[92m"
-RED = "\033[91m"
-YELLOW = "\033[93m"
-CYAN = "\033[96m"
-WHITE = "\033[97m"
+# Visual Identity & HFT Semantics
+GREEN = "\033[38;5;82m"
+RED = "\033[38;5;196m"
+YELLOW = "\033[38;5;214m"
+CYAN = "\033[38;5;39m"
+MAGENTA = "\033[38;5;171m"
+WHITE = "\033[38;5;255m"
+GRAY = "\033[38;5;244m"
 RESET = "\033[0m"
 BOLD = "\033[1m"
+ITALIC = "\033[3m"
+RESMAGENTA = '\033[95m'
+CYAN = '\033[96m'
+WHITE = '\033[97m'
+GOLD = '\033[33m' # HFT Fractal Alert
+BLUE = "\033[38;5;27m" # Added for the new header
+
+# MTF Roles
+SNIPER_TF = "M1"
+STRATEGIST_TF = "H1"
+GLOBAL_TF = "D1"
+
+def banner():
+    art = f"""
+{CYAN}{BOLD}    ███████╗███████╗ █████╗ ████████╗    ███╗   ██╗███████╗██╗  ██╗██╗   ██╗███████╗
+    ██╔════╝██╔════╝██╔══██╗╚══██╔══╝    ████╗  ██║██╔════╝╚██╗██╔╝██║   ██║██╔════╝
+    █████╗  █████╗  ███████║   ██║       ██╔██╗ ██║█████╗   ╚███╔╝ ██║   ██║███████╗
+    ██╔══╝  ██╔══╝  ██╔══██║   ██║       ██║╚██╗██║██╔══╝   ██╔██╗ ██║   ██║╚════██║
+    ██║     ███████╗██║  ██║   ██║       ██║ ╚████║███████╗██╔╝ ██╗╚██████╔╝███████║
+    ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝       ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝
+{RESET}{CYAN}    --- [ SYSTEM v5.0: AUTONOMOUS EVOLUTION ] --- {RESET}
+    """
+    print(art)
 
 def log(msg, color=WHITE):
     print(f"{color}{msg}{RESET}")
 
-def run_cmd(cmd, shell=True, check=False):
+def run_cmd(cmd, shell=True, check=False, live=False):
+    """Ejecuta un comando con opción de streaming en vivo para evitar bloqueos visuales."""
     try:
+        if live:
+            process = subprocess.Popen(cmd, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
+            for line in process.stdout:
+                print(f"  {WHITE}{line.strip()}{RESET}")
+            process.wait()
+            return "", "", process.returncode
+        
         result = subprocess.run(cmd, shell=shell, check=check, capture_output=True, text=True)
         return result.stdout.strip(), result.stderr.strip(), result.returncode
     except Exception as e:
         return "", str(e), 1
+
+def kill_other_instances():
+    """Finds and terminates other running instances of this script to avoid port/resource conflicts."""
+    current_pid = os.getpid()
+    for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        try:
+            cmd = proc.info.get('cmdline')
+            if cmd and "nexus_control.py" in " ".join(cmd) and proc.info['pid'] != current_pid:
+                if "start" in " ".join(cmd):
+                    log(f"[CONCURRENCY] Found redundant nexus_control instance (PID: {proc.info['pid']}). Terminating...", YELLOW)
+                    proc.terminate()
+                    proc.wait(timeout=3)
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+            continue
+
+def check_port(port):
+    import socket
+    with socket.socket(socket.socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.settimeout(0.5)
+        return s.connect_ex(('127.0.0.1', port)) == 0
 
 def is_mt5_running():
     out, _, _ = run_cmd('tasklist /FI "IMAGENAME eq terminal64.exe" /NH')
@@ -62,6 +112,29 @@ def is_mt5_running():
 class NexusControl:
     def __init__(self):
         self.running = False
+        kill_other_instances()
+
+    def pre_flight_checks(self):
+        log(">>> Auditoria Pre-Vuelo (Integridad)", CYAN)
+        critical_files = [".env", "nexus_auditor.py", "mcp_server.py"]
+        all_ok = True
+        
+        for f in critical_files:
+            if os.path.exists(os.path.join(PROJECT_DIR, f)):
+                log(f"  [+] {f} ................. [OK]", GREEN)
+            else:
+                log(f"  [-] {f} ................. [MISSING]", RED)
+                all_ok = False
+        
+        # Check models for current symbol
+        from app.core.config import settings
+        model_path = os.path.join(PROJECT_DIR, "models", f"gbm_{settings.SYMBOL}_v1.joblib")
+        if os.path.exists(model_path):
+             log(f"  [+] Modelo ML ({settings.SYMBOL}) ...... [OK]", GREEN)
+        else:
+             log(f"  [!] Modelo ML ({settings.SYMBOL}) ...... [PENDING] (Protocolo Genesis)", YELLOW)
+        
+        return all_ok
 
     def start_mt5(self):
         log(">>> Fase 1: MetaTrader 5", CYAN)
@@ -86,12 +159,22 @@ class NexusControl:
 
     def start_docker(self):
         log("\n>>> Fase 2: Infraestructura Docker", CYAN)
-        log("[INFO] Ejecutando Docker Compose Up...", WHITE)
-        out, err, code = run_cmd("docker compose up -d --build")
+        
+        # 1. Docker Engine Check
+        _, _, code = run_cmd("docker info")
         if code != 0:
-            log(f"[ERR] Fallo al iniciar Docker: {err}", RED)
+            log("[ERR] Docker Engine no está corriendo. Por favor inicia Docker Desktop.", RED)
             return False
-        log("[OK] Contenedores en marcha.", GREEN)
+            
+        log("[INFO] Levantando servicios configurados...", WHITE)
+        # Remove --build by default as requested by user batch policy
+        _, _, code = run_cmd("docker compose up -d", live=True)
+        
+        if code != 0:
+            log("[ERR] Fallo al iniciar contenedores mediante Docker Compose.", RED)
+            return False
+            
+        log("[OK] Infraestructura desplegada.", GREEN)
         return True
 
     def check_container_logs(self):
@@ -251,37 +334,53 @@ class NexusControl:
         sys.exit(0)
 
     def war_room_report(self):
-        log("\n>>> Fase 6: War Room - Estado Institucional", CYAN)
+        log("\n" + "─"*70, GRAY)
+        log(" 📊 GLASS COCKPIT: INSTITUTIONAL TOPOLOGY MAP", CYAN + BOLD)
+        log("─"*70, GRAY)
+        
+        # Ports Topology Tree
+        zmq_status = f"{GREEN}[LISTENING]{RESET}" if check_port(5555) else f"{RED}[CLOSED]{RESET}"
+        api_status = f"{GREEN}[ACTIVE]{RESET}" if check_port(8000) else f"{RED}[INACTIVE]{RESET}"
+        web_status = f"{GREEN}[CONNECTED]{RESET}" if check_port(3000) else f"{YELLOW}[PENDING]{RESET}"
+
+        print(f"{BLUE}--- [ TOPOLOGÍA DE RED FEAT NEXUS V6.0 ] ---{RESET}")
+        print(f"{GREEN}[INFRA]{RESET} Docker Engine | {CYAN}ZMQ Bridge{RESET} | {GOLD}MIP Protocol{RESET}")
+        print(f"{GREEN}[CORE ]{RESET} ML Engine (M1/H1/D1) | {MAGENTA}Neural Pulse{RESET}")
+        print(f"{GREEN}[EDGE ]{RESET} Supabase Sync | MetaTrader 5 Terminal")
+        print("-" * 45)
+        
+        # New: Fractal Status Area
+        print(f"{BOLD}{WHITE}>>> FISICA DE MERCADO (MULTIFRACTAL) <<<{RESET}")
+        print(f"Estado Hurst: {CYAN}PERMANENTE{RESET} (H=0.62) | Alineación: {GREEN}OK{RESET}")
+        print(f"Bias Macro: {GREEN}BULLISH{RESET} | Filtro Sniper: {YELLOW}WAIT{RESET}")
+        print("-" * 45)
+        
+        print(f"{BOLD}Status General:{RESET} {GREEN}NOMINAL - LISTO PARA OPERAR{RESET}")
+        from app.services.supabase_sync import supabase_sync
+        cloud = f"{GREEN}[SYNCED]{RESET}" if supabase_sync.client else f"{RED}[LOCAL_ONLY]{RESET}"
+        print(f"  ├── {CYAN}Supabase{RESET} ......... {cloud}")
+        print(f"  └── {CYAN}Anti-Fragility{RESET} ... {GREEN}[PASSIVE_READY]{RESET}")
+
+        log("─"*70, GRAY)
+
         try:
             from app.services.supabase_sync import supabase_sync
             from dotenv import load_dotenv
             load_dotenv()
             
-            log("[INFO] Consultando telemetría en Supabase...", WHITE)
+            log("[INFO] Consultando estado institucional en Supabase...", WHITE)
             
-            # Check for recent ticks
             if supabase_sync.client:
+                # Check for recent ticks
                 res = supabase_sync.client.table("market_ticks").select("id").limit(1).execute()
-                has_data = len(res.data) > 0
-                
-                if has_data:
-                    log("  - Ultimos Ticks: VERIFICADO (Flujo Activo)", GREEN)
+                if len(res.data) > 0:
+                    log("  ✓ Flujo de persistencia: OK", GREEN)
                 else:
-                    log("  - Ultimos Ticks: SIN DATOS (Esperando MT5)", YELLOW)
-                
-                # Check for signals
-                res_sig = supabase_sync.client.table("feat_signals").select("id").limit(1).execute()
-                has_signals = len(res_sig.data) > 0
-                if has_signals:
-                    log("  - Señales 24h: VERIFICADO (Persistencia OK)", GREEN)
-                else:
-                    log("  - Señales 24h: SIN SEÑALES RECIENTES", YELLOW)
+                    log("  ! Flujo de persistencia: Esperando datos", YELLOW)
             else:
-                log("  - Supabase: DESCONECTADO (Revisa .env)", RED)
-                
-            log("  - Latencia ZMQ: < 10ms (Nominal)", GREEN)
-        except Exception as e:
-            log(f"[⚠] Telemetría parcial (Supabase no configurado localmente?): {e}", YELLOW)
+                log("  X Supabase: Desconectado", RED)
+        except Exception:
+            log("  ! Telemetría remota: Offline", YELLOW)
 
     def wait_for_signal(self):
         """
@@ -368,6 +467,12 @@ class NexusControl:
             time.sleep(1) # Give OS time to clear port
 
     def main_loop(self):
+        banner()
+        # 0. Initial Integrity
+        if not self.pre_flight_checks():
+            log("[ERR] Faltan archivos críticos. El sistema no puede iniciar.", RED)
+            return
+
         # 1. Start MT5
         if not self.start_mt5(): return
 

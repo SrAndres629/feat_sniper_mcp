@@ -13,20 +13,27 @@ except ImportError:
     
 from app.core.config import settings
 
+from app.core.observability import obs_engine, tracer, resilient
+
 logger = logging.getLogger("MT5_Bridge.Core")
 
 T = TypeVar("T")
 
 class MT5Connection:
-    """
-    Gestor de conexión Singleton para MetaTrader 5.
+    """Singleton connection manager for MetaTrader 5.
     
-    Proporciona un entorno seguro para hilos (threading.Lock) y no bloqueante
-    (anyio.to_thread) para interactuar con la librería síncrona de MT5.
+    Provides a thread-safe (threading.Lock) and non-blocking (anyio.to_thread)
+    environment for interacting with the synchronous MT5 C-API.
+    
+    Attributes:
+        _instance: Singleton instance.
+        _lock: Singleton lifecycle lock.
+        _mt5_lock: API access synchronization lock.
+        _watchdog_task: Background connectivity monitor.
     """
-    _instance = None
+    _instance: Optional['MT5Connection'] = None
     _lock = threading.Lock()
-    _mt5_lock = threading.Lock()  # El candado real para las llamadas a la API de MT5
+    _mt5_lock = threading.Lock()
     _watchdog_task: Optional[asyncio.Task] = None
 
     def __new__(cls):
@@ -43,12 +50,15 @@ class MT5Connection:
         logger.info("MT5Connection Singleton inicializado.")
 
     async def startup(self) -> bool:
-        """
-        Inicializa la conexión con el terminal MT5 e inicia el watchdog.
-        En Linux/Docker, entra en modo pasivo sin lanzar errores.
+        """Initializes MT5 terminal connectivity and starts the watchdog.
+        
+        Enters passive mode in Linux/Docker environments.
+        
+        Returns:
+            bool: True if initialization was successful or skipped (Docker).
         """
         if not MT5_AVAILABLE:
-            logger.info("Entorno Linux/Docker detectado. Saltando inicialización local de MT5. Esperando conexión ZMQ...")
+            logger.info("Linux/Docker environment detected. Skipping local MT5 init. Entering Passive Mode.")
             return True
             
         success = await self.execute(self._initialize_mt5)
@@ -88,13 +98,18 @@ class MT5Connection:
                 logger.error(f"Error crítico en watchdog de MT5: {e}")
                 backoff = min(max_backoff, backoff * 2)
 
+    @resilient(max_retries=2, failure_threshold=2, recovery_timeout=10)
     def _initialize_mt5(self) -> bool:
-        """Lógica interna de inicialización (bloqueante)."""
+        """Internal initialization logic (Blocking).
+        
+        Returns:
+            bool: True if connection established.
+        """
         if not MT5_AVAILABLE:
-            logger.error("MetaTrader5 no está instalado en este entorno. Abortando inicialización.")
+            logger.error("MetaTrader5 is not installed in this environment.")
             return False
             
-        logger.info(f"Intentando conectar a MT5 (Server: {settings.MT5_SERVER})...")
+        logger.info(f"Connecting to MT5 (Server: {settings.MT5_SERVER})...")
         
         init_params = {
             "login": settings.MT5_LOGIN,
@@ -105,15 +120,14 @@ class MT5Connection:
         if settings.MT5_PATH:
             init_params["path"] = settings.MT5_PATH
 
-        # Forzar cierre previo por si acaso
-        mt5.shutdown()
+        mt5.shutdown() # Force clean state
 
         if not mt5.initialize(**init_params):
-            error = mt5.last_error()
-            logger.error(f"Error crítico al inicializar MT5: {error[1]} (Código: {error[0]})")
+            err_code, err_msg = mt5.last_error()
+            logger.error(f"MT5 Init Critical Failure: {err_msg} (Code: {err_code})")
             return False
             
-        logger.info("✅ Conexión con MT5 establecida exitosamente.")
+        logger.info("✅ MetaTrader 5 Connection Established.")
         return True
 
     async def shutdown(self):
