@@ -1025,6 +1025,96 @@ async def get_liquidity_pools(symbol: str = "XAUUSD"):
 
 
 # =============================================================================
+# FEAT MODULAR NEURAL TRAINING SYSTEM
+# =============================================================================
+
+@mcp.tool()
+@pulse_observer
+async def feat_check_tiempo(
+    server_time_gmt: str = None,
+    h4_candle: str = "NEUTRAL",
+    news_in_minutes: int = 999
+):
+    """
+    ⏰ FEAT Module T: Tiempo (Kill Switch #1)
+    Verifica Kill Zones, alineación H4, y filtro de noticias.
+    """
+    from app.skills.feat_tiempo import analyze_tiempo
+    return analyze_tiempo(server_time_gmt, h4_candle, news_in_minutes)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_analyze_forma(
+    h4_candles: list = None,
+    h1_candles: list = None,
+    m15_candles: list = None
+):
+    """
+    🏗️ FEAT Module F: Forma (Market Structure)
+    Detecta tendencia, BOS/CHoCH, y fases Wyckoff.
+    """
+    from app.skills.feat_forma import analyze_forma
+    return analyze_forma(h4_candles, h1_candles, m15_candles)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_map_espacio(
+    candles: list,
+    current_price: float,
+    market_structure: str = "NEUTRAL"
+):
+    """
+    📍 FEAT Module E: Espacio (Liquidity Zones)
+    Detecta FVG, Order Blocks, y Premium/Discount zones.
+    """
+    from app.skills.feat_espacio import analyze_espacio
+    return analyze_espacio(candles, current_price, market_structure)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_validate_aceleracion(
+    recent_candles: list,
+    poi_status: str = "NEUTRAL",
+    proposed_direction: str = None
+):
+    """
+    ⚡ FEAT Module A: Aceleración (Momentum Validation)
+    Valida Body/Wick, volumen, y detecta fakeouts.
+    """
+    from app.skills.feat_aceleracion import analyze_aceleracion
+    return analyze_aceleracion(recent_candles, poi_status, proposed_direction)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_full_chain(
+    symbol: str = "XAUUSD",
+    h4_candles: list = None,
+    h1_candles: list = None,
+    m15_candles: list = None,
+    m5_candles: list = None,
+    current_price: float = None
+):
+    """
+    🔗 FEAT COMPLETE CHAIN: Ejecuta T -> F -> E -> A en secuencia.
+    Si cualquier módulo falla, la cadena se detiene (Kill Switch).
+    Retorna señal de trading si todo pasa.
+    """
+    from app.skills.feat_chain import execute_feat_chain
+    return execute_feat_chain(
+        h4_candles=h4_candles,
+        h1_candles=h1_candles,
+        m15_candles=m15_candles,
+        m5_candles=m5_candles,
+        current_price=current_price,
+        symbol=symbol
+    )
+
+
+# =============================================================================
 # SYSTEM RESOURCES
 # =============================================================================
 
