@@ -1080,6 +1080,32 @@ async def feat_generate_chrono_features(
     return generate_chrono_features(server_time_utc, news_upcoming, current_spread_pips)
 
 
+@mcp.tool()
+@pulse_observer
+async def feat_analyze_tiempo_institucional(
+    server_time_utc: str = None,
+    d1_direction: str = "NEUTRAL",
+    h4_direction: str = "NEUTRAL",
+    h1_direction: str = "NEUTRAL",
+    has_sweep: bool = False,
+    news_upcoming: bool = False
+):
+    """
+    🏛️ FEAT TIEMPO INSTITUCIONAL: Análisis completo para GC/XAU.
+    
+    Integra:
+    - Sesiones: Globex, Asia/SGE, London, NY Overlap
+    - LBMA/SGE Fixes (AM/PM benchmarks)
+    - Alignment D1+H4+H1 con size multiplier
+    - Entry Templates: Confirmation/Post-Fix/Sweep
+    
+    Retorna checklist institucional completo.
+    """
+    from app.skills.feat_tiempo import analyze_tiempo_institucional
+    return analyze_tiempo_institucional(server_time_utc, d1_direction, h4_direction, h1_direction, has_sweep, news_upcoming)
+
+
+
 
 
 @mcp.tool()
