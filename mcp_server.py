@@ -1295,18 +1295,61 @@ async def feat_map_espacio_advanced(
     return analyze_espacio(candles, current_price, market_structure, "H1", chrono_features)
 
 
-@mcp.tool()
-@pulse_observer
-async def feat_generate_liquidity_features(
-    candles: list,
-    current_price: float,
-    chrono_features: dict = None
-):
-    """
-    🧠 FEAT LIQUIDITY ML: Genera features de zonas para red neuronal.
     """
     from app.skills.feat_espacio import generate_liquidity_features
     return generate_liquidity_features(candles, current_price, chrono_features)
+
+
+# =============================================================================
+# MARKET PHYSICS & REGIME ANALYSIS
+# =============================================================================
+
+@mcp.tool()
+@pulse_observer
+async def feat_analyze_physics(
+    m15_candles: list,
+    m5_candles: list
+):
+    """
+    FEAT PHYSICS: Analiza Masas y Movimientos.
+    
+    Retorna:
+    - PVP Vectorial (POC, VAH, VAL, Skew)
+    - MCI (Manipulation Index)
+    - Liquidity Primitives (Pools, Sweeps)
+    """
+    from app.skills.market_physics import market_physics
+    import pandas as pd
+    
+    df_m15 = pd.DataFrame(m15_candles) if m15_candles else pd.DataFrame()
+    df_m5 = pd.DataFrame(m5_candles) if m5_candles else pd.DataFrame()
+    
+    return {
+        "pvp": market_physics.calculate_pvp_vectorial(df_m15),
+        "mci": market_physics.calculate_mci(df_m5),
+        "liquidity": market_physics.detect_liquidity_primitives(df_m15)
+    }
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_detect_regime(
+    physics_metrics: dict,
+    temporal_features: dict,
+    trend_context: str = "NEUTRAL"
+):
+    """
+    FEAT REGIME FSM: Clasifica Estado del Mercado (0-1).
+    
+    Estados:
+    - ACCUMULATION (Low Entropy)
+    - MANIPULATION (Trap)
+    - EXPANSION_REAL (Trend)
+    - EXPANSION_FAKE (Failed Breakout)
+    """
+    from app.skills.feat_regime import regime_fsm
+    structure_context = {"trend": trend_context, "has_sweep": False} # Basic proxy
+    return regime_fsm.detect_regime(physics_metrics, temporal_features, structure_context)
 
 
 @mcp.tool()
@@ -1317,7 +1360,7 @@ async def feat_validate_aceleracion(
     proposed_direction: str = None
 ):
     """
-    ⚡ FEAT Module A: Aceleración (Momentum Validation)
+    FEAT Module A: Aceleración (Momentum Validation)
     Valida Body/Wick, volumen, y detecta fakeouts.
     """
     from app.skills.feat_aceleracion import analyze_aceleracion
@@ -1332,7 +1375,7 @@ async def feat_validate_aceleracion_advanced(
     chrono_features: dict = None
 ):
     """
-    ⚡ FEAT Module A ADVANCED: Momentum Chrono-Aware
+    FEAT Module A ADVANCED: Momentum Chrono-Aware
     
     Execution probability ajustada por ciclo temporal:
     - Kill Zone: +15% momentum score
@@ -1351,7 +1394,7 @@ async def feat_generate_momentum_features(
     chrono_features: dict = None
 ):
     """
-    🧠 FEAT MOMENTUM ML: Genera features de momentum para red neuronal.
+    FEAT MOMENTUM ML: Genera features de momentum para red neuronal.
     """
     from app.skills.feat_aceleracion import generate_momentum_features
     return generate_momentum_features(recent_candles, proposed_direction, chrono_features)
@@ -1369,7 +1412,7 @@ async def feat_full_chain(
     current_price: float = None
 ):
     """
-    🔗 FEAT COMPLETE CHAIN: Ejecuta T -> F -> E -> A en secuencia.
+    FEAT COMPLETE CHAIN: Ejecuta T -> F -> E -> A en secuencia.
     Si cualquier módulo falla, la cadena se detiene (Kill Switch).
     Retorna señal de trading si todo pasa.
     """
@@ -1401,15 +1444,15 @@ async def feat_full_chain_institucional(
     news_upcoming: bool = False
 ):
     """
-    🏛️ FEAT CHAIN INSTITUCIONAL: Pipeline completo MIP.
+    FEAT CHAIN INSTITUCIONAL: Pipeline completo MIP.
     
     6 Stages:
-    1. TIEMPO → Session, fixes, D1/H4/H1 alignment
-    2. FORMA → BOS/CHoCH, sweeps, structure  
-    3. ESPACIO → FVG, OB, Premium/Discount
-    4. ACELERACIÓN → Momentum, fakeout, volume
-    5. FUSION → MTF weighted probability
-    6. LIQUIDITY → DoM preflight
+    1. TIEMPO -> Session, fixes, D1/H4/H1 alignment
+    2. FORMA -> BOS/CHoCH, sweeps, structure  
+    3. ESPACIO -> FVG, OB, Premium/Discount
+    4. ACELERACION -> Momentum, fakeout, volume
+    5. FUSION -> MTF weighted probability
+    6. LIQUIDITY -> DoM preflight
     
     Retorna probabilidad 0.0-1.0 y trade_params si >0.55
     """
@@ -1419,17 +1462,6 @@ async def feat_full_chain_institucional(
         h4_candles, h1_candles, m15_candles, m5_candles, current_price,
         has_sweep, news_upcoming
     )
-
-
-
-# =============================================================================
-# SYSTEM RESOURCES
-# =============================================================================
-
-@mcp.resource("signals://live")
-async def get_live_signals():
-    """Stream de señales ZMQ disponibles."""
-    return "Stream Active"
 
 if __name__ == "__main__":
     import os
@@ -1441,8 +1473,8 @@ if __name__ == "__main__":
     is_docker = not sys.stdin.isatty() or os.environ.get("DOCKER_MODE", "").lower() == "true"
     
     if is_docker:
-        logger.info("🐳 Modo Docker detectado - Iniciando servidor SSE en puerto 8000...")
+        logger.info("Modo Docker detectado - Iniciando servidor SSE en puerto 8000...")
         mcp.run(transport="sse", host="0.0.0.0", port=8000)
     else:
-        logger.info("🖥️ Modo Windows detectado - Iniciando servidor STDIO...")
+        logger.info("Modo Windows detectado - Iniciando servidor STDIO...")
         mcp.run()
