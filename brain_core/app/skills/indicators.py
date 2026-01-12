@@ -13,18 +13,18 @@ from app.skills.market import TIMEFRAME_MAP
 
 async def get_technical_indicator(req: IndicatorRequest) -> Dict[str, Any]:
     """
-    Calcula indicadores técnicos usando datos directos de MT5.
+    Calcula indicadores tcnicos usando datos directos de MT5.
     """
     symbol = req.symbol
     tf_str = req.timeframe.upper()
     indicator = req.indicator.upper()
     
     if tf_str not in TIMEFRAME_MAP:
-        return {"status": "error", "message": f"Timeframe {tf_str} no válido."}
+        return {"status": "error", "message": f"Timeframe {tf_str} no vlido."}
     
     mt5_tf = TIMEFRAME_MAP[tf_str]
     
-    # Cantidad de velas necesarias (periodo + margen para cálculo)
+    # Cantidad de velas necesarias (periodo + margen para clculo)
     n_candles = req.period + 100
     
     rates = await mt5_conn.execute(mt5.copy_rates_from_pos, symbol, mt5_tf, 0, n_candles)

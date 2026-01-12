@@ -84,13 +84,13 @@ except ImportError:
     logger.warning("MetaTrader5 module not found found. Running in Linux/Docker mode? Some local-only features will be disabled.")
 
 
-# Importar lógica de negocio de la app
+# Importar lgica de negocio de la app
 from app.core.mt5_conn import mt5_conn
 from app.skills import (
     market, vision, execution, trade_mgmt, 
     indicators, history, calendar, 
     quant_coder, custom_loader,
-    tester, unified_model, remote_compute # Nuevos módulos
+    tester, unified_model, remote_compute # Nuevos mdulos
 )
 from app.models.schemas import (
     MarketDataRequest, TradeOrderRequest, PositionManageRequest, 
@@ -131,7 +131,7 @@ async def app_lifespan(server: FastMCP):
             asyncio.create_task(supabase_sync.log_tick(data))
             
         elif msg_type == "signal":
-            logger.info(f"Señal recibida vía ZMQ: {data}")
+            logger.info(f"Seal recibida va ZMQ: {data}")
             import asyncio
             asyncio.create_task(supabase_sync.log_signal(data))
         
@@ -141,13 +141,13 @@ async def app_lifespan(server: FastMCP):
     
     # 3. Background Risk Monitor
     async def monitor_risk_loop():
-        logger.info("🛡️ Monitor de Riesgo Institucional ACTIVO")
+        logger.info(" Monitor de Riesgo Institucional ACTIVO")
         from app.services.risk_engine import risk_engine
         while True:
             try:
                 # Verificar Drawdown para Auto-Stop
                 if not await risk_engine.check_drawdown_limit():
-                    logger.critical("🚨 CIRCUIT BREAKER TRIPPED - Risk Limit Exceeded!")
+                    logger.critical(" CIRCUIT BREAKER TRIPPED - Risk Limit Exceeded!")
                 
                 # Aplicar Trailing Stop institucional a todas las posiciones
                 positions = await mt5_conn.execute(mt5.positions_get)
@@ -163,11 +163,11 @@ async def app_lifespan(server: FastMCP):
                                  "ticket": pos.ticket
                              })
                              
-                        # Agora usa ATR dinâmico (limite configurado nas settings)
+                        # Agora usa ATR dinmico (limite configurado nas settings)
                         await risk_engine.apply_trailing_stop(pos.symbol, pos.ticket)
             except Exception as e:
                 logger.error(f"Error in Risk Monitor: {e}")
-            await asyncio.sleep(5) # Revisión cada 5 segundos
+            await asyncio.sleep(5) # Revisin cada 5 segundos
 
     monitor_task = asyncio.create_task(monitor_risk_loop())
     
@@ -185,11 +185,11 @@ mcp = FastMCP("MT5_Neural_Sentinel", lifespan=app_lifespan)
 # Registrar Skills de Indicadores Propios
 custom_loader.register_custom_skills(mcp)
 
-# Registrar Skills de Cómputo Remoto (NEXUS)
+# Registrar Skills de Cmputo Remoto (NEXUS)
 remote_compute.register_remote_skills(mcp)
 
 # =============================================================================
-# PILLAR 1: CÓRTEX DE COMPILACIÓN (Code Builder)
+# PILLAR 1: CRTEX DE COMPILACIN (Code Builder)
 # =============================================================================
 
 @mcp.tool()
@@ -197,42 +197,42 @@ remote_compute.register_remote_skills(mcp)
 async def create_and_compile_indicator(name: str, code: str, compile: bool = True):
     """
     Escribe y compila un nuevo indicador .mq5. 
-    Retorna el log de compilación para auto-corrección.
+    Retorna el log de compilacin para auto-correccin.
     """
     req = MQL5CodeRequest(name=name, code=code, compile=compile)
     return await quant_coder.create_native_indicator(req)
 
 # =============================================================================
-# PILLAR 2: OJO DE HALCÓN (Data Bridge)
+# PILLAR 2: OJO DE HALCN (Data Bridge)
 # =============================================================================
 
 @mcp.tool()
 @pulse_observer
 async def get_market_snapshot(symbol: str, timeframe: str = "M5"):
     """
-    Radiografía completa del mercado: Precio, Vela actual, Volatilidad y Cuenta.
+    Radiografa completa del mercado: Precio, Vela actual, Volatilidad y Cuenta.
     Ideal para decisiones de alta frecuencia.
     """
     return await market.get_market_snapshot(symbol, timeframe)
 
 @mcp.tool()
 async def get_candles(symbol: str, timeframe: str = "M5", n_candles: int = 100):
-    """Obtiene velas históricas (OHLCV)."""
+    """Obtiene velas histricas (OHLCV)."""
     return await market.get_candles(symbol, timeframe, n_candles)
 
 @mcp.tool()
 async def get_market_panorama(resize_factor: float = 0.75):
-    """Captura visual del gráfico."""
+    """Captura visual del grfico."""
     return await vision.capture_panorama(resize_factor=resize_factor)
 
 @mcp.tool()
 @pulse_observer
 async def get_trade_decision(symbol: str, timeframe: str = "M5"):
     """
-    Decisión de trading integrada para N8N.
+    Decisin de trading integrada para N8N.
     
     Combina ML (GBM/LSTM) + FEAT Score + FSM State + Indicadores
-    para generar una señal unificada con contexto completo.
+    para generar una seal unificada con contexto completo.
     
     Returns:
         JSON con signal, confidence, market_state, data_context
@@ -242,7 +242,7 @@ async def get_trade_decision(symbol: str, timeframe: str = "M5"):
     # 1. Obtener snapshot del mercado
     snapshot = await market.get_market_snapshot(symbol, timeframe)
     
-    # 2. Obtener predicción ML si disponible
+    # 2. Obtener prediccin ML si disponible
     ml_prediction = None
     try:
         from app.ml.ml_engine import ml_engine
@@ -267,7 +267,7 @@ async def get_trade_decision(symbol: str, timeframe: str = "M5"):
     except Exception as e:
         logger.warning(f"ML prediction unavailable: {e}")
     
-    # 3. Construir señal
+    # 3. Construir seal
     confidence = 0.5
     signal = "WAIT"
     
@@ -282,10 +282,10 @@ async def get_trade_decision(symbol: str, timeframe: str = "M5"):
         else:
             signal = "WAIT"
             
-        # Penalizar si hay anomalía
+        # Penalizar si hay anomala
         if ml_prediction.get("is_anomaly"):
             confidence *= 0.5
-            signal = "WAIT"  # No operar en manipulación
+            signal = "WAIT"  # No operar en manipulacin
     
     # 4. Determinar estado de mercado (FSM)
     volatility = snapshot.get("volatility", {})
@@ -329,15 +329,15 @@ async def get_trade_decision(symbol: str, timeframe: str = "M5"):
 @pulse_observer
 async def get_full_market_context(symbol: str, timeframe: str = "M5"):
     """
-    ⭐ SUPER ENDPOINT PARA N8N (SSH Gateway).
+     SUPER ENDPOINT PARA N8N (SSH Gateway).
     
-    Consolida TODO en un único JSON para que el Agente N8N tome decisiones
+    Consolida TODO en un nico JSON para que el Agente N8N tome decisiones
     basadas en la estrategia FEAT completa, no en datos crudos.
     
     Incluye:
     - raw_data: OHLCV actual
     - indicators: FEAT, PVP, EMAs
-    - ml_insight: Predicción + Explicabilidad
+    - ml_insight: Prediccin + Explicabilidad
     - memory_context: Recuerdos RAG relevantes
     - strategy_guidance: Prompt sugerido para N8N
     """
@@ -363,7 +363,7 @@ async def get_full_market_context(symbol: str, timeframe: str = "M5"):
     # 2. INDICADORES FEAT
     indicators = {
         "feat": {
-            "score": 0.0,  # Placeholder - viene de MT5 vía ZMQ
+            "score": 0.0,  # Placeholder - viene de MT5 va ZMQ
             "form": {"bos": False, "choch": False, "intent_candle": False},
             "space": {"at_zone": False, "proximity": 0.0, "zone_type": "NONE"},
             "acceleration": {
@@ -458,7 +458,7 @@ async def get_full_market_context(symbol: str, timeframe: str = "M5"):
     except Exception as e:
         logger.debug(f"RAG unavailable: {e}")
     
-    # 5. GUÍA PARA EL AGENTE N8N
+    # 5. GUA PARA EL AGENTE N8N
     strategy_guidance = {
         "system_prompt_suggestion": f"""
 You are analyzing {symbol} on {timeframe} timeframe.
@@ -497,7 +497,7 @@ Based on the data provided, decide: BUY, SELL, or WAIT.
 
 
 def _get_top_drivers(features: dict, prediction: dict) -> list:
-    """Extrae los factores principales que influyen en la predicción."""
+    """Extrae los factores principales que influyen en la prediccin."""
     drivers = []
     
     if features.get("rsi", 50) < 30:
@@ -520,7 +520,7 @@ def _get_top_drivers(features: dict, prediction: dict) -> list:
 
 
 def _generate_explanation(prediction: dict, indicators: dict) -> str:
-    """Genera explicación legible para el agente N8N."""
+    """Genera explicacin legible para el agente N8N."""
     p_win = prediction.get("p_win", 0.5)
     source = prediction.get("source", "NONE")
     
@@ -533,7 +533,7 @@ def _generate_explanation(prediction: dict, indicators: dict) -> str:
     return explanation
 
 def _get_market_session() -> dict:
-    """Detecta la sesión actual y killzones institucionales (UTC)."""
+    """Detecta la sesin actual y killzones institucionales (UTC)."""
     now = datetime.utcnow()
     hour = now.hour
     
@@ -587,7 +587,7 @@ async def run_shadow_backtest(
 async def execute_twin_entry(symbol: str = "XAUUSD", direction: str = "BUY"):
     """
     Ejecuta la estrategia Hybrid Twin-Engine.
-    Abre 2 operaciones simultáneas: Scalp ($2 TP) + Swing ($10+ TP).
+    Abre 2 operaciones simultneas: Scalp ($2 TP) + Swing ($10+ TP).
     Si no hay margen suficiente, solo abre el Scalp.
     """
     from app.skills.execution import execute_twin_trade
@@ -605,7 +605,7 @@ async def execute_twin_entry(symbol: str = "XAUUSD", direction: str = "BUY"):
 async def get_twin_engine_status():
     """
     Obtiene el estado actual del motor Twin-Engine.
-    Incluye asignación de capital Scalp vs Swing.
+    Incluye asignacin de capital Scalp vs Swing.
     """
     from app.services.risk_engine import risk_engine
     
@@ -619,7 +619,7 @@ async def get_twin_engine_status():
     }
 
 # =============================================================================
-# PILLAR 4: INYECCIÓN ESTRATÉGICA (Unified Model)
+# PILLAR 4: INYECCIN ESTRATGICA (Unified Model)
 # =============================================================================
 
 @mcp.tool()
@@ -637,7 +637,7 @@ async def query_unified_brain(sql_query: str):
 
 @mcp.tool()
 async def execute_trade(symbol: str, action: str, volume: float, price: float = None, sl: float = None, tp: float = None, comment: str = "MCP_Order"):
-    """Ejecuta órdenes: BUY, SELL, LIMIT, STOP."""
+    """Ejecuta rdenes: BUY, SELL, LIMIT, STOP."""
     req = TradeOrderRequest(symbol=symbol, action=action, volume=volume, price=price, sl=sl, tp=tp, comment=comment)
     result = await execution.send_order(req)
     return result.dict()
@@ -656,7 +656,7 @@ async def get_account_status():
 
 @mcp.tool()
 async def get_economic_calendar():
-    """Eventos económicos de alto impacto próximos."""
+    """Eventos econmicos de alto impacto prximos."""
     req = CalendarRequest(importance="HIGH", days_forward=1)
     return await calendar.get_economic_calendar(req)
 
@@ -669,7 +669,7 @@ async def get_financial_performance():
     import datetime
     from app.services.risk_engine import risk_engine
     
-    # 1. Métricas de Cuenta
+    # 1. Mtricas de Cuenta
     account = await market.get_account_metrics()
     
     # 2. Rendimiento Hoy (UTC)
@@ -710,14 +710,14 @@ async def get_financial_performance():
         "daily_pnl": round(daily_pnl, 2),
         "hourly_pnl": round(hourly_pnl, 2),
         "drawdown_percent": round((1 - account.get("equity") / account.get("balance")) * 100, 2) if account.get("balance",0) > 0 else 0,
-        "journal": journal[-10:] # Últimos 10 trades
+        "journal": journal[-10:] # ltimos 10 trades
     }
 
 @mcp.tool()
 async def get_profit_velocity():
     """
-    Calcula la velocidad de ganancia ($/Hora) de la sesión actual.
-    Fórmula: (Beneficio Total Sesión) / (Horas Transcurridas desde el inicio del día).
+    Calcula la velocidad de ganancia ($/Hora) de la sesin actual.
+    Frmula: (Beneficio Total Sesin) / (Horas Transcurridas desde el inicio del da).
     """
     import datetime
     perf = await get_financial_performance()
@@ -726,7 +726,7 @@ async def get_profit_velocity():
     start_of_day = datetime.datetime(now.year, now.month, now.day)
     hours_elapsed = (now - start_of_day).total_seconds() / 3600.0
     
-    # Mínimo 1 hora para evitar divisiones agresivas al inicio del día
+    # Mnimo 1 hora para evitar divisiones agresivas al inicio del da
     hours_elapsed = max(1.0, hours_elapsed)
     
     velocity = perf.get("daily_pnl", 0) / hours_elapsed
@@ -744,10 +744,10 @@ async def get_profit_velocity():
 @mcp.tool()
 async def remember(text: str, category: str = "general"):
     """
-    Almacena información en memoria permanente RAG.
+    Almacena informacin en memoria permanente RAG.
     Las memorias persisten entre reinicios del contenedor.
     
-    Categorías sugeridas: analysis, trade, news, pattern, lesson, config
+    Categoras sugeridas: analysis, trade, news, pattern, lesson, config
     """
     from app.services.rag_memory import rag_memory
     doc_id = rag_memory.store(text, category=category)
@@ -756,8 +756,8 @@ async def remember(text: str, category: str = "general"):
 @mcp.tool()
 async def recall(query: str, limit: int = 5, category: str = None):
     """
-    Busca información relevante en memoria RAG usando búsqueda semántica.
-    Retorna los documentos más similares a la query.
+    Busca informacin relevante en memoria RAG usando bsqueda semntica.
+    Retorna los documentos ms similares a la query.
     """
     from app.services.rag_memory import rag_memory
     results = rag_memory.search(query, k=limit, category=category)
@@ -770,8 +770,8 @@ async def recall(query: str, limit: int = 5, category: str = None):
 @mcp.tool()
 async def forget(category: str):
     """
-    Elimina todas las memorias de una categoría específica.
-    Útil para limpiar información obsoleta.
+    Elimina todas las memorias de una categora especfica.
+    til para limpiar informacin obsoleta.
     """
     from app.services.rag_memory import rag_memory
     count = rag_memory.forget(category=category)
@@ -780,7 +780,7 @@ async def forget(category: str):
 @mcp.tool()
 async def memory_stats():
     """
-    Obtiene estadísticas de la memoria RAG.
+    Obtiene estadsticas de la memoria RAG.
     """
     from app.services.rag_memory import rag_memory
     return {
@@ -789,7 +789,7 @@ async def memory_stats():
     }
 
 # =============================================================================
-# PILLAR 6: SYSTEM ADMIN (Auto-Diagnóstico)
+# PILLAR 6: SYSTEM ADMIN (Auto-Diagnstico)
 # =============================================================================
 
 @mcp.tool()
@@ -797,7 +797,7 @@ async def memory_stats():
 async def system_check():
     """
     Revisa la salud del servidor (CPU, RAM, Disco).
-    Útil para auto-diagnóstico antes de operaciones pesadas.
+    til para auto-diagnstico antes de operaciones pesadas.
     """
     from app.skills.system_ops import system_health_check
     return await system_health_check()
@@ -806,7 +806,7 @@ async def system_check():
 @pulse_observer
 async def system_environment():
     """
-    Obtiene información del entorno de ejecución.
+    Obtiene informacin del entorno de ejecucin.
     """
     from app.skills.system_ops import get_environment_info
     return await get_environment_info()
@@ -828,7 +828,7 @@ async def system_cleanup():
 @pulse_observer
 async def ml_predict(features: dict, symbol: str = "BTCUSD"):
     """
-    Genera predicción ML usando ensemble GBM+LSTM.
+    Genera prediccin ML usando ensemble GBM+LSTM.
     Shadow Mode por defecto (no ejecuta, solo predice).
     
     Args:
@@ -875,8 +875,8 @@ async def ml_train():
 @pulse_observer
 async def ml_enable_execution(enable: bool = True):
     """
-    (PELIGROSO) Activa/desactiva ejecución real de órdenes.
-    Solo usar después de verificar predicciones en Shadow Mode.
+    (PELIGROSO) Activa/desactiva ejecucin real de rdenes.
+    Solo usar despus de verificar predicciones en Shadow Mode.
     """
     from app.ml.ml_engine import enable_execution
     return await enable_execution(enable)
@@ -885,8 +885,8 @@ async def ml_enable_execution(enable: bool = True):
 @pulse_observer
 async def get_system_health():
     """
-    ⭐ HEALTH PULSE (Institutional Status)
-    Radiografía completa de la salud del ecosistema FEAT NEXUS.
+     HEALTH PULSE (Institutional Status)
+    Radiografa completa de la salud del ecosistema FEAT NEXUS.
     """
     from app.core.mt5_conn import mt5_conn
     from app.services.supabase_sync import supabase_sync
@@ -925,7 +925,7 @@ async def get_system_health():
 @pulse_observer
 async def get_market_state_tensor(symbol: str = "XAUUSD"):
     """
-    🧠 FEAT-DEEP: Returns the Multi-Temporal Market State Tensor.
+     FEAT-DEEP: Returns the Multi-Temporal Market State Tensor.
     Layers: Macro (H4), Structural (H1/M15), Execution (M5/M1).
     Includes alignment score and kill zone status.
     """
@@ -951,7 +951,7 @@ async def get_market_state_tensor(symbol: str = "XAUUSD"):
 @pulse_observer
 async def get_h4_veto_status(symbol: str = "XAUUSD", proposed_signal: str = "BUY"):
     """
-    ⚖️ FEAT-DEEP VETO RULE: Checks if a M1/M5 signal is allowed.
+     FEAT-DEEP VETO RULE: Checks if a M1/M5 signal is allowed.
     Returns ALLOW or VETO based on H4 trend alignment.
     
     Philosophy: M1 is noise, H4 is truth. No counter-trend trading.
@@ -985,7 +985,7 @@ async def get_h4_veto_status(symbol: str = "XAUUSD", proposed_signal: str = "BUY
 @pulse_observer
 async def get_kill_zone_status():
     """
-    ⏰ FEAT-DEEP: Returns current Kill Zone status.
+     FEAT-DEEP: Returns current Kill Zone status.
     NY: 07:00-11:00 UTC-4 (Best for XAUUSD)
     """
     from app.skills.liquidity_detector import get_current_kill_zone, is_in_kill_zone
@@ -1003,7 +1003,7 @@ async def get_kill_zone_status():
 @pulse_observer
 async def get_liquidity_pools(symbol: str = "XAUUSD"):
     """
-    💧 FEAT-DEEP: Detects institutional liquidity pools.
+     FEAT-DEEP: Detects institutional liquidity pools.
     Returns unmitigated Swing Highs/Lows that act as price magnets.
     """
     from app.ml.data_collector import fetch_multi_tf_data
@@ -1036,8 +1036,8 @@ async def feat_check_tiempo(
     news_in_minutes: int = 999
 ):
     """
-    ⏰ FEAT Module T: Tiempo (Kill Switch #1)
-    Verifica Kill Zones, alineación H4, y filtro de noticias.
+     FEAT Module T: Tiempo (Kill Switch #1)
+    Verifica Kill Zones, alineacin H4, y filtro de noticias.
     """
     from app.skills.feat_tiempo import analyze_tiempo
     return analyze_tiempo(server_time_gmt, h4_candle, news_in_minutes)
@@ -1052,7 +1052,7 @@ async def feat_check_tiempo_advanced(
     h1_direction: str = "NEUTRAL"
 ):
     """
-    🕐 FEAT Module T ADVANCED: Ciclo Diario de Liquidez XAU/USD
+     FEAT Module T ADVANCED: Ciclo Diario de Liquidez XAU/USD
     
     Analiza fases de liquidez institucional por hora:
     - ASIA_OVERNIGHT, PRE_LONDON, LONDON_KILLZONE, NY_KILLZONE, etc.
@@ -1071,7 +1071,7 @@ async def feat_generate_chrono_features(
     current_spread_pips: float = None
 ):
     """
-    🧠 FEAT CHRONO-ANALYST: Genera features numéricas para ML.
+     FEAT CHRONO-ANALYST: Genera features numricas para ML.
     
     NO hay kill switches - solo probabilidades y multiplicadores de riesgo.
     Incluye: ciclo semanal, liquidez, volatilidad, proximidad H4.
@@ -1091,7 +1091,7 @@ async def feat_analyze_tiempo_institucional(
     news_upcoming: bool = False
 ):
     """
-    🏛️ FEAT TIEMPO INSTITUCIONAL: Análisis completo para GC/XAU.
+     FEAT TIEMPO INSTITUCIONAL: Anlisis completo para GC/XAU.
     
     Integra:
     - Sesiones: Globex, Asia/SGE, London, NY Overlap
@@ -1113,7 +1113,7 @@ async def feat_analyze_tiempo_institucional(
 @pulse_observer
 async def feat_get_current_killzone_block(server_time_utc: str = None):
     """
-    🕐 KILLZONE BLOCK: Obtiene el bloque actual de 15 minutos (09:00-13:00 Bolivia).
+     KILLZONE BLOCK: Obtiene el bloque actual de 15 minutos (09:00-13:00 Bolivia).
     
     16 bloques con:
     - session_heat (0.0-1.0)
@@ -1121,7 +1121,7 @@ async def feat_get_current_killzone_block(server_time_utc: str = None):
     - liquidity_state (FSM)
     - action_recommendation
     
-    PEAK BLOCK: 09:30-09:44 ⭐
+    PEAK BLOCK: 09:30-09:44 
     """
     from app.skills.killzone_intelligence import feat_get_current_killzone_block as get_block
     return await get_block(server_time_utc)
@@ -1137,7 +1137,7 @@ async def feat_generate_temporal_ml_features(
     current_volume_ratio: float = 1.0
 ):
     """
-    🧠 TEMPORAL ML FEATURES: Genera vector de features para red neuronal.
+     TEMPORAL ML FEATURES: Genera vector de features para red neuronal.
     
     Incluye:
     - session_heat, expansion_prob (priors)
@@ -1162,12 +1162,12 @@ async def feat_check_h1_confirmation(
     in_killzone: bool = False
 ):
     """
-    ✅ H1 CONFIRMATION: Verifica nivel de confirmación H1.
+     H1 CONFIRMATION: Verifica nivel de confirmacin H1.
     
     Reglas:
     - Close fuera del nivel
     - Retest 5-30 min con rechazo
-    - Volume ≥ 1.3x
+    - Volume  1.3x
     - Killzone boost
     
     Retorna: level, score, proceed
@@ -1183,10 +1183,10 @@ async def feat_check_h1_confirmation(
 @pulse_observer
 async def feat_update_bayesian_prior(block: str, was_successful: bool):
     """
-    📊 UPDATE PRIOR: Actualiza prior bayesiano basado en resultado.
+     UPDATE PRIOR: Actualiza prior bayesiano basado en resultado.
     
-    Llamar después de cada trade para aprendizaje adaptativo.
-    Si accuracy < 40% por 5 días → reduce prior automáticamente.
+    Llamar despus de cada trade para aprendizaje adaptativo.
+    Si accuracy < 40% por 5 das  reduce prior automticamente.
     """
     from app.ml.temporal_features import feat_update_bayesian_prior as update_prior
     return await update_prior(block, was_successful)
@@ -1196,7 +1196,7 @@ async def feat_update_bayesian_prior(block: str, was_successful: bool):
 @pulse_observer
 async def feat_get_bayesian_priors():
     """
-    📈 GET PRIORS: Obtiene todos los priors bayesianos actuales.
+     GET PRIORS: Obtiene todos los priors bayesianos actuales.
     
     Muestra expansion_prob y confidence por cada bloque de 15-min.
     """
@@ -1216,7 +1216,7 @@ async def feat_analyze_forma(
     m15_candles: list = None
 ):
     """
-    🏗️ FEAT Module F: Forma (Market Structure)
+     FEAT Module F: Forma (Market Structure)
     Detecta tendencia, BOS/CHoCH, y fases Wyckoff.
     """
     from app.skills.feat_forma import analyze_forma
@@ -1232,7 +1232,7 @@ async def feat_analyze_forma_advanced(
     chrono_features: dict = None
 ):
     """
-    🏗️ FEAT Module F ADVANCED: Estructura Chrono-Aware
+     FEAT Module F ADVANCED: Estructura Chrono-Aware
     
     Integra contexto temporal para validar BOS/CHoCH:
     - Detecta trampas de Lunes (INDUCTION)
@@ -1252,7 +1252,7 @@ async def feat_generate_structure_features(
     chrono_features: dict = None
 ):
     """
-    🧠 FEAT STRUCTURE ML: Genera features numéricas de estructura.
+     FEAT STRUCTURE ML: Genera features numricas de estructura.
     
     Output listo para red neuronal: alignment_score, trend flags, event flags.
     """
@@ -1269,7 +1269,7 @@ async def feat_map_espacio(
     market_structure: str = "NEUTRAL"
 ):
     """
-    📍 FEAT Module E: Espacio (Liquidity Zones)
+     FEAT Module E: Espacio (Liquidity Zones)
     Detecta FVG, Order Blocks, y Premium/Discount zones.
     """
     from app.skills.feat_espacio import analyze_espacio
@@ -1285,7 +1285,7 @@ async def feat_map_espacio_advanced(
     chrono_features: dict = None
 ):
     """
-    📍 FEAT Module E ADVANCED: Zonas Chrono-Aware
+     FEAT Module E ADVANCED: Zonas Chrono-Aware
     
     Integra contexto temporal para validar calidad de zonas:
     - Zonas de Kill Zone tienen +20% score
@@ -1294,7 +1294,15 @@ async def feat_map_espacio_advanced(
     from app.skills.feat_espacio import analyze_espacio
     return analyze_espacio(candles, current_price, market_structure, "H1", chrono_features)
 
-
+@mcp.tool()
+@pulse_observer
+async def feat_generate_liquidity_features(
+    candles: list,
+    current_price: float,
+    chrono_features: dict = None
+):
+    """
+    FEAT LIQUIDITY ML: Genera features de liquidez.
     """
     from app.skills.feat_espacio import generate_liquidity_features
     return generate_liquidity_features(candles, current_price, chrono_features)
@@ -1325,10 +1333,79 @@ async def feat_analyze_physics(
     df_m5 = pd.DataFrame(m5_candles) if m5_candles else pd.DataFrame()
     
     return {
-        "pvp": market_physics.calculate_pvp_vectorial(df_m15),
-        "mci": market_physics.calculate_mci(df_m5),
-        "liquidity": market_physics.detect_liquidity_primitives(df_m15)
+        "pvp": market_physics.calculate_pvp_feat(df_m15),
+        "cvd": market_physics.calculate_cvd_metrics(df_m5),
+        "mci": market_physics.calculate_mci(df_m5)
     }
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_get_energy_map(
+    m15_candles: list,
+    bins: int = 50
+):
+    """
+    FEAT ENERGY MAP: Genera el tensor de energía institucional (Density * Kinetic * Flow).
+    """
+    import pandas as pd
+    from nexus_core.features import feat_features
+    df = pd.DataFrame(m15_candles)
+    return feat_features.generate_energy_map(df, bins)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_get_risk_parameters(
+    current_features: dict,
+    model_name: str = "gbm_XAUUSD_v1"
+):
+    """
+    FEAT RISK ENGINE: Retorna TP/SL dinámicos y probabilidad para cBot (C#).
+    """
+    from nexus_brain.model import nexus_brain
+    import os
+    
+    model_path = os.path.join("models", f"{model_name}.joblib")
+    if not nexus_brain.model and os.path.exists(model_path):
+        nexus_brain.load_model(model_path)
+        
+    return nexus_brain.predict_probability(current_features)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_get_structure_analysis(
+    candles: list,
+    timeframe: str = "M15"
+):
+    """
+    FEAT STRUCTURE ENGINE: Analiza la estructura institucional (FourJarvis).
+    Calcula scores de Forma (F), Espacio (E), Aceleración (A) y Tiempo (T).
+    """
+    import pandas as pd
+    from nexus_core.structure_engine import structure_engine
+    df = pd.DataFrame(candles)
+    # Ensure tick_time exists for Phase T
+    if 'tick_time' not in df.columns and 'timestamp' in df.columns:
+        df['tick_time'] = df['timestamp']
+    return structure_engine.compute_feat_index(df).iloc[-1].to_dict()
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_analyze_acceleration(
+    candles: list,
+    atr_window: int = 14
+):
+    """
+    FEAT ACCELERATION: Analiza el momento e intención final (Gatillo).
+    Retorna score de aceleración, tipo (breakout/rejection/climax) y trigger.
+    """
+    import pandas as pd
+    from nexus_core.acceleration import acceleration_engine
+    df = pd.DataFrame(candles)
+    return acceleration_engine.compute_acceleration_features(df).iloc[-1].to_dict()
 
 
 @mcp.tool()
@@ -1360,7 +1437,7 @@ async def feat_validate_aceleracion(
     proposed_direction: str = None
 ):
     """
-    FEAT Module A: Aceleración (Momentum Validation)
+    FEAT Module A: Aceleracion (Momentum Validation)
     Valida Body/Wick, volumen, y detecta fakeouts.
     """
     from app.skills.feat_aceleracion import analyze_aceleracion
@@ -1413,8 +1490,8 @@ async def feat_full_chain(
 ):
     """
     FEAT COMPLETE CHAIN: Ejecuta T -> F -> E -> A en secuencia.
-    Si cualquier módulo falla, la cadena se detiene (Kill Switch).
-    Retorna señal de trading si todo pasa.
+    Si cualquier modulo falla, la cadena se detiene (Kill Switch).
+    Retorna senal de trading si todo pasa.
     """
     from app.skills.feat_chain import execute_feat_chain_institucional
     return await execute_feat_chain_institucional(
@@ -1463,13 +1540,33 @@ async def feat_full_chain_institucional(
         has_sweep, news_upcoming
     )
 
+@mcp.tool()
+async def feat_deep_audit(auto_repair: bool = False) -> Dict[str, Any]:
+    """
+    MASTER AUDIT: Deep inspection of FEAT NEXUS ecosystem.
+    Checks: Connectivity, Intelligence (ML), Sensors (MSS-5), and Data Flow.
+    """
+    from app.skills.skill_deep_auditor import run_deep_audit
+    return run_deep_audit(auto_repair)
+
+@mcp.tool()
+async def feat_analyze_acceptance(
+    open_p: float, high: float, low: float, close_p: float, zone_price: Optional[float] = None
+) -> Dict[str, Any]:
+    """
+    KIV PROTOCOL: Analyze Acceptance Ratio (Body vs Wick).
+    If zone_price is provided, validates Conquest vs Probe.
+    """
+    from app.skills.feat_kiv import kiv_engine
+    candle = {"open": open_p, "high": high, "low": low, "close": close_p}
+    zones = {"resistance": zone_price} if zone_price else {}
+    return kiv_engine.validate_intent(candle, zones)
+
 if __name__ == "__main__":
     import os
     import sys
     
     # Detectar si estamos en Docker/Linux (sin TTY) o en Windows (con TTY)
-    # En Docker usamos HTTP para que el servidor persista
-    # En Windows local usamos STDIO para integración directa con IDE
     is_docker = not sys.stdin.isatty() or os.environ.get("DOCKER_MODE", "").lower() == "true"
     
     if is_docker:

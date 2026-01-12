@@ -4,7 +4,7 @@ from pathlib import Path
 
 class Settings(BaseSettings):
     """
-    Configuración global del sistema cargada desde variables de entorno o archivo .env.
+    Configuracin global del sistema cargada desde variables de entorno o archivo .env.
     """
     # MetaTrader 5 Credentials
     MT5_LOGIN: int
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     SUPABASE_URL: Optional[str] = None
     SUPABASE_KEY: Optional[str] = None
     
-    # SSH Offloading (Remote Cómputo)
+    # SSH Offloading (Remote Cmputo)
     SSH_HOST: Optional[str] = None
     SSH_USER: Optional[str] = None
     SSH_KEY_PATH: Optional[str] = None
@@ -58,5 +58,5 @@ class Settings(BaseSettings):
         case_sensitive=False
     )
 
-# Instancia global de configuración
+# Instancia global de configuracin
 settings = Settings()

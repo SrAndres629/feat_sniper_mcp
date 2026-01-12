@@ -19,7 +19,7 @@ IMPORTANCE_MAP = {
 
 async def get_economic_calendar(req: CalendarRequest) -> Dict[str, Any]:
     """
-    Obtiene eventos del calendario económico de MT5.
+    Obtiene eventos del calendario econmico de MT5.
     """
     from_date = datetime.now()
     to_date = from_date + timedelta(days=req.days_forward)
@@ -30,7 +30,7 @@ async def get_economic_calendar(req: CalendarRequest) -> Dict[str, Any]:
     if events is None or len(events) == 0:
         return {
             "status": "success",
-            "message": "No se encontraron eventos económicos en el periodo.",
+            "message": "No se encontraron eventos econmicos en el periodo.",
             "events": []
         }
     
@@ -45,7 +45,7 @@ async def get_economic_calendar(req: CalendarRequest) -> Dict[str, Any]:
     # Limpiar y formatear para el LLM
     results = []
     for _, row in df.iterrows():
-        # Obtener nombres descriptivos (opcionalmente podríamos llamar a calendar_countries_get)
+        # Obtener nombres descriptivos (opcionalmente podramos llamar a calendar_countries_get)
         results.append({
             "id": int(row['id']),
             "time": datetime.fromtimestamp(row['time']).strftime('%Y-%m-%d %H:%M:%S'),
@@ -62,5 +62,5 @@ async def get_economic_calendar(req: CalendarRequest) -> Dict[str, Any]:
         "currency_filter": req.currency,
         "importance_filter": req.importance,
         "total_events": len(results),
-        "events": results[:30] # Limitamos a los 30 más relevantes
+        "events": results[:30] # Limitamos a los 30 ms relevantes
     }

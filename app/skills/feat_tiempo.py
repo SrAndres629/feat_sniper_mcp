@@ -12,10 +12,10 @@ FUENTES:
 TIMEZONE BASE: Bolivia (UTC-4) / NY (EST/EDT)
 
 FIXES INSTITUCIONALES (Puntos de Anclaje):
-- LBMA AM Fix: ~10:30 UTC → 06:30 Bolivia
-- LBMA PM Fix: ~15:00 UTC → 11:00 Bolivia
-- SGE Morning: ~02:15 UTC → 22:15 Bolivia (día anterior)
-- SGE Afternoon: ~06:15 UTC → 02:15 Bolivia
+- LBMA AM Fix: ~10:30 UTC  06:30 Bolivia
+- LBMA PM Fix: ~15:00 UTC  11:00 Bolivia
+- SGE Morning: ~02:15 UTC  22:15 Bolivia (da anterior)
+- SGE Afternoon: ~06:15 UTC  02:15 Bolivia
 """
 
 import logging
@@ -50,10 +50,10 @@ class SessionPhase(Enum):
     ASIA_SGE = "ASIA_SGE"                  # 22:00-02:30 Bolivia
     PRE_LONDON = "PRE_LONDON"              # 02:30-04:00 Bolivia
     LONDON_OPEN = "LONDON_OPEN"            # 04:00-06:30 Bolivia
-    LBMA_AM_FIX = "LBMA_AM_FIX"           # 06:30 Bolivia (±20min)
+    LBMA_AM_FIX = "LBMA_AM_FIX"           # 06:30 Bolivia (20min)
     LONDON_MORNING = "LONDON_MORNING"      # 06:50-09:00 Bolivia
-    KILLZONE_OVERLAP = "KILLZONE_OVERLAP"  # 09:00-13:00 Bolivia ⭐
-    LBMA_PM_FIX = "LBMA_PM_FIX"           # 11:00 Bolivia (±20min)
+    KILLZONE_OVERLAP = "KILLZONE_OVERLAP"  # 09:00-13:00 Bolivia 
+    LBMA_PM_FIX = "LBMA_PM_FIX"           # 11:00 Bolivia (20min)
     NY_AFTERNOON = "NY_AFTERNOON"          # 13:00-18:00 Bolivia
     DAILY_PAUSE = "DAILY_PAUSE"            # 18:00-19:00 Bolivia
 
@@ -104,7 +104,7 @@ SESSION_MATRIX = {
         "expansion_prob": 0.30,
         "risk_mult": 0.40,
         "action": "PULLBACK_ENTRY",
-        "description": "Asia/SGE. Micro-sweeps. Entrar en pullbacks a soporte asiático."
+        "description": "Asia/SGE. Micro-sweeps. Entrar en pullbacks a soporte asitico."
     },
     (2, 4): {
         "phase": SessionPhase.PRE_LONDON,
@@ -112,7 +112,7 @@ SESSION_MATRIX = {
         "expansion_prob": 0.25,
         "risk_mult": 0.35,
         "action": "PREPARE",
-        "description": "Pre-London. Marcar niveles para expansión europea."
+        "description": "Pre-London. Marcar niveles para expansin europea."
     },
     (4, 6): {
         "phase": SessionPhase.LONDON_OPEN,
@@ -120,7 +120,7 @@ SESSION_MATRIX = {
         "expansion_prob": 0.55,
         "risk_mult": 0.65,
         "action": "BREAK_RETEST",
-        "description": "Apertura Londres. Breakouts del rango asiático."
+        "description": "Apertura Londres. Breakouts del rango asitico."
     },
     (6, 9): {
         "phase": SessionPhase.LONDON_MORNING,
@@ -128,7 +128,7 @@ SESSION_MATRIX = {
         "expansion_prob": 0.60,
         "risk_mult": 0.75,
         "action": "CONTINUATION",
-        "description": "Londres mañana. Post-LBMA AM. Continuaciones."
+        "description": "Londres maana. Post-LBMA AM. Continuaciones."
     },
     (9, 13): {
         "phase": SessionPhase.KILLZONE_OVERLAP,
@@ -136,7 +136,7 @@ SESSION_MATRIX = {
         "expansion_prob": 0.85,
         "risk_mult": 1.00,
         "action": "EXECUTE_FULL",
-        "description": "⭐ KILLZONE London-NY overlap. Máxima liquidez. Entradas principales."
+        "description": " KILLZONE London-NY overlap. Mxima liquidez. Entradas principales."
     },
     (13, 18): {
         "phase": SessionPhase.NY_AFTERNOON,
@@ -144,7 +144,7 @@ SESSION_MATRIX = {
         "expansion_prob": 0.35,
         "risk_mult": 0.50,
         "action": "MANAGE_ONLY",
-        "description": "NY tarde. Decrece liquidez. Solo gestión y re-tests."
+        "description": "NY tarde. Decrece liquidez. Solo gestin y re-tests."
     },
     (18, 19): {
         "phase": SessionPhase.DAILY_PAUSE,
@@ -211,7 +211,7 @@ def get_ny_time(utc_time: datetime = None) -> datetime:
 # =============================================================================
 
 def get_session_info(bolivia_hour: int) -> Dict[str, Any]:
-    """Obtiene info de sesión basada en hora Bolivia."""
+    """Obtiene info de sesin basada en hora Bolivia."""
     for (start, end), info in SESSION_MATRIX.items():
         # Handle wrap around midnight
         if start > end:
@@ -255,7 +255,7 @@ def calculate_alignment_score(
     h1_direction: str = None
 ) -> Dict[str, Any]:
     """
-    Calcula score de alineación multi-timeframe.
+    Calcula score de alineacin multi-timeframe.
     
     Reglas:
     - D1 + H4 aligned = 100% size
@@ -323,24 +323,24 @@ def match_entry_template(
     has_sweep: bool = False
 ) -> Dict[str, Any]:
     """
-    Determina qué plantilla de entrada aplica.
+    Determina qu plantilla de entrada aplica.
     """
     templates = []
     
-    # Template A: Confirmación Fuerte
+    # Template A: Confirmacin Fuerte
     if alignment["alignment_type"] == "FULL_ALIGNMENT" and \
        session_phase == SessionPhase.KILLZONE_OVERLAP:
         templates.append({
             "template": EntryTemplate.TEMPLATE_A.value,
-            "name": "Confirmación Fuerte",
+            "name": "Confirmacin Fuerte",
             "probability": 0.85,
             "rules": [
-                "D1/H4 alineados ✅",
-                "Overlap 09:00-13:00 ✅",
+                "D1/H4 alineados ",
+                "Overlap 09:00-13:00 ",
                 "Esperar break+retest H1",
-                "Tick-volume ≥ 1.5x media",
+                "Tick-volume  1.5x media",
                 "Stop bajo low del retest",
-                "TP: 1.5x riesgo mínimo"
+                "TP: 1.5x riesgo mnimo"
             ]
         })
     
@@ -348,14 +348,14 @@ def match_entry_template(
     if near_fix and alignment["size_multiplier"] >= 0.50:
         templates.append({
             "template": EntryTemplate.TEMPLATE_B.value,
-            "name": "Continuación Post-Fix",
+            "name": "Continuacin Post-Fix",
             "probability": 0.70,
             "rules": [
-                f"Post-fix detectado ✅",
-                "Confirmar con 2 velas H1 en dirección",
+                f"Post-fix detectado ",
+                "Confirmar con 2 velas H1 en direccin",
                 "Tick-volume en aumento",
                 "Entrada en retest del nivel del fix",
-                "Tamaño: 50% si D1 neutral"
+                "Tamao: 50% si D1 neutral"
             ]
         })
     
@@ -366,11 +366,11 @@ def match_entry_template(
             "name": "Sweep & Reversal",
             "probability": 0.75,
             "rules": [
-                "Mecha barró stops ✅",
+                "Mecha barr stops ",
                 "Fuerte vela de rechazo",
-                "Entrar en 1ª vela de confirmación",
-                "Stop bajo mínimo del sweep",
-                "Funciona incluso sin alineación HTF clara"
+                "Entrar en 1 vela de confirmacin",
+                "Stop bajo mnimo del sweep",
+                "Funciona incluso sin alineacin HTF clara"
             ]
         })
     
@@ -398,13 +398,13 @@ def analyze_tiempo_institucional(
     news_upcoming: bool = False
 ) -> Dict[str, Any]:
     """
-    🕐 FEAT TIEMPO INSTITUCIONAL: Análisis completo para GC/XAU.
+     FEAT TIEMPO INSTITUCIONAL: Anlisis completo para GC/XAU.
     
     Integra:
     - Sesiones globales (Globex, Asia, London, NY)
     - LBMA/SGE fixes
     - Ciclo semanal
-    - Alineación multi-timeframe
+    - Alineacin multi-timeframe
     - Plantillas de entrada
     """
     # Parse time
@@ -531,10 +531,10 @@ def analyze_tiempo_institucional(
         },
         
         "checklist": {
-            "htf_aligned": "✅" if alignment["alignment_type"] == "FULL_ALIGNMENT" else "⚠️",
-            "in_killzone": "✅" if session_phase == SessionPhase.KILLZONE_OVERLAP else "⏳",
-            "near_fix_warning": "⚠️ CAUTION" if fix_check.get("near_fix") else "✅ CLEAR",
-            "weekly_trap_risk": "⚠️ HIGH" if weekly_info["trap_probability"] > 0.5 else "✅ LOW",
+            "htf_aligned": "" if alignment["alignment_type"] == "FULL_ALIGNMENT" else "",
+            "in_killzone": "" if session_phase == SessionPhase.KILLZONE_OVERLAP else "",
+            "near_fix_warning": " CAUTION" if fix_check.get("near_fix") else " CLEAR",
+            "weekly_trap_risk": " HIGH" if weekly_info["trap_probability"] > 0.5 else " LOW",
             "recommended_action": templates["best_template"]["template"]
         },
         
@@ -548,13 +548,13 @@ def analyze_tiempo_institucional(
     
     # Add cautions
     if weekly_info["trap_probability"] > 0.5:
-        result["guidance"]["cautions"].append(f"📅 {weekly_info['phase'].value}: Alto riesgo de trampas")
+        result["guidance"]["cautions"].append(f" {weekly_info['phase'].value}: Alto riesgo de trampas")
     if fix_check.get("near_fix"):
-        result["guidance"]["cautions"].append(f"⏰ Cerca de {fix_check.get('fix_name')}: posible slippage")
+        result["guidance"]["cautions"].append(f" Cerca de {fix_check.get('fix_name')}: posible slippage")
     if alignment["alignment_type"] == "CONFLICT":
-        result["guidance"]["cautions"].append("⚠️ D1/H4 en conflicto: reducir tamaño o evitar")
+        result["guidance"]["cautions"].append(" D1/H4 en conflicto: reducir tamao o evitar")
     if session_info["action"] == "NO_TRADE":
-        result["guidance"]["cautions"].append("🚫 Pausa diaria: EVITAR operaciones")
+        result["guidance"]["cautions"].append(" Pausa diaria: EVITAR operaciones")
     
     logger.info(f"[FEAT-T] Bolivia={bolivia_time.strftime('%H:%M')}, Phase={session_phase.value}, RiskMult={combined_risk_mult}")
     
@@ -611,5 +611,5 @@ async def feat_analyze_tiempo_institucional(
     has_sweep=False,
     news_upcoming=False
 ):
-    """MCP Tool: Análisis institucional completo."""
+    """MCP Tool: Anlisis institucional completo."""
     return analyze_tiempo_institucional(server_time_utc, d1_direction, h4_direction, h1_direction, has_sweep, news_upcoming)

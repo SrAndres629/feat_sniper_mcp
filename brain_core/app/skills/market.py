@@ -33,16 +33,16 @@ TIMEFRAME_MAP = {
     "MN1": mt5.TIMEFRAME_MN1,
 }
 
-# Sistema de Caché en Memoria
-# Sistema de Caché en Memoria
+# Sistema de Cach en Memoria
+# Sistema de Cach en Memoria
 _candles_cache: Dict[str, Dict[str, Any]] = {}
 _account_cache: Dict[str, Any] = {"data": None, "timestamp": 0}
 MAX_CACHE_SIZE = 100  # Prevent memory leaks by limiting cache keys
 
 def _clean_cache():
-    """Mantiene el tamaño del caché bajo control."""
+    """Mantiene el tamao del cach bajo control."""
     if len(_candles_cache) > MAX_CACHE_SIZE:
-        # Eliminar el 20% más antiguo
+        # Eliminar el 20% ms antiguo
         keys_to_remove = sorted(_candles_cache.keys(), key=lambda k: _candles_cache[k]['timestamp'])[:int(MAX_CACHE_SIZE * 0.2)]
         for k in keys_to_remove:
             del _candles_cache[k]
@@ -50,26 +50,26 @@ def _clean_cache():
 
 async def get_candles(symbol: str, timeframe: str, n_candles: int = 100, output_format: str = "json") -> Dict[str, Any]:
     """
-    Obtiene las últimas N velas con sistema de caché de 3 segundos.
+    Obtiene las ltimas N velas con sistema de cach de 3 segundos.
     Soporta formato CSV para ahorrar tokens en la ventana de contexto de la IA.
     """
     now = time.time()
     tf_upper = timeframe.upper()
     cache_key = f"{symbol}_{tf_upper}_{n_candles}_{output_format}"
     
-    # Intentar obtener de caché
+    # Intentar obtener de cach
     cached = _candles_cache.get(cache_key)
     if cached and (now - cached["timestamp"]) < settings.MARKET_DATA_CACHE_TTL:
-        logger.debug(f"Caché HIT para {cache_key}")
+        logger.debug(f"Cach HIT para {cache_key}")
         return cached["data"]
     
     # Validar timeframe
     if tf_upper not in TIMEFRAME_MAP:
-        raise ValueError(f"Timeframe {timeframe} no es válido.")
+        raise ValueError(f"Timeframe {timeframe} no es vlido.")
     
     mt5_tf = TIMEFRAME_MAP[tf_upper]
     
-    # Asegurar que el símbolo es visible
+    # Asegurar que el smbolo es visible
     await mt5_conn.execute(mt5.symbol_select, symbol, True)
     
     # Obtener datos de MT5 de forma no bloqueante
@@ -107,22 +107,22 @@ async def get_candles(symbol: str, timeframe: str, n_candles: int = 100, output_
             "timestamp": now
         }
     
-    # Guardar en caché con limpieza previa
+    # Guardar en cach con limpieza previa
     if len(_candles_cache) > MAX_CACHE_SIZE:
         _clean_cache()
         
     _candles_cache[cache_key] = {"data": data, "timestamp": now}
-    logger.debug(f"Caché MISS para {cache_key}. Datos actualizados.")
+    logger.debug(f"Cach MISS para {cache_key}. Datos actualizados.")
     
     return data
 
 async def get_account_metrics() -> Dict[str, Any]:
     """
-    Obtiene métricas de la cuenta con caché de 0.5 segundos.
+    Obtiene mtricas de la cuenta con cach de 0.5 segundos.
     """
     now = time.time()
     
-    # Intentar obtener de caché
+    # Intentar obtener de cach
     if _account_cache["data"] and (now - _account_cache["timestamp"]) < settings.ACCOUNT_CACHE_TTL:
         return _account_cache["data"]
     
@@ -131,7 +131,7 @@ async def get_account_metrics() -> Dict[str, Any]:
     if account_info is None:
         return {
             "status": "error",
-            "message": "Fallo al leer información de la cuenta.",
+            "message": "Fallo al leer informacin de la cuenta.",
             "mt5_error": await mt5_conn.execute(mt5.last_error)
         }
     
@@ -150,7 +150,7 @@ async def get_account_metrics() -> Dict[str, Any]:
         "timestamp": now
     }
     
-    # Guardar en caché
+    # Guardar en cach
     _account_cache["data"] = data
     _account_cache["timestamp"] = now
     
@@ -158,11 +158,11 @@ async def get_account_metrics() -> Dict[str, Any]:
 
 async def get_volatility_metrics(symbol: str, timeframe: str = "H1", period: int = 14) -> Dict[str, Any]:
     """
-    Calcula métricas de volatilidad (ATR y Spread) para un símbolo.
+    Calcula mtricas de volatilidad (ATR y Spread) para un smbolo.
     """
     tf_upper = timeframe.upper()
     if tf_upper not in TIMEFRAME_MAP:
-        raise ValueError(f"Timeframe {timeframe} no es válido.")
+        raise ValueError(f"Timeframe {timeframe} no es vlido.")
     
     mt5_tf = TIMEFRAME_MAP[tf_upper]
     
@@ -174,16 +174,16 @@ async def get_volatility_metrics(symbol: str, timeframe: str = "H1", period: int
     
     df = pd.DataFrame(rates)
     
-    # Cálculo correcto de ATR (True Range)
+    # Clculo correcto de ATR (True Range)
     df['prev_close'] = df['close'].shift(1)
     df['tr0'] = df['high'] - df['low']
     df['tr1'] = (df['high'] - df['prev_close']).abs()
     df['tr2'] = (df['low'] - df['prev_close']).abs()
     
-    # El True Range es el máximo de las 3 medidas
+    # El True Range es el mximo de las 3 medidas
     df['tr'] = df[['tr0', 'tr1', 'tr2']].max(axis=1)
     
-    # ATR es la media móvil del TR
+    # ATR es la media mvil del TR
     atr = df['tr'].tail(period).mean()
     
     # Obtener Spread actual
@@ -191,14 +191,14 @@ async def get_volatility_metrics(symbol: str, timeframe: str = "H1", period: int
     tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
     
     if not symbol_info or not tick:
-        return {"status": "error", "message": "No se pudo obtener información del símbolo para spread."}
+        return {"status": "error", "message": "No se pudo obtener informacin del smbolo para spread."}
     
     spread_points = symbol_info.spread
     spread_value = tick.ask - tick.bid
     
     # Status de volatilidad robusto (Percentil)
-    # Comparamos el ATR actual con la media del ATR de los últimos periodos si es posible, 
-    # o usamos la desviación estándar del TR.
+    # Comparamos el ATR actual con la media del ATR de los ltimos periodos si es posible, 
+    # o usamos la desviacin estndar del TR.
     tr_mean = df['tr'].mean()
     tr_std = df['tr'].std()
     
@@ -224,27 +224,27 @@ async def get_volatility_metrics(symbol: str, timeframe: str = "H1", period: int
 
 async def get_market_snapshot(symbol: str, timeframe: str = "M5") -> Dict[str, Any]:
     """
-    Obtiene una radiografía completa del mercado en un solo llamado.
-    Combina: Última vela, Quote actual, Métricas de Cuenta y Volatilidad.
-    Esencial para que el agente tome decisiones rápidas (Ojo de Halcón).
+    Obtiene una radiografa completa del mercado en un solo llamado.
+    Combina: ltima vela, Quote actual, Mtricas de Cuenta y Volatilidad.
+    Esencial para que el agente tome decisiones rpidas (Ojo de Halcn).
     """
     # 1. Obtener Quote (Bid/Ask)
     tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
     if not tick:
         return {"status": "error", "message": f"No se pudo obtener tick para {symbol}"}
     
-    # 2. Obtener última vela (Situación actual)
+    # 2. Obtener ltima vela (Situacin actual)
     candles_data = await get_candles(symbol, timeframe, n_candles=1)
     if candles_data.get("status") != "success":
         last_candle = None
     else:
-        # Extraer la última vela de la lista
+        # Extraer la ltima vela de la lista
         last_candle = candles_data["candles"][-1] if candles_data["candles"] else None
 
     # 3. Obtener Volatilidad
     vol_data = await get_volatility_metrics(symbol, timeframe)
     
-    # 4. Obtener Estado de Cuenta (Para gestión de riesgo)
+    # 4. Obtener Estado de Cuenta (Para gestin de riesgo)
     account_data = await get_account_metrics()
 
     snapshot = {

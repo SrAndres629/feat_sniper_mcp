@@ -1,21 +1,21 @@
 """
 FEAT CHAIN INSTITUCIONAL: Orquestador Completo - v7.0 (Physics Aware)
 =====================================================================
-Integra todos los módulos MIP (Physics, Regime, Chrono) en una sola cadena de decisión.
+Integra todos los mdulos MIP (Physics, Regime, Chrono) en una sola cadena de decisin.
 
 Flujo:
-1. TIEMPO → Session phase, fixes, alignment
-2. PHYSICS → PVP, MCI, Liquidity Primitives
-3. REGIME → FSM State (Manipulation vs Expansion)
-4. FORMA → BOS/CHoCH, sweeps, structure
-5. ESPACIO → FVG, OB, Premium/Discount
-6. ACELERACIÓN → Momentum, fakeout, volume
-7. FUSION → MultiTimeLearningManager weighted decision
-8. INTENT → TTI Filter (Intent vs Noise)
-9. LIQUIDITY → DoM preflight check
-10. EXECUTION → Twin-Engine (Scalp + Swing)
+1. TIEMPO  Session phase, fixes, alignment
+2. PHYSICS  PVP, MCI, Liquidity Primitives
+3. REGIME  FSM State (Manipulation vs Expansion)
+4. FORMA  BOS/CHoCH, sweeps, structure
+5. ESPACIO  FVG, OB, Premium/Discount
+6. ACELERACIN  Momentum, fakeout, volume
+7. FUSION  MultiTimeLearningManager weighted decision
+8. INTENT  TTI Filter (Intent vs Noise)
+9. LIQUIDITY  DoM preflight check
+10. EXECUTION  Twin-Engine (Scalp + Swing)
 
-Cada paso tiene probabilidad de éxito. 
+Cada paso tiene probabilidad de xito. 
 El sistema NO tiene "kill switches" - solo multiplica probabilidades.
 """
 
@@ -43,7 +43,7 @@ async def execute_feat_chain_institucional(
     news_upcoming: bool = False
 ) -> Dict[str, Any]:
     """
-    🏛️ FEAT CHAIN INSTITUCIONAL: T-P-R-F-E-A-Fusion-I-L-Ex.
+     FEAT CHAIN INSTITUCIONAL: T-P-R-F-E-A-Fusion-I-L-Ex.
     
     Ahora con PHYSICS (PVP/MCI) y REGIME (FSM).
     """
@@ -70,6 +70,11 @@ async def execute_feat_chain_institucional(
     cumulative_probability = 1.0
     chain_log = []
     all_ml_features = {}
+    ml_features_to_log = [
+        "volatility_regime_norm",
+        "acceptance_ratio",
+        "wick_stress"
+    ]
     
     # helper to dataframe
     def candles_to_df(candles):
@@ -114,38 +119,47 @@ async def execute_feat_chain_institucional(
         cumulative_probability *= 0.5
 
     # =========================================================================
-    # STAGE 2: MARKET PHYSICS (PVP + MCI)
+    # STAGE 2: MARKET PHYSICS (PVP FEAT + CVD + Breakout)
     # =========================================================================
     try:
-        # Use M15 for profile and M5 for MCI
-        physics_pvp = market_physics.calculate_pvp_vectorial(df_m15)
+        # Use M15 for profile and M5 for CVD/MCI
+        physics_pvp = market_physics.calculate_pvp_feat(df_m15)
+        physics_cvd = market_physics.calculate_cvd_metrics(df_m5)
         physics_mci = market_physics.calculate_mci(df_m5)
-        physics_liq = market_physics.detect_liquidity_primitives(df_m15)
+        
+        # Estimate breakout probability
+        atr_data = get_technical_indicator(df_m15, IndicatorRequest(symbol=symbol, indicator="ATR"))
+        breakout_probs = market_physics.estimate_breakout_probability(physics_pvp, physics_cvd, atr_data.get("value", 0.1))
         
         physics_metrics = {
              "pvp": physics_pvp, 
+             "cvd": physics_cvd,
              "mci": physics_mci, 
-             "liquidity": physics_liq,
-             "poc_displacement": 0.0015 # Mock for now (needs history)
+             "breakout": breakout_probs
         }
         
-        mci_type = physics_mci.get("mci_type", "NEUTRAL")
-        mci_score = physics_mci.get("mci_score", 0.0)
-        
+        # Adjust probability based on physics breakout prediction
         physics_prob = 1.0
-        if "SWEEP" in mci_type:
-            physics_prob = 0.8 # Caution on sweep
-        elif mci_type == "CONTINUATION":
-            physics_prob = 1.1 # Boost
+        if breakout_probs["p_up"] > 0.7 or breakout_probs["p_down"] > 0.7:
+             physics_prob = 1.2 # High confidence in institutional intent
+        elif abs(physics_pvp["z_score"]) < 0.5:
+             physics_prob = 0.8 # Range bound / low interest
             
         cumulative_probability *= physics_prob
         
         result["chain_stages"]["2_PHYSICS"] = {
-             "mci_type": mci_type,
-             "poc_price": physics_pvp.get("poc") if physics_pvp else None,
-             "n_imbalances": physics_liq.get("n_imbalances", 0)
+             "poc": physics_pvp.get("poc"),
+             "z_score": physics_pvp.get("z_score"),
+             "cvd_accel": physics_cvd.get("cvd_acceleration"),
+             "p_breakout": max(breakout_probs.values())
         }
-        chain_log.append(f"P: {mci_type}")
+        
+        # Inject ML features
+        all_ml_features["poc_z_score"] = physics_pvp["z_score"]
+        all_ml_features["cvd_acceleration"] = physics_cvd["cvd_acceleration"]
+        all_ml_features["cvd_imbalance"] = physics_cvd["imbalance_ratio"]
+        
+        chain_log.append(f"P: POC={physics_pvp['poc']:.2f} Z={physics_pvp['z_score']:.1f}")
         
     except Exception as e:
         logger.error(f"[CHAIN] Stage 2 (PHYSICS) failed: {e}")
@@ -235,7 +249,7 @@ async def execute_feat_chain_institucional(
          poi_status = "NEUTRAL"
 
     # =========================================================================
-    # STAGE 6: ACELERACIÓN (Momentum)
+    # STAGE 6: ACELERACIN (Momentum)
     # =========================================================================
     try:
         proposed_direction = d1_direction if d1_direction != "NEUTRAL" else h4_direction
@@ -252,6 +266,35 @@ async def execute_feat_chain_institucional(
         cumulative_probability *= 0.5
 
     # =========================================================================
+    # STAGE 6.5: MSS-5 SENSORY SYNC (Neural Tensors)
+    # =========================================================================
+    try:
+        from app.skills.feat_sensory import calculate_mss5_tensors
+        mss5_data = calculate_mss5_tensors(df_m15)
+        
+        mss5_tensors = mss5_data["tensors"]
+        resonance_score = mss5_data["resonance_score"]
+        validation_status = mss5_data["validation"]
+        
+        # Modulate previous probability by resonance
+        cumulative_probability *= resonance_score
+        
+        # Map to ML Features
+        all_ml_features["momentum_kinetic_micro"] = mss5_tensors["kinetic_tension"]
+        all_ml_features["entropy_coefficient"] = mss5_tensors["entropy_coeff"]
+        all_ml_features["cycle_harmonic_phase"] = mss5_tensors["harmonic_phase"]
+        all_ml_features["institutional_mass_flow"] = 1.0 if mss5_tensors["mass_flow"] else 0.0
+        all_ml_features["volatility_regime_norm"] = mss5_tensors["volatility_norm"]
+        all_ml_features["acceptance_ratio"] = mss5_tensors["acceptance_ratio"]
+        all_ml_features["wick_stress"] = mss5_tensors["wick_stress"]
+        
+        chain_log.append(f"S: {validation_status}")
+        
+    except Exception as e:
+        logger.error(f"[CHAIN] Stage 6.5 (SENSORY) failed: {e}")
+        cumulative_probability *= 0.6 # Penalty for sensory failure
+
+    # =========================================================================
     # STAGE 7: FUSION LAYER (MTF Integration)
     # =========================================================================
     try:
@@ -264,11 +307,22 @@ async def execute_feat_chain_institucional(
         }
         hurst_map = {"D1": 0.55, "H4": 0.55, "H1": 0.50, "M15": 0.50, "M5": 0.50}
         
-        # Check if we should boost H4 (Killzone context)
-        h4_in_killzone = kz_block.get("session_heat", 0) > 0.6
-        fusion_prob = mtf_manager.resolve_conflicts(signals, hurst_map, h4_in_killzone)
+        # Dynamic Heat-based Attention
+        # Heat = normalized volatility (example)
+        heat_map = {
+            "M5": 0.8 if abs(physics_cvd.get("cvd_acceleration", 0)) > 500 else 0.4,
+            "M15": 0.6,
+            "H1": 0.5,
+            "H4": 0.7 if h4_in_killzone else 0.5,
+            "D1": 0.4
+        }
         
-        result["chain_stages"]["7_FUSION"] = {"fused_prob": round(fusion_prob, 3)}
+        fusion_prob = mtf_manager.resolve_conflicts(signals, hurst_map, h4_in_killzone, heat_map)
+        
+        result["chain_stages"]["7_FUSION"] = {
+            "fused_prob": round(fusion_prob, 3),
+            "attention": "DYNAMIC_HEAT"
+        }
         chain_log.append(f"FUSION: {fusion_prob:.2f}")
     except Exception as e:
         logger.error(f"[CHAIN] Stage 7 (FUSION) failed: {e}")
@@ -359,6 +413,14 @@ async def execute_feat_chain_institucional(
     }
     
     logger.info(f"[FEAT-CHAIN-v7] {action} prob={final_probability:.2f} Regime={regime} | {' '.join(chain_log)}")
+    
+    # SENIOR AUDIT RECORD
+    try:
+        from app.core.auditor_senior import auditor_senior
+        auditor_senior.record_execution(result["chain_stages"], result["final_decision"], symbol)
+    except Exception as e:
+        logger.error(f"Failed to record audit: {e}")
+
     return result
 
 

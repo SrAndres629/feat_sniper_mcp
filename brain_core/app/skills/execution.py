@@ -14,46 +14,46 @@ RETCODE_HINTS = {
     mt5.TRADE_RETCODE_REQUOTE: {
         "code": "REQUOTE",
         "message": "El precio ha cambiado.",
-        "suggestion": "Aumenta la desviación (slippage) permitida o intenta en un momento de menor volatilidad."
+        "suggestion": "Aumenta la desviacin (slippage) permitida o intenta en un momento de menor volatilidad."
     },
     mt5.TRADE_RETCODE_REJECT: {
         "code": "ORDER_REJECTED",
         "message": "La orden fue rechazada por el broker.",
-        "suggestion": "Revisa si el volumen es válido o si hay restricciones en el símbolo seleccionado."
+        "suggestion": "Revisa si el volumen es vlido o si hay restricciones en el smbolo seleccionado."
     },
     mt5.TRADE_RETCODE_CANCEL: {
         "code": "ORDER_CANCELLED",
         "message": "La orden fue cancelada por el servidor.",
-        "suggestion": "Verifica la conexión con el servidor del broker e intenta de nuevo."
+        "suggestion": "Verifica la conexin con el servidor del broker e intenta de nuevo."
     },
     mt5.TRADE_RETCODE_NO_MONEY: {
         "code": "INSUFFICIENT_FUNDS",
-        "message": "Margen insuficiente para abrir la posición.",
+        "message": "Margen insuficiente para abrir la posicin.",
         "suggestion": "Reduce el volumen del lote o deposita fondos en la cuenta."
     },
     mt5.TRADE_RETCODE_TRADE_DISABLED: {
         "code": "TRADING_DISABLED",
-        "message": "El trading está deshabilitado para esta cuenta o símbolo.",
-        "suggestion": "Contacta a tu broker o verifica si el mercado está abierto."
+        "message": "El trading est deshabilitado para esta cuenta o smbolo.",
+        "suggestion": "Contacta a tu broker o verifica si el mercado est abierto."
     },
     mt5.TRADE_RETCODE_MARKET_CLOSED: {
         "code": "MARKET_CLOSED",
-        "message": "El mercado está cerrado actualmente.",
-        "suggestion": "Espera a la apertura de la sesión de trading correspondiente."
+        "message": "El mercado est cerrado actualmente.",
+        "suggestion": "Espera a la apertura de la sesin de trading correspondiente."
     },
     mt5.TRADE_RETCODE_INVALID_STOPS: {
         "code": "INVALID_STOPS",
-        "message": "Niveles de Stop Loss (SL) o Take Profit (TP) inválidos.",
-        "suggestion": "Asegúrate de respetar la distancia mínima de puntos (freeze level) dictada por el broker."
+        "message": "Niveles de Stop Loss (SL) o Take Profit (TP) invlidos.",
+        "suggestion": "Asegrate de respetar la distancia mnima de puntos (freeze level) dictada por el broker."
     },
     mt5.TRADE_RETCODE_INVALID_VOLUME: {
         "code": "INVALID_VOLUME",
-        "message": "El volumen de la orden no es válido.",
-        "suggestion": "Verifica el lote mínimo, el lote máximo y el step de volumen del símbolo."
+        "message": "El volumen de la orden no es vlido.",
+        "suggestion": "Verifica el lote mnimo, el lote mximo y el step de volumen del smbolo."
     }
 }
 
-# Mapeo de tipos de órdenes
+# Mapeo de tipos de rdenes
 ACTION_TO_MT5_TYPE = {
     "BUY": mt5.ORDER_TYPE_BUY,
     "SELL": mt5.ORDER_TYPE_SELL,
@@ -66,7 +66,7 @@ ACTION_TO_MT5_TYPE = {
 async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderResponse]:
     """
     Ejecuta una orden (Mercado o Pendiente) con validaciones de seguridad avanzadas.
-    Instrumentado con OTel y Métricas de Ejecución.
+    Instrumentado con OTel y Mtricas de Ejecucin.
     """
     from app.core.observability import obs_engine, tracer
     import time
@@ -110,8 +110,8 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
                 status="error",
                 error=ErrorDetail(
                     code="RISK_VETO",
-                    message="Operación bloqueada por límite de drawdown diario.",
-                    suggestion="Espera a que se recupere la equidad o ajusta el parámetro MAX_DAILY_DRAWDOWN_PERCENT."
+                    message="Operacin bloqueada por lmite de drawdown diario.",
+                    suggestion="Espera a que se recupere la equidad o ajusta el parmetro MAX_DAILY_DRAWDOWN_PERCENT."
                 )
             )
 
@@ -124,7 +124,7 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
             volume = await risk_engine.get_adaptive_lots(symbol, int(sl_points))
             span.set_attribute("adaptive_volume", volume)
 
-        # 1. VALIDACIÓN INTELIGENTE (SMART GUARDRAILS)
+        # 1. VALIDACIN INTELIGENTE (SMART GUARDRAILS)
         is_valid, error_msg = await OrderValidator.validate_order(
             symbol=symbol,
             volume=volume,
@@ -141,11 +141,11 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
                 error=ErrorDetail(
                     code="VALIDATION_FAILED",
                     message=error_msg,
-                    suggestion="Corrige los parámetros de la orden basados en los límites del broker."
+                    suggestion="Corrige los parmetros de la orden basados en los lmites del broker."
                 )
             )
 
-        # 2. VALIDACIÓN DE MARGEN
+        # 2. VALIDACIN DE MARGEN
         has_margin, margin_err = await OrderValidator.validate_margin(symbol, volume, action)
         if not has_margin:
             obs_engine.track_order(symbol, action, "INSUFFICIENT_MARGIN")
@@ -158,7 +158,7 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
                 )
             )
 
-        # 3. CALCULO DE DESVIACIÓN DINÁMICA (SLIPPAGE)
+        # 3. CALCULO DE DESVIACIN DINMICA (SLIPPAGE)
         symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
         spread = symbol_info.spread
         dynamic_deviation = max(20, int(spread * 1.5)) 
@@ -170,7 +170,7 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
             if not price:
                 return ResponseModel(
                     status="error",
-                    error=ErrorDetail(code="PRICE_REQUIRED", message="El precio es requerido para órdenes pendientes.", suggestion="Envía un 'price'.")
+                    error=ErrorDetail(code="PRICE_REQUIRED", message="El precio es requerido para rdenes pendientes.", suggestion="Enva un 'price'.")
                 )
             exec_price = price
         else:
@@ -203,7 +203,7 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
 
         logger.info(f"Enviando orden {action} de {volume} lots en {symbol} a {exec_price} (Dev: {dynamic_deviation})")
 
-        # 5. EJECUCIÓN
+        # 5. EJECUCIN
         result = await mt5_conn.execute(mt5.order_send, request)
 
         if result is None:
@@ -215,7 +215,7 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
                 error=ErrorDetail(
                     code=f"MT5_INTERNAL_ERROR_{error[0]}",
                     message=error[1],
-                    suggestion="Error crítico de comunicación con MetaTrader 5."
+                    suggestion="Error crtico de comunicacin con MetaTrader 5."
                 )
             )
 
@@ -227,8 +227,8 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
             obs_engine.track_order(symbol, action, f"FAILED_{result.retcode}")
             hint = RETCODE_HINTS.get(result.retcode, {
                 "code": f"RETCODE_{result.retcode}",
-                "message": f"Fallo en la ejecución: {result.comment}",
-                "suggestion": "Consulta el log de MT5 para más detalles técnicos."
+                "message": f"Fallo en la ejecucin: {result.comment}",
+                "suggestion": "Consulta el log de MT5 para ms detalles tcnicos."
             })
             
             return ResponseModel(
@@ -236,7 +236,7 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
                 error=ErrorDetail(**hint)
             )
 
-        # Éxito
+        # xito
         circuit_breaker.record_success()
         obs_engine.track_order(symbol, action, "SUCCESS")
         

@@ -1,7 +1,7 @@
 """
 RAG Memory Engine - Memoria Persistente con ChromaDB
 =====================================================
-Proporciona almacenamiento y búsqueda semántica de información
+Proporciona almacenamiento y bsqueda semntica de informacin
 para que la IA tenga "memoria ilimitada" persistente.
 """
 
@@ -27,7 +27,7 @@ def _get_embedding_function():
             _embedding_function = embedding_functions.SentenceTransformerEmbeddingFunction(
                 model_name="all-MiniLM-L6-v2"
             )
-            logger.info("✅ Modelo de embeddings cargado: all-MiniLM-L6-v2")
+            logger.info(" Modelo de embeddings cargado: all-MiniLM-L6-v2")
         except Exception as e:
             logger.error(f"Error cargando modelo de embeddings: {e}")
             raise
@@ -35,7 +35,7 @@ def _get_embedding_function():
 
 
 def _get_collection():
-    """Lazy load de la colección ChromaDB."""
+    """Lazy load de la coleccin ChromaDB."""
     global _chromadb_client, _collection
     if _collection is None:
         try:
@@ -56,7 +56,7 @@ def _get_collection():
                 metadata={"description": "FEAT Sniper AI Memory Store"}
             )
             
-            logger.info(f"✅ ChromaDB inicializado en {persist_dir} con {_collection.count()} memorias")
+            logger.info(f" ChromaDB inicializado en {persist_dir} con {_collection.count()} memorias")
         except Exception as e:
             logger.error(f"Error inicializando ChromaDB: {e}")
             raise
@@ -65,7 +65,7 @@ def _get_collection():
 
 class RAGMemory:
     """
-    Singleton para gestión de memoria RAG.
+    Singleton para gestin de memoria RAG.
     
     Uso:
         from app.services.rag_memory import rag_memory
@@ -105,11 +105,11 @@ class RAGMemory:
         
         Args:
             text: Texto a almacenar
-            category: Categoría para organización (analysis, trade, news, etc.)
+            category: Categora para organizacin (analysis, trade, news, etc.)
             metadata: Metadatos adicionales opcionales
         
         Returns:
-            ID único del documento almacenado
+            ID nico del documento almacenado
         """
         collection = _get_collection()
         
@@ -129,7 +129,7 @@ class RAGMemory:
             metadatas=[doc_metadata]
         )
         
-        logger.info(f"📝 Memoria almacenada: {doc_id[:30]}... (categoria: {category})")
+        logger.info(f" Memoria almacenada: {doc_id[:30]}... (categoria: {category})")
         return doc_id
     
     def search(
@@ -139,12 +139,12 @@ class RAGMemory:
         category: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
-        Búsqueda semántica en memoria.
+        Bsqueda semntica en memoria.
         
         Args:
-            query: Texto de búsqueda
-            k: Número máximo de resultados
-            category: Filtrar por categoría (opcional)
+            query: Texto de bsqueda
+            k: Nmero mximo de resultados
+            category: Filtrar por categora (opcional)
         
         Returns:
             Lista de documentos relevantes con score
@@ -170,7 +170,7 @@ class RAGMemory:
                     "distance": results["distances"][0][i] if results.get("distances") else None
                 })
         
-        logger.info(f"🔍 Búsqueda '{query[:30]}...' - {len(formatted)} resultados")
+        logger.info(f" Bsqueda '{query[:30]}...' - {len(formatted)} resultados")
         return formatted
     
     def forget(
@@ -179,14 +179,14 @@ class RAGMemory:
         doc_ids: Optional[List[str]] = None
     ) -> int:
         """
-        Elimina memorias por categoría o IDs específicos.
+        Elimina memorias por categora o IDs especficos.
         
         Args:
-            category: Eliminar todas las memorias de esta categoría
-            doc_ids: Lista de IDs específicos a eliminar
+            category: Eliminar todas las memorias de esta categora
+            doc_ids: Lista de IDs especficos a eliminar
         
         Returns:
-            Número de documentos eliminados
+            Nmero de documentos eliminados
         """
         collection = _get_collection()
         
@@ -194,7 +194,7 @@ class RAGMemory:
             collection.delete(ids=doc_ids)
             count = len(doc_ids)
         elif category:
-            # Obtener IDs por categoría
+            # Obtener IDs por categora
             results = collection.get(where={"category": category})
             if results["ids"]:
                 collection.delete(ids=results["ids"])
@@ -204,15 +204,15 @@ class RAGMemory:
         else:
             # Sin filtro = limpiar todo (peligroso)
             count = collection.count()
-            # No permitir borrado total sin confirmación explícita
-            logger.warning("⚠️ Intento de borrar toda la memoria sin filtro. Operación cancelada.")
+            # No permitir borrado total sin confirmacin explcita
+            logger.warning(" Intento de borrar toda la memoria sin filtro. Operacin cancelada.")
             return 0
         
-        logger.info(f"🗑️ {count} memorias eliminadas (categoria: {category or 'específico'})")
+        logger.info(f" {count} memorias eliminadas (categoria: {category or 'especfico'})")
         return count
     
     def count(self, category: Optional[str] = None) -> int:
-        """Cuenta el número de memorias almacenadas."""
+        """Cuenta el nmero de memorias almacenadas."""
         collection = _get_collection()
         if category:
             results = collection.get(where={"category": category})
@@ -220,7 +220,7 @@ class RAGMemory:
         return collection.count()
     
     def get_categories(self) -> List[str]:
-        """Obtiene lista de categorías únicas en la memoria."""
+        """Obtiene lista de categoras nicas en la memoria."""
         collection = _get_collection()
         results = collection.get()
         if results["metadatas"]:

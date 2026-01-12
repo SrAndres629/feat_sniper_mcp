@@ -7,8 +7,8 @@ logger = logging.getLogger("MT5_Bridge.SupabaseSync")
 
 class SupabaseSync:
     """
-    Gestor de sincronización con Supabase para el ecosistema NEXUS.
-    Centraliza el logging de señales y trades en la nube.
+    Gestor de sincronizacin con Supabase para el ecosistema NEXUS.
+    Centraliza el logging de seales y trades en la nube.
     """
     _client: Optional[Client] = None
 
@@ -17,17 +17,17 @@ class SupabaseSync:
 
     def _initialize_client(self):
         if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
-            logger.warning("Supabase no configurado. El logging en la nube estará desactivado.")
+            logger.warning("Supabase no configurado. El logging en la nube estar desactivado.")
             return
 
         try:
             self._client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-            logger.info("✅ Cliente Supabase NEXUS inicializado.")
+            logger.info(" Cliente Supabase NEXUS inicializado.")
         except Exception as e:
             logger.error(f"Error inicializando Supabase: {e}")
 
     async def log_signal(self, data: Dict[str, Any]):
-        """Registra una señal del Sniper en Supabase."""
+        """Registra una seal del Sniper en Supabase."""
         if not self._client:
             return
 
@@ -43,17 +43,17 @@ class SupabaseSync:
                 "metadata": data
             }
             
-            # Operación síncrona enviada a hilo para no bloquear el loop
+            # Operacin sncrona enviada a hilo para no bloquear el loop
             import anyio
             await anyio.to_thread.run_sync(
                 lambda: self._client.table("sniper_signals").insert(payload).execute()
             )
-            logger.info(f"📤 Señal sincronizada con Supabase: {payload['symbol']} {payload['action']}")
+            logger.info(f" Seal sincronizada con Supabase: {payload['symbol']} {payload['action']}")
         except Exception as e:
-            logger.error(f"Error sincronizando señal con Supabase: {e}")
+            logger.error(f"Error sincronizando seal con Supabase: {e}")
 
     async def update_performance(self, model_id: str, metrics: Dict[str, Any]):
-        """Actualiza métricas de performance del modelo ML en la nube."""
+        """Actualiza mtricas de performance del modelo ML en la nube."""
         if not self._client:
             return
             

@@ -1,18 +1,18 @@
 """
 FEAT Module F: FORMA (Arquitectura Estructural) - CHRONO-AWARE
 ===============================================================
-Define el sesgo direccional (Bias) mediante análisis fractal CON CONTEXTO TEMPORAL.
+Define el sesgo direccional (Bias) mediante anlisis fractal CON CONTEXTO TEMPORAL.
 
 Conceptos Clave SMC:
 - Tendencia Alcista: HH (Higher High) + HL (Higher Low)
 - Tendencia Bajista: LH (Lower High) + LL (Lower Low)
 - BOS (Break of Structure): Ruptura con CUERPO de vela (no mecha)
-- CHoCH (Change of Character): Primera señal de reversión
+- CHoCH (Change of Character): Primera seal de reversin
 
-INTEGRACIÓN TEMPORAL:
+INTEGRACIN TEMPORAL:
 - Valida BOS/CHoCH contra ciclo semanal (Induction vs Direction)
 - Detecta trampas de Lunes (falsos breakouts)
-- Ajusta confianza según alineación con Kill Zones
+- Ajusta confianza segn alineacin con Kill Zones
 """
 
 import logging
@@ -41,7 +41,7 @@ class StructuralEvent(Enum):
     BOS_BEARISH = "BOS_BAJISTA"
     CHOCH_BULLISH = "CHOCH_ALCISTA"
     CHOCH_BEARISH = "CHOCH_BAJISTA"
-    SWEEP_BULLISH = "SWEEP_ALCISTA"   # Mecha sin cierre (liquidación)
+    SWEEP_BULLISH = "SWEEP_ALCISTA"   # Mecha sin cierre (liquidacin)
     SWEEP_BEARISH = "SWEEP_BAJISTA"
     NONE = "SIN_EVENTO"
 
@@ -64,7 +64,7 @@ class WyckoffPhase(Enum):
 
 def find_swing_points(candles: pd.DataFrame, lookback: int = 2) -> Dict[str, List]:
     """
-    Identifica Swing Highs y Swing Lows usando método N-velas.
+    Identifica Swing Highs y Swing Lows usando mtodo N-velas.
     """
     swing_highs = []
     swing_lows = []
@@ -134,13 +134,13 @@ def detect_structure(swing_highs: List, swing_lows: List) -> Tuple[Trend, str, f
         confidence = 0.9 if (prev_low - last_low) > (swing_lows[-3]["price"] - prev_low if len(swing_lows) > 2 else 0) else 0.75
         return (Trend.BEARISH, "LH + LL confirmado", confidence)
     
-    # Rango/Consolidación
+    # Rango/Consolidacin
     if last_high < prev_high and last_low > prev_low:
-        return (Trend.RANGING, "Compresión de rango detectada", 0.6)
+        return (Trend.RANGING, "Compresin de rango detectada", 0.6)
     
-    # Expansión (breakout potencial)
+    # Expansin (breakout potencial)
     if last_high > prev_high and last_low < prev_low:
-        return (Trend.NEUTRAL, "Expansión de volatilidad", 0.5)
+        return (Trend.NEUTRAL, "Expansin de volatilidad", 0.5)
     
     return (Trend.NEUTRAL, "Estructura mixta", 0.4)
 
@@ -157,10 +157,10 @@ def detect_bos_choch(
     weekly_phase: str = None
 ) -> Dict[str, Any]:
     """
-    Detecta BOS/CHoCH con validación temporal.
+    Detecta BOS/CHoCH con validacin temporal.
     
-    REGLA CRÍTICA: 
-    - Solo cuenta como BOS si el CUERPO cierra más allá del nivel
+    REGLA CRTICA: 
+    - Solo cuenta como BOS si el CUERPO cierra ms all del nivel
     - Una MECHA es un SWEEP (toma de liquidez), no un BOS
     - En INDUCTION (Lunes), los BOS tienen menor confianza
     """
@@ -181,7 +181,7 @@ def detect_bos_choch(
     if weekly_phase == "INDUCTION":
         chrono_modifier = 0.5  # Lunes: alto riesgo de trampas
     elif weekly_phase == "DIRECTION":
-        chrono_modifier = 1.2  # Martes: máxima confianza
+        chrono_modifier = 1.2  # Martes: mxima confianza
     elif weekly_phase == "EXPANSION":
         chrono_modifier = 1.1  # Jueves: buena confianza
     
@@ -194,15 +194,15 @@ def detect_bos_choch(
         if last_open < last_swing_high:  # Rompimiento limpio
             base_confidence = 0.85
         else:
-            base_confidence = 0.70  # Ya abrió arriba
+            base_confidence = 0.70  # Ya abri arriba
         
         result = {
             "event": StructuralEvent.BOS_BULLISH.value,
             "level_broken": last_swing_high,
             "close_price": last_close,
             "confidence": min(1.0, base_confidence * chrono_modifier),
-            "details": "Cuerpo cerró encima del máximo estructural",
-            "chrono_warning": "⚠️ BOS en INDUCTION - posible trampa" if weekly_phase == "INDUCTION" else None
+            "details": "Cuerpo cerr encima del mximo estructural",
+            "chrono_warning": " BOS en INDUCTION - posible trampa" if weekly_phase == "INDUCTION" else None
         }
         return result
     
@@ -218,14 +218,14 @@ def detect_bos_choch(
             "level_broken": last_swing_low,
             "close_price": last_close,
             "confidence": min(1.0, base_confidence * chrono_modifier),
-            "details": "Cuerpo cerró debajo del mínimo estructural",
-            "chrono_warning": "⚠️ BOS en INDUCTION - posible trampa" if weekly_phase == "INDUCTION" else None
+            "details": "Cuerpo cerr debajo del mnimo estructural",
+            "chrono_warning": " BOS en INDUCTION - posible trampa" if weekly_phase == "INDUCTION" else None
         }
         return result
     
     # ===== SWEEP DETECTION (Mecha sin cierre) =====
     
-    # Sweep Alcista: Mecha tocó pero cuerpo cerró abajo
+    # Sweep Alcista: Mecha toc pero cuerpo cerr abajo
     if last_high > last_swing_high and last_close < last_swing_high:
         result = {
             "event": StructuralEvent.SWEEP_BULLISH.value,
@@ -233,7 +233,7 @@ def detect_bos_choch(
             "wick_high": last_high,
             "close_price": last_close,
             "confidence": 0.60 * chrono_modifier,
-            "details": "Liquidación de stops - mecha sin cierre estructural"
+            "details": "Liquidacin de stops - mecha sin cierre estructural"
         }
         return result
     
@@ -245,11 +245,11 @@ def detect_bos_choch(
             "wick_low": last_low,
             "close_price": last_close,
             "confidence": 0.60 * chrono_modifier,
-            "details": "Liquidación de stops - mecha sin cierre estructural"
+            "details": "Liquidacin de stops - mecha sin cierre estructural"
         }
         return result
     
-    # ===== CHoCH DETECTION (Cambio de carácter) =====
+    # ===== CHoCH DETECTION (Cambio de carcter) =====
     
     if current_trend == Trend.BULLISH and len(swing_lows) >= 2:
         second_last_low = swing_lows[-2]["price"]
@@ -259,7 +259,7 @@ def detect_bos_choch(
                 "level_broken": second_last_low,
                 "close_price": last_close,
                 "confidence": 0.80 * chrono_modifier,
-                "details": "Tendencia alcista ROTA - posible reversión bajista"
+                "details": "Tendencia alcista ROTA - posible reversin bajista"
             }
             return result
     
@@ -271,7 +271,7 @@ def detect_bos_choch(
                 "level_broken": second_last_high,
                 "close_price": last_close,
                 "confidence": 0.80 * chrono_modifier,
-                "details": "Tendencia bajista ROTA - posible reversión alcista"
+                "details": "Tendencia bajista ROTA - posible reversin alcista"
             }
             return result
     
@@ -347,14 +347,14 @@ def analyze_forma(
     chrono_features: Dict = None
 ) -> Dict[str, Any]:
     """
-    🏗️ FEAT MODULE F: Análisis de Estructura de Mercado (Chrono-Aware).
+     FEAT MODULE F: Anlisis de Estructura de Mercado (Chrono-Aware).
     
     Analiza en 3 temporalidades (fractalidad):
     - Macro (H4): Tendencia dominante
     - Intermedio (H1): Estructura operativa
     - Micro (M15): Confirmaciones tempranas
     
-    INTEGRA contexto temporal de Module T para validar señales.
+    INTEGRA contexto temporal de Module T para validar seales.
     """
     result = {
         "module": "FEAT_Forma_ChronoAware",
@@ -476,11 +476,11 @@ def analyze_forma(
     }
     
     if weekly_phase == "INDUCTION":
-        result["guidance"]["cautions"].append("📅 LUNES: Alto riesgo de falsos breakouts")
+        result["guidance"]["cautions"].append(" LUNES: Alto riesgo de falsos breakouts")
     if h4_trend != h1_trend:
-        result["guidance"]["cautions"].append("⚠️ H4/H1 no alineados - esperar confirmación")
+        result["guidance"]["cautions"].append(" H4/H1 no alineados - esperar confirmacin")
     if any("SWEEP" in tf_analysis.get(tf, {}).get("last_event", "") for tf in ["H4", "H1"]):
-        result["guidance"]["cautions"].append("🔄 Sweep detectado - posible reversión")
+        result["guidance"]["cautions"].append(" Sweep detectado - posible reversin")
     
     logger.info(f"[FEAT-F] H4={h4_trend}({h4_conf:.2f}), H1={h1_trend}({h1_conf:.2f}), Align={alignment_score:.2f}")
     
@@ -494,7 +494,7 @@ def generate_structure_features(
     chrono_features: Dict = None
 ) -> Dict[str, Any]:
     """
-    Genera vector de features para ML desde análisis estructural.
+    Genera vector de features para ML desde anlisis estructural.
     """
     analysis = analyze_forma(h4_candles, h1_candles, m15_candles, None, chrono_features)
     return {

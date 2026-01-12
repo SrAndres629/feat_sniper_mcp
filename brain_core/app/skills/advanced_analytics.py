@@ -67,7 +67,7 @@ class AdvancedAnalytics:
     async def get_alpha_health_report():
         """
         Health of the Alpha: Reporte consolidado de decaimiento del modelo 
-        y precisión institucional.
+        y precisin institucional.
         """
         return {
             "model_consistency": 0.94,

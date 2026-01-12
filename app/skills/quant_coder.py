@@ -15,9 +15,9 @@ logger = logging.getLogger("MT5_Bridge.Skills.QuantCoder")
 
 async def create_native_indicator(req: MQL5CodeRequest) -> Dict[str, Any]:
     """
-    Toma código MQL5, lo guarda en la carpeta de indicadores de MT5 e intenta compilarlo.
+    Toma cdigo MQL5, lo guarda en la carpeta de indicadores de MT5 e intenta compilarlo.
     """
-    # 1. Obtener información del terminal para saber dónde guardar
+    # 1. Obtener informacin del terminal para saber dnde guardar
     term_info = await mt5_conn.execute(mt5.terminal_info)
     if not term_info:
         return {"status": "error", "message": "No se pudo obtener la ruta del terminal MT5."}
@@ -26,7 +26,7 @@ async def create_native_indicator(req: MQL5CodeRequest) -> Dict[str, Any]:
     indicators_path = os.path.join(data_path, "MQL5", "Indicators")
     
     if not os.path.exists(indicators_path):
-        return {"status": "error", "message": f"No se encontró la carpeta de indicadores en {indicators_path}"}
+        return {"status": "error", "message": f"No se encontr la carpeta de indicadores en {indicators_path}"}
 
     # 2. Guardar el archivo .mq5
     filename = f"{req.name}.mq5"
@@ -42,7 +42,7 @@ async def create_native_indicator(req: MQL5CodeRequest) -> Dict[str, Any]:
     except Exception as e:
         return {"status": "error", "message": f"Fallo al escribir el archivo: {str(e)}"}
 
-    # 3. Intentar Compilación (Opcional pero recomendado)
+    # 3. Intentar Compilacin (Opcional pero recomendado)
     # Buscamos el metaeditor64.exe en la ruta del terminal
     terminal_path = term_info.path
     metaeditor_path = os.path.join(terminal_path, "metaeditor64.exe")
@@ -50,7 +50,7 @@ async def create_native_indicator(req: MQL5CodeRequest) -> Dict[str, Any]:
     compilation_status = "Skipped"
     if req.compile and os.path.exists(metaeditor_path):
         try:
-            logger.info(f"Iniciando compilación con {metaeditor_path}...")
+            logger.info(f"Iniciando compilacin con {metaeditor_path}...")
             # Comando: metaeditor64.exe /compile:"ruta_al_archivo" /log:"ruta_al_log"
             log_path = full_path + ".log"
             result = subprocess.run(

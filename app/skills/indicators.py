@@ -17,18 +17,18 @@ from app.skills.market import TIMEFRAME_MAP
 
 async def get_technical_indicator(req: IndicatorRequest) -> Dict[str, Any]:
     """
-    Calcula indicadores técnicos usando datos directos de MT5.
+    Calcula indicadores tcnicos usando datos directos de MT5.
     """
     symbol = req.symbol
     tf_str = req.timeframe.upper()
     indicator = req.indicator.upper()
     
     if tf_str not in TIMEFRAME_MAP:
-        return {"status": "error", "message": f"Timeframe {tf_str} no válido."}
+        return {"status": "error", "message": f"Timeframe {tf_str} no vlido."}
     
     mt5_tf = TIMEFRAME_MAP[tf_str]
     
-    # Cantidad de velas necesarias (periodo + margen para cálculo)
+    # Cantidad de velas necesarias (periodo + margen para clculo)
     n_candles = req.period + 100
     
     rates = await mt5_conn.execute(mt5.copy_rates_from_pos, symbol, mt5_tf, 0, n_candles)
@@ -99,6 +99,24 @@ async def get_technical_indicator(req: IndicatorRequest) -> Dict[str, Any]:
             result_data["mid"] = float(df['sma'].iloc[-1])
             result_data["upper"] = float(df['upper'].iloc[-1])
             result_data["lower"] = float(df['lower'].iloc[-1])
+
+        elif indicator == "OBV":
+            # On-Balance Volume
+            df['obv'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
+            result_data["value"] = float(df['obv'].iloc[-1])
+            result_data["change"] = float(df['obv'].diff().iloc[-1])
+
+        elif indicator == "ACCEPTANCE_RATIO":
+            body = (df['close'] - df['open']).abs()
+            candle_range = (df['high'] - df['low'])
+            df['acc'] = np.where(candle_range > 0, body / candle_range, 0)
+            result_data["value"] = float(df['acc'].iloc[-1])
+
+        elif indicator == "WICK_STRESS":
+            body = (df['close'] - df['open']).abs()
+            candle_range = (df['high'] - df['low'])
+            acc = np.where(candle_range > 0, body / candle_range, 0)
+            result_data["value"] = float(1.0 - acc.iloc[-1])
 
         result_data["status"] = "success"
         return result_data

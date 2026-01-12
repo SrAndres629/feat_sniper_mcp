@@ -8,7 +8,7 @@ logger = logging.getLogger("MT5_Bridge.RemoteCompute")
 
 class RemoteWorker:
     """
-    Gestor de ejecución remota vía SSH para Offloading de cómputo.
+    Gestor de ejecucin remota va SSH para Offloading de cmputo.
     """
     def __init__(self):
         self.host = settings.SSH_HOST
@@ -27,7 +27,7 @@ class RemoteWorker:
             if self.key_path and os.path.exists(self.key_path):
                 client.connect(self.host, username=self.user, key_filename=self.key_path, timeout=10)
             else:
-                # Si no hay llave, asumimos que se requiere configuración o falla
+                # Si no hay llave, asumimos que se requiere configuracin o falla
                 logger.warning("SSH Key no encontrada o no configurada.")
                 return None
                 
@@ -43,7 +43,7 @@ class RemoteWorker:
             return {"status": "error", "message": "SSH Worker no configurado o inaccesible."}
 
         try:
-            logger.info(f"🛰️ Enviando comando al Worker Remoto: {command}")
+            logger.info(f" Enviando comando al Worker Remoto: {command}")
             import anyio
             
             def run_cmd():
@@ -64,13 +64,13 @@ class RemoteWorker:
 remote_worker = RemoteWorker()
 
 def register_remote_skills(mcp):
-    """Registra las herramientas de cómputo remoto en el MCP."""
+    """Registra las herramientas de cmputo remoto en el MCP."""
     
     @mcp.tool(name="skill_execute_remote_task")
     async def execute_remote_task(command: str):
         """
         Ejecuta una tarea de computo pesado (ML training, Optuna) en un servidor remoto via SSH.
-        Requiere configuración previa en .env (SSH_HOST, SSH_USER, SSH_KEY_PATH).
+        Requiere configuracin previa en .env (SSH_HOST, SSH_USER, SSH_KEY_PATH).
         """
         return await remote_worker.execute_remote_cmd(command)
 
@@ -81,4 +81,4 @@ def register_remote_skills(mcp):
         if client:
             client.close()
             return {"status": "connected", "host": remote_worker.host}
-        return {"status": "disconnected", "reason": "Configuración incompleta o timeout."}
+        return {"status": "disconnected", "reason": "Configuracin incompleta o timeout."}

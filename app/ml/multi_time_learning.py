@@ -4,7 +4,7 @@ MULTI-TIME LEARNING MANAGER (MIP v7.0 - Killzone Aware)
 Manages multitemporal datasets, hierarchical weights, and fractal alignment.
 
 UPGRADES v7.0:
-- Dynamic H4 weight boost when close is in killzone (0.25 → 0.40)
+- Dynamic H4 weight boost when close is in killzone (0.25  0.40)
 - Killzone-aware fusion layer
 - Integration with temporal features
 - Confirmation window logic
@@ -26,9 +26,9 @@ logger = logging.getLogger("QuantumLeap.MultiTimeLearning")
 
 H4_KILLZONE_OVERLAP = {
     # H4 candles that include significant killzone portions
-    # Format: H4_close_hour → contains_killzone, weight_boost
+    # Format: H4_close_hour  contains_killzone, weight_boost
     8: {"contains_killzone": True, "weight_boost": 0.10, "note": "Ends at 08:00, includes 04-08 London"},
-    12: {"contains_killzone": True, "weight_boost": 0.15, "note": "Ends at 12:00, includes 09-12 overlap ⭐"},
+    12: {"contains_killzone": True, "weight_boost": 0.15, "note": "Ends at 12:00, includes 09-12 overlap "},
     16: {"contains_killzone": False, "weight_boost": 0.0, "note": "Ends at 16:00, NY afternoon"},
     20: {"contains_killzone": False, "weight_boost": 0.0, "note": "Ends at 20:00, includes globex open"},
     0: {"contains_killzone": False, "weight_boost": 0.0, "note": "Ends at 00:00, Asia"},
@@ -82,7 +82,7 @@ class MultiTimeLearningManager:
         # Boost H4 if close is in killzone
         if h4_close_in_killzone:
             # H4 close during overlap = institutional authority
-            boost = 0.15  # 0.25 → 0.40
+            boost = 0.15  # 0.25  0.40
             self.weights["H4"] += boost
             
             # Reduce micro timeframes to compensate
@@ -99,8 +99,6 @@ class MultiTimeLearningManager:
     def get_fractal_weights(self, hurst_map: Dict[str, float]) -> Dict[str, float]:
         """
         Adjusts weights dynamically based on market physics (Hurst).
-        
-        If a timeframe is highly trending (H > 0.6), its weight increases.
         """
         dynamic_weights = self.weights.copy()
         
@@ -113,6 +111,38 @@ class MultiTimeLearningManager:
         # Normalize weights to sum to 1.0
         total = sum(dynamic_weights.values())
         return {k: v / total for k, v in dynamic_weights.items()}
+
+    def calculate_attention_weights(
+        self, 
+        heat_map: Dict[str, float], 
+        hurst_map: Optional[Dict[str, float]] = None
+    ) -> Dict[str, float]:
+        """
+        FEAT ATTENTION LAYER: Dynamically distributes influence based on 'Heat'.
+        Heat = (ATR / Price) * Volume_Relative.
+        
+        Uses Softmax-like normalization.
+        """
+        # heat_map values should be 0.0 to 1.0 proxies of activity/volatility
+        # We use exponentials to sharpen the focus on the 'hottest' timeframe
+        exp_heat = {tf: np.exp(h * 2.0) for tf, h in heat_map.items()}
+        
+        # Merge with base structural weights
+        combined = {}
+        for tf, h_val in exp_heat.items():
+            base_w = self.weights.get(tf, 0.1)
+            # Fractal adjustment if hurst provided
+            fractal_adj = 1.0
+            if hurst_map and tf in hurst_map:
+                h = hurst_map[tf]
+                fractal_adj = 1.2 if h > 0.6 else (0.8 if h < 0.4 else 1.0)
+            
+            combined[tf] = h_val * base_w * fractal_adj
+            
+        total = sum(combined.values()) + 1e-9
+        attention_weights = {tf: v / total for tf, v in combined.items()}
+        
+        return attention_weights
     
     def calculate_alignment_score(
         self,
@@ -179,26 +209,23 @@ class MultiTimeLearningManager:
         self,
         signals: Dict[str, float],
         hurst_map: Dict[str, float],
-        h4_in_killzone: bool = False
+        h4_in_killzone: bool = False,
+        heat_map: Optional[Dict[str, float]] = None
     ) -> float:
         """
         Applies Fusion Layer logic to generate a final Trade Probability.
-        
-        Args:
-            signals: Dict of [TF: probability].
-            hurst_map: Dict of [TF: Hurst Exponent].
-            h4_in_killzone: If H4 close was in killzone, boost its weight.
-            
-        Returns:
-            float: Final consolidated probability.
         """
         # Update context if H4 in killzone
         if h4_in_killzone and not self.h4_close_in_killzone:
             self.update_killzone_context(True, True)
         
-        weights = self.get_fractal_weights(hurst_map)
+        # Determine weights (Attention or Fractal)
+        if heat_map:
+            weights = self.calculate_attention_weights(heat_map, hurst_map)
+        else:
+            weights = self.get_fractal_weights(hurst_map)
+            
         final_prob = 0.0
-        
         for tf, prob in signals.items():
             final_prob += prob * weights.get(tf, 0.0)
             
@@ -228,7 +255,7 @@ class MultiTimeLearningManager:
         Get confirmation requirements for a timeframe signal.
         
         Based on domain knowledge:
-        - H1: Close + 5-30min retest + vol ≥1.3x
+        - H1: Close + 5-30min retest + vol 1.3x
         - H4: Close in killzone = instant confirmation, else wait 4h
         - D1: Confirm in next killzone (09:00-13:00)
         """

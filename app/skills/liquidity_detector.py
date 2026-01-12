@@ -1,7 +1,7 @@
 """
 Liquidity Intelligence Module - FEAT-DEEP Protocol
 ===================================================
-Detección de piscinas de liquidez institucional:
+Deteccin de piscinas de liquidez institucional:
 - Swing Highs/Lows no mitigados
 - Asian Session Sweeps
 - Fair Value Gaps (FVG)
@@ -30,7 +30,7 @@ KILL_ZONES = {
 
 def get_current_kill_zone(utc_offset: int = -4) -> Optional[str]:
     """
-    Determina la Kill Zone activa basándose en la hora actual.
+    Determina la Kill Zone activa basndose en la hora actual.
     
     Returns:
         "NY", "LONDON", "ASIA" o None si no hay KZ activa.
@@ -54,7 +54,7 @@ def get_current_kill_zone(utc_offset: int = -4) -> Optional[str]:
 
 def is_in_kill_zone(zone: str = "NY", utc_offset: int = -4) -> bool:
     """
-    Verifica si estamos dentro de una Kill Zone específica.
+    Verifica si estamos dentro de una Kill Zone especfica.
     """
     current = get_current_kill_zone(utc_offset)
     return current == zone
@@ -70,8 +70,8 @@ def detect_liquidity_pools(
     
     Args:
         candles: DataFrame con columnas ['high', 'low', 'close', 'time']
-        lookback: Número de velas a analizar
-        min_touches: Mínimo de toques para considerar zona válida
+        lookback: Nmero de velas a analizar
+        min_touches: Mnimo de toques para considerar zona vlida
         
     Returns:
         Dict con liquidity_above, liquidity_below, y pools list
@@ -142,7 +142,7 @@ def detect_asian_sweep(
     utc_offset: int = -4
 ) -> Dict[str, Any]:
     """
-    Detecta si el precio ha barrido (sweep) el rango de la sesión asiática.
+    Detecta si el precio ha barrido (sweep) el rango de la sesin asitica.
     
     Un sweep ocurre cuando el precio rompe el High/Low de Asia y 
     luego vuelve a entrar en el rango con fuerza.
@@ -206,7 +206,7 @@ def detect_fvg(
 def calculate_body_wick_ratio(candle: Dict[str, float]) -> float:
     """
     Calcula el ratio Cuerpo/Mecha de una vela.
-    Velas de intención tienen > 70% cuerpo.
+    Velas de intencin tienen > 70% cuerpo.
     """
     high, low = candle["high"], candle["low"]
     open_, close = candle["open"], candle["close"]
@@ -221,7 +221,7 @@ def calculate_body_wick_ratio(candle: Dict[str, float]) -> float:
 
 def is_intention_candle(candle: Dict[str, float], threshold: float = 70.0) -> bool:
     """
-    Determina si una vela es de "intención" (cuerpo > 70% del rango).
+    Determina si una vela es de "intencin" (cuerpo > 70% del rango).
     """
     return calculate_body_wick_ratio(candle) >= threshold
 
@@ -312,7 +312,7 @@ class MarketStateTensor:
         h1_candles: pd.DataFrame, 
         m15_candles: pd.DataFrame
     ) -> Dict[str, Any]:
-        """H1/M15: Forma y Sincronía (CHoCH, W/M patterns)"""
+        """H1/M15: Forma y Sincrona (CHoCH, W/M patterns)"""
         if len(m15_candles) < 10:
             return {"M15_Structure": "UNKNOWN", "M15_CHoCH": False}
         
@@ -337,7 +337,7 @@ class MarketStateTensor:
         m5_candles: pd.DataFrame, 
         m1_candles: pd.DataFrame
     ) -> Dict[str, Any]:
-        """M5/M1: Aceleración y Tiempo (Volume, Intention)"""
+        """M5/M1: Aceleracin y Tiempo (Volume, Intention)"""
         if len(m1_candles) < 5:
             return {"M1_Acceleration": 0, "M1_Intention": False}
         
@@ -366,8 +366,8 @@ class MarketStateTensor:
         execution: Dict
     ) -> float:
         """
-        Calcula el score de alineación entre capas (0-100).
-        100 = Todas las capas alineadas en la misma dirección.
+        Calcula el score de alineacin entre capas (0-100).
+        100 = Todas las capas alineadas en la misma direccin.
         """
         score = 0
         
@@ -397,7 +397,7 @@ class MarketStateTensor:
         return min(100, score)
     
     def _simple_rsi(self, prices: pd.Series, period: int = 14) -> float:
-        """Cálculo simple de RSI."""
+        """Clculo simple de RSI."""
         if len(prices) < period:
             return 50.0
         

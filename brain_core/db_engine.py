@@ -497,7 +497,7 @@ class UnifiedModelDB:
     def get_narrative_history(self, days: int = 30) -> List[str]:
         """
         Extrae la historia del modelo y la convierte en una narrativa natural para RAG.
-        Combina estados y transiciones en una serie cronológica legible.
+        Combina estados y transiciones en una serie cronolgica legible.
         """
         narratives = []
         
@@ -512,11 +512,11 @@ class UnifiedModelDB:
         for row in cursor.fetchall():
             ts = row['timestamp'].strftime("%Y-%m-%d %H:%M")
             narrative = (
-                f"El {ts}, en {row['symbol']} ({row['timeframe']}), el mercado cambió de "
+                f"El {ts}, en {row['symbol']} ({row['timeframe']}), el mercado cambi de "
                 f"{row['from_state']} a {row['to_state']} con una confianza del {row['confidence']:.1f}%. "
             )
             if row['reason']:
-                narrative += f"Motivo táctico: {row['reason']}."
+                narrative += f"Motivo tctico: {row['reason']}."
             narratives.append(narrative)
 
         # 2. Obtener Estados representativos (cada cierto tiempo o cambios de metrics)
@@ -532,13 +532,13 @@ class UnifiedModelDB:
         for row in cursor.fetchall():
             ts = row['timestamp'].strftime("%Y-%m-%d %H:%M")
             narrative = (
-                f"Observación en {ts}: {row['symbol']} en {row['state']}. "
-                f"Score FEAT: {row['feat_score']:.1f}, Compresión: {row['compression']:.2f}, "
+                f"Observacin en {ts}: {row['symbol']} en {row['state']}. "
+                f"Score FEAT: {row['feat_score']:.1f}, Compresin: {row['compression']:.2f}, "
                 f"Velocidad: {row['speed']:.2f}. Confianza del modelo: {row['confidence']:.1f}%."
             )
             narratives.append(narrative)
             
-        return sorted(narratives) # Devolver en orden cronológico
+        return sorted(narratives) # Devolver en orden cronolgico
     
     def close(self) -> None:
         """Close database connection."""

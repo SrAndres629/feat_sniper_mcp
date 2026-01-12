@@ -22,7 +22,7 @@ class UnifiedModelDB:
         """
         Ejecuta una consulta SQL de solo lectura sobre el Unified Model.
         """
-        # Seguridad básica: impedir DROP, DELETE, INSERT, UPDATE
+        # Seguridad bsica: impedir DROP, DELETE, INSERT, UPDATE
         forbidden = ["DROP", "DELETE", "INSERT", "UPDATE", "ALTER", "TRUNCATE"]
         if any(cmd in sql_query.upper() for cmd in forbidden):
              return {"status": "error", "message": "Only SELECT queries are allowed for safety."}
@@ -42,9 +42,9 @@ class UnifiedModelDB:
 
     async def get_fsm_transition_matrix(self, period: str = "H1") -> Dict[str, Any]:
         """
-        Recupera la matriz de probabilidad de transición de estados de la FSM.
+        Recupera la matriz de probabilidad de transicin de estados de la FSM.
         """
-        # Ejemplo hipotético de consulta
+        # Ejemplo hipottico de consulta
         sql = f"""
             SELECT previous_state, current_state, count(*) as frequency
             FROM fsm_transitions
@@ -52,7 +52,7 @@ class UnifiedModelDB:
             GROUP BY previous_state, current_state
             ORDER BY frequency DESC
         """
-        # Si la tabla no existe, fallará elegantemente
+        # Si la tabla no existe, fallar elegantemente
         return await self.query_custom_sql(sql)
 
 unified_db = UnifiedModelDB()

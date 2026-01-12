@@ -8,28 +8,28 @@ logger = logging.getLogger("MT5_Bridge.Skills.TradeMgmt")
 
 async def manage_position(data: PositionManageRequest) -> ResponseModel[PositionActionResponse]:
     """
-    Gestiona posiciones abiertas: Cierre total/parcial o modificación de SL/TP.
+    Gestiona posiciones abiertas: Cierre total/parcial o modificacin de SL/TP.
     """
     ticket = data.ticket
     
-    # 1. Obtener info de la posición
+    # 1. Obtener info de la posicin
     positions = await mt5_conn.execute(mt5.positions_get, ticket=ticket)
     if not positions or len(positions) == 0:
         return ResponseModel(
             status="error",
             error=ErrorDetail(
                 code="POSITION_NOT_FOUND",
-                message=f"No se encontró la posición con ticket {ticket}.",
-                suggestion="Verifica que el ticket sea correcto y que la posición siga abierta."
+                message=f"No se encontr la posicin con ticket {ticket}.",
+                suggestion="Verifica que el ticket sea correcto y que la posicin siga abierta."
             )
         )
     
     pos = positions[0]
     symbol = pos.symbol
     
-    # 2. Lógica de CIERRE / ELIMINACIÓN
+    # 2. Lgica de CIERRE / ELIMINACIN
     if data.action == "CLOSE" or data.action == "DELETE":
-        # DELETE es para órdenes pendientes
+        # DELETE es para rdenes pendientes
         if data.action == "DELETE":
             request = {
                 "action": mt5.TRADE_ACTION_REMOVE,
@@ -37,7 +37,7 @@ async def manage_position(data: PositionManageRequest) -> ResponseModel[Position
             }
             result = await mt5_conn.execute(mt5.order_send, request)
         else:
-            # Lógica de CLOSE (Dealer execution)
+            # Lgica de CLOSE (Dealer execution)
             volume_to_close = data.volume if data.volume else pos.volume
             # Validar volumen de cierre
             if volume_to_close > pos.volume:
@@ -45,7 +45,7 @@ async def manage_position(data: PositionManageRequest) -> ResponseModel[Position
                     status="error",
                     error=ErrorDetail(
                         code="INVALID_CLOSE_VOLUME",
-                        message=f"Intentando cerrar {volume_to_close} pero la posición solo tiene {pos.volume}.",
+                        message=f"Intentando cerrar {volume_to_close} pero la posicin solo tiene {pos.volume}.",
                         suggestion="Ajusta el volumen a cerrar para que sea menor o igual al actual."
                     )
                 )
@@ -83,13 +83,13 @@ async def manage_position(data: PositionManageRequest) -> ResponseModel[Position
             data=PositionActionResponse(
                 ticket=ticket,
                 status="EXECUTED",
-                message=f"Ticket {ticket} procesado con éxito ({data.action})."
+                message=f"Ticket {ticket} procesado con xito ({data.action})."
             )
         )
 
-    # 3. Lógica de MODIFICACIÓN (SL/TP/PRICE)
+    # 3. Lgica de MODIFICACIN (SL/TP/PRICE)
     elif data.action == "MODIFY":
-        # Para órdenes pendientes el ticket es 'order', para posiciones es 'position'
+        # Para rdenes pendientes el ticket es 'order', para posiciones es 'position'
         # Pero MT5 suele discriminar por el campo 'action'
         request = {
             "action": mt5.TRADE_ACTION_SLTP if not data.price else mt5.TRADE_ACTION_MODIFY,
@@ -112,7 +112,7 @@ async def manage_position(data: PositionManageRequest) -> ResponseModel[Position
                 error=ErrorDetail(
                     code=f"MODIFY_FAILED_{result.retcode}",
                     message=f"Fallo al modificar: {result.comment}",
-                    suggestion="Verifica que el SL/TP no esté demasiado cerca del precio (Stops Level)."
+                    suggestion="Verifica que el SL/TP no est demasiado cerca del precio (Stops Level)."
                 )
             )
             
@@ -121,8 +121,8 @@ async def manage_position(data: PositionManageRequest) -> ResponseModel[Position
             data=PositionActionResponse(
                 ticket=ticket,
                 status="MODIFIED",
-                message=f"SL/TP de la posición {ticket} actualizados."
+                message=f"SL/TP de la posicin {ticket} actualizados."
             )
         )
 
-    return ResponseModel(status="error", error=ErrorDetail(code="INVALID_ACTION", message="Acción no soportada.", suggestion="Usa CLOSE o MODIFY."))
+    return ResponseModel(status="error", error=ErrorDetail(code="INVALID_ACTION", message="Accin no soportada.", suggestion="Usa CLOSE o MODIFY."))

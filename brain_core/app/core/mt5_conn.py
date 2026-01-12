@@ -19,10 +19,10 @@ T = TypeVar("T")
 
 class MT5Connection:
     """
-    Gestor de conexión Singleton para MetaTrader 5.
+    Gestor de conexin Singleton para MetaTrader 5.
     
     Proporciona un entorno seguro para hilos (threading.Lock) y no bloqueante
-    (anyio.to_thread) para interactuar con la librería síncrona de MT5.
+    (anyio.to_thread) para interactuar con la librera sncrona de MT5.
     """
     _instance = None
     _lock = threading.Lock()
@@ -44,7 +44,7 @@ class MT5Connection:
 
     async def startup(self) -> bool:
         """
-        Inicializa la conexión con el terminal MT5 e inicia el watchdog.
+        Inicializa la conexin con el terminal MT5 e inicia el watchdog.
         """
         success = await self.execute(self._initialize_mt5)
         if success:
@@ -55,10 +55,10 @@ class MT5Connection:
         """Inicia la tarea de monitoreo en segundo plano."""
         if self._watchdog_task is None or self._watchdog_task.done():
             self._watchdog_task = asyncio.create_task(self._connection_watchdog())
-            logger.info("Watchdog de conexión MT5 iniciado.")
+            logger.info("Watchdog de conexin MT5 iniciado.")
 
     async def _connection_watchdog(self):
-        """Tarea periódica que verifica y restaura la conexión con Backoff Exponencial."""
+        """Tarea peridica que verifica y restaura la conexin con Backoff Exponencial."""
         backoff = 10
         max_backoff = 60
         
@@ -67,26 +67,26 @@ class MT5Connection:
             try:
                 is_connected = await self.execute(lambda: mt5.terminal_info() is not None)
                 if not is_connected:
-                    logger.warning(f"Watchdog: Conexión MT5 perdida. Reintentando en {backoff}s...")
+                    logger.warning(f"Watchdog: Conexin MT5 perdida. Reintentando en {backoff}s...")
                     success = await self.execute(self._initialize_mt5)
                     
                     if success:
-                        logger.info("Watchdog: Conexión restaurada.")
+                        logger.info("Watchdog: Conexin restaurada.")
                         backoff = 10 # Reset
                     else:
                         backoff = min(max_backoff, backoff * 2) # Incrementar espera
                 else:
                     backoff = 10 # Reset si estamos bien
-                    logger.debug("Watchdog: Conexión OK.")
+                    logger.debug("Watchdog: Conexin OK.")
                     
             except Exception as e:
-                logger.error(f"Error crítico en watchdog de MT5: {e}")
+                logger.error(f"Error crtico en watchdog de MT5: {e}")
                 backoff = min(max_backoff, backoff * 2)
 
     def _initialize_mt5(self) -> bool:
-        """Lógica interna de inicialización (bloqueante)."""
+        """Lgica interna de inicializacin (bloqueante)."""
         if not MT5_AVAILABLE:
-            logger.error("MetaTrader5 no está instalado en este entorno. Abortando inicialización.")
+            logger.error("MetaTrader5 no est instalado en este entorno. Abortando inicializacin.")
             return False
             
         logger.info(f"Intentando conectar a MT5 (Server: {settings.MT5_SERVER})...")
@@ -105,26 +105,26 @@ class MT5Connection:
 
         if not mt5.initialize(**init_params):
             error = mt5.last_error()
-            logger.error(f"Error crítico al inicializar MT5: {error[1]} (Código: {error[0]})")
+            logger.error(f"Error crtico al inicializar MT5: {error[1]} (Cdigo: {error[0]})")
             return False
             
-        logger.info("✅ Conexión con MT5 establecida exitosamente.")
+        logger.info(" Conexin con MT5 establecida exitosamente.")
         return True
 
     async def shutdown(self):
-        """Cierra la conexión con MT5 y detiene el watchdog."""
+        """Cierra la conexin con MT5 y detiene el watchdog."""
         if self._watchdog_task:
             self._watchdog_task.cancel()
-            logger.info("Watchdog de conexión MT5 detenido.")
-        logger.info("Cerrando conexión con MT5...")
+            logger.info("Watchdog de conexin MT5 detenido.")
+        logger.info("Cerrando conexin con MT5...")
         if MT5_AVAILABLE:
             await self.execute(mt5.shutdown)
-        logger.info("🛑 MT5 desconectado.")
+        logger.info(" MT5 desconectado.")
 
     async def execute(self, func: Callable[..., T], *args, **kwargs) -> T:
         """
-        Punto de entrada maestro para ejecutar cualquier función de mt5.
-        Instrumentado con OTel y Métricas de Latencia.
+        Punto de entrada maestro para ejecutar cualquier funcin de mt5.
+        Instrumentado con OTel y Mtricas de Latencia.
         """
         from app.core.observability import obs_engine, tracer
         import time
@@ -150,12 +150,12 @@ class MT5Connection:
                 raise e
 
     def _locked_execution(self, func: Callable[..., T], *args, **kwargs) -> T:
-        """Envuelve la ejecución de la función dentro del lock de MT5."""
+        """Envuelve la ejecucin de la funcin dentro del lock de MT5."""
         if not MT5_AVAILABLE:
-            raise RuntimeError("Operación MT5 solicitada pero la librería no está disponible.")
+            raise RuntimeError("Operacin MT5 solicitada pero la librera no est disponible.")
             
         with self._mt5_lock:
-            # Una verificación extra de seguridad
+            # Una verificacin extra de seguridad
             if not mt5.terminal_info() and func != self._initialize_mt5 and func != mt5.initialize:
                 logger.warning("Llamada detectada sin terminal activo, intentando re-init...")
                 self._initialize_mt5()

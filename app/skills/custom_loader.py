@@ -19,7 +19,7 @@ def register_custom_skills(mcp):
         logger.warning(f"Directorio de indicadores no encontrado: {indicators_dir}")
         return
 
-    # Cargar configuración de rutas de MT5
+    # Cargar configuracin de rutas de MT5
     watch_dir = None
     if config_path.exists():
         try:
@@ -30,7 +30,7 @@ def register_custom_skills(mcp):
             logger.error(f"Error cargando bridge_config.json: {e}")
 
     if not watch_dir or not watch_dir.exists():
-        logger.warning("No se pudo determinar el watch_dir de MT5. Las skills personalizadas podrían no funcionar.")
+        logger.warning("No se pudo determinar el watch_dir de MT5. Las skills personalizadas podran no funcionar.")
 
     # Buscar archivos .mq5
     mq5_files = list(indicators_dir.glob("*.mq5"))
@@ -47,22 +47,22 @@ def register_custom_skills(mcp):
 
 def register_indicator_tool(mcp, indicator_name: str, watch_dir: Optional[Path]):
     """
-    Registra dinámicamente una herramienta MCP para un indicador específico.
+    Registra dinmicamente una herramienta MCP para un indicador especfico.
     """
     tool_name = f"skill_{indicator_name.lower().replace('.', '_')}"
     
-    # Definir la función de la herramienta
+    # Definir la funcin de la herramienta
     async def indicator_tool(symbol: str, timeframe: str = "H1", n_rows: int = 100):
         """
         Obtiene los datos exportados por el indicador personalizado.
-        - symbol: Símbolo del activo (ej: EURUSD)
+        - symbol: Smbolo del activo (ej: EURUSD)
         - timeframe: Temporalidad (ej: H1, M15)
-        - n_rows: Número de registros más recientes a retornar.
+        - n_rows: Nmero de registros ms recientes a retornar.
         """
         if not watch_dir:
             return {"status": "error", "message": "MT5 Files directory not configured in bridge_config.json"}
         
-        # Patrón de búsqueda: IndicatorName_Export_Symbol_Timeframe.csv
+        # Patrn de bsqueda: IndicatorName_Export_Symbol_Timeframe.csv
         search_patterns = [
             f"{indicator_name}_Export_{symbol}_{timeframe}.csv",
             f"{indicator_name}_{symbol}_{timeframe}.csv",
@@ -79,7 +79,7 @@ def register_indicator_tool(mcp, indicator_name: str, watch_dir: Optional[Path])
         if not csv_path:
             return {
                 "status": "error", 
-                "message": f"No se encontró exportación para {indicator_name} ({symbol} {timeframe}) en {watch_dir}."
+                "message": f"No se encontr exportacin para {indicator_name} ({symbol} {timeframe}) en {watch_dir}."
             }
         
         try:
@@ -101,7 +101,7 @@ def register_indicator_tool(mcp, indicator_name: str, watch_dir: Optional[Path])
 
 def register_python_pipeline_tools(mcp, python_dir: Path):
     """
-    Registra herramientas para ejecutar el pipeline de análisis de Python.
+    Registra herramientas para ejecutar el pipeline de anlisis de Python.
     """
     import subprocess
     import sys
@@ -109,10 +109,10 @@ def register_python_pipeline_tools(mcp, python_dir: Path):
     @mcp.tool(name="skill_run_unified_analysis")
     async def run_unified_analysis(symbol: str = "EURUSD", timeframe: str = "H1", data_path: Optional[str] = None):
         """
-        Ejecuta el pipeline institucional completo: Ingesta, ML Training, Optimización y Dashboard.
-        - symbol: Símbolo para el análisis.
+        Ejecuta el pipeline institucional completo: Ingesta, ML Training, Optimizacin y Dashboard.
+        - symbol: Smbolo para el anlisis.
         - timeframe: Temporalidad.
-        - data_path: (Opcional) Ruta al CSV específico. Si no se da, usará la exportación más reciente.
+        - data_path: (Opcional) Ruta al CSV especfico. Si no se da, usar la exportacin ms reciente.
         """
         pipeline_script = python_dir / "run_pipeline.py"
         if not pipeline_script.exists():
@@ -141,7 +141,7 @@ def register_python_pipeline_tools(mcp, python_dir: Path):
     @mcp.tool(name="skill_get_analysis_report")
     async def get_analysis_report():
         """
-        Devuelve el estado de los últimos resultados del pipeline (thresholds y métricas ML).
+        Devuelve el estado de los ltimos resultados del pipeline (thresholds y mtricas ML).
         """
         report_path = python_dir / "ml_thresholds.json"
         calib_path = python_dir / "optuna_calibration.json"

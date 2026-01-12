@@ -3,7 +3,7 @@ import sys
 from fastmcp import FastMCP
 from contextlib import asynccontextmanager
 
-# Configuración de Logging CRÍTICA para MCP
+# Configuracin de Logging CRTICA para MCP
 # Todo log debe ir a stderr para no romper el protocolo JSON-RPC en stdout
 logging.basicConfig(
     level=logging.INFO,
@@ -14,13 +14,13 @@ logger = logging.getLogger("MT5_MCP_Server")
 
 import MetaTrader5 as mt5
 
-# Importar lógica de negocio de la app
+# Importar lgica de negocio de la app
 from app.core.mt5_conn import mt5_conn
 from app.skills import (
     market, vision, execution, trade_mgmt, 
     indicators, history, calendar, 
     quant_coder, custom_loader,
-    tester, unified_model, remote_compute # Nuevos módulos
+    tester, unified_model, remote_compute # Nuevos mdulos
 )
 from app.models.schemas import (
     MarketDataRequest, TradeOrderRequest, PositionManageRequest, 
@@ -46,8 +46,8 @@ async def app_lifespan(server: FastMCP):
     
     # Iniciar ZMQ Bridge para Streaming de baja latencia
     async def on_signal(data):
-        logger.info(f"Señal recibida vía ZMQ: {data}")
-        # Sincronizar con la nube de forma asíncrona (Fire & Forget)
+        logger.info(f"Seal recibida va ZMQ: {data}")
+        # Sincronizar con la nube de forma asncrona (Fire & Forget)
         import asyncio
         asyncio.create_task(supabase_sync.log_signal(data))
         
@@ -75,42 +75,42 @@ memory_collection = chroma_client.get_or_create_collection(
 # Registrar Skills de Indicadores Propios
 custom_loader.register_custom_skills(mcp)
 
-# Registrar Skills de Cómputo Remoto (NEXUS)
+# Registrar Skills de Cmputo Remoto (NEXUS)
 remote_compute.register_remote_skills(mcp)
 
 # =============================================================================
-# PILLAR 1: CÓRTEX DE COMPILACIÓN (Code Builder)
+# PILLAR 1: CRTEX DE COMPILACIN (Code Builder)
 # =============================================================================
 
 @mcp.tool()
 async def create_and_compile_indicator(name: str, code: str, compile: bool = True):
     """
     Escribe y compila un nuevo indicador .mq5. 
-    Retorna el log de compilación para auto-corrección.
+    Retorna el log de compilacin para auto-correccin.
     """
     req = MQL5CodeRequest(name=name, code=code, compile=compile)
     return await quant_coder.create_native_indicator(req)
 
 # =============================================================================
-# PILLAR 2: OJO DE HALCÓN (Data Bridge)
+# PILLAR 2: OJO DE HALCN (Data Bridge)
 # =============================================================================
 
 @mcp.tool()
 async def get_market_snapshot(symbol: str, timeframe: str = "M5"):
     """
-    Radiografía completa del mercado: Precio, Vela actual, Volatilidad y Cuenta.
+    Radiografa completa del mercado: Precio, Vela actual, Volatilidad y Cuenta.
     Ideal para decisiones de alta frecuencia.
     """
     return await market.get_market_snapshot(symbol, timeframe)
 
 @mcp.tool()
 async def get_candles(symbol: str, timeframe: str = "M5", n_candles: int = 100):
-    """Obtiene velas históricas (OHLCV)."""
+    """Obtiene velas histricas (OHLCV)."""
     return await market.get_candles(symbol, timeframe, n_candles)
 
 @mcp.tool()
 async def get_market_panorama(resize_factor: float = 0.75):
-    """Captura visual del gráfico."""
+    """Captura visual del grfico."""
     return await vision.capture_panorama(resize_factor=resize_factor)
 
 # =============================================================================
@@ -143,7 +143,7 @@ async def run_shadow_backtest(
     )
 
 # =============================================================================
-# PILLAR 4: INYECCIÓN ESTRATÉGICA (Unified Model)
+# PILLAR 4: INYECCIN ESTRATGICA (Unified Model)
 # =============================================================================
 
 @mcp.tool()
@@ -160,7 +160,7 @@ async def query_unified_brain(sql_query: str):
 
 @mcp.tool()
 async def execute_trade(symbol: str, action: str, volume: float, price: float = None, sl: float = None, tp: float = None, comment: str = "MCP_Order"):
-    """Ejecuta órdenes: BUY, SELL, LIMIT, STOP."""
+    """Ejecuta rdenes: BUY, SELL, LIMIT, STOP."""
     req = TradeOrderRequest(symbol=symbol, action=action, volume=volume, price=price, sl=sl, tp=tp, comment=comment)
     result = await execution.send_order(req)
     return result.dict()
@@ -179,7 +179,7 @@ async def get_account_status():
 
 @mcp.tool()
 async def get_economic_calendar():
-    """Eventos económicos de alto impacto próximos."""
+    """Eventos econmicos de alto impacto prximos."""
     req = CalendarRequest(importance="HIGH", days_forward=1)
     return await calendar.get_economic_calendar(req)
 
@@ -189,7 +189,7 @@ async def get_economic_calendar():
 
 @mcp.resource("signals://live")
 async def get_live_signals():
-    """Stream de señales ZMQ disponibles."""
+    """Stream de seales ZMQ disponibles."""
     return "Stream Active"
 
 # =============================================================================
@@ -202,7 +202,7 @@ async def ingest_memories(days: int = 30):
     Sincroniza el historial de SQLite con la memoria vectorial RAG. 
     Permite al bot recordar eventos pasados.
     """
-    logger.info(f"RAG: Ingestando memorias de los últimos {days} días...")
+    logger.info(f"RAG: Ingestando memorias de los ltimos {days} das...")
     db_path = os.path.join(os.path.dirname(__file__), "unified_model.db")
     if not os.path.exists(db_path):
         return "Error: DB local no encontrada para ingesta."
@@ -215,24 +215,24 @@ async def ingest_memories(days: int = 30):
         
         batch_ids = [f"mem_{datetime.datetime.now().timestamp()}_{i}" for i in range(len(narratives))]
         memory_collection.add(documents=narratives, ids=batch_ids)
-        return f"Éxito: {len(narratives)} memorias tácticas sincronizadas en el almacén vectorial."
+        return f"xito: {len(narratives)} memorias tcticas sincronizadas en el almacn vectorial."
     finally:
         db.close()
 
 @mcp.tool()
 async def query_memory(question: str):
     """
-    Consulta la memoria histórica usando lenguaje natural.
-    Ejemplo: '¿Cómo nos fue con la última divergencia?'
+    Consulta la memoria histrica usando lenguaje natural.
+    Ejemplo: 'Cmo nos fue con la ltima divergencia?'
     """
     logger.info(f"RAG: Consultando memoria sobre: {question}")
     results = memory_collection.query(query_texts=[question], n_results=5)
     
     docs = results.get('documents', [[]])[0]
     if not docs:
-        return "No hay recuerdos similares en el almacén vectorial."
+        return "No hay recuerdos similares en el almacn vectorial."
     
-    return "### Eventos Históricos Relacionados:\n\n" + "\n\n---\n\n".join(docs)
+    return "### Eventos Histricos Relacionados:\n\n" + "\n\n---\n\n".join(docs)
 
 if __name__ == "__main__":
     mcp.run()

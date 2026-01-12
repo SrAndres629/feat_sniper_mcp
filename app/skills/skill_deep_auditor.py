@@ -1,75 +1,115 @@
-from datetime import datetime, timezone
-import sys
+
+import logging
 import os
-import subprocess
+import sys
 import json
+import sqlite3
+import pandas as pd
+from datetime import datetime, timezone
+from typing import Dict, Any, List
 
-# Ensure parent directory is in path to import nexus modules if needed
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+logger = logging.getLogger("FEAT.DeepAuditor")
 
-def run_deep_audit(auto_repair: bool = False):
+class DeepAuditor:
     """
-    SKILL: AUDITOR PROFUNDA
-    Ejecuta la auditoría maestra del sistema NEXUS y opcionalmente aplica correcciones.
-    Returns: Dict con el estado del sistema y reporte de anomalías.
+    🔬 INSTITUTIONAL GRADE AUDITOR
+    Analyzes system health, ML performance, and data integrity.
     """
-    try:
-        # Run the auditor script directly to get the JSON output
-        # We assume nexus_auditor.py is in the project root
-        project_root = os.getcwd() # Assumption: Skill runs with CWD at root
-        auditor_path = os.path.join(project_root, "nexus_auditor.py")
-        
-        if not os.path.exists(auditor_path):
-             # Fallback if we are in app/skills
-             auditor_path = os.path.join(project_root, "../../nexus_auditor.py")
+    def __init__(self, db_path: str = "app/data/market_data.db"):
+        self.db_path = db_path
+        if not os.path.exists(self.db_path):
+            self.db_path = "data/market_data.db"
 
-        cmd = ["python", "nexus_auditor.py"]
-        
-        # Capture output
-        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=project_root)
-        
-        # Extract JSON tracer
-        import re
-        json_match = re.search(r'REPAIR_REQUEST_START\s*(\{.*?\})\s*REPAIR_REQUEST_END', result.stdout, re.DOTALL)
-        
+    def run_comprehensive_audit(self) -> Dict[str, Any]:
         report = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "status": "UNKNOWN",
-            "anomalies": [],
-            "critical_fixes_applied": False
+            "status": "NOMINAL",
+            "modules": {},
+            "metrics": {},
+            "anomalies": []
         }
-        
-        if json_match:
-            data = json.loads(json_match.group(1))
-            report["anomalies"] = data.get("anomalies", [])
-            report["critical"] = data.get("critical", [])
-            
-            if not report["critical"]:
-                report["status"] = "OPERATIONAL"
-            else:
-                report["status"] = "CRITICAL_FAILURE"
-                
-                if auto_repair:
-                    # Trigger the orchestrator's repair logic
-                    # For now, we simulate this by returning the intent, 
-                    # as nexus_control.py handles the actual process management
-                    report["repair_instruction"] = "Run 'python nexus_control.py start' to trigger Deep Healer."
-        
-        # Check for generated report file
-        report_file = os.path.join(project_root, "AUDIT_REPORT.md")
-        if os.path.exists(report_file):
-            with open(report_file, "r", encoding="utf-8") as f:
-                report["report_content"] = f.read()
+
+        # 1. Database Integrity & Freshness
+        db_audit = self._audit_database()
+        report["modules"]["database"] = db_audit
+        if db_audit["status"] != "OK":
+            report["status"] = "DEGRADED"
+            report["anomalies"].append(f"DB_STALE: {db_audit['latency_sec']}s")
+
+        # 2. ML Feature Distribution Audit
+        # Check if MSS-5 sensors are producing valid data (not all zeros / NaNs)
+        ml_audit = self._audit_ml_features()
+        report["modules"]["ml_engine"] = ml_audit
+        if ml_audit["status"] != "OK":
+            report["status"] = "CRITICAL"
+            report["anomalies"].append("ML_FEATURE_CORRUPTION")
+
+        # 3. Process & Infrastructure Check
+        infra_audit = self._audit_infrastructure()
+        report["modules"]["infrastructure"] = infra_audit
 
         return report
 
-    except Exception as e:
-        return {"error": str(e), "status": "SKILL_FAILURE"}
+    def _audit_database(self) -> Dict[str, Any]:
+        try:
+            if not os.path.exists(self.db_path):
+                return {"status": "ERROR", "message": "File not found"}
+            
+            conn = sqlite3.connect(self.db_path)
+            df = pd.read_sql("SELECT * FROM market_ticks ORDER BY id DESC LIMIT 10", conn)
+            conn.close()
 
-# Entry point for MCP
-tool_name = "skill_auditor_profunda"
-tool_description = "Ejecuta auditoría maestra del sistema NEXUS con capacidad de diagnóstico profundo."
+            if df.empty:
+                return {"status": "EMPTY", "latency_sec": -1}
 
-def execute(parameters: dict):
-    repair = parameters.get("auto_repair", False)
-    return run_deep_audit(repair)
+            last_ts = pd.to_datetime(df['tick_time'].iloc[0].replace("Z", "+00:00"))
+            latency = (datetime.now(timezone.utc) - last_ts).total_seconds()
+
+            return {
+                "status": "OK" if latency < 300 else "STALE",
+                "latency_sec": int(latency),
+                "record_count": len(df)
+            }
+        except Exception as e:
+            return {"status": "ERROR", "message": str(e)}
+
+    def _audit_ml_features(self) -> Dict[str, Any]:
+        """Check for NaN or Dead features in the last batch."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            # Check the last 100 entries for M1
+            df = pd.read_sql("SELECT * FROM market_data WHERE timeframe='M1' ORDER BY tick_time DESC LIMIT 100", conn)
+            conn.close()
+
+            if df.empty:
+                return {"status": "WAITING_DATA", "nan_count": 0}
+
+            # Check specific MSS-5 tensors
+            tensors = ["momentum_kinetic_micro", "entropy_coefficient", "cycle_harmonic_phase", "acceptance_ratio"]
+            missing_tensors = [t for t in tensors if t not in df.columns]
+            
+            if missing_tensors:
+                 return {"status": "SCHEMA_MISMATCH", "missing": missing_tensors}
+
+            nan_stats = df[tensors].isna().sum().to_dict()
+            total_nans = sum(nan_stats.values())
+
+            return {
+                "status": "OK" if total_nans == 0 else "CORRUPTED",
+                "nan_report": nan_stats,
+                "feature_health": "OPTIMAL" if total_nans == 0 else "SUBOPTIMAL"
+            }
+        except Exception as e:
+            return {"status": "ERROR", "message": str(e)}
+
+    def _audit_infrastructure(self) -> Dict[str, Any]:
+        import psutil
+        return {
+            "cpu_percent": psutil.cpu_percent(),
+            "memory_percent": psutil.virtual_memory().percent,
+            "os": sys.platform
+        }
+
+def run_deep_audit(auto_repair: bool = False):
+    auditor = DeepAuditor()
+    return auditor.run_comprehensive_audit()

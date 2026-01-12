@@ -50,7 +50,7 @@ def load_data_mtf(symbol: str, timeframe: str) -> Tuple[np.ndarray, np.ndarray]:
     conn.close()
     
     if len(rows) < 500:
-        logger.warning(f"⚠️ Insufficient data for {symbol} {timeframe} ({len(rows)} samples). Using bootstrap data.")
+        logger.warning(f" Insufficient data for {symbol} {timeframe} ({len(rows)} samples). Using bootstrap data.")
         # Synthetic cold start for demo/initialization
         X = np.random.randn(500, len(FEATURE_NAMES)).astype(np.float32)
         y = np.random.randint(0, 2, 500).astype(np.int64)
@@ -67,7 +67,7 @@ def train_sniper(symbol: str, timeframe: str):
     from sklearn.model_selection import TimeSeriesSplit
     from sklearn.metrics import log_loss
     
-    logger.info(f"🎯 Training SNIPER model for {symbol} [{timeframe}]")
+    logger.info(f" Training SNIPER model for {symbol} [{timeframe}]")
     X, y = load_data_mtf(symbol, timeframe)
     
     model = GradientBoostingClassifier(
@@ -84,13 +84,13 @@ def train_sniper(symbol: str, timeframe: str):
         "trained_at": datetime.utcnow().isoformat()
     }, path)
     
-    logger.info(f"✅ Sniper model saved: {path}")
+    logger.info(f" Sniper model saved: {path}")
 
 def train_strategist(symbol: str, timeframe: str):
     """Trains a structural bias model for trend identification."""
     from sklearn.ensemble import RandomForestClassifier
     
-    logger.info(f"🏛️ Training STRATEGIST model for {symbol} [{timeframe}]")
+    logger.info(f" Training STRATEGIST model for {symbol} [{timeframe}]")
     X, y = load_data_mtf(symbol, timeframe)
     
     # Strategists use more robust, deeper trees with higher sampling
@@ -108,7 +108,7 @@ def train_strategist(symbol: str, timeframe: str):
         "trained_at": datetime.utcnow().isoformat()
     }, path)
     
-    logger.info(f"✅ Strategist model saved: {path}")
+    logger.info(f" Strategist model saved: {path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FEAT MTF Hierarchical Trainer")

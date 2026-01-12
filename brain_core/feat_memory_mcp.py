@@ -8,11 +8,11 @@ from db_engine import UnifiedModelDB
 from datetime import datetime
 from typing import List, Optional
 
-# Configuración de Logging para MCP
+# Configuracin de Logging para MCP
 logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger("FEAT_Memory_Brain")
 
-# Rutas - Basadas en la ubicación del archivo
+# Rutas - Basadas en la ubicacin del archivo
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "unified_model.db")
 CHROMA_PATH = os.path.join(BASE_DIR, "chroma_db")
@@ -24,10 +24,10 @@ mcp = FastMCP("FEAT_Memory_Brain")
 chroma_client = chromadb.PersistentClient(path=CHROMA_PATH)
 
 # Usar SentenceTransformers para embeddings de alta calidad localmente
-# Esto descargará el modelo 'all-MiniLM-L6-v2' la primera vez (aprox 80MB)
+# Esto descargar el modelo 'all-MiniLM-L6-v2' la primera vez (aprox 80MB)
 sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
 
-# Crear o recuperar colección
+# Crear o recuperar coleccin
 collection = chroma_client.get_or_create_collection(
     name="market_memories", 
     embedding_function=sentence_transformer_ef
@@ -37,12 +37,12 @@ collection = chroma_client.get_or_create_collection(
 async def ingest_memories(days: int = 30):
     """
     Extrae la historia narrativa de la base de datos SQLite y la indexa en la memoria vectorial.
-    Llamar periódicamente para mantener la memoria actualizada.
+    Llamar peridicamente para mantener la memoria actualizada.
     """
-    logger.info(f"Iniciando ingesta de memorias (últimos {days} días)...")
+    logger.info(f"Iniciando ingesta de memorias (ltimos {days} das)...")
     
     if not os.path.exists(DB_PATH):
-        return f"Error: No se encontró la base de datos en {DB_PATH}"
+        return f"Error: No se encontr la base de datos en {DB_PATH}"
 
     db = UnifiedModelDB(DB_PATH)
     try:
@@ -50,7 +50,7 @@ async def ingest_memories(days: int = 30):
         if not narratives:
             return "No se encontraron nuevas memorias narrativas en el periodo especificado."
         
-        # Generar IDs únicos basados en timestamp para evitar duplicados en la sesión
+        # Generar IDs nicos basados en timestamp para evitar duplicados en la sesin
         batch_ids = [f"mem_{datetime.now().timestamp()}_{i}" for i in range(len(narratives))]
         
         collection.add(
@@ -58,7 +58,7 @@ async def ingest_memories(days: int = 30):
             ids=batch_ids
         )
         
-        return f"Éxito: Se han procesado e indexado {len(narratives)} fragmentos de memoria narrativa en el almacén vectorial."
+        return f"xito: Se han procesado e indexado {len(narratives)} fragmentos de memoria narrativa en el almacn vectorial."
     except Exception as e:
         logger.error(f"Fallo en la ingesta: {str(e)}")
         return f"Error durante la ingesta: {str(e)}"
@@ -68,8 +68,8 @@ async def ingest_memories(days: int = 30):
 @mcp.tool()
 async def query_memory(question: str):
     """
-    Realiza una búsqueda semántica en la memoria histórica del bot. 
-    Ejemplo: '¿Qué pasó la última vez que el score fue bajo?' o 'Busca patrones de expansión en EURUSD'.
+    Realiza una bsqueda semntica en la memoria histrica del bot. 
+    Ejemplo: 'Qu pas la ltima vez que el score fue bajo?' o 'Busca patrones de expansin en EURUSD'.
     """
     logger.info(f"Consultando memoria vectorial para: '{question}'")
     
@@ -80,7 +80,7 @@ async def query_memory(question: str):
         )
         
         if not results['documents'] or len(results['documents'][0]) == 0:
-            return "No se han encontrado recuerdos relevantes. ¿Has ejecutado 'ingest_memories' primero?"
+            return "No se han encontrado recuerdos relevantes. Has ejecutado 'ingest_memories' primero?"
             
         context_list = results['documents'][0]
         formatted_results = "\n\n---\n\n".join(context_list)

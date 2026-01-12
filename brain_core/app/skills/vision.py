@@ -26,14 +26,14 @@ async def capture_panorama(resize_factor: float = 0.75) -> Dict[str, Any]:
         screenshot = await anyio.to_thread.run_sync(pyautogui.screenshot)
         
         if screenshot is None:
-            raise ValueError("La captura de pantalla devolvió un objeto nulo.")
+            raise ValueError("La captura de pantalla devolvi un objeto nulo.")
 
         # Redimensionar para optimizar tokens y ancho de banda
         if resize_factor < 1.0:
             new_size = (int(screenshot.width * resize_factor), int(screenshot.height * resize_factor))
             screenshot = screenshot.resize(new_size, Image.Resampling.LANCZOS)
         
-        # Guardar en buffer de memoria como JPEG (mejor compresión que PNG)
+        # Guardar en buffer de memoria como JPEG (mejor compresin que PNG)
         buffer = io.BytesIO()
         screenshot.save(buffer, format="JPEG", quality=85)
         
@@ -51,10 +51,10 @@ async def capture_panorama(resize_factor: float = 0.75) -> Dict[str, Any]:
         logger.error(f"Error en Vision Skill: {str(e)}")
         # Detectar errores comunes de pantalla bloqueada o permisos
         error_msg = str(e)
-        suggestion = "Asegúrate de que la terminal MT5 esté maximizada y la pantalla no esté bloqueada."
+        suggestion = "Asegrate de que la terminal MT5 est maximizada y la pantalla no est bloqueada."
         
         if "display" in error_msg.lower():
-            error_msg = "Error de acceso al display (posible sesión RDP desconectada o pantalla bloqueada)."
+            error_msg = "Error de acceso al display (posible sesin RDP desconectada o pantalla bloqueada)."
         
         return {
             "status": "error",

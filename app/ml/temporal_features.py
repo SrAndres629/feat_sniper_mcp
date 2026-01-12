@@ -115,7 +115,7 @@ class BayesianPriors:
         """
         Calculate posterior probability using Bayes' theorem approximation.
         
-        P(success | evidence) ∝ P(success) × P(evidence | success)
+        P(success | evidence)  P(success)  P(evidence | success)
         """
         prior = self.get_prior(block)
         base_prob = prior["expansion_prob"]

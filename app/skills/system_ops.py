@@ -1,5 +1,5 @@
 """
-System Operations Skill - Auto-Diagnóstico y Control del Host
+System Operations Skill - Auto-Diagnstico y Control del Host
 ==============================================================
 Permite que la IA monitoree y gestione la salud del sistema.
 """
@@ -16,7 +16,7 @@ logger = logging.getLogger("MT5_Bridge.SystemOps")
 async def system_health_check() -> Dict[str, Any]:
     """
     Revisa la salud del servidor (CPU, RAM, Disco).
-    Útil para auto-diagnóstico antes de operaciones pesadas.
+    til para auto-diagnstico antes de operaciones pesadas.
     """
     try:
         import psutil
@@ -86,7 +86,7 @@ async def system_health_check() -> Dict[str, Any]:
 
 async def get_process_info() -> Dict[str, Any]:
     """
-    Obtiene información sobre los procesos del contenedor.
+    Obtiene informacin sobre los procesos del contenedor.
     """
     try:
         import psutil
@@ -109,7 +109,7 @@ async def get_process_info() -> Dict[str, Any]:
 
 async def get_environment_info() -> Dict[str, Any]:
     """
-    Obtiene información del entorno de ejecución.
+    Obtiene informacin del entorno de ejecucin.
     """
     import sys
     import platform
@@ -128,7 +128,7 @@ async def get_environment_info() -> Dict[str, Any]:
 async def list_running_tasks() -> Dict[str, Any]:
     """
     Lista las tareas asyncio activas.
-    Útil para debugging de procesos colgados.
+    til para debugging de procesos colgados.
     """
     tasks = asyncio.all_tasks()
     return {
@@ -159,26 +159,26 @@ async def cleanup_cache() -> Dict[str, Any]:
     }
 
 
-# Función peligrosa - requiere confirmación explícita
+# Funcin peligrosa - requiere confirmacin explcita
 async def restart_internal_service(service: str) -> Dict[str, Any]:
     """
     (PELIGROSO) Intenta reiniciar servicios internos.
-    Solo debe usarse como último recurso.
+    Solo debe usarse como ltimo recurso.
     
-    Servicios válidos: zmq_bridge, rag_memory, watchdog
+    Servicios vlidos: zmq_bridge, rag_memory, watchdog
     """
     valid_services = ["zmq_bridge", "rag_memory", "watchdog"]
     
     if service not in valid_services:
         return {
             "status": "error",
-            "message": f"Servicio inválido. Opciones: {valid_services}"
+            "message": f"Servicio invlido. Opciones: {valid_services}"
         }
     
-    logger.warning(f"⚠️ Restart solicitado para: {service}")
+    logger.warning(f" Restart solicitado para: {service}")
     
-    # Por seguridad, solo logueamos la intención
-    # El restart real requeriría lógica específica por servicio
+    # Por seguridad, solo logueamos la intencin
+    # El restart real requerira lgica especfica por servicio
     return {
         "status": "logged",
         "service": service,

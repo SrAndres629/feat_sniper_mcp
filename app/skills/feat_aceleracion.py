@@ -1,17 +1,17 @@
 """
-FEAT Module A: ACELERACIÓN (Vector de Intención) - CHRONO-AWARE
+FEAT Module A: ACELERACIN (Vector de Intencin) - CHRONO-AWARE
 ================================================================
 Mide velocidad y volumen para validar entrada y descartar Fakeouts.
 
 Conceptos Clave:
-- Body/Wick Ratio: Vela de intención = cuerpo > 70%, mecha < 30%
+- Body/Wick Ratio: Vela de intencin = cuerpo > 70%, mecha < 30%
 - Volume Confirmation: Volumen > 1.5x promedio
 - Fakeout Detection: Mecha que barre nivel pero cierra dentro
 
-INTEGRACIÓN TEMPORAL:
+INTEGRACIN TEMPORAL:
 - Momentum en Kill Zone tiene mayor peso
-- Fakeouts de Lunes (INDUCTION) son más comunes
-- ATR normalizado por sesión
+- Fakeouts de Lunes (INDUCTION) son ms comunes
+- ATR normalizado por sesin
 """
 
 import logging
@@ -100,7 +100,7 @@ def analyze_candle_structure(candle: Dict) -> Dict[str, Any]:
 
 def classify_candle_pattern(candle: Dict, prev_candle: Dict = None) -> Tuple[CandlePattern, float]:
     """
-    Clasifica patrón de vela con score de confianza.
+    Clasifica patrn de vela con score de confianza.
     """
     structure = analyze_candle_structure(candle)
     body_ratio = structure["body_ratio"]
@@ -202,7 +202,7 @@ def detect_fakeout(candles: pd.DataFrame, level: float, direction: str) -> Dict[
     fakeout_result = {"is_fakeout": False, "fakeout_score": 0}
     
     if direction == "BUY":
-        # Fakeout bajista: mecha rompió bajo pero cerró arriba
+        # Fakeout bajista: mecha rompi bajo pero cerr arriba
         if last["low"] < level and last["close"] > level:
             wick_size = level - last["low"]
             body_size = abs(last["close"] - last["open"])
@@ -217,7 +217,7 @@ def detect_fakeout(candles: pd.DataFrame, level: float, direction: str) -> Dict[
                 }
     
     elif direction == "SELL":
-        # Fakeout alcista: mecha rompió arriba pero cerró abajo
+        # Fakeout alcista: mecha rompi arriba pero cerr abajo
         if last["high"] > level and last["close"] < level:
             wick_size = last["high"] - level
             body_size = abs(last["close"] - last["open"])
@@ -271,10 +271,10 @@ def analyze_aceleracion(
     chrono_features: Dict = None
 ) -> Dict[str, Any]:
     """
-    ⚡ FEAT MODULE A: Validación de Momentum (Chrono-Aware).
+     FEAT MODULE A: Validacin de Momentum (Chrono-Aware).
     
-    Confirma si hay aceleración real o es una trampa.
-    Este es el último filtro antes de ejecutar.
+    Confirma si hay aceleracin real o es una trampa.
+    Este es el ltimo filtro antes de ejecutar.
     """
     result = {
         "module": "FEAT_Aceleracion_ChronoAware",
@@ -303,9 +303,9 @@ def analyze_aceleracion(
     if weekly_phase == "INDUCTION":
         momentum_chrono_mult = 0.7  # Lunes: momentum menos confiable
     elif is_killzone:
-        momentum_chrono_mult = 1.15  # Kill Zone: momentum más confiable
+        momentum_chrono_mult = 1.15  # Kill Zone: momentum ms confiable
     elif weekly_phase == "EXPANSION":
-        momentum_chrono_mult = 1.1  # Jueves: buena expansión
+        momentum_chrono_mult = 1.1  # Jueves: buena expansin
     
     df = pd.DataFrame(recent_candles)
     
@@ -452,13 +452,13 @@ def analyze_aceleracion(
     }
     
     if fakeout_check.get("is_fakeout"):
-        result["guidance"]["cautions"].append("🚫 FAKEOUT detectado - NO ejecutar")
+        result["guidance"]["cautions"].append(" FAKEOUT detectado - NO ejecutar")
     if momentum_type == MomentumType.EXHAUSTION:
-        result["guidance"]["cautions"].append("⚠️ Vela de agotamiento - posible reversión")
+        result["guidance"]["cautions"].append(" Vela de agotamiento - posible reversin")
     if weekly_phase == "INDUCTION":
-        result["guidance"]["cautions"].append("📅 LUNES: Momentum puede ser falso")
+        result["guidance"]["cautions"].append(" LUNES: Momentum puede ser falso")
     if vol_analysis["classification"] == "LOW":
-        result["guidance"]["cautions"].append("📉 Volumen bajo - confirmar antes de entry")
+        result["guidance"]["cautions"].append(" Volumen bajo - confirmar antes de entry")
     
     logger.info(f"[FEAT-A] Score={adjusted_momentum:.1f}, Type={momentum_type.value}, ExecProb={execution_probability:.2f}")
     
@@ -490,7 +490,7 @@ async def feat_validate_aceleracion(
     poi_status: str = "NEUTRAL",
     proposed_direction: str = None
 ) -> Dict[str, Any]:
-    """MCP Tool: FEAT Module A - Aceleración (legacy)."""
+    """MCP Tool: FEAT Module A - Aceleracin (legacy)."""
     return analyze_aceleracion(recent_candles, poi_status, proposed_direction)
 
 
@@ -499,7 +499,7 @@ async def feat_validate_aceleracion_advanced(
     proposed_direction: str = None,
     chrono_features: Dict = None
 ) -> Dict[str, Any]:
-    """MCP Tool: FEAT Module A - Aceleración (chrono-aware)."""
+    """MCP Tool: FEAT Module A - Aceleracin (chrono-aware)."""
     return analyze_aceleracion(recent_candles, "NEUTRAL", proposed_direction, 14, chrono_features)
 
 

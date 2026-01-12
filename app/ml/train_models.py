@@ -40,9 +40,11 @@ logger = logging.getLogger("QuantumLeap.Trainer")
 # Feature columns (must match data_collector.py)
 FEATURE_NAMES = [
     "close", "open", "high", "low", "volume",
-    "rsi", "ema_fast", "ema_slow", "ema_spread",
-    "feat_score", "fsm_state", "atr", "compression",
-    "liquidity_above", "liquidity_below"
+    "rsi", "atr", "ema_fast", "ema_slow",
+    "feat_score", "fsm_state", "liquidity_ratio", "volatility_zscore",
+    "momentum_kinetic_micro", "entropy_coefficient", "cycle_harmonic_phase", 
+    "institutional_mass_flow", "volatility_regime_norm", "acceptance_ratio", 
+    "wick_stress", "poc_z_score", "cvd_acceleration"
 ]
 
 
@@ -74,7 +76,7 @@ def load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray]:
 
 def load_from_sqlite(db_path: str = "data/market_data.db") -> Tuple[np.ndarray, np.ndarray]:
     """
-    Carga dataset directamente desde SQLite (más eficiente que CSV).
+    Carga dataset directamente desde SQLite (ms eficiente que CSV).
     Lee de la tabla training_samples.
     
     Returns:
@@ -91,8 +93,9 @@ def load_from_sqlite(db_path: str = "data/market_data.db") -> Tuple[np.ndarray, 
     
     query = f"""
         SELECT {', '.join(FEATURE_NAMES)}, label
-        FROM training_samples
-        ORDER BY timestamp
+        FROM market_data
+        WHERE label IS NOT NULL
+        ORDER BY tick_time
     """
     
     cursor = conn.execute(query)
@@ -117,8 +120,8 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
     """
     Entrena GradientBoostingClassifier con TimeSeriesSplit.
     
-    Objetivo: Minimizar LogLoss para clasificación binaria.
-    Validación: Walk-forward para evitar look-ahead bias.
+    Objetivo: Minimizar LogLoss para clasificacin binaria.
+    Validacin: Walk-forward para evitar look-ahead bias.
     
     Returns:
         Path al modelo guardado
@@ -132,7 +135,7 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
     logger.info("PHASE 2: Training Gradient Boosting Model")
     logger.info("=" * 60)
     
-    # TimeSeriesSplit para validación temporal
+    # TimeSeriesSplit para validacin temporal
     tscv = TimeSeriesSplit(n_splits=5)
     
     # Impute NaNs
@@ -140,7 +143,7 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
     imputer = SimpleImputer(strategy='mean')
     X_imputed = imputer.fit_transform(X)
     
-    # Normalización
+    # Normalizacin
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_imputed)
     
@@ -152,7 +155,7 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
         X_train, X_val = X_scaled[train_idx], X_scaled[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
         
-        # Modelo con hiperparámetros optimizados para trading
+        # Modelo con hiperparmetros optimizados para trading
         model = GradientBoostingClassifier(
             n_estimators=200,
             learning_rate=0.05,
@@ -165,7 +168,7 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
         
         model.fit(X_train, y_train)
         
-        # Evaluación
+        # Evaluacin
         y_pred_proba = model.predict_proba(X_val)
         y_pred = model.predict(X_val)
         
@@ -193,14 +196,14 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
         "cv_results": fold_results
     }, model_path)
     
-    logger.info(f"✅ GBM Model saved to {model_path}")
+    logger.info(f" GBM Model saved to {model_path}")
     logger.info(f"   Best LogLoss: {best_loss:.5f}")
     
     return model_path
 
 
 # =============================================================================
-# FASE 3: LSTM CON ATENCIÓN (TEMPORAL)
+# FASE 3: LSTM CON ATENCIN (TEMPORAL)
 # =============================================================================
 
 def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
@@ -210,7 +213,7 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
     Arquitectura:
     - LSTM bidireccional con 2 capas
     - Self-Attention para ponderar velas relevantes
-    - Clasificación binaria (WIN/LOSS)
+    - Clasificacin binaria (WIN/LOSS)
     
     Returns:
         Path al modelo guardado
@@ -258,7 +261,7 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
         shuffle=False
     )
     
-    # Modelo LSTM con Atención
+    # Modelo LSTM con Atencin
     class LSTMWithAttention(nn.Module):
         def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2, num_classes: int = 2):
             super().__init__()
@@ -378,7 +381,7 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
         "n_samples": len(X)
     }, model_path)
     
-    logger.info(f"✅ LSTM Model saved to {model_path}")
+    logger.info(f" LSTM Model saved to {model_path}")
     logger.info(f"   Best Val Loss: {best_val_loss:.5f}")
     
     return model_path
@@ -399,8 +402,8 @@ def train_all():
     if os.path.exists(DATA_PATH):
         X, y = load_dataset(DATA_PATH)
     else:
-        logger.warning(f"⚠️ Dataset not found at {DATA_PATH}")
-        logger.info("⚡ Generating SYNTHETIC COLD-START DATA to initialize models...")
+        logger.warning(f" Dataset not found at {DATA_PATH}")
+        logger.info(" Generating SYNTHETIC COLD-START DATA to initialize models...")
         # Generate 1000 random samples (Cold Start)
         import numpy as np
         X = np.random.randn(MIN_SAMPLES, len(FEATURE_NAMES)).astype(np.float32)
@@ -409,7 +412,7 @@ def train_all():
     logger.info(f"Loaded Dataset Shape: X={X.shape}, y={y.shape}")
 
     if len(X) < MIN_SAMPLES:
-        logger.warning(f"⚠️ Insufficient data ({len(X)} < {MIN_SAMPLES}). Attempting training anyway (Risk Mode)...")
+        logger.warning(f" Insufficient data ({len(X)} < {MIN_SAMPLES}). Attempting training anyway (Risk Mode)...")
     
     # Ensure 2D
     if X.ndim == 1:
@@ -431,7 +434,7 @@ def train_all():
     }
     
     logger.info("=" * 60)
-    logger.info("✅ Training Complete!")
+    logger.info(" Training Complete!")
     logger.info(f"   GBM: {gbm_path}")
     logger.info(f"   LSTM: {lstm_path}")
     logger.info("=" * 60)

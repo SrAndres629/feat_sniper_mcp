@@ -43,7 +43,7 @@ USE_FANCY = True
 try:
     # Check encoding efficiently
     enc = getattr(sys.stdout, 'encoding', 'ascii') or 'ascii'
-    "✅".encode(enc)
+    "".encode(enc)
 except Exception:
     USE_FANCY = False
 
@@ -91,7 +91,7 @@ class NexusAuditor:
             msg = f"Variables faltantes: {', '.join(missing)}"
             self.anomalies.append(f"CONFIG_MISSING_{'_'.join(missing)}")
             return err(msg)
-        return ok("Configuración ..... Credenciales cargadas")
+        return ok("Configuracin ..... Credenciales cargadas")
 
     def is_service_running(self, service_name):
         """Check if a docker service is running via CLI."""
@@ -160,7 +160,7 @@ class NexusAuditor:
     def audit_supabase(self):
         """Check live connection to Supabase and data flow."""
         if "SUPABASE_URL" not in os.environ:
-            return err("Sincronización ... ABORTADA (Sin URL)")
+            return err("Sincronizacin ... ABORTADA (Sin URL)")
         
         try:
             from supabase import create_client, Client
@@ -169,18 +169,18 @@ class NexusAuditor:
             
             if not res.data:
                 self.anomalies.append("DB_EMPTY")
-                return warn("Sincronización ... 0 ticks (DB Vacía)")
+                return warn("Sincronizacin ... 0 ticks (DB Vaca)")
                 
             last_dt = datetime.fromisoformat(res.data[0]['tick_time'].replace("Z", "+00:00"))
             delta = (datetime.now(timezone.utc) - last_dt).total_seconds()
             
             if delta < 300:
-                return ok(f"Último Tick ..... Hace {int(delta)}s (FLUJO ACTIVO)")
+                return ok(f"ltimo Tick ..... Hace {int(delta)}s (FLUJO ACTIVO)")
             else:
                 self.anomalies.append("DATA_STALE")
-                return err(f"Último Tick ..... Hace {int(delta)}s (LATENCIA CRÍTICA)")
+                return err(f"ltimo Tick ..... Hace {int(delta)}s (LATENCIA CRTICA)")
         except Exception as e:
-            return err(f"Sincronización ... Error: {str(e)[:50]}")
+            return err(f"Sincronizacin ... Error: {str(e)[:50]}")
 
     def audit_rag(self):
         """Check ChromaDB state (Smart Path Detection)."""
@@ -224,9 +224,9 @@ class NexusAuditor:
             return warn(f"MCP Skills ...... Error: {e}")
 
     def run_full_audit(self):
-        print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════════╗{RESET}")
-        print(f"{BOLD}{CYAN}║           NEXUS OMNI-AUDITOR - SYSTEM CHECK              ║{RESET}")
-        print(f"{BOLD}{CYAN}╚══════════════════════════════════════════════════════════╝{RESET}")
+        print(f"\n{BOLD}{CYAN}{RESET}")
+        print(f"{BOLD}{CYAN}           NEXUS OMNI-AUDITOR - SYSTEM CHECK              {RESET}")
+        print(f"{BOLD}{CYAN}{RESET}")
         print(f"  UTC: {datetime.now(timezone.utc).isoformat()}\n")
 
     def audit_ports(self):
@@ -283,7 +283,7 @@ class NexusAuditor:
             status = f"DB Integrity ... Modo {mode.upper()}"
             if mode.upper() != "WAL":
                 self.anomalies.append("DB_NOT_WAL")
-                return warn(f"{status} (Debería ser WAL)")
+                return warn(f"{status} (Debera ser WAL)")
             return ok(status)
         except Exception as e:
             return err(f"DB Integrity ... Error: {e}")
@@ -342,20 +342,20 @@ class NexusAuditor:
         
         # 1. Check .env
         if os.path.exists(".env"):
-            print(f"    {GREEN}✓{RESET} .env detectado")
+            print(f"    {GREEN}{RESET} .env detectado")
         else:
             self.anomalies.append("ENV_MISSING")
-            print(f"    {RED}✗{RESET} FALTA .env")
+            print(f"    {RED}{RESET} FALTA .env")
 
         # 2. Check Git
         try:
             out = subprocess.check_output(["git", "status", "--porcelain"], text=True)
             if out.strip():
-                print(f"    {YELLOW}⚠{RESET} Cambios pendientes en Git ({len(out.splitlines())} archivos)")
+                print(f"    {YELLOW}{RESET} Cambios pendientes en Git ({len(out.splitlines())} archivos)")
             else:
-                 print(f"    {GREEN}✓{RESET} Git Sincronizado (Tree Clean)")
+                 print(f"    {GREEN}{RESET} Git Sincronizado (Tree Clean)")
         except:
-            print(f"    {YELLOW}⚠{RESET} No es un repositorio Git")
+            print(f"    {YELLOW}{RESET} No es un repositorio Git")
 
     def audit_phase_2_docker(self):
         """Fase 2: Docker y servicios"""
@@ -364,17 +364,17 @@ class NexusAuditor:
             client = docker.from_env()
             container = client.containers.get("feat-sniper-brain")
             if container.status == "running":
-                 print(f"    {GREEN}✓{RESET} Contenedor Principal: RUNNING")
+                 print(f"    {GREEN}{RESET} Contenedor Principal: RUNNING")
             else:
                 self.anomalies.append("DOCKER_STOPPED")
-                print(f"    {RED}✗{RESET} Contenedor Principal: {container.status}")
+                print(f"    {RED}{RESET} Contenedor Principal: {container.status}")
         except Exception:
             # If docker lib fails, fallback to CLI
             if self.is_service_running("mcp-brain") or self.check_port(8000):
-                 print(f"    {GREEN}✓{RESET} Servicio Detectado (CLI/Port)")
+                 print(f"    {GREEN}{RESET} Servicio Detectado (CLI/Port)")
             else:
                  self.anomalies.append("DOCKER_ERROR")
-                 print(f"    {RED}✗{RESET} Docker no responde")
+                 print(f"    {RED}{RESET} Docker no responde")
 
     def audit_phase_3_transport(self):
         """Fase 3: Puertos y Transporte"""
@@ -382,10 +382,10 @@ class NexusAuditor:
         ports = {5555: "ZMQ", 8000: "API", 3000: "WEB"}
         for p, n in ports.items():
             if self.check_port(p):
-                 print(f"    {GREEN}✓{RESET} Puerto {p} ({n}): ONLINE")
+                 print(f"    {GREEN}{RESET} Puerto {p} ({n}): ONLINE")
             else:
                 self.anomalies.append(f"PORT_{p}_DOWN")
-                print(f"    {RED}✗{RESET} Puerto {p} ({n}): CERRADO")
+                print(f"    {RED}{RESET} Puerto {p} ({n}): CERRADO")
 
     def audit_phase_4_db(self):
         """Fase 4: Base de Datos y Persistencia"""
@@ -393,9 +393,9 @@ class NexusAuditor:
         res = self.audit_db_advanced()
         # Parse return from legacy method or improve it
         if "Modo WAL" in res:
-             print(f"    {GREEN}✓{RESET} Integridad: {res}")
+             print(f"    {GREEN}{RESET} Integridad: {res}")
         else:
-             print(f"    {YELLOW}⚠{RESET} {res}")
+             print(f"    {YELLOW}{RESET} {res}")
 
         # Check Freshness using SMART PATH from audit_db_advanced logic
         db_path = "/app/data/market_data.db" if self.is_docker else "./data/market_data.db"
@@ -414,32 +414,32 @@ class NexusAuditor:
                     now = datetime.now(timezone.utc)
                     delta = (now - last_ts).total_seconds()
                     if delta < 60:
-                        print(f"    {GREEN}✓{RESET} Feed: EN VIVO (Hace {int(delta)}s)")
+                        print(f"    {GREEN}{RESET} Feed: EN VIVO (Hace {int(delta)}s)")
                     else:
                         self.anomalies.append("DATA_STALE")
-                        print(f"    {YELLOW}⚠{RESET} Feed: RETRASADO (Hace {int(delta)}s)")
+                        print(f"    {YELLOW}{RESET} Feed: RETRASADO (Hace {int(delta)}s)")
                 else:
                     self.anomalies.append("DB_EMPTY")
-                    print(f"    {YELLOW}⚠{RESET} Feed: SIN DATOS (Esperando Tick)")
+                    print(f"    {YELLOW}{RESET} Feed: SIN DATOS (Esperando Tick)")
             except Exception as e:
-                print(f"    {RED}✗{RESET} Error DB: {e}")
+                print(f"    {RED}{RESET} Error DB: {e}")
         else:
-             print(f"    {RED}✗{RESET} DB no encontrada en {db_path}")
+             print(f"    {RED}{RESET} DB no encontrada en {db_path}")
 
     def audit_phase_5_indicators(self):
         """Fase 5: Indicadores y Contexto"""
         print(f"{BOLD}  [FASE 5/10] INDICADORES Y CONTEXTO{RESET}")
         # Logic to check specific indicator columns if possible, for now placeholder check
-        print(f"    {GREEN}✓{RESET} Validación de Schema: OK (Supuesto)")
+        print(f"    {GREEN}{RESET} Validacin de Schema: OK (Supuesto)")
 
     def audit_phase_6_ml(self):
         """Fase 6: Motor ML"""
         print(f"{BOLD}  [FASE 6/10] MOTOR ML (MODELOS){RESET}")
         res = self.audit_ml_models()
         if "Cargados" in res:
-             print(f"    {GREEN}✓{RESET} Modelos: OK")
+             print(f"    {GREEN}{RESET} Modelos: OK")
         else:
-             print(f"    {RED}✗{RESET} {res}")
+             print(f"    {RED}{RESET} {res}")
 
     def audit_phase_7_rag(self):
         """Fase 7: RAG y Memoria"""
@@ -447,31 +447,31 @@ class NexusAuditor:
         # Check Chroma
         res = self.audit_rag()
         if "Persistencia activa" in res:
-             print(f"    {GREEN}✓{RESET} ChromaDB: OK")
+             print(f"    {GREEN}{RESET} ChromaDB: OK")
         else:
-             print(f"    {YELLOW}⚠{RESET} ChromaDB: {res}")
+             print(f"    {YELLOW}{RESET} ChromaDB: {res}")
 
     def audit_phase_8_api(self):
         """Fase 8: API MCP"""
         print(f"{BOLD}  [FASE 8/10] API MCP (DECISION TOOLSET){RESET}")
-        print(f"    {GREEN}✓{RESET} Toolset Config: {len(self.load_skills())} Skills")
+        print(f"    {GREEN}{RESET} Toolset Config: {len(self.load_skills())} Skills")
 
     def audit_phase_9_traffic(self):
         """Fase 9: Trafico y Sincronizacion"""
-        print(f"{BOLD}  [FASE 9/10] TRÁFICO Y SINCRONIZACIÓN{RESET}")
-        print(f"    {GREEN}✓{RESET} Latencia Interna: <1ms (Estinada)")
+        print(f"{BOLD}  [FASE 9/10] TRFICO Y SINCRONIZACIN{RESET}")
+        print(f"    {GREEN}{RESET} Latencia Interna: <1ms (Estinada)")
 
     def audit_phase_10_resources(self):
         """Fase 10: Recursos"""
         print(f"{BOLD}  [FASE 10/10] RECURSOS DEL SISTEMA{RESET}")
         res = self.audit_system_resources()
-        symbol = f"{GREEN}✓{RESET}" if 'OK' in res or '|' in res else f"{RED}✗{RESET}"
+        symbol = f"{GREEN}{RESET}" if 'OK' in res or '|' in res else f"{RED}{RESET}"
         print(f"    {symbol} {res}")
 
     def run_full_audit(self):
-        print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════════╗{RESET}")
-        print(f"{BOLD}{CYAN}║     NEXUS PROTOCOLO MAESTRO v3.2 - AUDITORÍA SENIOR      ║{RESET}")
-        print(f"{BOLD}{CYAN}╚══════════════════════════════════════════════════════════╝{RESET}")
+        print(f"\n{BOLD}{CYAN}{RESET}")
+        print(f"{BOLD}{CYAN}     NEXUS PROTOCOLO MAESTRO v3.2 - AUDITORA SENIOR      {RESET}")
+        print(f"{BOLD}{CYAN}{RESET}")
         print(f"  UTC: {datetime.now(timezone.utc).isoformat()}\n")
 
         self.audit_phase_1_env()
@@ -500,15 +500,15 @@ class NexusAuditor:
         # Critical anomalies that actually need "Repair"
         critical_anomalies = [a for a in self.anomalies if "EMPTY" not in a and "NOT_READY" not in a and "PORT_5555" not in a]
 
-        print(f"{CYAN}  ────────────────────────────────────────────────────────{RESET}")
+        print(f"{CYAN}  {RESET}")
         if not critical_anomalies:
             if "DB_EMPTY" in self.anomalies or "PORT_5555_DOWN" in self.anomalies:
-                 print(f"  {YELLOW}⚠{RESET} {BOLD}SISTEMA READY (ESPERANDO DATOS/PROCESOS){RESET}")
+                 print(f"  {YELLOW}{RESET} {BOLD}SISTEMA READY (ESPERANDO DATOS/PROCESOS){RESET}")
             else:
-                print(f"  {GREEN}✓{RESET} {BOLD}SISTEMA READY PARA OPERAR{RESET}")
+                print(f"  {GREEN}{RESET} {BOLD}SISTEMA READY PARA OPERAR{RESET}")
             sys.exit(0)
         else:
-            print(f"  {RED}✗{RESET} {BOLD}ANOMALÍAS DETECTADAS: {len(critical_anomalies)}{RESET}")
+            print(f"  {RED}{RESET} {BOLD}ANOMALAS DETECTADAS: {len(critical_anomalies)}{RESET}")
             
             # This TRACER is for the Antigravity Agent and Healer to catch
             print(f"\n{BOLD}{RED}REPAIR_REQUEST_START{RESET}")

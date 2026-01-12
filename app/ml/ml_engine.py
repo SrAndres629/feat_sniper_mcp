@@ -1,13 +1,13 @@
 """
 ML Engine - Quantum Leap Phase 4
 ================================
-Motor de inferencia con Shadow Mode y detección de anomalías.
+Motor de inferencia con Shadow Mode y deteccin de anomalas.
 
 Features:
 - Carga segura de modelos GBM y LSTM
-- Shadow Mode por defecto (no ejecuta órdenes)
-- IsolationForest para detección de manipulación
-- Integración SSE para alertas
+- Shadow Mode por defecto (no ejecuta rdenes)
+- IsolationForest para deteccin de manipulacin
+- Integracin SSE para alertas
 """
 
 import os
@@ -72,11 +72,11 @@ class ModelLoader:
             import joblib
             if os.path.exists(path):
                 data = joblib.load(path)
-                logger.info(f"✅ GBM Model [{role}] loaded for {symbol}: {path}")
+                logger.info(f" GBM Model [{role}] loaded for {symbol}: {path}")
                 return data
             return None
         except Exception as e:
-            logger.warning(f"⚠️ GBM load failed for {symbol} [{role}]: {e}")
+            logger.warning(f" GBM load failed for {symbol} [{role}]: {e}")
             return None
             
     @staticmethod
@@ -105,10 +105,10 @@ class ModelLoader:
             )
             model.load_state_dict(data["model_state"])
             model.eval()
-            logger.info(f"✅ LSTM Model loaded for {symbol}: {path}")
+            logger.info(f" LSTM Model loaded for {symbol}: {path}")
             return {"model": model, "config": config}
         except Exception as e:
-            logger.warning(f"⚠️ LSTM load failed for {symbol}: {e}")
+            logger.warning(f" LSTM load failed for {symbol}: {e}")
             return None
 
 
@@ -196,7 +196,7 @@ class ShadowLogger:
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         
     def log(self, prediction: Dict):
-        """Guarda predicción para análisis posterior."""
+        """Guarda prediccin para anlisis posterior."""
         record = {
             "timestamp": datetime.utcnow().isoformat(),
             **prediction
@@ -414,9 +414,9 @@ class MLEngine:
         # Log and persistent tracking
         if not self.execution_enabled:
             self.shadow_logger.log(result)
-            logger.info(f"🔮 [{symbol}] SHADOW: {result['prediction']} (p={p_win:.3f}, src={source})")
+            logger.info(f" [{symbol}] SHADOW: {result['prediction']} (p={p_win:.3f}, src={source})")
         else:
-            logger.info(f"⚡ [{symbol}] EXECUTE: {result['prediction']} (p={p_win:.3f})")
+            logger.info(f" [{symbol}] EXECUTE: {result['prediction']} (p={p_win:.3f})")
             
         return result
         
@@ -455,8 +455,8 @@ async def get_ml_status() -> Dict[str, Any]:
     
     
 async def enable_execution(enable: bool = True) -> Dict[str, str]:
-    """MCP Tool: Activa/desactiva ejecución real."""
+    """MCP Tool: Activa/desactiva ejecucin real."""
     ml_engine.execution_enabled = enable
     mode = "EXECUTION" if enable else "SHADOW"
-    logger.warning(f"🔧 Mode changed to: {mode}")
+    logger.warning(f" Mode changed to: {mode}")
     return {"mode": mode, "execution_enabled": enable}

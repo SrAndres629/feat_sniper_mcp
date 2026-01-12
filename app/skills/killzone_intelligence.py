@@ -10,7 +10,7 @@ Transforma el conocimiento de dominio (killzone 09:00-13:00) en tensores ML.
 - action_recommendation
 
 TIMEZONE: Bolivia (UTC-4)
-PEAK BLOCK: 09:30-09:44 ⭐ (máxima convergencia institucional)
+PEAK BLOCK: 09:30-09:44  (mxima convergencia institucional)
 """
 
 import logging
@@ -39,7 +39,7 @@ except:
 class LiquidityState(Enum):
     ACCUMULATION = "ACCUMULATION"      # 09:00-09:14 - Building liquidity
     SWEEP_HUNT = "SWEEP_HUNT"          # 09:15-09:29 - HFT hunting stops
-    EXPANSION_PEAK = "EXPANSION_PEAK"  # 09:30-09:44 - ⭐ Max execution
+    EXPANSION_PEAK = "EXPANSION_PEAK"  # 09:30-09:44 -  Max execution
     CONTINUATION = "CONTINUATION"       # 09:45-10:29 - Follow-through
     CONSOLIDATION = "CONSOLIDATION"     # 10:30-10:59 - Testing structure
     FIX_EVENT = "FIX_EVENT"            # 11:00-11:14 - LBMA PM fix
@@ -72,8 +72,8 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.ACCUMULATION,
         "action": ActionRecommendation.WAIT_CONFIRM,
         "volume_threshold": 1.3,
-        "description": "Apertura NY. Liquidez sube. Esperar confirmación H1.",
-        "notes": "No entrar en primera vela. Exigir cierre H1 + tick-vol ≥1.3x."
+        "description": "Apertura NY. Liquidez sube. Esperar confirmacin H1.",
+        "notes": "No entrar en primera vela. Exigir cierre H1 + tick-vol 1.3x."
     },
     
     # Block 2: 09:15-09:29 - Sweep hunting
@@ -85,19 +85,19 @@ KILLZONE_BLOCKS = {
         "action": ActionRecommendation.PREPARE,
         "volume_threshold": 1.3,
         "description": "HFT busca stops. Posibles sweeps en niveles clave.",
-        "notes": "Preparar entrada en rechazo de sweep. Stop bajo mínimo del sweep."
+        "notes": "Preparar entrada en rechazo de sweep. Stop bajo mnimo del sweep."
     },
     
-    # Block 3: 09:30-09:44 ⭐ PEAK - Maximum probability
+    # Block 3: 09:30-09:44  PEAK - Maximum probability
     "09:30": {
         "end": "09:44",
-        "session_heat": 1.00,  # ⭐ PEAK
+        "session_heat": 1.00,  #  PEAK
         "expansion_prob": 0.85,
         "state": LiquidityState.EXPANSION_PEAK,
         "action": ActionRecommendation.EXECUTE,
         "volume_threshold": 1.5,
-        "description": "⭐ MÁXIMA PROBABILIDAD. Convergencia institucional.",
-        "notes": "Break con cierre H1 + vol ≥1.5x → entrada en retest. RR mínimo 1:1.5.",
+        "description": " MXIMA PROBABILIDAD. Convergencia institucional.",
+        "notes": "Break con cierre H1 + vol 1.5x  entrada en retest. RR mnimo 1:1.5.",
         "is_peak": True
     },
     
@@ -109,7 +109,7 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.CONTINUATION,
         "action": ActionRecommendation.TRAILING,
         "volume_threshold": 1.3,
-        "description": "Continuación o agotamiento. Trailing si dentro.",
+        "description": "Continuacin o agotamiento. Trailing si dentro.",
         "notes": "Si ya entraste, trailing. Si no, solo retest limpio con volumen."
     },
     
@@ -121,8 +121,8 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.CONTINUATION,
         "action": ActionRecommendation.EXECUTE_HALF,
         "volume_threshold": 1.3,
-        "description": "Segunda ola de ejecución. Pullbacks válidos.",
-        "notes": "Entrada en pullback con confirmación 5m/15m si H4/D1 alineados."
+        "description": "Segunda ola de ejecucin. Pullbacks vlidos.",
+        "notes": "Entrada en pullback con confirmacin 5m/15m si H4/D1 alineados."
     },
     
     # Block 6: 10:15-10:29 - Bank hedging
@@ -145,7 +145,7 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.CONSOLIDATION,
         "action": ActionRecommendation.EXECUTE_HALF,
         "volume_threshold": 1.2,
-        "description": "Consolidación. Confirmar tendencia real.",
+        "description": "Consolidacin. Confirmar tendencia real.",
         "notes": "Entrar si 2 H1 seguidas confirman. Si divergencia en vol, salir."
     },
     
@@ -157,11 +157,11 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.CONSOLIDATION,
         "action": ActionRecommendation.SCALE_OUT,
         "volume_threshold": 1.1,
-        "description": "Testing estructura. Reducir exposición.",
+        "description": "Testing estructura. Reducir exposicin.",
         "notes": "No abrir nuevas grandes posiciones. Reducir si ya dentro."
     },
     
-    # Block 9: 11:00-11:14 - LBMA PM FIX ⚠️
+    # Block 9: 11:00-11:14 - LBMA PM FIX 
     "11:00": {
         "end": "11:14",
         "session_heat": 0.50,
@@ -169,8 +169,8 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.FIX_EVENT,
         "action": ActionRecommendation.AVOID,
         "volume_threshold": 1.0,
-        "description": "⚠️ LBMA PM Fix. Posibles falsos breakouts.",
-        "notes": "EVITAR ±10-20 min. Usar nivel del fix como S/R intradía.",
+        "description": " LBMA PM Fix. Posibles falsos breakouts.",
+        "notes": "EVITAR 10-20 min. Usar nivel del fix como S/R intrada.",
         "fix_event": True,
         "fix_name": "LBMA_PM"
     },
@@ -183,8 +183,8 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.POST_FIX,
         "action": ActionRecommendation.EXECUTE_HALF,
         "volume_threshold": 1.2,
-        "description": "Reacción post-fix. Decisión de continuar o revertir.",
-        "notes": "Si continúa con vol → retest. Si revierte → sweep+rej para reversal."
+        "description": "Reaccin post-fix. Decisin de continuar o revertir.",
+        "notes": "Si contina con vol  retest. Si revierte  sweep+rej para reversal."
     },
     
     # Block 11: 11:30-11:44 - Second wave or decay
@@ -207,8 +207,8 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.DECELERATION,
         "action": ActionRecommendation.SCALE_OUT,
         "volume_threshold": 1.0,
-        "description": "Transición a última hora. Liquidez baja.",
-        "notes": "Evitar añadir. Preparar cierre parcial."
+        "description": "Transicin a ltima hora. Liquidez baja.",
+        "notes": "Evitar aadir. Preparar cierre parcial."
     },
     
     # Block 13: 12:00-12:14 - Late execution attempts
@@ -219,7 +219,7 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.DECELERATION,
         "action": ActionRecommendation.NO_NEW,
         "volume_threshold": 1.2,
-        "description": "Intentos tardíos de ejecución.",
+        "description": "Intentos tardos de ejecucin.",
         "notes": "Solo entradas con vol confirmado y retest."
     },
     
@@ -231,8 +231,8 @@ KILLZONE_BLOCKS = {
         "state": LiquidityState.DECELERATION,
         "action": ActionRecommendation.TRAILING,
         "volume_threshold": 1.1,
-        "description": "Continuación o finalización del día.",
-        "notes": "Trailing y protección. Solo scalps con RR ceñido."
+        "description": "Continuacin o finalizacin del da.",
+        "notes": "Trailing y proteccin. Solo scalps con RR ceido."
     },
     
     # Block 15: 12:30-12:44 - Low probability
@@ -244,7 +244,7 @@ KILLZONE_BLOCKS = {
         "action": ActionRecommendation.NO_NEW,
         "volume_threshold": 1.0,
         "description": "Baja probabilidad de nuevas expansiones.",
-        "notes": "Pequeñas entradas con stops tight. No escalar."
+        "notes": "Pequeas entradas con stops tight. No escalar."
     },
     
     # Block 16: 12:45-12:59 - Killzone close
@@ -256,7 +256,7 @@ KILLZONE_BLOCKS = {
         "action": ActionRecommendation.SCALE_OUT,
         "volume_threshold": 1.0,
         "description": "Cierre de killzone. Toma de ganancias.",
-        "notes": "Cerrar mayoría de posiciones intradía."
+        "notes": "Cerrar mayora de posiciones intrada."
     }
 }
 
@@ -573,7 +573,7 @@ def generate_temporal_ml_features(
         # Confirmation
         "h1_confirmation_score": h1_confirmation_score,
         
-        # Combined probability (bayesian prior × evidence)
+        # Combined probability (bayesian prior  evidence)
         "combined_probability": round(
             block.get("session_heat", 0.5) * 
             alignment["size_multiplier"] * 

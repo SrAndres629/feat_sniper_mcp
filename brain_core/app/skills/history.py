@@ -10,7 +10,7 @@ logger = logging.getLogger("MT5_Bridge.Skills.History")
 
 async def get_trade_history(req: HistoryRequest) -> Dict[str, Any]:
     """
-    Obtiene el historial de órdenes cerradas y calcula métricas de rendimiento.
+    Obtiene el historial de rdenes cerradas y calcula mtricas de rendimiento.
     """
     days = req.days
     from_date = datetime.now() - timedelta(days=days)
@@ -41,7 +41,7 @@ async def get_trade_history(req: HistoryRequest) -> Dict[str, Any]:
     if df_out.empty:
          return {"status": "success", "metrics": {"total_trades": 0}, "deals": []}
 
-    # Cálculos de Métricas
+    # Clculos de Mtricas
     total_trades = len(df_out)
     winning_trades = len(df_out[df_out['profit'] > 0])
     losing_trades = len(df_out[df_out['profit'] <= 0])
@@ -56,7 +56,7 @@ async def get_trade_history(req: HistoryRequest) -> Dict[str, Any]:
     
     # Limpiar deals para respuesta
     deals_list = []
-    for _, row in df_out.tail(20).iterrows(): # Solo los últimos 20 para no saturar contexto
+    for _, row in df_out.tail(20).iterrows(): # Solo los ltimos 20 para no saturar contexto
         deals_list.append({
             "ticket": int(row['ticket']),
             "symbol": row['symbol'],

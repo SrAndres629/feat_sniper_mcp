@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field, field_validator
 T = TypeVar("T")
 
 # =============================================================================
-# ENVELOPE PATTERN (RESPUESTA ESTÁNDAR)
+# ENVELOPE PATTERN (RESPUESTA ESTNDAR)
 # =============================================================================
 
 class ErrorDetail(BaseModel):
@@ -24,7 +24,7 @@ class ResponseModel(BaseModel, Generic[T]):
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 # =============================================================================
-# INPUT MODELS (VALIDACIÓN DE ENTRADA)
+# INPUT MODELS (VALIDACIN DE ENTRADA)
 # =============================================================================
 
 class MarketDataRequest(BaseModel):
@@ -37,7 +37,7 @@ class TradeOrderRequest(BaseModel):
     symbol: str
     action: Literal["BUY", "SELL", "BUY_LIMIT", "SELL_LIMIT", "BUY_STOP", "SELL_STOP"]
     volume: float = Field(..., ge=0.01)
-    price: Optional[float] = None  # Requerido para órdenes pendientes
+    price: Optional[float] = None  # Requerido para rdenes pendientes
     sl: Optional[float] = None
     tp: Optional[float] = None
     comment: str = "AI_MCP_Order"
@@ -52,7 +52,7 @@ class IndicatorRequest(BaseModel):
 
 class MQL5CodeRequest(BaseModel):
     name: str  # Nombre del archivo (ej: 'SuperTrend_AI')
-    code: str  # Código MQL5 completo
+    code: str  # Cdigo MQL5 completo
     compile: bool = True
 
 class CalendarRequest(BaseModel):
@@ -73,11 +73,11 @@ class VolatilityRequest(BaseModel):
 
 class PositionManageRequest(BaseModel):
     ticket: int
-    action: Literal["CLOSE", "MODIFY", "DELETE"]  # DELETE para órdenes pendientes
+    action: Literal["CLOSE", "MODIFY", "DELETE"]  # DELETE para rdenes pendientes
     volume: Optional[float] = None  # Requerido para CLOSE parcial
     sl: Optional[float] = None      # Requerido para MODIFY
     tp: Optional[float] = None      # Requerido para MODIFY
-    price: Optional[float] = None   # Para modificar precio de órdenes pendientes
+    price: Optional[float] = None   # Para modificar precio de rdenes pendientes
 
 # =============================================================================
 # OUTPUT MODELS (DATOS LIMPIOS PARA n8n)

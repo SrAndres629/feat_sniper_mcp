@@ -1,5 +1,5 @@
 """
-🛰️ FEAT NEXUS COMMAND CENTER v5.0 - Autonomous Evolution
+ FEAT NEXUS COMMAND CENTER v5.0 - Autonomous Evolution
 ======================================================
 Distinguished Orchestrator for High-Frequency Systems.
 
@@ -58,12 +58,12 @@ GLOBAL_TF = "D1"
 
 def banner():
     art = f"""
-{CYAN}{BOLD}    ███████╗███████╗ █████╗ ████████╗    ███╗   ██╗███████╗██╗  ██╗██╗   ██╗███████╗
-    ██╔════╝██╔════╝██╔══██╗╚══██╔══╝    ████╗  ██║██╔════╝╚██╗██╔╝██║   ██║██╔════╝
-    █████╗  █████╗  ███████║   ██║       ██╔██╗ ██║█████╗   ╚███╔╝ ██║   ██║███████╗
-    ██╔══╝  ██╔══╝  ██╔══██║   ██║       ██║╚██╗██║██╔══╝   ██╔██╗ ██║   ██║╚════██║
-    ██║     ███████╗██║  ██║   ██║       ██║ ╚████║███████╗██╔╝ ██╗╚██████╔╝███████║
-    ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝       ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝
+{CYAN}{BOLD}                  
+             
+                          
+                         
+                       
+                           
 {RESET}{CYAN}    --- [ SYSTEM v5.0: AUTONOMOUS EVOLUTION ] --- {RESET}
     """
     print(art)
@@ -72,7 +72,7 @@ def log(msg, color=WHITE):
     print(f"{color}{msg}{RESET}")
 
 def run_cmd(cmd, shell=True, check=False, live=False):
-    """Ejecuta un comando con opción de streaming en vivo para evitar bloqueos visuales."""
+    """Ejecuta un comando con opcin de streaming en vivo para evitar bloqueos visuales."""
     try:
         if live:
             process = subprocess.Popen(cmd, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, universal_newlines=True)
@@ -148,7 +148,7 @@ class NexusControl:
             # Wait for window
             for _ in range(15):
                 if is_mt5_running():
-                    log("[OK] MT5 iniciado con éxito.", GREEN)
+                    log("[OK] MT5 iniciado con xito.", GREEN)
                     return True
                 time.sleep(1)
             log("[ERR] MT5 no inicio tras 15 segundos.", RED)
@@ -163,7 +163,7 @@ class NexusControl:
         # 1. Docker Engine Check
         _, _, code = run_cmd("docker info")
         if code != 0:
-            log("[ERR] Docker Engine no está corriendo. Por favor inicia Docker Desktop.", RED)
+            log("[ERR] Docker Engine no est corriendo. Por favor inicia Docker Desktop.", RED)
             return False
             
         log("[INFO] Levantando servicios...", WHITE)
@@ -172,7 +172,7 @@ class NexusControl:
         needs_rebuild = self._check_needs_rebuild()
         
         if needs_rebuild:
-            log("[INFO] Cambios detectados en código fuente. Reconstruyendo contenedor...", YELLOW)
+            log("[INFO] Cambios detectados en cdigo fuente. Reconstruyendo contenedor...", YELLOW)
             _, _, code = run_cmd("docker compose up -d --build", live=True)
         else:
             log("[INFO] Sin cambios detectados. Usando contenedor existente.", GREEN)
@@ -186,7 +186,7 @@ class NexusControl:
         return True
     
     def _check_needs_rebuild(self):
-        """Detecta si hay cambios en el código fuente desde el último build."""
+        """Detecta si hay cambios en el cdigo fuente desde el ltimo build."""
         import hashlib
         import glob
         
@@ -232,7 +232,7 @@ class NexusControl:
                 return True
             time.sleep(2)
         
-        log("[⚠] Brain tardando en responder. Revisa 'docker compose logs mcp-brain'", YELLOW)
+        log("[] Brain tardando en responder. Revisa 'docker compose logs mcp-brain'", YELLOW)
         return False
 
     def run_auditor(self):
@@ -271,27 +271,27 @@ class NexusControl:
                 
                 ANOMALY_MAP = {
                     "CONFIG_MISSING": "Faltan credenciales en .env (SUPABASE_URL/KEY)",
-                    "ZMQ_NOT_READY": "ZMQ Bridge (Puerto 5555) no responde. ¿MT5 cerrado?",
+                    "ZMQ_NOT_READY": "ZMQ Bridge (Puerto 5555) no responde. MT5 cerrado?",
                     "MT5_OFFLINE": "MetaTrader 5 no detectado en procesos.",
-                    "DB_EMPTY": "Base de datos vacía (Esperando primer tick).",
+                    "DB_EMPTY": "Base de datos vaca (Esperando primer tick).",
                     "DATA_STALE": "Datos obsoletos en DB (>5 min sin ticks).",
                     "RAG_MISSING": "Memoria RAG corrupta o no montada.",
-                    "NO_SKILLS": "MCP Server no cargó las skills (revisar mcp_server.py)."
+                    "NO_SKILLS": "MCP Server no carg las skills (revisar mcp_server.py)."
                 }
 
                 log("!"*60, RED)
-                log(">>> REPORTE DE FALLOS (Acción Requerida)", RED + BOLD)
+                log(">>> REPORTE DE FALLOS (Accin Requerida)", RED + BOLD)
                 for code in critical:
                      # Handle dynamic codes like CONFIG_MISSING_KEY
                     desc = ANOMALY_MAP.get(code, "Error desconocido")
                     if "CONFIG_MISSING" in code and code not in ANOMALY_MAP:
-                        desc = f"Configuración incompleta: {code.replace('CONFIG_MISSING_', '')}"
+                        desc = f"Configuracin incompleta: {code.replace('CONFIG_MISSING_', '')}"
                     log(f"  [X] {code}: {desc}", YELLOW)
                 log("!"*60 + "\n", RED)
 
                 # TRIGGER AUTO-HEALING
                 if self.attempt_self_repair(critical):
-                    log("[INFO] Reparación exitosa. Re-auditando...", GREEN)
+                    log("[INFO] Reparacin exitosa. Re-auditando...", GREEN)
                     return self.run_auditor() # Recursive retry
                 
                 return False
@@ -302,19 +302,19 @@ class NexusControl:
             log("[OK] Auditoria superada (Failsafe).", GREEN)
             return True
             
-        log("[ERR] Fallo crítico en auditoría. Revisa el detalle arriba.", RED)
+        log("[ERR] Fallo crtico en auditora. Revisa el detalle arriba.", RED)
         return False
 
     def attempt_self_repair(self, anomalies):
         """
         NEXUS DEEP HEALER SKILL
-        Intenta solucionar anomalías conocidas automáticamente.
+        Intenta solucionar anomalas conocidas automticamente.
         """
-        log("\n>>> INICIANDO PROTOCOLO DE AUTO-REPARACIÓN DEEP HEALER...", CYAN + BOLD)
+        log("\n>>> INICIANDO PROTOCOLO DE AUTO-REPARACIN DEEP HEALER...", CYAN + BOLD)
         repaired = False
 
         if "MT5_OFFLINE" in anomalies:
-            log("[FIX] Detectado MT5 Caído. Reiniciando terminal...", YELLOW)
+            log("[FIX] Detectado MT5 Cado. Reiniciando terminal...", YELLOW)
             self.start_mt5()
             repaired = True
 
@@ -355,11 +355,11 @@ class NexusControl:
             time.sleep(2) # Wait for fixes to settle
             return True
             
-        log("[ALERT] No se pudieron aplicar correcciones automáticas para los errores actuales.", RED)
+        log("[ALERT] No se pudieron aplicar correcciones automticas para los errores actuales.", RED)
         return False
 
     def open_dashboard(self):
-        log("\n>>> Fase 5: Visualización", CYAN)
+        log("\n>>> Fase 5: Visualizacin", CYAN)
         log("[INFO] Lanzando Dashboard: http://localhost:3000", WHITE)
         webbrowser.open("http://localhost:3000")
 
@@ -378,16 +378,16 @@ class NexusControl:
         sys.exit(0)
 
     def war_room_report(self):
-        log("\n" + "─"*70, GRAY)
-        log(" 📊 GLASS COCKPIT: INSTITUTIONAL TOPOLOGY MAP", CYAN + BOLD)
-        log("─"*70, GRAY)
+        log("\n" + ""*70, GRAY)
+        log("  GLASS COCKPIT: INSTITUTIONAL TOPOLOGY MAP", CYAN + BOLD)
+        log(""*70, GRAY)
         
         # Ports Topology Tree
         zmq_status = f"{GREEN}[LISTENING]{RESET}" if check_port(5555) else f"{RED}[CLOSED]{RESET}"
         api_status = f"{GREEN}[ACTIVE]{RESET}" if check_port(8000) else f"{RED}[INACTIVE]{RESET}"
         web_status = f"{GREEN}[CONNECTED]{RESET}" if check_port(3000) else f"{YELLOW}[PENDING]{RESET}"
 
-        print(f"{BLUE}--- [ TOPOLOGÍA DE RED FEAT NEXUS V6.0 ] ---{RESET}")
+        print(f"{BLUE}--- [ TOPOLOGA DE RED FEAT NEXUS V6.0 ] ---{RESET}")
         print(f"{GREEN}[INFRA]{RESET} Docker Engine | {CYAN}ZMQ Bridge{RESET} | {GOLD}MIP Protocol{RESET}")
         print(f"{GREEN}[CORE ]{RESET} ML Engine (M1/H1/D1) | {MAGENTA}Neural Pulse{RESET}")
         print(f"{GREEN}[EDGE ]{RESET} Supabase Sync | MetaTrader 5 Terminal")
@@ -395,17 +395,17 @@ class NexusControl:
         
         # New: Fractal Status Area
         print(f"{BOLD}{WHITE}>>> FISICA DE MERCADO (MULTIFRACTAL) <<<{RESET}")
-        print(f"Estado Hurst: {CYAN}PERMANENTE{RESET} (H=0.62) | Alineación: {GREEN}OK{RESET}")
+        print(f"Estado Hurst: {CYAN}PERMANENTE{RESET} (H=0.62) | Alineacin: {GREEN}OK{RESET}")
         print(f"Bias Macro: {GREEN}BULLISH{RESET} | Filtro Sniper: {YELLOW}WAIT{RESET}")
         print("-" * 45)
         
         print(f"{BOLD}Status General:{RESET} {GREEN}NOMINAL - LISTO PARA OPERAR{RESET}")
         from app.services.supabase_sync import supabase_sync
         cloud = f"{GREEN}[SYNCED]{RESET}" if supabase_sync.client else f"{RED}[LOCAL_ONLY]{RESET}"
-        print(f"  ├── {CYAN}Supabase{RESET} ......... {cloud}")
-        print(f"  └── {CYAN}Anti-Fragility{RESET} ... {GREEN}[PASSIVE_READY]{RESET}")
+        print(f"   {CYAN}Supabase{RESET} ......... {cloud}")
+        print(f"   {CYAN}Anti-Fragility{RESET} ... {GREEN}[PASSIVE_READY]{RESET}")
 
-        log("─"*70, GRAY)
+        log(""*70, GRAY)
 
         try:
             from app.services.supabase_sync import supabase_sync
@@ -418,24 +418,24 @@ class NexusControl:
                 # Check for recent ticks
                 res = supabase_sync.client.table("market_ticks").select("id").limit(1).execute()
                 if len(res.data) > 0:
-                    log("  ✓ Flujo de persistencia: OK", GREEN)
+                    log("   Flujo de persistencia: OK", GREEN)
                 else:
                     log("  ! Flujo de persistencia: Esperando datos", YELLOW)
             else:
                 log("  X Supabase: Desconectado", RED)
         except Exception:
-            log("  ! Telemetría remota: Offline", YELLOW)
+            log("  ! Telemetra remota: Offline", YELLOW)
 
     def wait_for_signal(self):
         """
-        PROTOCOLO DE SINCRONIZACIÓN INICIAL (Handshake)
+        PROTOCOLO DE SINCRONIZACIN INICIAL (Handshake)
         Escucha el primer paquete de MT5 para autoconfigurar el activo.
         """
         import zmq
         import re
         
-        log("\n>>> Fase 1.5: Sincronización Activa Chart-to-Brain", CYAN)
-        log("[INFO] Esperando señal del gráfico (Arrastra el indicador)...", WHITE)
+        log("\n>>> Fase 1.5: Sincronizacin Activa Chart-to-Brain", CYAN)
+        log("[INFO] Esperando seal del grfico (Arrastra el indicador)...", WHITE)
         
         context = zmq.Context()
         socket = context.socket(zmq.SUB)
@@ -452,10 +452,10 @@ class NexusControl:
             
             detected_symbol = data.get("symbol")
             if not detected_symbol:
-                log("[WARN] Mensaje recibido sin símbolo. Ignorando...", YELLOW)
+                log("[WARN] Mensaje recibido sin smbolo. Ignorando...", YELLOW)
                 return False
                 
-            log(f"[DETECTADO] Activo en Gráfico: {detected_symbol}", GREEN + BOLD)
+            log(f"[DETECTADO] Activo en Grfico: {detected_symbol}", GREEN + BOLD)
             
             # Check if config needs update
             from app.core.config import settings
@@ -495,7 +495,7 @@ class NexusControl:
                     
                     run_cmd(f"python \"{seed_script}\"")
                     run_cmd(f"python \"{train_script}\"")
-                    log(f"[OK] Genésis completado para {detected_symbol}", GREEN)
+                    log(f"[OK] Gensis completado para {detected_symbol}", GREEN)
                 else:
                     log(f"[OK] Cerebro ya existe para {detected_symbol}. Cargando...", GREEN)
 
@@ -514,7 +514,7 @@ class NexusControl:
         banner()
         # 0. Initial Integrity
         if not self.pre_flight_checks():
-            log("[ERR] Faltan archivos críticos. El sistema no puede iniciar.", RED)
+            log("[ERR] Faltan archivos crticos. El sistema no puede iniciar.", RED)
             return
 
         # 1. Start MT5
@@ -542,9 +542,9 @@ class NexusControl:
         # 7. Open Web
         self.open_dashboard()
 
-        log("\n" + "═"*60, GREEN)
+        log("\n" + ""*60, GREEN)
         log("   FEAT SNIPER NEXUS ESTA OPERATIVO (Presiona Ctrl+C para apagar)", GREEN + BOLD)
-        log("═"*60, GREEN)
+        log(""*60, GREEN)
 
         try:
             while True:

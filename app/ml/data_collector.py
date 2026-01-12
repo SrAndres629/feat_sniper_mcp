@@ -6,7 +6,7 @@ Captura de ticks/velas con persistencia en SQLite WAL.
 Optimizaciones:
 - SQLite WAL mode para concurrencia
 - Batch inserts cada N ticks
-- Índices para queries rápidas del Oracle
+- ndices para queries rpidas del Oracle
 """
 
 import os
@@ -37,7 +37,10 @@ logger = logging.getLogger("QuantumLeap.DataCollector")
 FEATURE_NAMES: List[str] = [
     "close", "open", "high", "low", "volume",
     "rsi", "atr", "ema_fast", "ema_slow",
-    "feat_score", "fsm_state", "liquidity_ratio", "volatility_zscore"
+    "feat_score", "fsm_state", "liquidity_ratio", "volatility_zscore",
+    "momentum_kinetic_micro", "entropy_coefficient", "cycle_harmonic_phase", 
+    "institutional_mass_flow", "volatility_regime_norm", "acceptance_ratio", 
+    "wick_stress", "poc_z_score", "cvd_acceleration"
 ]
 
 TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]
@@ -50,7 +53,7 @@ TIMEFRAME_MAP = {
 class SQLiteWALConnection:
     """
     Thread-safe SQLite connection with WAL mode.
-    Permite lecturas y escrituras simultáneas.
+    Permite lecturas y escrituras simultneas.
     """
     
     def __init__(self, db_path: str):
@@ -90,27 +93,26 @@ class SQLiteWALConnection:
         schema_path = os.path.join(os.getcwd(), "app", "db", "institutional_schema.sql")
         
         with self.get_connection() as conn:
-            if os.path.exists(schema_path):
-                with open(schema_path, "r") as f:
-                    conn.executescript(f.read())
-                logger.info("✅ Institutional schema applied.")
-            else:
-                # Failsafe basic schema
-                conn.execute("""
-                    CREATE TABLE IF NOT EXISTS market_data (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        tick_time TIMESTAMP NOT NULL,
-                        symbol TEXT NOT NULL,
-                        timeframe TEXT NOT NULL,
-                        close REAL, open REAL, high REAL, low REAL, volume REAL,
-                        rsi REAL, atr REAL, ema_fast REAL, ema_slow REAL,
-                        fsm_state INTEGER, feat_score REAL,
-                        label INTEGER DEFAULT NULL,
-                        labeled_at TIMESTAMP DEFAULT NULL,
-                        UNIQUE(tick_time, symbol, timeframe)
-                    )
-                """)
-            conn.commit()
+                if os.path.exists(schema_path):
+                    with open(schema_path, "r") as f:
+                        conn.executescript(f.read())
+                    logger.info(" Institutional schema applied.")
+                
+                # Dynamic Migration (Add columns if missing)
+                cursor = conn.execute("PRAGMA table_info(market_data)")
+                existing_cols = [row[1] for row in cursor.fetchall()]
+                new_cols = [
+                    "momentum_kinetic_micro", "entropy_coefficient", "cycle_harmonic_phase",
+                    "institutional_mass_flow", "volatility_regime_norm", "acceptance_ratio",
+                    "wick_stress", "poc_z_score", "cvd_acceleration"
+                ]
+                for col in new_cols:
+                    if col not in existing_cols:
+                        try:
+                            conn.execute(f"ALTER TABLE market_data ADD COLUMN {col} REAL")
+                            logger.info(f" Migrated: Added column {col} to market_data.")
+                        except sqlite3.OperationalError: pass
+                conn.commit()
 
 
 class OracleLabeler:
@@ -237,7 +239,17 @@ class DataCollector:
             "fsm_state": int(indicators.get("fsm_state", 0)),
             "feat_score": float(indicators.get("feat_score", 0.0)),
             "liquidity_ratio": float(indicators.get("liquidity_ratio", 1.0)),
-            "volatility_zscore": float(indicators.get("volatility_zscore", 0.0))
+            "volatility_zscore": float(indicators.get("volatility_zscore", 0.0)),
+            # New Neural Tensors
+            "momentum_kinetic_micro": float(indicators.get("momentum_kinetic_micro", 0.0)),
+            "entropy_coefficient": float(indicators.get("entropy_coefficient", 0.0)),
+            "cycle_harmonic_phase": float(indicators.get("cycle_harmonic_phase", 0.0)),
+            "institutional_mass_flow": float(indicators.get("institutional_mass_flow", 0.0)),
+            "volatility_regime_norm": float(indicators.get("volatility_regime_norm", 0.0)),
+            "acceptance_ratio": float(indicators.get("acceptance_ratio", 0.0)),
+            "wick_stress": float(indicators.get("wick_stress", 0.0)),
+            "poc_z_score": float(indicators.get("poc_z_score", 0.0)),
+            "cvd_acceleration": float(indicators.get("cvd_acceleration", 0.0))
         }
         
     def collect(self, symbol: str, candle: Dict[str, Any], indicators: Dict[str, Any], timeframe: str = "M1") -> None:
@@ -288,11 +300,17 @@ class DataCollector:
                 INSERT OR IGNORE INTO market_data (
                     tick_time, symbol, timeframe, close, open, high, low, volume,
                     rsi, atr, ema_fast, ema_slow, fsm_state, feat_score,
-                    liquidity_ratio, volatility_zscore
+                    liquidity_ratio, volatility_zscore,
+                    momentum_kinetic_micro, entropy_coefficient, cycle_harmonic_phase,
+                    institutional_mass_flow, volatility_regime_norm, acceptance_ratio,
+                    wick_stress, poc_z_score, cvd_acceleration
                 ) VALUES (
                     :tick_time, :symbol, :timeframe, :close, :open, :high, :low, :volume,
                     :rsi, :atr, :ema_fast, :ema_slow, :fsm_state, :feat_score,
-                    :liquidity_ratio, :volatility_zscore
+                    :liquidity_ratio, :volatility_zscore,
+                    :momentum_kinetic_micro, :entropy_coefficient, :cycle_harmonic_phase,
+                    :institutional_mass_flow, :volatility_regime_norm, :acceptance_ratio,
+                    :wick_stress, :poc_z_score, :cvd_acceleration
                 )
             """, self.batch)
             conn.commit()
@@ -302,7 +320,7 @@ class DataCollector:
         
         # Procesar etiquetas pendientes
         if self.samples_collected % 500 == 0:
-            # Asumir símbolo del último tick
+            # Asumir smbolo del ltimo tick
             if self.batch:
                 self.oracle.process_pending_labels(self.batch[-1]["symbol"])
                 
@@ -312,7 +330,7 @@ class DataCollector:
             self._flush_batch()
             
     def get_stats(self) -> Dict:
-        """Estadísticas de recolección multitemporal."""
+        """Estadsticas de recoleccin multitemporal."""
         stats = {"total_samples": self.samples_collected}
         with self.db.get_connection() as conn:
             for tf in TIMEFRAMES:
@@ -371,7 +389,7 @@ async def collect_sample(symbol: str, candle: Dict, indicators: Dict) -> Dict:
     
     
 async def get_collection_stats() -> Dict:
-    """MCP Tool: Obtiene estadísticas."""
+    """MCP Tool: Obtiene estadsticas."""
     return data_collector.get_stats()
     
     

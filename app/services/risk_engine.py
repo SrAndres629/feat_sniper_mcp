@@ -18,13 +18,13 @@ class RiskEngine:
         self._last_reset_date: Optional[str] = None
 
     async def _ensure_daily_balance(self):
-        """Calcula o recupera el balance inicial del día para el drawdown."""
+        """Calcula o recupera el balance inicial del da para el drawdown."""
         today = datetime.now().strftime("%Y-%m-%d")
         if self._last_reset_date != today:
             account_info = await mt5_conn.execute(mt5.account_info)
             if account_info:
-                # En un sistema real, buscaríamos el balance al 00:00 en el historial
-                # Aquí usamos el balance actual como base si es el primer inicio del día
+                # En un sistema real, buscaramos el balance al 00:00 en el historial
+                # Aqu usamos el balance actual como base si es el primer inicio del da
                 self._daily_opening_balance = account_info.balance
                 self._last_reset_date = today
                 logger.info(f"RiskEngine: Daily balance reset. Base: ${self._daily_opening_balance:.2f}")
@@ -68,8 +68,8 @@ class RiskEngine:
         current_drawdown = (real_loss / self._daily_opening_balance) * 100
         
         if current_drawdown > settings.MAX_DAILY_DRAWDOWN_PERCENT:
-            logger.warning(f"⛔ PHANTOM MODE ACTIVE: Daily DD {current_drawdown:.2f}% (Limit: {settings.MAX_DAILY_DRAWDOWN_PERCENT}%)")
-            logger.warning("Operativa pausada. Iniciando recalibración interna...")
+            logger.warning(f" PHANTOM MODE ACTIVE: Daily DD {current_drawdown:.2f}% (Limit: {settings.MAX_DAILY_DRAWDOWN_PERCENT}%)")
+            logger.warning("Operativa pausada. Iniciando recalibracin interna...")
             return False
         
         return True
@@ -86,7 +86,7 @@ class RiskEngine:
         symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
         tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
         
-        # Obtener ATR para el cálculo dinámico
+        # Obtener ATR para el clculo dinmico
         from app.skills.market import get_volatility_metrics
         vol = await get_volatility_metrics(symbol)
         atr = vol.get("atr", 0)
@@ -96,24 +96,24 @@ class RiskEngine:
         
         if pos.type == mt5.POSITION_TYPE_BUY:
             current_profit_points = (tick.bid - pos.price_open) / symbol_info.point
-            # Lógica Breakeven (1.5 * ATR)
+            # Lgica Breakeven (1.5 * ATR)
             if current_profit_points > (trail_points) and pos.sl < pos.price_open:
                 logger.info(f"RiskEngine: Moving ticket {ticket} to BREAKEVEN (ATR Trail)")
                 await self._modify_sl(ticket, pos.price_open, pos.tp)
             
-            # Trailing dinámico
+            # Trailing dinmico
             new_sl = tick.bid - (trail_points * symbol_info.point)
             if new_sl > pos.sl and new_sl < tick.bid:
                 await self._modify_sl(ticket, new_sl, pos.tp)
         
         elif pos.type == mt5.POSITION_TYPE_SELL:
             current_profit_points = (pos.price_open - tick.ask) / symbol_info.point
-            # Lógica Breakeven (1.5 * ATR)
+            # Lgica Breakeven (1.5 * ATR)
             if current_profit_points > (trail_points) and (pos.sl == 0 or pos.sl > pos.price_open):
                 logger.info(f"RiskEngine: Moving ticket {ticket} to BREAKEVEN (ATR Trail)")
                 await self._modify_sl(ticket, pos.price_open, pos.tp)
                 
-            # Trailing dinámico
+            # Trailing dinmico
             new_sl = tick.ask + (trail_points * symbol_info.point)
             if (pos.sl == 0 or new_sl < pos.sl) and new_sl > tick.ask:
                 await self._modify_sl(ticket, new_sl, pos.tp)
@@ -135,7 +135,7 @@ class RiskEngine:
     
     async def get_capital_allocation(self) -> Dict[str, Any]:
         """
-        Regla 50/50 Dinámica: Divide el margen libre para Scalp vs Swing.
+        Regla 50/50 Dinmica: Divide el margen libre para Scalp vs Swing.
         """
         account = await mt5_conn.execute(mt5.account_info)
         if not account:
@@ -181,7 +181,7 @@ class RiskEngine:
     
     async def max_positions_allowed(self) -> int:
         """
-        Growth Trigger: Determina cuántas posiciones podemos tener basado en equity.
+        Growth Trigger: Determina cuntas posiciones podemos tener basado en equity.
         """
         account = await mt5_conn.execute(mt5.account_info)
         if not account:

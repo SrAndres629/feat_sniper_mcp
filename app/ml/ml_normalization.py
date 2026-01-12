@@ -70,30 +70,30 @@ class ATRNormalizer:
         price_change = close - open_
         
         normalized = {
-            # ═══ Position relative to candle ═══
+            #  Position relative to candle 
             "candle_range_atr": candle_range / atr,
             "candle_body_atr": candle_body / atr,
             "price_change_atr": price_change / atr,
             
-            # ═══ Volume analysis ═══
+            #  Volume analysis 
             "volume_relative": volume / vol_ma if vol_ma > 0 else 1.0,
             
-            # ═══ Volatility normalized indicators ═══
+            #  Volatility normalized indicators 
             "rsi": features.get("rsi", 50.0),  # RSI is already 0-100
             "ema_spread_atr": features.get("ema_spread", 0) / atr,
             
-            # ═══ FEAT metrics (normalized) ═══
+            #  FEAT metrics (normalized) 
             "feat_score": features.get("feat_score", 0) / 100.0,  # 0-1 scale
             "compression_ratio": features.get("compression", 0.5),  # Already ratio
             
-            # ═══ Zone distance ═══
+            #  Zone distance 
             "liquidity_above_atr": features.get("liquidity_above", 0) / atr,
             "liquidity_below_atr": features.get("liquidity_below", 0) / atr,
             
-            # ═══ State indicators (categorical) ═══
+            #  State indicators (categorical) 
             "fsm_state": features.get("fsm_state", 0),
             
-            # ═══ Original ATR for reference ═══
+            #  Original ATR for reference 
             "atr": atr
         }
         
@@ -122,9 +122,9 @@ class ATRNormalizer:
         return desired_atr_distance * atr
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 # ASSET PROFILE - Metadata for Cross-Asset Intelligence
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 
 ASSET_PROFILES = {
     "XAUUSD": {
@@ -189,9 +189,9 @@ def get_asset_profile(symbol: str) -> Dict:
 normalizer = ATRNormalizer()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 # MCP-COMPATIBLE ASYNC WRAPPERS
-# ═══════════════════════════════════════════════════════════════════════════
+# 
 
 async def get_asset_profile_tool(symbol: str) -> Dict:
     """MCP Tool: Get asset profile and metadata."""

@@ -66,7 +66,7 @@ def main():
     
     rates = None
     if last_ts:
-        logger.info(f"✅ Existing data found for {SYMBOL} up to {last_ts}.")
+        logger.info(f" Existing data found for {SYMBOL} up to {last_ts}.")
         # Fetch only new data (from last_ts to now)
         # MT5 copy_rates_range(symbol, timeframe, date_from, date_to)
         # Note: date_from should be slightly before last_ts to ensure continuity, or just last_ts.
@@ -76,7 +76,7 @@ def main():
         
         rates = mt5.copy_rates_range(SYMBOL, TIMEFRAME, date_from, date_to)
     else:
-        logger.info(f"⚠️ No data for {SYMBOL}. Starting GENESIS download ({BARS_INITIAL} bars)...")
+        logger.info(f" No data for {SYMBOL}. Starting GENESIS download ({BARS_INITIAL} bars)...")
         rates = mt5.copy_rates_from_pos(SYMBOL, TIMEFRAME, 0, BARS_INITIAL)
         
     mt5.shutdown()

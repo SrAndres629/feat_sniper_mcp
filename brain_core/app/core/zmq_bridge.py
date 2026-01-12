@@ -38,7 +38,7 @@ class ZMQBridge:
         logger.info("ZMQ Bridge detenido.")
 
     async def _listen(self):
-        """Loop de escucha asíncrono."""
+        """Loop de escucha asncrono."""
         while self.is_running:
             try:
                 # Recibir mensaje de MT5

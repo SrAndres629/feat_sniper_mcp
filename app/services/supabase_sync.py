@@ -28,12 +28,12 @@ class SupabaseSync:
 
     def _initialize_client(self):
         if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
-            logger.warning("Supabase no configurado. El logging en la nube estará desactivado.")
+            logger.warning("Supabase no configurado. El logging en la nube estar desactivado.")
             return
 
         try:
             self._client = create_client(settings.SUPABASE_URL, settings.SUPABASE_KEY)
-            logger.info("✅ Cliente Supabase NEXUS inicializado.")
+            logger.info(" Cliente Supabase NEXUS inicializado.")
         except Exception as e:
             logger.error(f"Error inicializando Supabase: {e}")
 
@@ -71,7 +71,7 @@ class SupabaseSync:
         await anyio.to_thread.run_sync(
             lambda: self._client.table("feat_signals").insert(payload).execute()
         )
-        logger.info(f"📤 Signal synced with Supabase: {payload['symbol']} {payload['action']}")
+        logger.info(f" Signal synced with Supabase: {payload['symbol']} {payload['action']}")
 
     @resilient(max_retries=1, failure_threshold=10)
     async def log_tick(self, data: Dict[str, Any]) -> None:

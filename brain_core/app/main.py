@@ -21,7 +21,7 @@ from app.models.schemas import (
 )
 from app.skills import market, vision, execution, trade_mgmt, indicators, history, calendar, quant_coder
 
-# Configuración de logging
+# Configuracin de logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(message)s",
@@ -36,14 +36,14 @@ logger = logging.getLogger("MT5_Bridge.Gateway")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Gestiona el ciclo de vida de la aplicación:
+    Gestiona el ciclo de vida de la aplicacin:
     - Conecta con MT5 al iniciar.
     - Desconecta al cerrar.
     """
     logger.info("Iniciando MT5 Neural Bridge Gateway...")
     success = await mt5_conn.startup()
     if not success:
-        logger.error("No se pudo establecer conexión inicial con MT5. El servidor operará en modo degradado.")
+        logger.error("No se pudo establecer conexin inicial con MT5. El servidor operar en modo degradado.")
     
     yield
     
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="MT5 Neural Bridge API",
-    description="Gateway de alta disponibilidad para trading algorítmico e IA.",
+    description="Gateway de alta disponibilidad para trading algortmico e IA.",
     version="2.0.0",
     lifespan=lifespan
 )
@@ -103,7 +103,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             "error": {
                 "code": "INTERNAL_SERVER_ERROR",
                 "message": f"{type(exc).__name__}: {str(exc)}",
-                "suggestion": "Revisa los logs del servidor para más detalles."
+                "suggestion": "Revisa los logs del servidor para ms detalles."
             },
             "timestamp": datetime.utcnow().isoformat()
         }
@@ -115,7 +115,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health", response_model=ResponseModel[dict])
 async def health_check():
-    """Verifica el estado de la conexión con MetaTrader 5."""
+    """Verifica el estado de la conexin con MetaTrader 5."""
     connected = await mt5_conn.execute(mt5.terminal_info) is not None
     
     return ResponseModel(
@@ -123,14 +123,14 @@ async def health_check():
         data={"mt5_connected": connected},
         error=None if connected else ErrorDetail(
             code="MT5_DISCONNECTED",
-            message="El terminal MT5 no está respondiendo.",
-            suggestion="Asegúrate de que MT5 esté abierto y con sesión iniciada."
+            message="El terminal MT5 no est respondiendo.",
+            suggestion="Asegrate de que MT5 est abierto y con sesin iniciada."
         )
     )
 
 @app.post("/market/candles", response_model=ResponseModel[MarketDataResponse])
 async def get_candles(request: MarketDataRequest):
-    """Obtiene datos OHLC con sistema de caché."""
+    """Obtiene datos OHLC con sistema de cach."""
     result = await market.get_candles(
         symbol=request.symbol,
         timeframe=request.timeframe,
@@ -144,7 +144,7 @@ async def get_candles(request: MarketDataRequest):
             error=ErrorDetail(
                 code=result.get("mt5_error", ["DATA_ERROR"])[1],
                 message=result["message"],
-                suggestion="Verifica el símbolo y el timeframe."
+                suggestion="Verifica el smbolo y el timeframe."
             )
         )
     
@@ -152,7 +152,7 @@ async def get_candles(request: MarketDataRequest):
 
 @app.get("/market/account", response_model=ResponseModel[AccountMetrics])
 async def get_account_metrics():
-    """Obtiene métricas clave de la cuenta para gestión de riesgo."""
+    """Obtiene mtricas clave de la cuenta para gestin de riesgo."""
     result = await market.get_account_metrics()
     
     if result["status"] == "error":
@@ -161,7 +161,7 @@ async def get_account_metrics():
             error=ErrorDetail(
                 code="ACCOUNT_ERROR",
                 message=result["message"],
-                suggestion="Verifica la sesión en MT5."
+                suggestion="Verifica la sesin en MT5."
             )
         )
         
@@ -169,7 +169,7 @@ async def get_account_metrics():
 
 @app.post("/vision/panorama", response_model=ResponseModel[VisionResponse])
 async def capture_panorama(request: PanoramaRequest):
-    """Captura la pantalla actual de MT5 para análisis visual."""
+    """Captura la pantalla actual de MT5 para anlisis visual."""
     result = await vision.capture_panorama(resize_factor=request.resize_factor)
     
     if result["status"] == "error":
@@ -194,35 +194,35 @@ async def create_indicator(request: MQL5CodeRequest):
 
 @app.post("/market/indicators", response_model=ResponseModel[dict])
 async def get_indicators(request: IndicatorRequest):
-    """Calcula indicadores técnicos (RSI, Moving Average, MACD, etc)."""
+    """Calcula indicadores tcnicos (RSI, Moving Average, MACD, etc)."""
     result = await indicators.get_technical_indicator(request)
     if result["status"] == "error":
         return ResponseModel(
             status="error",
-            error=ErrorDetail(code="INDICATOR_ERROR", message=result["message"], suggestion="Verifica los parámetros del indicador.")
+            error=ErrorDetail(code="INDICATOR_ERROR", message=result["message"], suggestion="Verifica los parmetros del indicador.")
         )
     return ResponseModel(status="success", data=result)
 
 @app.post("/market/calendar", response_model=ResponseModel[dict])
 async def get_calendar(request: CalendarRequest):
-    """Obtiene el calendario económico de MT5 para análisis fundamental."""
+    """Obtiene el calendario econmico de MT5 para anlisis fundamental."""
     result = await calendar.get_economic_calendar(request)
     return ResponseModel(status="success", data=result)
 
 @app.post("/account/history", response_model=ResponseModel[dict])
 async def get_history(request: HistoryRequest):
-    """Obtiene el historial de trading y métricas de rendimiento (Win Rate, Profit Factor)."""
+    """Obtiene el historial de trading y mtricas de rendimiento (Win Rate, Profit Factor)."""
     result = await history.get_trade_history(request)
     return ResponseModel(status="success", data=result)
 
 @app.post("/trade/order", response_model=ResponseModel[TradeOrderResponse])
 async def place_order(request: TradeOrderRequest):
-    """Envía una orden al mercado (Market o Pending) con validaciones pre-flight."""
+    """Enva una orden al mercado (Market o Pending) con validaciones pre-flight."""
     return await execution.send_order(request)
 
 @app.post("/market/volatility", response_model=ResponseModel[VolatilityMetrics])
 async def get_volatility(request: VolatilityRequest):
-    """Calcula métricas de ATR y Spread."""
+    """Calcula mtricas de ATR y Spread."""
     result = await market.get_volatility_metrics(
         symbol=request.symbol,
         timeframe=request.timeframe,
@@ -235,7 +235,7 @@ async def get_volatility(request: VolatilityRequest):
             error=ErrorDetail(
                 code="VOLATILITY_ERROR",
                 message=result["message"],
-                suggestion="Verifica el símbolo y que haya suficiente historial."
+                suggestion="Verifica el smbolo y que haya suficiente historial."
             )
         )
         
@@ -243,7 +243,7 @@ async def get_volatility(request: VolatilityRequest):
 
 @app.post("/trade/manage", response_model=ResponseModel[PositionActionResponse])
 async def manage_position(request: PositionManageRequest):
-    """Gestiona una posición abierta (Cierre o Modificación)."""
+    """Gestiona una posicin abierta (Cierre o Modificacin)."""
     return await trade_mgmt.manage_position(request)
 
 # =============================================================================
@@ -252,7 +252,7 @@ async def manage_position(request: PositionManageRequest):
 
 @app.post("/analytics/performance", response_model=ResponseModel[dict])
 async def get_performance(request: HistoryRequest):
-    """Auditoría cuantitativa de rendimiento (Sharpe, Win Rate, etc)."""
+    """Auditora cuantitativa de rendimiento (Sharpe, Win Rate, etc)."""
     from app.services.analytics import analytics_engine
     
     # 1. Obtener historial raw
@@ -260,13 +260,13 @@ async def get_performance(request: HistoryRequest):
     if history_data["status"] == "error":
         return ResponseModel(status="error", error=ErrorDetail(code="HISTORY_ERROR", message=history_data["message"], suggestion="Revisa el terminal MT5."))
     
-    # 2. Procesar métricas institucionales
+    # 2. Procesar mtricas institucionales
     metrics = await analytics_engine.get_performance_metrics(history_data.get("deals", []))
     return ResponseModel(status="success", data=metrics)
 
 @app.get("/risk/metrics", response_model=ResponseModel[dict])
 async def get_risk_status():
-    """Estado actual de exposición y riesgo de la cuenta."""
+    """Estado actual de exposicin y riesgo de la cuenta."""
     from app.services.risk_engine import risk_engine
     
     exposure = await risk_engine.get_total_exposure()
@@ -287,14 +287,14 @@ async def get_risk_status():
 
 @app.post("/sniper/setup_score", response_model=ResponseModel[dict])
 async def get_ml_score(request: IndicatorRequest):
-    """Clasificación de setups con ML-Lite y detección de anomalías."""
+    """Clasificacin de setups con ML-Lite y deteccin de anomalas."""
     from app.skills.ml_sniper import ml_sniper
     result = await ml_sniper.score_setup(request.symbol, request.timeframe)
     return ResponseModel(status="success", data=result)
 
 @app.get("/sniper/liquidity/{symbol}", response_model=ResponseModel[dict])
 async def get_liquidity(symbol: str):
-    """Análisis de profundidad de mercado (DoM) institucional."""
+    """Anlisis de profundidad de mercado (DoM) institucional."""
     from app.skills.liquidity import liquidity_engine
     result = await liquidity_engine.get_market_depth(symbol)
     return ResponseModel(status="success", data=result)

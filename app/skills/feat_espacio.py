@@ -1,14 +1,14 @@
 """
-FEAT Module E: ESPACIO (Geometría de Liquidez) - CHRONO-AWARE
+FEAT Module E: ESPACIO (Geometra de Liquidez) - CHRONO-AWARE
 ==============================================================
-Determina DÓNDE el Smart Money ha dejado huellas de liquidez.
+Determina DNDE el Smart Money ha dejado huellas de liquidez.
 
 Zonas Institucionales:
 1. FVG (Fair Value Gap): Desequilibrios de precio
-2. OB (Order Block): Última vela contraria antes de impulso
-3. Breaker Block: OB que falló y ahora es soporte/resistencia
+2. OB (Order Block): ltima vela contraria antes de impulso
+3. Breaker Block: OB que fall y ahora es soporte/resistencia
 
-INTEGRACIÓN TEMPORAL:
+INTEGRACIN TEMPORAL:
 - Zonas creadas en Kill Zone tienen mayor probabilidad
 - Zonas de Lunes (INDUCTION) son potenciales trampas
 - Premium/Discount ajustado por ciclo semanal
@@ -146,7 +146,7 @@ def detect_fvg(candles: pd.DataFrame, lookback: int = 30) -> List[Dict]:
 
 def detect_order_blocks(candles: pd.DataFrame, lookback: int = 30) -> List[Dict]:
     """
-    Detecta Order Blocks con validación de FVG.
+    Detecta Order Blocks con validacin de FVG.
     """
     obs = []
     
@@ -240,7 +240,7 @@ def calculate_premium_discount(
     range_low: float
 ) -> Dict[str, Any]:
     """
-    Calcula si el precio está en Premium (vender) o Discount (comprar).
+    Calcula si el precio est en Premium (vender) o Discount (comprar).
     Equilibrium = 50%
     """
     range_size = range_high - range_low
@@ -300,7 +300,7 @@ def analyze_espacio(
     chrono_features: Dict = None
 ) -> Dict[str, Any]:
     """
-    📍 FEAT MODULE E: Mapeo de Zonas de Liquidez (Chrono-Aware).
+     FEAT MODULE E: Mapeo de Zonas de Liquidez (Chrono-Aware).
     
     Busca FVGs, Order Blocks y calcula Premium/Discount.
     Integra contexto temporal para validar calidad de zonas.
@@ -435,13 +435,13 @@ def analyze_espacio(
     }
     
     if weekly_phase == "INDUCTION":
-        result["guidance"]["cautions"].append("📅 LUNES: Zonas pueden ser trampas")
+        result["guidance"]["cautions"].append(" LUNES: Zonas pueden ser trampas")
     if not price_in_zone and high_quality_zones:
-        result["guidance"]["cautions"].append(f"⏳ Precio lejos de POI. Esperar retroceso a zona")
+        result["guidance"]["cautions"].append(f" Precio lejos de POI. Esperar retroceso a zona")
     if pd_zone["percentage"] > 70 and market_structure == "BULLISH":
-        result["guidance"]["cautions"].append("⚠️ Comprando en Premium - riesgo elevado")
+        result["guidance"]["cautions"].append(" Comprando en Premium - riesgo elevado")
     if pd_zone["percentage"] < 30 and market_structure == "BEARISH":
-        result["guidance"]["cautions"].append("⚠️ Vendiendo en Discount - riesgo elevado")
+        result["guidance"]["cautions"].append(" Vendiendo en Discount - riesgo elevado")
     
     logger.info(f"[FEAT-E] HQ Zones: {len(high_quality_zones)}, P/D: {pd_zone['zone']}, InZone: {price_in_zone}")
     

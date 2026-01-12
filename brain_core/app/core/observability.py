@@ -46,7 +46,7 @@ tracer = trace.get_tracer(__name__)
 
 class ObservabilityEngine:
     """
-    Controlador maestro de telemetría y métricas institucionales.
+    Controlador maestro de telemetra y mtricas institucionales.
     """
     _instance = None
     
@@ -66,7 +66,7 @@ class ObservabilityEngine:
         return cls._instance
 
     def track_latency(self, operation: str, symbol: str, duration: float):
-        """Registra la latencia de una operación."""
+        """Registra la latencia de una operacin."""
         LATENCY_HISTOGRAM.labels(operation=operation, symbol=symbol).observe(duration)
 
     def track_order(self, symbol: str, action: str, status: str):
