@@ -1105,6 +1105,106 @@ async def feat_analyze_tiempo_institucional(
     return analyze_tiempo_institucional(server_time_utc, d1_direction, h4_direction, h1_direction, has_sweep, news_upcoming)
 
 
+# =============================================================================
+# KILLZONE MICRO-TEMPORAL INTELLIGENCE
+# =============================================================================
+
+@mcp.tool()
+@pulse_observer
+async def feat_get_current_killzone_block(server_time_utc: str = None):
+    """
+    🕐 KILLZONE BLOCK: Obtiene el bloque actual de 15 minutos (09:00-13:00 Bolivia).
+    
+    16 bloques con:
+    - session_heat (0.0-1.0)
+    - expansion_probability
+    - liquidity_state (FSM)
+    - action_recommendation
+    
+    PEAK BLOCK: 09:30-09:44 ⭐
+    """
+    from app.skills.killzone_intelligence import feat_get_current_killzone_block as get_block
+    return await get_block(server_time_utc)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_generate_temporal_ml_features(
+    server_time_utc: str = None,
+    d1_direction: str = "NEUTRAL",
+    h4_direction: str = "NEUTRAL",
+    h1_direction: str = "NEUTRAL",
+    current_volume_ratio: float = 1.0
+):
+    """
+    🧠 TEMPORAL ML FEATURES: Genera vector de features para red neuronal.
+    
+    Incluye:
+    - session_heat, expansion_prob (priors)
+    - alignment_factor (-1.0 to +1.0)
+    - posterior_probability (Bayesian)
+    - liquidity_state one-hot
+    """
+    from app.skills.killzone_intelligence import generate_temporal_ml_features
+    return generate_temporal_ml_features(
+        server_time_utc, d1_direction, h4_direction, h1_direction, current_volume_ratio
+    )
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_check_h1_confirmation(
+    h1_closed_outside: bool,
+    minutes_since_close: int,
+    retest_occurred: bool = False,
+    retest_rejected: bool = False,
+    current_volume_ratio: float = 1.0,
+    in_killzone: bool = False
+):
+    """
+    ✅ H1 CONFIRMATION: Verifica nivel de confirmación H1.
+    
+    Reglas:
+    - Close fuera del nivel
+    - Retest 5-30 min con rechazo
+    - Volume ≥ 1.3x
+    - Killzone boost
+    
+    Retorna: level, score, proceed
+    """
+    from app.skills.killzone_intelligence import check_h1_confirmation
+    return check_h1_confirmation(
+        h1_closed_outside, minutes_since_close, retest_occurred,
+        retest_rejected, current_volume_ratio, in_killzone
+    )
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_update_bayesian_prior(block: str, was_successful: bool):
+    """
+    📊 UPDATE PRIOR: Actualiza prior bayesiano basado en resultado.
+    
+    Llamar después de cada trade para aprendizaje adaptativo.
+    Si accuracy < 40% por 5 días → reduce prior automáticamente.
+    """
+    from app.ml.temporal_features import feat_update_bayesian_prior as update_prior
+    return await update_prior(block, was_successful)
+
+
+@mcp.tool()
+@pulse_observer
+async def feat_get_bayesian_priors():
+    """
+    📈 GET PRIORS: Obtiene todos los priors bayesianos actuales.
+    
+    Muestra expansion_prob y confidence por cada bloque de 15-min.
+    """
+    from app.ml.temporal_features import feat_get_all_priors as get_priors
+    return await get_priors()
+
+
+
 
 
 
