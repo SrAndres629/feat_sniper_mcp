@@ -918,6 +918,113 @@ async def get_system_health():
     return health
 
 # =============================================================================
+# FEAT-DEEP MULTI-TEMPORAL INTELLIGENCE TOOLS
+# =============================================================================
+
+@mcp.tool()
+@pulse_observer
+async def get_market_state_tensor(symbol: str = "XAUUSD"):
+    """
+    🧠 FEAT-DEEP: Returns the Multi-Temporal Market State Tensor.
+    Layers: Macro (H4), Structural (H1/M15), Execution (M5/M1).
+    Includes alignment score and kill zone status.
+    """
+    from app.ml.data_collector import fetch_multi_tf_data
+    
+    data = await fetch_multi_tf_data(symbol)
+    
+    if data.get("tensor"):
+        return {
+            "symbol": symbol,
+            "tensor": data["tensor"],
+            "status": "ACTIVE"
+        }
+    
+    return {
+        "symbol": symbol,
+        "error": "No multi-TF data available. Collect data first.",
+        "status": "NO_DATA"
+    }
+
+
+@mcp.tool()
+@pulse_observer
+async def get_h4_veto_status(symbol: str = "XAUUSD", proposed_signal: str = "BUY"):
+    """
+    ⚖️ FEAT-DEEP VETO RULE: Checks if a M1/M5 signal is allowed.
+    Returns ALLOW or VETO based on H4 trend alignment.
+    
+    Philosophy: M1 is noise, H4 is truth. No counter-trend trading.
+    """
+    from app.ml.data_collector import get_h4_bias
+    from app.ml.ml_engine import ml_engine
+    
+    # Get current H4 bias
+    bias_data = await get_h4_bias(symbol)
+    h4_trend = bias_data.get("H4_Trend", "NEUTRAL")
+    
+    # Update ML Engine macro bias cache
+    ml_engine.update_macro_bias(symbol, h4_trend)
+    
+    # Apply Veto Rule
+    should_trade, reason = ml_engine.apply_feat_veto(symbol, proposed_signal)
+    
+    return {
+        "symbol": symbol,
+        "proposed_signal": proposed_signal,
+        "h4_trend": h4_trend,
+        "decision": "ALLOW" if should_trade else "VETO",
+        "reason": reason,
+        "alignment_score": bias_data.get("alignment_score", 0),
+        "kill_zone": bias_data.get("kill_zone"),
+        "in_ny_kz": bias_data.get("in_ny_kz", False)
+    }
+
+
+@mcp.tool()
+@pulse_observer
+async def get_kill_zone_status():
+    """
+    ⏰ FEAT-DEEP: Returns current Kill Zone status.
+    NY: 07:00-11:00 UTC-4 (Best for XAUUSD)
+    """
+    from app.skills.liquidity_detector import get_current_kill_zone, is_in_kill_zone
+    
+    return {
+        "current_kill_zone": get_current_kill_zone(),
+        "in_ny_session": is_in_kill_zone("NY"),
+        "in_london_session": is_in_kill_zone("LONDON"),
+        "in_asia_session": is_in_kill_zone("ASIA"),
+        "recommendation": "OPTIMAL" if is_in_kill_zone("NY") else "REDUCED_RISK"
+    }
+
+
+@mcp.tool()
+@pulse_observer
+async def get_liquidity_pools(symbol: str = "XAUUSD"):
+    """
+    💧 FEAT-DEEP: Detects institutional liquidity pools.
+    Returns unmitigated Swing Highs/Lows that act as price magnets.
+    """
+    from app.ml.data_collector import fetch_multi_tf_data
+    from app.skills.liquidity_detector import detect_liquidity_pools
+    
+    data = await fetch_multi_tf_data(symbol)
+    
+    if not data.get("H1").empty:
+        liq = detect_liquidity_pools(data["H1"])
+        return {
+            "symbol": symbol,
+            "liquidity_above": liq.get("liquidity_above", 0),
+            "liquidity_below": liq.get("liquidity_below", 0),
+            "total_pools": liq.get("total_pools", 0),
+            "pools": liq.get("pools", [])[:5]  # Top 5 pools
+        }
+    
+    return {"symbol": symbol, "error": "No H1 data for liquidity detection"}
+
+
+# =============================================================================
 # SYSTEM RESOURCES
 # =============================================================================
 

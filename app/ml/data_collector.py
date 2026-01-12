@@ -385,3 +385,79 @@ async def flush_pending() -> Dict:
     """MCP Tool: Fuerza flush del batch pendiente."""
     data_collector.force_flush()
     return {"status": "flushed", **data_collector.get_stats()}
+
+
+# =============================================================================
+# FEAT-DEEP MULTI-TEMPORAL FUNCTIONS
+# =============================================================================
+
+async def fetch_multi_tf_data(symbol: str, mt5_conn=None) -> Dict[str, Any]:
+    """
+    FEAT-DEEP Protocol: Fetches market data across all timeframes simultaneously.
+    
+    Returns a dict with candles for: H4, H1, M15, M5, M1
+    Used to build the Market State Tensor.
+    """
+    from app.skills.liquidity_detector import MarketStateTensor, market_tensor
+    
+    result = {
+        "symbol": symbol,
+        "H4": pd.DataFrame(),
+        "H1": pd.DataFrame(),
+        "M15": pd.DataFrame(),
+        "M5": pd.DataFrame(),
+        "M1": pd.DataFrame(),
+        "tensor": None,
+        "error": None
+    }
+    
+    # Fetch from SQLite cache (real MT5 fetch would require mt5_conn)
+    with data_collector.db.get_connection() as conn:
+        for tf in ["H4", "H1", "M15", "M5", "M1"]:
+            query = """
+                SELECT tick_time, open, high, low, close, volume, rsi, atr
+                FROM market_data 
+                WHERE symbol = ? AND timeframe = ?
+                ORDER BY tick_time DESC
+                LIMIT 100
+            """
+            rows = conn.execute(query, (symbol, tf)).fetchall()
+            if rows:
+                df = pd.DataFrame([dict(row) for row in rows])
+                df = df.sort_values("tick_time", ascending=True).reset_index(drop=True)
+                result[tf] = df
+    
+    # Build Market State Tensor if we have data
+    if not result["H4"].empty and not result["M1"].empty:
+        try:
+            tensor = market_tensor.build_tensor(
+                h4_candles=result["H4"],
+                h1_candles=result["H1"],
+                m15_candles=result["M15"],
+                m5_candles=result["M5"],
+                m1_candles=result["M1"]
+            )
+            result["tensor"] = tensor
+        except Exception as e:
+            result["error"] = str(e)
+    
+    return result
+
+
+async def get_h4_bias(symbol: str) -> Dict[str, Any]:
+    """
+    FEAT-DEEP Protocol: Returns the current H4 trend bias for Veto Rule.
+    """
+    data = await fetch_multi_tf_data(symbol)
+    
+    if data.get("tensor"):
+        h4_trend = data["tensor"]["macro"].get("H4_Trend", "NEUTRAL")
+        return {
+            "symbol": symbol,
+            "H4_Trend": h4_trend,
+            "alignment_score": data["tensor"].get("alignment_score", 0),
+            "kill_zone": data["tensor"].get("kill_zone"),
+            "in_ny_kz": data["tensor"].get("in_ny_kz", False)
+        }
+    
+    return {"symbol": symbol, "H4_Trend": "NEUTRAL", "error": "No H4 data available"}

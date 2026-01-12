@@ -14,11 +14,21 @@ import os
 import json
 import logging
 import numpy as np
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timezone
 import torch.nn as nn
 from app.core.config import settings
 from app.ml.fractal_analysis import fractal_analyzer
+
+# FEAT-DEEP Multi-Temporal Intelligence
+try:
+    from app.skills.liquidity_detector import (
+        is_in_kill_zone, get_current_kill_zone,
+        detect_liquidity_pools, is_intention_candle
+    )
+    FEAT_DEEP_AVAILABLE = True
+except ImportError:
+    FEAT_DEEP_AVAILABLE = False
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -218,10 +228,48 @@ class MLEngine:
         self.sequence_buffers: Dict[str, List[Dict[str, float]]] = {}
         self.seq_len_map: Dict[str, int] = {}
         
-        # Macro Memory (Bias Cache)
-        self.macro_bias: Dict[str, Dict[str, Any]] = {} 
+        # FEAT-DEEP Multi-Temporal State
+        self.macro_bias: Dict[str, str] = {}  # H4 Trend per symbol
+        self.h4_veto_enabled: bool = True     # Veto Rule: No counter-trend trading
+        self.kill_zone_filter: bool = True    # Reduce risk outside NY session
         
-        logger.info(f"MLEngine V6.0 [MIP] initialized. Multifractal Logic: ENABLED.")
+        logger.info(f"MLEngine V7.0 [FEAT-DEEP] initialized. Multi-TF Veto: ENABLED.")
+    
+    def apply_feat_veto(self, symbol: str, m1_signal: str) -> Tuple[bool, str]:
+        """
+        FEAT-DEEP Veto Rule: Prevents counter-trend trading.
+        
+        IF H4_BEARISH + M1_BUY -> Force HOLD (Veto)
+        IF H4_BULLISH + M1_SELL -> Force HOLD (Veto)
+        
+        Returns:
+            (should_trade: bool, reason: str)
+        """
+        if not self.h4_veto_enabled:
+            return (True, "H4 Veto disabled")
+        
+        h4_trend = self.macro_bias.get(symbol, "NEUTRAL")
+        
+        # Veto Rule
+        if h4_trend == "BEARISH" and m1_signal == "BUY":
+            return (False, f"VETO: H4={h4_trend} conflicts with M1={m1_signal}")
+        
+        if h4_trend == "BULLISH" and m1_signal == "SELL":
+            return (False, f"VETO: H4={h4_trend} conflicts with M1={m1_signal}")
+        
+        # Kill Zone Filter
+        if self.kill_zone_filter and FEAT_DEEP_AVAILABLE:
+            if not is_in_kill_zone("NY"):
+                kz = get_current_kill_zone()
+                if kz is None:
+                    return (True, f"CAUTION: Outside Kill Zone, reduced confidence")
+        
+        return (True, f"ALIGNED: H4={h4_trend} + M1={m1_signal}")
+    
+    def update_macro_bias(self, symbol: str, h4_trend: str):
+        """Updates the H4 macro bias for a symbol."""
+        self.macro_bias[symbol] = h4_trend
+        logger.info(f"[FEAT-DEEP] Updated H4 Bias for {symbol}: {h4_trend}")
         
     def _ensure_models(self, symbol: str) -> None:
         """Lazily loads models for the requested symbol with Role Separation."""
