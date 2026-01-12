@@ -1,400 +1,458 @@
 """
-FEAT Module T: TIEMPO ADVANCED (Ciclo Diario de Liquidez)
-==========================================================
-Sistema avanzado de Market Timing basado en ciclos de liquidez NY.
+FEAT Module T: TIEMPO PROBABILÍSTICO (Chrono-Analyst Master)
+==============================================================
+Sistema de timing probabilístico para XAU/USD.
 
-Fases del Ciclo:
-- ASIA_OVERNIGHT: 00:00-04:00 NY - Intensidad BAJA
-- PRE_LONDON: 04:00-06:00 NY - Intensidad MEDIA
-- LONDON_KILLZONE: 06:00-09:00 NY - Intensidad ALTA
-- LONDON_LUNCH: 09:00-11:00 NY - Intensidad MEDIA
-- NY_KILLZONE: 11:30-13:00 NY - Intensidad MUY ALTA
-- NY_MIDDAY: 13:00-15:00 NY - Intensidad ALTA
-- NY_CLOSE: 15:00-17:00 NY - Intensidad MEDIA (decae)
-- POST_MARKET: 17:00+ NY - Intensidad BAJA
+FILOSOFÍA: La IA SIEMPRE puede operar, pero ajusta su política según:
+- Liquidez esperada (0.0-1.0)
+- Volatilidad esperada (0.0-1.0)  
+- Risk multiplier (0.1-2.0)
+- Ciclo semanal (Induction/Direction/Expansion/Closing)
 
-Cierres H4 (NY): 00:00, 04:00, 08:00, 12:00, 16:00, 20:00
+NO hay "Kill Switches" - solo PRIOR PROBABILITIES y RISK ADJUSTMENTS.
 """
 
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional, Literal
+from typing import Dict, Any, List
 from enum import Enum
+import pytz
 
-logger = logging.getLogger("FEAT.TiempoAdvanced")
+logger = logging.getLogger("FEAT.ChronoAnalyst")
 
 
 # =============================================================================
-# ENUMS Y CONSTANTES
+# TIMEZONES
 # =============================================================================
 
-class LiquidityPhase(Enum):
+try:
+    NY_TZ = pytz.timezone('America/New_York')
+    BOLIVIA_TZ = pytz.timezone('America/La_Paz')  # Santa Cruz = La Paz timezone
+except:
+    NY_TZ = None
+    BOLIVIA_TZ = None
+
+
+# =============================================================================
+# ENUMS
+# =============================================================================
+
+class WeeklyCycle(Enum):
+    INDUCTION = "INDUCTION"      # Lunes: Falsos breakouts, crear liquidez
+    DIRECTION = "DIRECTION"       # Martes: Se establece dirección real
+    MIDWEEK = "MIDWEEK"          # Miércoles: Corrección o continuación
+    EXPANSION = "EXPANSION"       # Jueves: Máxima expansión
+    CLOSING = "CLOSING"          # Viernes: Cierre de ciclos
+
+
+class SessionPhase(Enum):
     ASIA_OVERNIGHT = "ASIA_OVERNIGHT"
     ASIA_DEEP = "ASIA_DEEP"
     PRE_LONDON = "PRE_LONDON"
     LONDON_KILLZONE = "LONDON_KILLZONE"
-    LONDON_LUNCH = "LONDON_LUNCH"
+    LONDON_CONTINUATION = "LONDON_CONTINUATION"
     PRE_NY = "PRE_NY"
-    NY_KILLZONE = "NY_KILLZONE"
-    NY_MIDDAY = "NY_MIDDAY"
+    NY_OPEN_KILLZONE = "NY_OPEN_KILLZONE"
+    NY_NEWS = "NY_NEWS"
+    NY_LUNCH = "NY_LUNCH"
+    NY_AFTERNOON = "NY_AFTERNOON"
     NY_CLOSE = "NY_CLOSE"
     POST_MARKET = "POST_MARKET"
 
 
-class LiquidityIntensity(Enum):
-    LOW = "LOW"
-    MEDIUM = "MEDIUM"
-    HIGH = "HIGH"
-    VERY_HIGH = "VERY_HIGH"
+# =============================================================================
+# MATRIZ DE LIQUIDEZ: FEATURES NUMÉRICAS (0.0-1.0)
+# =============================================================================
 
-
-class OperationalMode(Enum):
-    WAIT = "WAIT"           # No operar, dormir
-    PREPARE = "PREPARE"     # Marcar niveles, preparar órdenes
-    EXECUTE = "EXECUTE"     # Ejecutar con escalonamiento
-    MANAGE_ONLY = "MANAGE"  # Solo gestionar posiciones abiertas
-
-
-# Mapeo de fases con horarios NY y características
-LIQUIDITY_PHASES = {
-    # (hora_inicio, hora_fin): (fase, intensidad, modo, descripción)
-    (0, 1): (LiquidityPhase.ASIA_OVERNIGHT, LiquidityIntensity.LOW, OperationalMode.WAIT, 
-             "Rango estrecho, spreads amplios"),
-    (1, 4): (LiquidityPhase.ASIA_DEEP, LiquidityIntensity.LOW, OperationalMode.WAIT,
-             "Liquidez mínima; evitar tamaño alto"),
-    (4, 6): (LiquidityPhase.PRE_LONDON, LiquidityIntensity.MEDIUM, OperationalMode.PREPARE,
-             "Primeros indicios de posicionamiento; marcar POCs"),
-    (6, 9): (LiquidityPhase.LONDON_KILLZONE, LiquidityIntensity.HIGH, OperationalMode.EXECUTE,
-             "Gran volumen; barridos de stops; ejecutar escalonado"),
-    (9, 11): (LiquidityPhase.LONDON_LUNCH, LiquidityIntensity.MEDIUM, OperationalMode.MANAGE_ONLY,
-              "Transición; momentum puede consolidar"),
-    (11, 13): (LiquidityPhase.NY_KILLZONE, LiquidityIntensity.VERY_HIGH, OperationalMode.EXECUTE,
-               "PICO de liquidez y volatilidad; ejecutar con slices"),
-    (13, 15): (LiquidityPhase.NY_MIDDAY, LiquidityIntensity.HIGH, OperationalMode.MANAGE_ONLY,
-               "Continuación o consolidación; trailing stops"),
-    (15, 17): (LiquidityPhase.NY_CLOSE, LiquidityIntensity.MEDIUM, OperationalMode.MANAGE_ONLY,
-               "Recolocación de stops; reducir tamaño"),
-    (17, 20): (LiquidityPhase.POST_MARKET, LiquidityIntensity.LOW, OperationalMode.WAIT,
-               "Liquidez decrece; preparar macro-niveles"),
-    (20, 24): (LiquidityPhase.ASIA_OVERNIGHT, LiquidityIntensity.LOW, OperationalMode.WAIT,
-               "Rango, acumulación ligera")
+# (hora_inicio, hora_fin): {features}
+LIQUIDITY_MATRIX = {
+    (0, 1):   {"phase": "ASIA_OVERNIGHT", "liquidity": 0.15, "volatility": 0.10, "risk_mult": 0.25, "spread_risk": 0.80},
+    (1, 3):   {"phase": "ASIA_DEEP", "liquidity": 0.10, "volatility": 0.08, "risk_mult": 0.20, "spread_risk": 0.90},
+    (3, 4):   {"phase": "ASIA_LATE", "liquidity": 0.20, "volatility": 0.15, "risk_mult": 0.30, "spread_risk": 0.70},
+    (4, 5):   {"phase": "PRE_LONDON", "liquidity": 0.35, "volatility": 0.30, "risk_mult": 0.50, "spread_risk": 0.50},
+    (5, 6):   {"phase": "LONDON_EARLY", "liquidity": 0.55, "volatility": 0.50, "risk_mult": 0.70, "spread_risk": 0.35},
+    (6, 8):   {"phase": "LONDON_KILLZONE", "liquidity": 0.80, "volatility": 0.75, "risk_mult": 1.00, "spread_risk": 0.20},
+    (8, 9):   {"phase": "LONDON_CONTINUATION", "liquidity": 0.75, "volatility": 0.65, "risk_mult": 0.90, "spread_risk": 0.25},
+    (9, 10):  {"phase": "PRE_NY", "liquidity": 0.50, "volatility": 0.45, "risk_mult": 0.60, "spread_risk": 0.40},
+    (10, 11): {"phase": "NY_OPEN_KILLZONE", "liquidity": 0.95, "volatility": 0.90, "risk_mult": 1.00, "spread_risk": 0.15},
+    (11, 12): {"phase": "NY_NEWS", "liquidity": 0.90, "volatility": 0.95, "risk_mult": 0.80, "spread_risk": 0.20},
+    (12, 13): {"phase": "NY_LUNCH", "liquidity": 0.60, "volatility": 0.50, "risk_mult": 0.65, "spread_risk": 0.30},
+    (13, 15): {"phase": "NY_AFTERNOON", "liquidity": 0.55, "volatility": 0.50, "risk_mult": 0.60, "spread_risk": 0.35},
+    (15, 16): {"phase": "NY_CLOSE", "liquidity": 0.40, "volatility": 0.35, "risk_mult": 0.40, "spread_risk": 0.50},
+    (16, 17): {"phase": "POST_MARKET_EARLY", "liquidity": 0.25, "volatility": 0.20, "risk_mult": 0.25, "spread_risk": 0.70},
+    (17, 20): {"phase": "POST_MARKET", "liquidity": 0.15, "volatility": 0.12, "risk_mult": 0.20, "spread_risk": 0.80},
+    (20, 24): {"phase": "ASIA_OVERNIGHT", "liquidity": 0.15, "volatility": 0.10, "risk_mult": 0.25, "spread_risk": 0.80},
 }
 
-# Cierres H4 importantes (hora NY)
-H4_CLOSES_NY = [0, 4, 8, 12, 16, 20]
+# Cierres H4 importantes (hora NY) - momentos de posible barrido
+H4_CLOSES = [0, 4, 8, 12, 16, 20]
 
 
 # =============================================================================
-# FUNCIONES DE CONVERSIÓN TEMPORAL
+# CICLO SEMANAL
 # =============================================================================
 
-def utc_to_ny(utc_time: datetime) -> datetime:
-    """
-    Convierte hora UTC a hora de Nueva York (Eastern Time).
-    Considera DST automáticamente.
-    """
-    # Offset estándar NY: UTC-5 (EST) o UTC-4 (EDT)
-    # Simplificación: usamos -5 por defecto (ajustar según DST)
-    ny_offset = timedelta(hours=-5)
-    return utc_time + ny_offset
+WEEKLY_CYCLE_MAP = {
+    0: {"phase": WeeklyCycle.INDUCTION, "risk_mult": 0.50, "bias": "TRAP_EXPECTED", 
+        "note": "Lunes: Falsos breakouts. Movimientos suelen ser trampas."},
+    1: {"phase": WeeklyCycle.DIRECTION, "risk_mult": 1.00, "bias": "DIRECTION_DISCOVERY",
+        "note": "Martes: Se establece la dirección real de la semana."},
+    2: {"phase": WeeklyCycle.MIDWEEK, "risk_mult": 0.85, "bias": "CONTINUATION_OR_CORRECTION",
+        "note": "Miércoles: Posible corrección o continuación."},
+    3: {"phase": WeeklyCycle.EXPANSION, "risk_mult": 1.20, "bias": "MAX_EXPANSION",
+        "note": "Jueves: Día de máxima expansión. Riesgo agresivo."},
+    4: {"phase": WeeklyCycle.CLOSING, "risk_mult": 0.40, "bias": "WEEKLY_CLOSE",
+        "note": "Viernes: Cierre de ciclos. Solo operar NY AM (10-12)."},
+    5: {"phase": WeeklyCycle.CLOSING, "risk_mult": 0.10, "bias": "WEEKEND",
+        "note": "Sábado: Mercado cerrado."},
+    6: {"phase": WeeklyCycle.CLOSING, "risk_mult": 0.10, "bias": "WEEKEND",
+        "note": "Domingo: Pre-apertura Asia (tarde)."},
+}
 
 
-def get_current_ny_time() -> datetime:
-    """Obtiene la hora actual en Nueva York."""
-    return utc_to_ny(datetime.now(timezone.utc))
+# =============================================================================
+# FUNCIONES DE TIMEZONE
+# =============================================================================
 
-
-def parse_time_input(time_input: str = None) -> datetime:
-    """
-    Parsea una entrada de tiempo (string o None).
-    Retorna datetime en UTC.
-    """
-    if time_input is None:
-        return datetime.now(timezone.utc)
+def get_ny_time(utc_time: datetime = None) -> datetime:
+    """Convierte UTC a hora de Nueva York."""
+    if utc_time is None:
+        utc_time = datetime.now(timezone.utc)
     
-    try:
-        if "T" in time_input:
-            return datetime.fromisoformat(time_input.replace("Z", "+00:00"))
-        elif ":" in time_input:
-            # Solo hora HH:MM
-            parts = time_input.split(":")
-            now = datetime.now(timezone.utc)
-            return now.replace(hour=int(parts[0]), minute=int(parts[1]), second=0)
-        else:
-            return datetime.now(timezone.utc)
-    except:
-        return datetime.now(timezone.utc)
+    if NY_TZ:
+        try:
+            if utc_time.tzinfo is None:
+                utc_time = utc_time.replace(tzinfo=timezone.utc)
+            return utc_time.astimezone(NY_TZ)
+        except:
+            pass
+    
+    # Fallback: UTC-5 (EST)
+    return utc_time - timedelta(hours=5)
+
+
+def get_bolivia_time(utc_time: datetime = None) -> datetime:
+    """Convierte UTC a hora de Bolivia (Santa Cruz = UTC-4)."""
+    if utc_time is None:
+        utc_time = datetime.now(timezone.utc)
+    
+    if BOLIVIA_TZ:
+        try:
+            if utc_time.tzinfo is None:
+                utc_time = utc_time.replace(tzinfo=timezone.utc)
+            return utc_time.astimezone(BOLIVIA_TZ)
+        except:
+            pass
+    
+    # Fallback: UTC-4
+    return utc_time - timedelta(hours=4)
 
 
 # =============================================================================
-# FUNCIONES DE ANÁLISIS DE FASE
+# FUNCIONES DE ANÁLISIS
 # =============================================================================
 
-def get_liquidity_phase(ny_hour: int) -> Dict[str, Any]:
+def get_liquidity_features(ny_hour: int) -> Dict[str, Any]:
     """
-    Determina la fase de liquidez basada en la hora NY.
+    Obtiene features de liquidez para la hora NY dada.
+    Retorna valores numéricos para ML.
     """
-    for (start, end), (phase, intensity, mode, desc) in LIQUIDITY_PHASES.items():
+    for (start, end), features in LIQUIDITY_MATRIX.items():
         if start <= ny_hour < end:
-            return {
-                "phase": phase,
-                "intensity": intensity,
-                "operational_mode": mode,
-                "description": desc
-            }
+            return features.copy()
     
-    # Default
-    return {
-        "phase": LiquidityPhase.ASIA_OVERNIGHT,
-        "intensity": LiquidityIntensity.LOW,
-        "operational_mode": OperationalMode.WAIT,
-        "description": "Fuera de horario principal"
-    }
+    # Default: baja liquidez
+    return {"phase": "UNKNOWN", "liquidity": 0.1, "volatility": 0.1, "risk_mult": 0.2, "spread_risk": 0.9}
 
 
-def is_near_h4_close(ny_hour: int, ny_minute: int, margin_minutes: int = 15) -> bool:
+def get_weekly_features(weekday: int) -> Dict[str, Any]:
     """
-    Verifica si estamos cerca de un cierre H4 (±margin minutos).
-    Los cierres H4 son momentos de posible barrido institucional.
+    Obtiene features del ciclo semanal.
+    weekday: 0=Lunes, 1=Martes, ..., 6=Domingo
     """
-    for h4_close in H4_CLOSES_NY:
-        if ny_hour == h4_close and ny_minute < margin_minutes:
-            return True
-        if ny_hour == (h4_close - 1) % 24 and ny_minute >= (60 - margin_minutes):
-            return True
-    return False
+    return WEEKLY_CYCLE_MAP.get(weekday, WEEKLY_CYCLE_MAP[6]).copy()
 
 
-def calculate_intensity_multiplier(
-    base_intensity: LiquidityIntensity,
-    news_upcoming: bool = False,
-    is_h4_close: bool = False
-) -> Dict[str, Any]:
+def calculate_h4_proximity(ny_hour: int, ny_minute: int) -> Dict[str, Any]:
     """
-    Ajusta la intensidad basada en factores adicionales.
+    Calcula proximidad al cierre H4 más cercano.
     """
-    multiplier = 1.0
-    warnings = []
+    # Encontrar cierre H4 más cercano
+    current_minutes = ny_hour * 60 + ny_minute
     
-    if news_upcoming:
-        multiplier *= 1.5  # Aumenta volatilidad esperada
-        warnings.append("⚠️ Noticia próxima - Ampliar spreads y reducir tamaño")
+    min_distance = 240  # 4 horas máximo
+    nearest_close = 0
     
-    if is_h4_close:
-        multiplier *= 1.2  # Posibles barridos
-        warnings.append("🕐 Cierre H4 próximo - Proteger posiciones")
-    
-    # Ajustar intensidad
-    intensity_order = [LiquidityIntensity.LOW, LiquidityIntensity.MEDIUM, 
-                       LiquidityIntensity.HIGH, LiquidityIntensity.VERY_HIGH]
-    
-    current_idx = intensity_order.index(base_intensity)
-    adjusted_idx = min(len(intensity_order) - 1, int(current_idx * multiplier))
-    
-    return {
-        "adjusted_intensity": intensity_order[adjusted_idx],
-        "multiplier": multiplier,
-        "warnings": warnings
-    }
-
-
-# =============================================================================
-# FUNCIÓN PRINCIPAL DE ANÁLISIS
-# =============================================================================
-
-def analyze_tiempo_advanced(
-    server_time_utc: str = None,
-    news_event_upcoming: bool = False,
-    h4_direction: str = "NEUTRAL",
-    h1_direction: str = "NEUTRAL"
-) -> Dict[str, Any]:
-    """
-    🕐 FEAT MODULE T ADVANCED: Ciclo Diario de Liquidez XAU/USD
-    
-    Analiza la hora actual y determina:
-    - Fase del ciclo de liquidez
-    - Intensidad esperada (M15/H1/H4)
-    - Modo operativo (WAIT/PREPARE/EXECUTE/MANAGE)
-    - Checklist de confirmación multitemporal
-    
-    Args:
-        server_time_utc: Hora del servidor en formato ISO o HH:MM (UTC)
-        news_event_upcoming: Si hay noticias de alto impacto próximas
-        h4_direction: Dirección de H4 para validación
-        h1_direction: Dirección de H1 para validación
+    for h4_close in H4_CLOSES:
+        close_minutes = h4_close * 60
         
-    Returns:
-        Dict con análisis completo de timing institucional
+        # Distancia hacia adelante
+        dist_forward = (close_minutes - current_minutes) % 1440
+        # Distancia hacia atrás
+        dist_backward = (current_minutes - close_minutes) % 1440
+        
+        if dist_forward < min_distance:
+            min_distance = dist_forward
+            nearest_close = h4_close
+        if dist_backward < min_distance:
+            min_distance = dist_backward
+            nearest_close = h4_close
+    
+    return {
+        "nearest_h4_close": nearest_close,
+        "minutes_to_h4_close": min_distance,
+        "is_near_h4_close": min_distance <= 15,
+        "h4_close_warning": min_distance <= 5
+    }
+
+
+def calculate_combined_risk_multiplier(
+    liquidity_features: Dict,
+    weekly_features: Dict,
+    h4_proximity: Dict,
+    news_upcoming: bool = False,
+    current_spread_pips: float = None,
+    avg_spread_pips: float = None
+) -> Dict[str, Any]:
     """
-    # Parse y convertir tiempo
-    utc_time = parse_time_input(server_time_utc)
-    ny_time = utc_to_ny(utc_time)
+    Calcula el multiplicador de riesgo combinado.
+    Este es el output más importante para el ML y la ejecución.
+    """
+    # Base: multiplicador de la hora
+    hourly_mult = liquidity_features.get("risk_mult", 0.5)
+    
+    # Ajuste semanal
+    weekly_mult = weekly_features.get("risk_mult", 1.0)
+    
+    # Penalización por proximidad H4
+    h4_penalty = 0.7 if h4_proximity.get("is_near_h4_close") else 1.0
+    
+    # Penalización por noticias
+    news_penalty = 0.5 if news_upcoming else 1.0
+    
+    # Penalización por spread alto
+    spread_penalty = 1.0
+    if current_spread_pips and avg_spread_pips and avg_spread_pips > 0:
+        spread_ratio = current_spread_pips / avg_spread_pips
+        if spread_ratio > 2.0:
+            spread_penalty = 0.3  # Spread muy alto
+        elif spread_ratio > 1.5:
+            spread_penalty = 0.6  # Spread elevado
+    
+    # Combinar todos los factores
+    combined = hourly_mult * weekly_mult * h4_penalty * news_penalty * spread_penalty
+    
+    # Limitar entre 0.1 y 2.0
+    final_mult = max(0.1, min(2.0, combined))
+    
+    return {
+        "hourly_mult": hourly_mult,
+        "weekly_mult": weekly_mult,
+        "h4_penalty": h4_penalty,
+        "news_penalty": news_penalty,
+        "spread_penalty": spread_penalty,
+        "combined_risk_multiplier": round(final_mult, 3),
+        "recommended_size": "MICRO" if final_mult < 0.3 else ("SMALL" if final_mult < 0.5 else ("NORMAL" if final_mult < 0.8 else "FULL"))
+    }
+
+
+# =============================================================================
+# FUNCIÓN PRINCIPAL: GENERATE ML FEATURES
+# =============================================================================
+
+def generate_chrono_features(
+    server_time_utc: str = None,
+    news_upcoming: bool = False,
+    current_spread_pips: float = None,
+    avg_spread_pips: float = None
+) -> Dict[str, Any]:
+    """
+    🕐 FEAT CHRONO-ANALYST: Genera features numéricas para ML.
+    
+    CRÍTICO: Este output es para alimentar a la red neuronal.
+    NO hay "gates" o "kill switches" - solo PROBABILIDADES y MULTIPLICADORES.
+    
+    Returns:
+        Dict con features numéricas listas para ML
+    """
+    # Parse time
+    if server_time_utc:
+        try:
+            if isinstance(server_time_utc, str):
+                if "T" in server_time_utc:
+                    utc_time = datetime.fromisoformat(server_time_utc.replace("Z", "+00:00"))
+                else:
+                    parts = server_time_utc.split(":")
+                    utc_time = datetime.now(timezone.utc).replace(hour=int(parts[0]), minute=int(parts[1]))
+            else:
+                utc_time = server_time_utc
+        except:
+            utc_time = datetime.now(timezone.utc)
+    else:
+        utc_time = datetime.now(timezone.utc)
+    
+    # Convert timezones
+    ny_time = get_ny_time(utc_time)
+    bolivia_time = get_bolivia_time(utc_time)
+    
     ny_hour = ny_time.hour
     ny_minute = ny_time.minute
+    weekday = ny_time.weekday()  # 0=Monday
     
-    # Obtener fase de liquidez
-    phase_info = get_liquidity_phase(ny_hour)
-    phase = phase_info["phase"]
-    base_intensity = phase_info["intensity"]
-    base_mode = phase_info["operational_mode"]
+    # Get features
+    liquidity_features = get_liquidity_features(ny_hour)
+    weekly_features = get_weekly_features(weekday)
+    h4_proximity = calculate_h4_proximity(ny_hour, ny_minute)
     
-    # Verificar cercanía a cierre H4
-    near_h4_close = is_near_h4_close(ny_hour, ny_minute)
+    # Calculate combined risk
+    risk_analysis = calculate_combined_risk_multiplier(
+        liquidity_features, weekly_features, h4_proximity,
+        news_upcoming, current_spread_pips, avg_spread_pips
+    )
     
-    # Ajustar intensidad por factores externos
-    intensity_adj = calculate_intensity_multiplier(base_intensity, news_event_upcoming, near_h4_close)
-    
-    # Determinar modo operativo final
-    final_mode = base_mode
-    if news_event_upcoming and base_mode == OperationalMode.EXECUTE:
-        final_mode = OperationalMode.PREPARE  # Reducir a preparación si hay noticias
-    
-    # Validación multitemporal
-    multitemporal_check = {
-        "h4_aligned": h4_direction != "NEUTRAL",
-        "h1_aligned": h1_direction != "NEUTRAL",
-        "h4_h1_match": h4_direction == h1_direction,
-        "ready_for_m15": h4_direction == h1_direction and h4_direction != "NEUTRAL"
+    # Build ML feature vector
+    ml_features = {
+        # Time features (normalized)
+        "hour_ny": ny_hour,
+        "hour_ny_normalized": ny_hour / 23.0,
+        "minute_normalized": ny_minute / 59.0,
+        "weekday": weekday,
+        "weekday_normalized": weekday / 6.0,
+        
+        # Session flags (one-hot)
+        "is_asia": 1 if ny_hour in range(0, 5) or ny_hour in range(19, 24) else 0,
+        "is_london": 1 if ny_hour in range(5, 12) else 0,
+        "is_ny": 1 if ny_hour in range(10, 17) else 0,
+        "is_overlap": 1 if ny_hour in range(10, 12) else 0,
+        
+        # Killzone flags
+        "is_london_killzone": 1 if ny_hour in range(6, 9) else 0,
+        "is_ny_killzone": 1 if ny_hour in range(10, 12) else 0,
+        "is_any_killzone": 1 if ny_hour in range(6, 9) or ny_hour in range(10, 12) else 0,
+        
+        # Continuous features (0-1)
+        "liquidity_expected": liquidity_features["liquidity"],
+        "volatility_expected": liquidity_features["volatility"],
+        "spread_risk": liquidity_features["spread_risk"],
+        
+        # Weekly cycle
+        "weekly_phase": weekly_features["phase"].value,
+        "weekly_risk_mult": weekly_features["risk_mult"],
+        "is_induction_day": 1 if weekday == 0 else 0,
+        "is_expansion_day": 1 if weekday == 3 else 0,
+        "is_closing_day": 1 if weekday == 4 else 0,
+        
+        # H4 proximity
+        "minutes_to_h4_close": h4_proximity["minutes_to_h4_close"],
+        "is_near_h4_close": 1 if h4_proximity["is_near_h4_close"] else 0,
+        
+        # Combined risk
+        "combined_risk_multiplier": risk_analysis["combined_risk_multiplier"],
+        
+        # News
+        "news_upcoming": 1 if news_upcoming else 0
     }
     
-    # Generar instrucción de acción
-    if final_mode == OperationalMode.WAIT:
-        instruction = "STOP_CHAIN"
-        action_text = "Mercado dormido. No operar hasta próxima Kill Zone."
-    elif final_mode == OperationalMode.PREPARE:
-        instruction = "ALERT_ONLY"
-        action_text = "Preparar niveles y ordenes limit. Esperar confirmación."
-    elif final_mode == OperationalMode.EXECUTE:
-        if multitemporal_check["ready_for_m15"]:
-            instruction = "PROCEED_TO_MODULE_F"
-            action_text = "Kill Zone activa + Alineación HTF. Buscar entrada en M15."
-        else:
-            instruction = "WAIT_FOR_ALIGNMENT"
-            action_text = "Kill Zone activa pero sin alineación HTF. Esperar."
-    else:  # MANAGE
-        instruction = "MANAGE_POSITIONS"
-        action_text = "Solo gestionar posiciones. No abrir nuevas."
-    
-    # Risk warning
-    risk_warnings = intensity_adj["warnings"].copy()
-    if base_intensity == LiquidityIntensity.VERY_HIGH:
-        risk_warnings.append("⚡ Volatilidad extrema - Usar slicing y stops amplios")
-    
+    # Build human-readable result
     result = {
-        "module": "FEAT_TIEMPO_ADVANCED",
-        "status": "ANALYZED",
-        "timestamp_utc": utc_time.isoformat(),
+        "module": "FEAT_CHRONO_ANALYST",
+        "timestamp_utc": utc_time.isoformat() if hasattr(utc_time, 'isoformat') else str(utc_time),
         
-        # Tiempo
-        "ny_time": ny_time.strftime("%H:%M"),
-        "ny_hour": ny_hour,
-        "utc_time": utc_time.strftime("%H:%M"),
+        # Human readable times
+        "time": {
+            "utc": utc_time.strftime("%H:%M") if hasattr(utc_time, 'strftime') else str(utc_time),
+            "ny": ny_time.strftime("%H:%M") if hasattr(ny_time, 'strftime') else str(ny_time),
+            "bolivia": bolivia_time.strftime("%H:%M") if hasattr(bolivia_time, 'strftime') else str(bolivia_time),
+            "day_of_week": ny_time.strftime("%A") if hasattr(ny_time, 'strftime') else str(weekday)
+        },
         
-        # Fase de liquidez
-        "phase_name": phase.value,
-        "phase_description": phase_info["description"],
-        "liquidity_intensity": intensity_adj["adjusted_intensity"].value,
-        "base_intensity": base_intensity.value,
+        # Session analysis
+        "session": {
+            "phase": liquidity_features["phase"],
+            "liquidity_expected": liquidity_features["liquidity"],
+            "volatility_expected": liquidity_features["volatility"],
+            "spread_risk": liquidity_features["spread_risk"]
+        },
         
-        # Modo operativo
-        "operational_mode": final_mode.value,
-        "instruction": instruction,
-        "action_text": action_text,
+        # Weekly cycle
+        "weekly": {
+            "phase": weekly_features["phase"].value,
+            "bias": weekly_features["bias"],
+            "note": weekly_features["note"]
+        },
         
-        # Alertas
-        "near_h4_close": near_h4_close,
-        "news_upcoming": news_event_upcoming,
-        "risk_warnings": risk_warnings,
+        # H4 analysis
+        "h4": h4_proximity,
         
-        # Checklist multitemporal
-        "multitemporal_check": multitemporal_check,
-        "checklist": {
-            "h4_check": "✅ PASS" if multitemporal_check["h4_aligned"] else "❌ REQUIRED",
-            "h1_check": "✅ PASS" if multitemporal_check["h1_aligned"] else "❌ REQUIRED",
-            "htf_alignment": "✅ ALIGNED" if multitemporal_check["h4_h1_match"] else "⚠️ DIVERGENT",
-            "m15_trigger": "🔍 SEARCH" if multitemporal_check["ready_for_m15"] else "⏳ WAIT"
+        # Risk analysis
+        "risk": risk_analysis,
+        
+        # ML features (for neural network)
+        "ml_features": ml_features,
+        
+        # Action guidance (soft, not hard rules)
+        "guidance": {
+            "can_trade": True,  # SIEMPRE puede tradear
+            "recommended_size": risk_analysis["recommended_size"],
+            "risk_multiplier": risk_analysis["combined_risk_multiplier"],
+            "cautions": []
         }
     }
     
-    logger.info(f"[FEAT-T] NY={ny_time.strftime('%H:%M')}, Phase={phase.value}, Mode={final_mode.value}")
+    # Add cautions (advisory, not blocking)
+    if liquidity_features["liquidity"] < 0.3:
+        result["guidance"]["cautions"].append("⚠️ Baja liquidez: considera reducir tamaño")
+    if h4_proximity["is_near_h4_close"]:
+        result["guidance"]["cautions"].append("🕐 Cerca de cierre H4: posible barrido")
+    if weekday == 0 and ny_hour < 12:
+        result["guidance"]["cautions"].append("📅 Lunes AM: alta probabilidad de falsos breakouts")
+    if news_upcoming:
+        result["guidance"]["cautions"].append("📰 Noticia próxima: aumentar stop o reducir tamaño")
+    
+    logger.info(f"[FEAT-T] NY={ny_time.strftime('%H:%M')}, Phase={liquidity_features['phase']}, RiskMult={risk_analysis['combined_risk_multiplier']}")
     
     return result
 
 
 # =============================================================================
-# FUNCIÓN SIMPLIFICADA PARA RETROCOMPATIBILIDAD
+# FUNCIONES LEGACY (retrocompatibilidad)
 # =============================================================================
 
-def analyze_tiempo(
-    server_time_gmt: str = None,
-    h4_candle: str = "NEUTRAL",
-    news_in_minutes: int = 999,
-    proposed_direction: str = None
-) -> Dict[str, Any]:
-    """
-    Wrapper de retrocompatibilidad para analyze_tiempo_advanced.
-    """
-    news_upcoming = news_in_minutes <= 30
+def analyze_tiempo(server_time_gmt: str = None, h4_candle: str = "NEUTRAL", news_in_minutes: int = 999, proposed_direction: str = None) -> Dict[str, Any]:
+    """Wrapper de retrocompatibilidad."""
+    result = generate_chrono_features(server_time_gmt, news_in_minutes <= 30)
     
-    result = analyze_tiempo_advanced(
-        server_time_utc=server_time_gmt,
-        news_event_upcoming=news_upcoming,
-        h4_direction=h4_candle,
-        h1_direction=h4_candle  # Usar H4 como proxy si no tenemos H1
-    )
-    
-    # Convertir a formato legacy
-    legacy_result = {
+    # Formato legacy
+    return {
         "module": "FEAT_Tiempo",
-        "status": "OPEN" if result["operational_mode"] in ["EXECUTE", "PREPARE"] else "CLOSED",
-        "session": result["phase_name"],
-        "server_time_gmt": result["utc_time"],
-        "instruction": result["instruction"],
-        "analysis": {
-            "kill_zone": {
-                "name": result["phase_name"],
-                "can_trade": result["operational_mode"] in ["EXECUTE", "PREPARE"],
-                "risk_level": result["liquidity_intensity"],
-                "note": result["phase_description"]
-            },
-            "h4_candle": h4_candle,
-            "news_filter": {"status": "PAUSE" if news_upcoming else "CLEAR"}
-        },
-        "bias_constraint": "LONGS_PREFERRED" if h4_candle == "BULLISH" else (
-            "SHORTS_PREFERRED" if h4_candle == "BEARISH" else "NEUTRAL"
-        ),
-        
-        # Nuevo: datos avanzados
-        "advanced": {
-            "ny_time": result["ny_time"],
-            "liquidity_intensity": result["liquidity_intensity"],
-            "operational_mode": result["operational_mode"],
-            "checklist": result["checklist"],
-            "risk_warnings": result["risk_warnings"]
-        }
+        "status": "OPEN",  # Siempre abierto (probabilístico)
+        "session": result["session"]["phase"],
+        "instruction": "PROCEED_TO_MODULE_F",  # Siempre procede
+        "analysis": result["session"],
+        "risk_multiplier": result["risk"]["combined_risk_multiplier"],
+        "advanced": result
     }
-    
-    return legacy_result
+
+
+def analyze_tiempo_advanced(server_time_utc: str = None, news_event_upcoming: bool = False, h4_direction: str = "NEUTRAL", h1_direction: str = "NEUTRAL") -> Dict[str, Any]:
+    """Wrapper avanzado."""
+    return generate_chrono_features(server_time_utc, news_event_upcoming)
 
 
 # =============================================================================
-# ASYNC WRAPPERS PARA MCP
+# ASYNC MCP WRAPPERS
 # =============================================================================
 
-async def feat_check_tiempo(
-    server_time_gmt: str = None,
-    h4_candle: str = "NEUTRAL",
-    news_in_minutes: int = 999
-) -> Dict[str, Any]:
-    """MCP Tool: FEAT Module T - Tiempo (retrocompatible)."""
+async def feat_check_tiempo(server_time_gmt: str = None, h4_candle: str = "NEUTRAL", news_in_minutes: int = 999) -> Dict[str, Any]:
+    """MCP Tool: Tiempo legacy."""
     return analyze_tiempo(server_time_gmt, h4_candle, news_in_minutes)
 
 
-async def feat_check_tiempo_advanced(
-    server_time_utc: str = None,
-    news_event_upcoming: bool = False,
-    h4_direction: str = "NEUTRAL",
-    h1_direction: str = "NEUTRAL"
-) -> Dict[str, Any]:
-    """MCP Tool: FEAT Module T ADVANCED - Ciclo de Liquidez."""
+async def feat_check_tiempo_advanced(server_time_utc: str = None, news_event_upcoming: bool = False, h4_direction: str = "NEUTRAL", h1_direction: str = "NEUTRAL") -> Dict[str, Any]:
+    """MCP Tool: Tiempo advanced."""
     return analyze_tiempo_advanced(server_time_utc, news_event_upcoming, h4_direction, h1_direction)
+
+
+async def feat_generate_chrono_features(server_time_utc: str = None, news_upcoming: bool = False, current_spread_pips: float = None) -> Dict[str, Any]:
+    """MCP Tool: Generate ML-ready chrono features."""
+    return generate_chrono_features(server_time_utc, news_upcoming, current_spread_pips)

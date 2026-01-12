@@ -1063,6 +1063,24 @@ async def feat_check_tiempo_advanced(
     return analyze_tiempo_advanced(server_time_utc, news_event_upcoming, h4_direction, h1_direction)
 
 
+@mcp.tool()
+@pulse_observer
+async def feat_generate_chrono_features(
+    server_time_utc: str = None,
+    news_upcoming: bool = False,
+    current_spread_pips: float = None
+):
+    """
+    🧠 FEAT CHRONO-ANALYST: Genera features numéricas para ML.
+    
+    NO hay kill switches - solo probabilidades y multiplicadores de riesgo.
+    Incluye: ciclo semanal, liquidez, volatilidad, proximidad H4.
+    """
+    from app.skills.feat_tiempo import generate_chrono_features
+    return generate_chrono_features(server_time_utc, news_upcoming, current_spread_pips)
+
+
+
 
 @mcp.tool()
 @pulse_observer
