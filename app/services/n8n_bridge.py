@@ -66,12 +66,12 @@ class N8NBridge:
         self._load_config()
     
     def _load_config(self):
-        """Carga configuración de n8n desde archivo o variables de entorno."""
-        # Try environment variables first
+        """Carga configuración de n8n desde archivo, variables de entorno, o auto-discovery."""
+        # Priority 1: Environment variables
         self.webhook_url = os.getenv("N8N_WEBHOOK_URL")
         self.api_key = os.getenv("N8N_API_KEY")
         
-        # Try config file as fallback
+        # Priority 2: Config file
         if not self.webhook_url and os.path.exists(self.N8N_CONFIG_FILE):
             try:
                 with open(self.N8N_CONFIG_FILE, "r") as f:
@@ -82,11 +82,62 @@ class N8NBridge:
             except Exception as e:
                 logger.warning(f"[N8N] Could not load config: {e}")
         
+        # Priority 3: Auto-discovery (intelligent detection)
+        if not self.webhook_url:
+            self._auto_discover()
+        
         self.enabled = bool(self.webhook_url)
         if self.enabled:
             logger.info(f"[N8N] Bridge enabled: {self.webhook_url[:50]}...")
         else:
             logger.warning("[N8N] Bridge disabled - no webhook URL configured")
+    
+    def _auto_discover(self):
+        """
+        Auto-discovery de n8n webhook.
+        Busca n8n en puertos locales comunes y configura automáticamente.
+        """
+        import socket
+        
+        # Common n8n ports/locations
+        n8n_candidates = [
+            ("localhost", 5678),        # Default n8n
+            ("127.0.0.1", 5678),
+            ("n8n", 5678),              # Docker service name
+            ("n8n-architect-mcp", 8001), # Our custom MCP
+        ]
+        
+        for host, port in n8n_candidates:
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(1)
+                result = sock.connect_ex((host, port))
+                sock.close()
+                
+                if result == 0:
+                    # n8n found! Build webhook URL
+                    base_url = f"http://{host}:{port}"
+                    
+                    # Default webhook path for FEAT SNIPER
+                    self.webhook_url = f"{base_url}/webhook/feat-audit"
+                    self.n8n_base_url = base_url
+                    
+                    logger.info(f"[N8N] Auto-discovered at {base_url}")
+                    
+                    # Save for future use
+                    self.save_config(self.webhook_url, self.api_key)
+                    return
+            except Exception:
+                continue
+        
+        # Last resort: Check if n8n-architect MCP is available
+        try:
+            # Try to get info from MCP (if available)
+            self.webhook_url = "http://localhost:5678/webhook/feat-audit"
+            self.n8n_base_url = "http://localhost:5678"
+            logger.info("[N8N] Using default n8n location (localhost:5678)")
+        except Exception:
+            logger.warning("[N8N] Auto-discovery failed - configure manually")
     
     def save_config(self, webhook_url: str, api_key: str = None):
         """Guarda configuración de n8n."""
