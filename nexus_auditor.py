@@ -458,19 +458,111 @@ class NexusAuditor:
 
     def audit_phase_9_traffic(self):
         """Fase 9: Trafico y Sincronizacion"""
-        print(f"{BOLD}  [FASE 9/10] TRFICO Y SINCRONIZACIN{RESET}")
+        print(f"{BOLD}  [FASE 9/12] TRFICO Y SINCRONIZACIN{RESET}")
         print(f"    {GREEN}{RESET} Latencia Interna: <1ms (Estinada)")
 
-    def audit_phase_10_resources(self):
-        """Fase 10: Recursos"""
-        print(f"{BOLD}  [FASE 10/10] RECURSOS DEL SISTEMA{RESET}")
+    def audit_phase_10_fsm_rlaif(self):
+        """Fase 10: FSM y RLAIF Architecture"""
+        print(f"{BOLD}  [FASE 10/12] FSM Y ARQUITECTURA RLAIF{RESET}")
+        
+        # Check FSM state file
+        fsm_path = os.path.join(os.getcwd(), "data", "fsm_state.json")
+        if os.path.exists(fsm_path):
+            try:
+                with open(fsm_path, "r") as f:
+                    fsm_data = json.load(f)
+                state = fsm_data.get("state", "unknown")
+                winrate = fsm_data.get("winrate", 0)
+                
+                if state == "recalibration":
+                    self.anomalies.append("FSM_RECALIBRATION")
+                    print(f"    {RED}{RESET} FSM State: RECALIBRATION (WinRate: {winrate:.1%})")
+                    print(f"    {YELLOW}{RESET} Sistema en modo de recalibracin - Trading DETENIDO")
+                elif state == "supervised":
+                    print(f"    {YELLOW}{RESET} FSM State: SUPERVISED (WinRate: {winrate:.1%})")
+                elif state == "autonomous":
+                    print(f"    {GREEN}{RESET} FSM State: AUTONOMOUS (WinRate: {winrate:.1%})")
+                else:
+                    print(f"    {YELLOW}{RESET} FSM State: {state}")
+            except Exception as e:
+                print(f"    {RED}{RESET} FSM: Error leyendo estado ({e})")
+        else:
+            print(f"    {YELLOW}{RESET} FSM: Sin historial (Primera ejecucin)")
+    
+    def audit_phase_11_vault(self):
+        """Fase 11: The Vault (Capital Protection)"""
+        print(f"{BOLD}  [FASE 11/12] THE VAULT (PROTECCIN DE CAPITAL){RESET}")
+        
+        vault_path = os.path.join(os.getcwd(), "data", "vault_state.json")
+        if os.path.exists(vault_path):
+            try:
+                with open(vault_path, "r") as f:
+                    vault_data = json.load(f)
+                
+                vault_balance = vault_data.get("vault_balance", 0)
+                trading_capital = vault_data.get("trading_capital", 0)
+                transfers = vault_data.get("total_vault_transfers", 0)
+                next_trigger = vault_data.get("last_trigger_equity", 30) * 2
+                
+                print(f"    {GREEN}{RESET} Vault Balance: ${vault_balance:.2f}")
+                print(f"    {GREEN}{RESET} Trading Capital: ${trading_capital:.2f}")
+                print(f"    {GREEN}{RESET} Transfers to Safety: {transfers}")
+                print(f"    {CYAN}{RESET} Next Trigger at: ${next_trigger:.2f}")
+                
+            except Exception as e:
+                print(f"    {RED}{RESET} Vault: Error leyendo estado ({e})")
+        else:
+            print(f"    {YELLOW}{RESET} Vault: Sin historial (Capital inicial)")
+    
+    def audit_phase_12_n8n(self):
+        """Fase 12: n8n LLM Integration"""
+        print(f"{BOLD}  [FASE 12/12] N8N LLM INTEGRATION{RESET}")
+        
+        # Check n8n config
+        n8n_config_path = os.path.join(os.getcwd(), "data", "n8n_config.json")
+        if os.path.exists(n8n_config_path):
+            try:
+                with open(n8n_config_path, "r") as f:
+                    config = json.load(f)
+                webhook_url = config.get("webhook_url", "")
+                if webhook_url:
+                    # Try to check connectivity
+                    try:
+                        req = urllib.request.Request(webhook_url, method='HEAD')
+                        urllib.request.urlopen(req, timeout=5)
+                        print(f"    {GREEN}{RESET} n8n Webhook: CONECTADO")
+                    except:
+                        print(f"    {YELLOW}{RESET} n8n Webhook: Configurado (no verificable)")
+                else:
+                    self.anomalies.append("N8N_NOT_CONFIGURED")
+                    print(f"    {YELLOW}{RESET} n8n Webhook: NO CONFIGURADO")
+            except:
+                print(f"    {YELLOW}{RESET} n8n: Error leyendo config")
+        else:
+            print(f"    {YELLOW}{RESET} n8n: Sin configurar (Modo standalone)")
+        
+        # Check feedback log
+        feedback_path = os.path.join(os.getcwd(), "data", "llm_feedback_log.jsonl")
+        if os.path.exists(feedback_path):
+            try:
+                with open(feedback_path, "r") as f:
+                    lines = f.readlines()
+                print(f"    {GREEN}{RESET} LLM Feedback Log: {len(lines)} registros")
+            except:
+                print(f"    {YELLOW}{RESET} LLM Feedback Log: No accesible")
+        else:
+            print(f"    {CYAN}{RESET} LLM Feedback Log: Vaco (Sin feedback an)")
+
+    def audit_phase_13_resources(self):
+        """Fase 13: Recursos"""
+        print(f"{BOLD}  [FASE 13/13] RECURSOS DEL SISTEMA{RESET}")
         res = self.audit_system_resources()
         symbol = f"{GREEN}{RESET}" if 'OK' in res or '|' in res else f"{RED}{RESET}"
         print(f"    {symbol} {res}")
 
     def run_full_audit(self):
         print(f"\n{BOLD}{CYAN}{RESET}")
-        print(f"{BOLD}{CYAN}     NEXUS PROTOCOLO MAESTRO v3.2 - AUDITORA SENIOR      {RESET}")
+        print(f"{BOLD}{CYAN}     NEXUS PROTOCOLO MAESTRO v4.0 - AUDITORA RLAIF      {RESET}")
         print(f"{BOLD}{CYAN}{RESET}")
         print(f"  UTC: {datetime.now(timezone.utc).isoformat()}\n")
 
@@ -492,7 +584,13 @@ class NexusAuditor:
         print()
         self.audit_phase_9_traffic()
         print()
-        self.audit_phase_10_resources()
+        self.audit_phase_10_fsm_rlaif()
+        print()
+        self.audit_phase_11_vault()
+        print()
+        self.audit_phase_12_n8n()
+        print()
+        self.audit_phase_13_resources()
         print()
         
         self.generate_report()

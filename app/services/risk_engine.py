@@ -1,21 +1,155 @@
 import logging
 import MetaTrader5 as mt5
-from datetime import datetime, time as dtime
+import json
+import os
+from datetime import datetime, time as dtime, timezone
 from typing import Dict, Any, Optional, List
 from app.core.config import settings
 from app.core.mt5_conn import mt5_conn
 
 logger = logging.getLogger("MT5_Bridge.Services.Risk")
 
+
+# =============================================================================
+# THE VAULT: Capital Protection System
+# =============================================================================
+
+class TheVault:
+    """
+    Sistema de protección de capital estilo "banco".
+    
+    Al duplicar el capital inicial:
+    - 50% de las ganancias se "bloquean" (vault_balance)
+    - 50% se reinvierten para interés compuesto
+    - Se genera alerta para transferir a cuenta de resguardo
+    """
+    
+    VAULT_STATE_FILE = "data/vault_state.json"
+    COMPOUNDING_MULTIPLIER = 2.0  # Trigger at 2x initial capital
+    VAULT_PERCENTAGE = 0.50  # 50% to vault
+    
+    def __init__(self, initial_capital: float = 30.0):
+        self.initial_capital = initial_capital
+        self.vault_balance = 0.0  # Protected profits (virtual)
+        self.trading_capital = initial_capital  # Active trading equity
+        self.total_vault_transfers = 0
+        self.last_trigger_equity = initial_capital
+        self.pending_transfer_alerts: List[Dict] = []
+        self._load_state()
+    
+    def _load_state(self):
+        """Carga estado persistido del Vault."""
+        try:
+            if os.path.exists(self.VAULT_STATE_FILE):
+                with open(self.VAULT_STATE_FILE, "r") as f:
+                    data = json.load(f)
+                    self.initial_capital = data.get("initial_capital", self.initial_capital)
+                    self.vault_balance = data.get("vault_balance", 0.0)
+                    self.trading_capital = data.get("trading_capital", self.initial_capital)
+                    self.total_vault_transfers = data.get("total_vault_transfers", 0)
+                    self.last_trigger_equity = data.get("last_trigger_equity", self.initial_capital)
+                    logger.info(f"[VAULT] State loaded: Vault=${self.vault_balance:.2f}, Trading=${self.trading_capital:.2f}")
+        except Exception as e:
+            logger.warning(f"[VAULT] Could not load state: {e}")
+    
+    def _save_state(self):
+        """Persiste estado del Vault."""
+        os.makedirs(os.path.dirname(self.VAULT_STATE_FILE) or ".", exist_ok=True)
+        data = {
+            "initial_capital": self.initial_capital,
+            "vault_balance": self.vault_balance,
+            "trading_capital": self.trading_capital,
+            "total_vault_transfers": self.total_vault_transfers,
+            "last_trigger_equity": self.last_trigger_equity,
+            "last_updated": datetime.now(timezone.utc).isoformat()
+        }
+        with open(self.VAULT_STATE_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+    
+    def check_vault_trigger(self, current_equity: float) -> Optional[Dict[str, Any]]:
+        """
+        Verifica si se debe activar el Vault (al duplicar capital).
+        
+        Returns:
+            Dict con detalles de transferencia si se activa, None si no.
+        """
+        trigger_target = self.last_trigger_equity * self.COMPOUNDING_MULTIPLIER
+        
+        if current_equity >= trigger_target:
+            profit = current_equity - self.last_trigger_equity
+            vault_amount = profit * self.VAULT_PERCENTAGE
+            reinvest_amount = profit - vault_amount
+            
+            # Update vault
+            self.vault_balance += vault_amount
+            self.trading_capital = self.last_trigger_equity + reinvest_amount
+            self.last_trigger_equity = self.trading_capital  # New baseline
+            self.total_vault_transfers += 1
+            
+            transfer_alert = {
+                "type": "VAULT_TRIGGER",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "profit_total": round(profit, 2),
+                "vault_amount": round(vault_amount, 2),
+                "reinvest_amount": round(reinvest_amount, 2),
+                "new_vault_balance": round(self.vault_balance, 2),
+                "new_trading_capital": round(self.trading_capital, 2),
+                "transfer_count": self.total_vault_transfers,
+                "message": f"💰 VAULT TRIGGER #{self.total_vault_transfers}: Mover ${vault_amount:.2f} a cuenta de resguardo"
+            }
+            
+            self.pending_transfer_alerts.append(transfer_alert)
+            self._save_state()
+            
+            logger.warning(f"[VAULT] 🔐 TRIGGERED! Profit: ${profit:.2f} | To Vault: ${vault_amount:.2f} | Reinvest: ${reinvest_amount:.2f}")
+            
+            return transfer_alert
+        
+        return None
+    
+    def get_effective_margin(self, account_free_margin: float) -> float:
+        """
+        Retorna el margen efectivo para trading (excluyendo vault virtual).
+        El bot NO debe usar el vault_balance como margen.
+        """
+        # El vault es virtual, pero limitamos operaciones basado en trading_capital
+        effective = min(account_free_margin, self.trading_capital)
+        return max(0, effective)
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Retorna estado completo del Vault."""
+        return {
+            "initial_capital": self.initial_capital,
+            "vault_balance": round(self.vault_balance, 2),
+            "trading_capital": round(self.trading_capital, 2),
+            "total_protected": round(self.vault_balance, 2),
+            "total_transfers": self.total_vault_transfers,
+            "last_trigger_equity": round(self.last_trigger_equity, 2),
+            "next_trigger_at": round(self.last_trigger_equity * self.COMPOUNDING_MULTIPLIER, 2),
+            "pending_alerts": len(self.pending_transfer_alerts)
+        }
+    
+    def pop_pending_alert(self) -> Optional[Dict]:
+        """Extrae y retorna la siguiente alerta pendiente."""
+        if self.pending_transfer_alerts:
+            return self.pending_transfer_alerts.pop(0)
+        return None
+
+
+# Singleton global del Vault
+the_vault = TheVault(initial_capital=settings.INITIAL_CAPITAL if hasattr(settings, 'INITIAL_CAPITAL') else 30.0)
+
+
 class RiskEngine:
     """
     Institutional Risk Management Engine.
-    Handles adaptive lot sizing, drawdown protection, and exposure limits.
+    Handles adaptive lot sizing, drawdown protection, exposure limits, and Vault integration.
     """
     
     def __init__(self):
         self._daily_opening_balance: Optional[float] = None
         self._last_reset_date: Optional[str] = None
+        self.vault = the_vault  # Integrate Vault
 
     async def _ensure_daily_balance(self):
         """Calcula o recupera el balance inicial del da para el drawdown."""

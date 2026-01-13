@@ -20,3 +20,31 @@ Always run `feat_deep_audit` after any logic modification to ensure sensor align
 
 ## 5. Neural State Tensors
 Features like `momentum_kinetic_micro` and `wick_stress` are normalized vectors. Do not feed raw price data without these abstractions.
+
+## 6. MT5 Tick-Level CVD (Real Volume Delta)
+
+> [!IMPORTANT]
+> As of 2026-01-13, the system supports **real CVD** using MT5 tick flags.
+
+### Available Functions (`app/ml/data_collector.py`):
+
+| Function | Purpose |
+|----------|---------|
+| `fetch_historical_ticks(symbol, date_from, date_to)` | Extracts ticks with Bid/Ask/Flags from MT5 |
+| `compute_real_cvd(tick_df)` | Calculates CVD using flags (BUY=32, SELL=64) |
+| `fetch_tick_data(symbol, minutes_back)` | MCP Tool: Combined extraction + CVD calc |
+
+### Example Usage:
+```python
+from app.ml.data_collector import fetch_tick_data
+result = await fetch_tick_data("XAUUSD", minutes_back=5)
+# result["cvd_metrics"]["imbalance_ratio"] -> -1 to +1
+```
+
+### Energy Map Integration (`nexus_core/features.py`):
+```python
+from nexus_core.features import feat_features
+energy = feat_features.generate_energy_map(df, tick_cvd=result["cvd_metrics"])
+# energy["cvd_source"] -> "real_mt5_ticks" or "tick_rule_approximation"
+```
+

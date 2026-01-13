@@ -6,10 +6,13 @@ __pycache__/
 venv/
 env/
 .env
+.env.local
 
-# Models & Data
+# Models & Data (Large Files)
 models/*.pth
+models/*.pt
 models/*.bin
+models/*.joblib
 *.pkl
 *.h5
 data/
@@ -18,6 +21,13 @@ app/db/*.db
 app/db/*.sqlite
 *.log
 *.sqlite3
+
+# RLAIF Persistence (Auto-generated)
+data/fsm_state.json
+data/vault_state.json
+data/llm_corrections.jsonl
+data/llm_feedback_log.jsonl
+data/n8n_config.json
 
 # Node/JS
 node_modules/
@@ -35,3 +45,9 @@ dashboard/build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Docker Build Cache
+.docker_build_hash
+
+# Test Outputs
+AUDIT_REPORT.md

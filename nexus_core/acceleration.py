@@ -27,6 +27,7 @@ class AccelerationEngine:
     def compute_acceleration_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Main API for context-aware acceleration analysis.
+        Incorporates FEAT acceleration logic: Momentum, RVOL, CVD Proxy.
         """
         res = pd.DataFrame(index=df.index)
         
@@ -35,7 +36,9 @@ class AccelerationEngine:
         lows = df['low']
         closes = df['close']
         opens = df['open']
+        volumes = df['volume']
         
+        # ATR Calculation
         tr = np.maximum(highs - lows, 
                         np.maximum(abs(highs - closes.shift(1)), 
                                    abs(lows - closes.shift(1))))
@@ -44,16 +47,27 @@ class AccelerationEngine:
         res['disp_norm'] = (closes - opens).abs() / (atr + 1e-9)
         
         # 2. Volume Z-Score (Effort)
-        vol = df['volume']
-        vol_mu = vol.rolling(window=self.config['vol_w']).mean()
-        vol_std = vol.rolling(window=self.config['vol_w']).std()
-        res['vol_z'] = (vol - vol_mu) / (vol_std + 1e-9)
+        vol_mu = volumes.rolling(window=self.config['vol_w']).mean()
+        vol_std = volumes.rolling(window=self.config['vol_w']).std()
+        res['vol_z'] = (volumes - vol_mu) / (vol_std + 1e-9)
+        
+        # --- NEW FEAT METRICS FROM PROMPT ---
+        # Candle Momentum: (Abs Body) / ATR
+        res['candle_momentum'] = (abs(closes - opens)) / (atr + 1e-9)
+        
+        # RVOL (Relative Volume): Volume / Moving Average Volume
+        res['rvol'] = volumes / (vol_mu + 1e-9)
+        
+        # CVD Proxy: if Close >= Open -> +Vol, else -Vol
+        delta_proxy = np.where(closes >= opens, volumes, -volumes)
+        res['cvd_proxy'] = pd.Series(delta_proxy, index=df.index).cumsum()
+        # ------------------------------------
         
         # 3. FVG Recognition (Structural gap)
         # Bullish Gap: Low(i) > High(i-2)
-        bull_fvg = (df['low'] > df['high'].shift(2)).astype(float)
+        bull_fvg = (lows > highs.shift(2)).astype(float)
         # Bearish Gap: High(i) < Low(i-2)
-        bear_fvg = (df['high'] < df['low'].shift(2)).astype(float)
+        bear_fvg = (highs < lows.shift(2)).astype(float)
         res['fvg_created'] = (bull_fvg + bear_fvg).clip(0, 1)
         
         # 4. Velocity (Delta P / Delta T)
@@ -61,6 +75,8 @@ class AccelerationEngine:
         
         # 5. Composite Score (Logit-like)
         w = self.config['weights']
+        # Incorporate new metrics optionally or stick to config weights. 
+        # For now, map disp_norm ~ candle_momentum roughly.
         linear_comb = (w['w1'] * res['disp_norm'] + 
                        w['w2'] * res['vol_z'] + 
                        w['w3'] * res['fvg_created'] + 

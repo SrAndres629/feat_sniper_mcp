@@ -406,6 +406,173 @@ async def flush_pending() -> Dict:
 
 
 # =============================================================================
+# MT5 TICK-LEVEL DATA EXTRACTION (Real CVD)
+# =============================================================================
+
+async def fetch_historical_ticks(
+    symbol: str, 
+    date_from: datetime, 
+    date_to: datetime,
+    mt5_conn=None
+) -> pd.DataFrame:
+    """
+    Extrae ticks históricos con Bid/Ask/Flags desde MT5.
+    Los flags permiten identificar Buy/Sell agresivo para CVD real.
+    
+    Args:
+        symbol: Símbolo del instrumento (ej: "XAUUSD")
+        date_from: Fecha inicial (datetime con timezone)
+        date_to: Fecha final (datetime con timezone)
+        mt5_conn: Opcional, conexión MT5 existente
+        
+    Returns:
+        DataFrame con columnas: time, bid, ask, last, volume, flags, is_buy, is_sell
+        
+    MT5 Tick Flags Reference:
+        - TICK_FLAG_BID = 2 (bid price changed)
+        - TICK_FLAG_ASK = 4 (ask price changed)  
+        - TICK_FLAG_LAST = 8 (last deal price changed)
+        - TICK_FLAG_VOLUME = 16 (volume changed)
+        - TICK_FLAG_BUY = 32 (last deal was buy)
+        - TICK_FLAG_SELL = 64 (last deal was sell)
+    """
+    try:
+        import MetaTrader5 as mt5
+    except ImportError:
+        logger.warning("[Docker Mode] MT5 not available for tick extraction")
+        return pd.DataFrame()
+    
+    # Ensure MT5 is initialized
+    if not mt5.terminal_info():
+        if not mt5.initialize():
+            logger.error(f"MT5 initialization failed: {mt5.last_error()}")
+            return pd.DataFrame()
+    
+    # Fetch ticks with ALL data (bid, ask, last, volume, flags)
+    ticks = mt5.copy_ticks_range(symbol, date_from, date_to, mt5.COPY_TICKS_ALL)
+    
+    if ticks is None or len(ticks) == 0:
+        logger.warning(f"No ticks received for {symbol} in range {date_from} -> {date_to}")
+        return pd.DataFrame()
+    
+    df = pd.DataFrame(ticks)
+    df['time'] = pd.to_datetime(df['time'], unit='s')
+    
+    # Parse flags to identify aggressive buy/sell
+    # MT5 Flag constants: BUY=32, SELL=64
+    df['is_buy'] = (df['flags'] & 32) > 0
+    df['is_sell'] = (df['flags'] & 64) > 0
+    
+    logger.info(f"Fetched {len(df)} ticks for {symbol}: {df['is_buy'].sum()} buys, {df['is_sell'].sum()} sells")
+    
+    return df
+
+
+def compute_real_cvd(tick_df: pd.DataFrame) -> Dict[str, Any]:
+    """
+    Calcula CVD (Cumulative Volume Delta) real usando flags de MT5.
+    
+    A diferencia de la aproximación tick-rule, esto usa los flags reales
+    de MT5 que indican si cada tick fue una compra o venta agresiva.
+    
+    Args:
+        tick_df: DataFrame de ticks con columnas 'volume', 'is_buy', 'is_sell'
+        
+    Returns:
+        Dict con métricas CVD:
+        - cvd: Valor acumulado final
+        - cvd_series: Serie temporal del CVD
+        - buy_volume: Volumen total de compras
+        - sell_volume: Volumen total de ventas
+        - imbalance_ratio: Ratio de desbalance (-1 a 1)
+        - acceleration: Tasa de cambio del CVD
+    """
+    if tick_df.empty or 'is_buy' not in tick_df.columns:
+        return {
+            "cvd": 0.0,
+            "cvd_series": [],
+            "buy_volume": 0.0,
+            "sell_volume": 0.0,
+            "imbalance_ratio": 0.0,
+            "acceleration": 0.0
+        }
+    
+    # Calculate signed volume: + for buys, - for sells
+    tick_df = tick_df.copy()
+    tick_df['signed_volume'] = np.where(
+        tick_df['is_buy'], 
+        tick_df['volume'],
+        np.where(tick_df['is_sell'], -tick_df['volume'], 0)
+    )
+    
+    # Cumulative sum = CVD
+    tick_df['cvd'] = tick_df['signed_volume'].cumsum()
+    
+    buy_vol = tick_df.loc[tick_df['is_buy'], 'volume'].sum()
+    sell_vol = tick_df.loc[tick_df['is_sell'], 'volume'].sum()
+    total_vol = buy_vol + sell_vol + 1e-9
+    
+    # Imbalance ratio: -1 (all sells) to +1 (all buys)
+    imbalance = (buy_vol - sell_vol) / total_vol
+    
+    # Acceleration: rate of change of CVD (last 10 vs previous 10)
+    cvd_series = tick_df['cvd'].values
+    if len(cvd_series) >= 20:
+        recent = cvd_series[-10:].mean()
+        previous = cvd_series[-20:-10].mean()
+        acceleration = (recent - previous) / (abs(previous) + 1e-9)
+    else:
+        acceleration = 0.0
+    
+    return {
+        "cvd": float(cvd_series[-1]) if len(cvd_series) > 0 else 0.0,
+        "cvd_series": cvd_series.tolist(),
+        "buy_volume": float(buy_vol),
+        "sell_volume": float(sell_vol),
+        "imbalance_ratio": float(imbalance),
+        "acceleration": float(acceleration)
+    }
+
+
+async def fetch_tick_data(symbol: str, minutes_back: int = 5) -> Dict[str, Any]:
+    """
+    MCP Tool: Extrae ticks y calcula CVD real.
+    
+    Args:
+        symbol: Símbolo del instrumento
+        minutes_back: Minutos hacia atrás para extraer
+        
+    Returns:
+        Dict con ticks y métricas CVD
+    """
+    date_to = datetime.now(timezone.utc)
+    date_from = date_to - timedelta(minutes=minutes_back)
+    
+    tick_df = await fetch_historical_ticks(symbol, date_from, date_to)
+    
+    if tick_df.empty:
+        return {
+            "symbol": symbol,
+            "status": "no_data",
+            "ticks_count": 0,
+            "cvd_metrics": None
+        }
+    
+    cvd_metrics = compute_real_cvd(tick_df)
+    
+    return {
+        "symbol": symbol,
+        "status": "success",
+        "ticks_count": len(tick_df),
+        "time_range": {
+            "from": date_from.isoformat(),
+            "to": date_to.isoformat()
+        },
+        "cvd_metrics": cvd_metrics
+    }
+
+
+# =============================================================================
 # FEAT-DEEP MULTI-TEMPORAL FUNCTIONS
 # =============================================================================
 

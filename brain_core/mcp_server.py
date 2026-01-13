@@ -234,5 +234,193 @@ async def query_memory(question: str):
     
     return "### Eventos Histricos Relacionados:\n\n" + "\n\n---\n\n".join(docs)
 
+
+# =============================================================================
+# PILLAR 6: RLAIF BICAMERAL ARCHITECTURE (Neural Telemetry)
+# =============================================================================
+
+@mcp.tool()
+async def get_inference_full_context(trade_id: str = None):
+    """
+    Expone el 'pensamiento' completo de la Red Neuronal para auditoría del LLM.
+    
+    Returns:
+        - input_tensors: Datos normalizados que entraron al modelo
+        - feat_scores: Vectores FEAT (Form, Espacio, Aceleración, Tiempo)
+        - prediction: Probabilidad y propuesta de trade
+        - justification: Explicación textual del razonamiento
+    """
+    from app.core.config import settings
+    import sys
+    import os
+    
+    # Get current symbol from settings
+    symbol = settings.SYMBOL
+    
+    # Fetch latest market data for context
+    try:
+        snapshot = await market.get_market_snapshot(symbol, "M5")
+    except Exception:
+        snapshot = {}
+    
+    # Get FEAT scores from analytics
+    try:
+        feat_analysis = await advanced_analytics.calculate_advanced_metrics(symbol)
+    except Exception:
+        feat_analysis = {}
+    
+    # Build inference context
+    context = {
+        "trade_id": trade_id or f"ctx_{datetime.datetime.now().timestamp()}",
+        "symbol": symbol,
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        
+        # INPUT: Normalized tensors
+        "input_tensors": {
+            "price_data": snapshot.get("candle", {}),
+            "volatility": snapshot.get("volatility", {}),
+            "account": snapshot.get("account", {})
+        },
+        
+        # PROCESS: FEAT Scores
+        "feat_scores": {
+            "feat_form": feat_analysis.get("feat_form", 0),
+            "feat_space": feat_analysis.get("feat_space", 0),
+            "feat_acceleration": feat_analysis.get("feat_acceleration", 0),
+            "feat_time": feat_analysis.get("feat_time", 0),
+            "feat_index": feat_analysis.get("feat_index", 0),
+            "cvd_imbalance": feat_analysis.get("cvd_imbalance", 0),
+            "energy_score": feat_analysis.get("energy_score", 0)
+        },
+        
+        # OUTPUT: Prediction (if model is loaded)
+        "prediction": {
+            "direction": feat_analysis.get("bias", "NEUTRAL"),
+            "confidence": feat_analysis.get("confidence", 0.5),
+            "proposed_sl_pips": feat_analysis.get("sl_pips", 50),
+            "proposed_tp_pips": feat_analysis.get("tp_pips", 100)
+        },
+        
+        # META: Human-readable justification
+        "justification": _generate_justification(feat_analysis, snapshot)
+    }
+    
+    return context
+
+
+def _generate_justification(feat_analysis: dict, snapshot: dict) -> str:
+    """Genera explicación textual del razonamiento de la NN."""
+    feat_index = feat_analysis.get("feat_index", 0)
+    bias = feat_analysis.get("bias", "NEUTRAL")
+    confidence = feat_analysis.get("confidence", 0.5)
+    
+    if feat_index > 0.7:
+        strength = "FUERTE"
+    elif feat_index > 0.4:
+        strength = "MODERADA"
+    else:
+        strength = "DÉBIL"
+    
+    justification = f"""
+📊 ANÁLISIS PROBABILÍSTICO
+==========================
+Señal {strength} hacia {bias} (Confianza: {confidence:.1%})
+
+FEAT Index: {feat_index:.2f}
+- Forma: {feat_analysis.get('feat_form', 0):.2f} (Estructura de precio)
+- Espacio: {feat_analysis.get('feat_space', 0):.2f} (Zonas de liquidez)
+- Aceleración: {feat_analysis.get('feat_acceleration', 0):.2f} (Momentum)
+- Tiempo: {feat_analysis.get('feat_time', 0):.2f} (Fase de mercado)
+
+CVD Imbalance: {feat_analysis.get('cvd_imbalance', 0):.2f}
+Energy Score: {feat_analysis.get('energy_score', 0):.2f}
+
+Volatilidad ATR: {snapshot.get('volatility', {}).get('atr', 'N/A')}
+"""
+    return justification.strip()
+
+
+@mcp.tool()
+async def get_neural_state():
+    """
+    Retorna el estado actual del FSM y métricas de rendimiento.
+    Usado por n8n para decidir el modo de operación.
+    """
+    # Import FSM from nexus_control (avoiding circular imports)
+    import sys
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+    
+    try:
+        from nexus_control import performance_tracker, TradingState
+        fsm_status = performance_tracker.get_status()
+    except ImportError:
+        fsm_status = {
+            "current_state": "supervised",
+            "winrate": 0.5,
+            "error": "FSM not initialized"
+        }
+    
+    # Get Vault status
+    try:
+        from app.services.risk_engine import the_vault
+        vault_status = the_vault.get_status()
+    except ImportError:
+        vault_status = {"error": "Vault not initialized"}
+    
+    return {
+        "fsm": fsm_status,
+        "vault": vault_status,
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+    }
+
+
+@mcp.tool()
+async def get_vault_status():
+    """
+    Retorna estado del sistema de protección de capital (The Vault).
+    """
+    try:
+        from app.services.risk_engine import the_vault
+        return the_vault.get_status()
+    except ImportError:
+        return {"error": "Vault module not available"}
+
+
+@mcp.tool()
+async def store_trade_reflection(
+    trade_id: str,
+    nn_proposal: dict,
+    llm_feedback: dict,
+    market_result: dict
+):
+    """
+    Guarda la reflexión de un trade para aprendizaje futuro.
+    Indexa en ChromaDB para futuras consultas semánticas.
+    """
+    # Create narrative for embedding
+    narrative = f"""
+Trade {trade_id}: 
+NN propuso {nn_proposal.get('direction', 'UNKNOWN')} con confianza {nn_proposal.get('confidence', 0):.1%}.
+LLM {llm_feedback.get('decision', 'NO_RESPONSE')}: {llm_feedback.get('feedback', 'Sin feedback')}.
+Resultado: {'GANANCIA' if market_result.get('profit', 0) > 0 else 'PÉRDIDA'} de ${market_result.get('profit', 0):.2f}.
+"""
+    
+    # Store in ChromaDB
+    doc_id = f"refl_{trade_id}_{datetime.datetime.now().timestamp()}"
+    memory_collection.add(
+        documents=[narrative.strip()],
+        ids=[doc_id],
+        metadatas=[{
+            "trade_id": trade_id,
+            "nn_direction": nn_proposal.get('direction'),
+            "llm_decision": llm_feedback.get('decision'),
+            "profit": market_result.get('profit', 0)
+        }]
+    )
+    
+    logger.info(f"[RLAIF] Trade reflection stored: {trade_id}")
+    return {"status": "stored", "doc_id": doc_id}
+
+
 if __name__ == "__main__":
     mcp.run()

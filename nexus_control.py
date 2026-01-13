@@ -22,11 +22,185 @@ import signal
 import json
 import webbrowser
 from datetime import datetime, timezone
+from enum import Enum
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Any
 import psutil
 from dotenv import load_dotenv
 
 # Force load .env before anything else
 load_dotenv()
+
+
+# =============================================================================
+# RLAIF BICAMERAL ARCHITECTURE: FSM Control System
+# =============================================================================
+
+class TradingState(Enum):
+    """
+    Máquina de Estados Finita para control Maestro-Aprendiz.
+    
+    🔴 RECALIBRATION: WinRate < 35% - Trading detenido, LLM diagnostica
+    🟡 SUPERVISED: 35% <= WinRate <= 70% - NN propone, LLM aprueba
+    🟢 AUTONOMOUS: WinRate > 70% - NN ejecuta, LLM audita post-mortem
+    """
+    RECALIBRATION = "recalibration"
+    SUPERVISED = "supervised"
+    AUTONOMOUS = "autonomous"
+
+
+@dataclass
+class TradeRecord:
+    """Registro de trade para cálculo de WinRate."""
+    trade_id: str
+    symbol: str
+    direction: str  # BUY/SELL
+    entry_price: float
+    exit_price: Optional[float] = None
+    profit: Optional[float] = None
+    nn_confidence: float = 0.0
+    llm_approved: Optional[bool] = None
+    llm_feedback: str = ""
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    closed: bool = False
+
+
+class PerformanceTracker:
+    """
+    Rastrea el rendimiento de la NN para determinar el estado del FSM.
+    Usa ventana deslizante de últimos N trades.
+    """
+    
+    WINRATE_AUTONOMOUS_THRESHOLD = 0.70  # 70%
+    WINRATE_RECALIBRATION_THRESHOLD = 0.35  # 35%
+    MIN_TRADES_FOR_EVALUATION = 10
+    EVALUATION_WINDOW = 50  # Últimos 50 trades
+    
+    def __init__(self, state_file: str = "data/fsm_state.json"):
+        self.state_file = state_file
+        self.trade_history: List[TradeRecord] = []
+        self.current_state = TradingState.SUPERVISED  # Default: Supervised
+        self._load_state()
+    
+    def _load_state(self):
+        """Carga estado persistido desde disco."""
+        try:
+            if os.path.exists(self.state_file):
+                with open(self.state_file, "r") as f:
+                    data = json.load(f)
+                    self.current_state = TradingState(data.get("state", "supervised"))
+                    # Cargar historial resumido
+                    self.trade_history = []
+                    for t in data.get("recent_trades", []):
+                        self.trade_history.append(TradeRecord(
+                            trade_id=t["trade_id"],
+                            symbol=t["symbol"],
+                            direction=t["direction"],
+                            entry_price=t["entry_price"],
+                            exit_price=t.get("exit_price"),
+                            profit=t.get("profit"),
+                            nn_confidence=t.get("nn_confidence", 0),
+                            llm_approved=t.get("llm_approved"),
+                            closed=t.get("closed", False)
+                        ))
+        except Exception as e:
+            print(f"[FSM] Error loading state: {e}. Starting fresh.")
+            self.current_state = TradingState.SUPERVISED
+    
+    def _save_state(self):
+        """Persiste estado a disco."""
+        os.makedirs(os.path.dirname(self.state_file) or ".", exist_ok=True)
+        data = {
+            "state": self.current_state.value,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "winrate": self.calculate_winrate(),
+            "recent_trades": [
+                {
+                    "trade_id": t.trade_id,
+                    "symbol": t.symbol,
+                    "direction": t.direction,
+                    "entry_price": t.entry_price,
+                    "exit_price": t.exit_price,
+                    "profit": t.profit,
+                    "nn_confidence": t.nn_confidence,
+                    "llm_approved": t.llm_approved,
+                    "closed": t.closed
+                }
+                for t in self.trade_history[-self.EVALUATION_WINDOW:]
+            ]
+        }
+        with open(self.state_file, "w") as f:
+            json.dump(data, f, indent=2)
+    
+    def record_trade(self, trade: TradeRecord):
+        """Registra un nuevo trade."""
+        self.trade_history.append(trade)
+        # Mantener solo ventana de evaluación
+        if len(self.trade_history) > self.EVALUATION_WINDOW * 2:
+            self.trade_history = self.trade_history[-self.EVALUATION_WINDOW:]
+        self._save_state()
+    
+    def close_trade(self, trade_id: str, exit_price: float, profit: float):
+        """Cierra un trade y actualiza su resultado."""
+        for t in self.trade_history:
+            if t.trade_id == trade_id and not t.closed:
+                t.exit_price = exit_price
+                t.profit = profit
+                t.closed = True
+                break
+        self._save_state()
+        self.evaluate_and_transition()
+    
+    def calculate_winrate(self) -> float:
+        """Calcula WinRate de trades cerrados en la ventana."""
+        closed_trades = [t for t in self.trade_history if t.closed][-self.EVALUATION_WINDOW:]
+        if len(closed_trades) < self.MIN_TRADES_FOR_EVALUATION:
+            return 0.5  # Default 50% cuando no hay suficientes datos
+        
+        wins = sum(1 for t in closed_trades if t.profit and t.profit > 0)
+        return wins / len(closed_trades)
+    
+    def evaluate_and_transition(self) -> TradingState:
+        """Evalúa rendimiento y transiciona estado si es necesario."""
+        winrate = self.calculate_winrate()
+        closed_count = len([t for t in self.trade_history if t.closed])
+        
+        old_state = self.current_state
+        
+        # Solo transicionar si hay suficientes trades para evaluar
+        if closed_count >= self.MIN_TRADES_FOR_EVALUATION:
+            if winrate >= self.WINRATE_AUTONOMOUS_THRESHOLD:
+                self.current_state = TradingState.AUTONOMOUS
+            elif winrate < self.WINRATE_RECALIBRATION_THRESHOLD:
+                self.current_state = TradingState.RECALIBRATION
+            else:
+                self.current_state = TradingState.SUPERVISED
+        
+        if old_state != self.current_state:
+            print(f"[FSM] State Transition: {old_state.value} → {self.current_state.value} (WinRate: {winrate:.1%})")
+            self._save_state()
+        
+        return self.current_state
+    
+    def get_status(self) -> Dict[str, Any]:
+        """Retorna estado actual para telemetría."""
+        closed_trades = [t for t in self.trade_history if t.closed]
+        return {
+            "current_state": self.current_state.value,
+            "winrate": self.calculate_winrate(),
+            "total_trades": len(self.trade_history),
+            "closed_trades": len(closed_trades),
+            "wins": sum(1 for t in closed_trades if t.profit and t.profit > 0),
+            "losses": sum(1 for t in closed_trades if t.profit and t.profit <= 0),
+            "thresholds": {
+                "autonomous": self.WINRATE_AUTONOMOUS_THRESHOLD,
+                "recalibration": self.WINRATE_RECALIBRATION_THRESHOLD
+            }
+        }
+
+
+# Singleton global para FSM
+performance_tracker = PerformanceTracker()
 
 # Configuration
 MT5_PATH = os.getenv("MT5_PATH", r"C:\Program Files\LiteFinance MT5 Terminal\terminal64.exe")

@@ -15,10 +15,15 @@ class FEATFeatures:
     def __init__(self):
         self.version = "2.5.0"
 
-    def generate_energy_map(self, df: pd.DataFrame, bins_n: int = 50) -> Dict[str, Any]:
+    def generate_energy_map(self, df: pd.DataFrame, bins_n: int = 50, tick_cvd: dict = None) -> Dict[str, Any]:
         """
         Synthesizes the FEAT Energy Map: Composite of Density, Volatility, and Flow.
         Returns tensors ready for CNN/LSTM consumption.
+        
+        Args:
+            df: DataFrame with OHLCV data
+            bins_n: Number of bins for price discretization
+            tick_cvd: Optional dict from compute_real_cvd() for real CVD flow field
         """
         if df.empty or len(df) < 20:
             return {"energy_tensor": np.array([]), "hotspots": []}
@@ -46,13 +51,25 @@ class FEATFeatures:
         kinetic_field /= (kinetic_field.sum() + 1e-9)
 
         # 3. Flow Field (CVD Intensity)
-        # Using a simple tick-rule approximation for the heat map
-        deltas = np.diff(prices, prepend=prices[0])
-        flow_delta = deltas * volumes
-        flow_field = np.zeros(len(centers))
-        for i in range(len(indices)):
-            if indices[i] < len(flow_field):
-                flow_field[indices[i]] += flow_delta[i]
+        # Use REAL CVD if tick data available, otherwise tick-rule approximation
+        if tick_cvd and 'cvd_series' in tick_cvd and len(tick_cvd['cvd_series']) > 0:
+            # Real CVD from MT5 tick flags - resample to match bins
+            cvd_series = np.array(tick_cvd['cvd_series'])
+            # Normalize and project to price bins (simplified: use last N values)
+            cvd_resampled = np.interp(
+                np.linspace(0, len(cvd_series)-1, len(centers)),
+                np.arange(len(cvd_series)),
+                cvd_series
+            )
+            flow_field = cvd_resampled
+        else:
+            # Fallback: Tick-rule approximation for the heat map
+            deltas = np.diff(prices, prepend=prices[0])
+            flow_delta = deltas * volumes
+            flow_field = np.zeros(len(centers))
+            for i in range(len(indices)):
+                if indices[i] < len(flow_field):
+                    flow_field[indices[i]] += flow_delta[i]
 
         # 4. Composite Energy Tensor
         # E = Density * Kinetic * tanh(Flow)
@@ -67,6 +84,7 @@ class FEATFeatures:
             "energy_tensor": energy_tensor_norm.tolist(),
             "poc_idx": int(np.argmax(density_field)),
             "max_energy_idx": int(np.argmax(np.abs(energy_tensor_norm))),
+            "cvd_source": "real_mt5_ticks" if tick_cvd else "tick_rule_approximation",
             "metadata": {
                 "bins": bins_n,
                 "bin_size": bin_size,
@@ -105,5 +123,33 @@ class FEATFeatures:
             "accel_score": accel_results.get("accel_score", 0),
             "accel_type": accel_results.get("accel_type", "normal")
         }
+
+    def apply_feat_engineering(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Orchestrates Structure and Acceleration engines to produce the full FEAT feature set.
+        Returns the DataFrame enriched with all institutional metrics.
+        """
+        if df.empty: return df
+        
+        # 1. Structure Engine
+        df = structure_engine.detect_structure(df)
+        df = structure_engine.detect_zones(df)
+        
+        # 2. Acceleration Engine
+        # Returns a dataframe with columns like 'accel_score', 'disp_norm', etc.
+        accel_df = acceleration_engine.compute_acceleration_features(df)
+        
+        # Join acceleration features
+        # Ensure we don't duplicate columns if they already exist
+        cols_to_use = accel_df.columns.difference(df.columns)
+        df = df.join(accel_df[cols_to_use])
+        
+        # 3. Compute Final Index
+        # This adds feat_form, feat_space, feat_acceleration, feat_time, feat_index
+        index_res = structure_engine.compute_feat_index(df)
+        cols_to_use_idx = index_res.columns.difference(df.columns)
+        df = df.join(index_res[cols_to_use_idx])
+        
+        return df
 
 feat_features = FEATFeatures()
