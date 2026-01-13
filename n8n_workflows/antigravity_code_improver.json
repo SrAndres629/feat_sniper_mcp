@@ -1,0 +1,168 @@
+{
+    "name": "FEAT Antigravity Code Improver",
+    "nodes": [
+        {
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "hours",
+                            "triggerAtHour": 1
+                        }
+                    ]
+                }
+            },
+            "id": "schedule-trigger",
+            "name": "Hourly Check",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "position": [
+                250,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://localhost:8000/tools/get_pending_code_changes",
+                "method": "POST",
+                "jsonParameters": true,
+                "options": {}
+            },
+            "id": "check-pending",
+            "name": "Check Pending Requests",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                450,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "conditions": {
+                    "number": [
+                        {
+                            "value1": "={{ $json.count }}",
+                            "operation": "larger",
+                            "value2": 0
+                        }
+                    ]
+                }
+            },
+            "id": "has-pending",
+            "name": "Has Pending?",
+            "type": "n8n-nodes-base.if",
+            "position": [
+                650,
+                300
+            ]
+        },
+        {
+            "parameters": {
+                "model": "claude-3-5-sonnet-20241022",
+                "messages": {
+                    "values": [
+                        {
+                            "role": "system",
+                            "content": "You are Antigravity Prime, an autonomous code improvement agent. Analyze the code change request and generate a detailed instruction for the Antigravity IDE agent.\n\nFormat your response as:\n1. File to modify\n2. Specific changes needed\n3. Test command to verify\n\nBe precise and actionable."
+                        },
+                        {
+                            "role": "user",
+                            "content": "Code Change Request:\n{{ JSON.stringify($json.pending[0], null, 2) }}"
+                        }
+                    ]
+                }
+            },
+            "id": "llm-generate-fix",
+            "name": "LLM Generate Fix",
+            "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+            "position": [
+                850,
+                200
+            ]
+        },
+        {
+            "parameters": {
+                "url": "http://localhost:8000/tools/complete_code_change",
+                "method": "POST",
+                "jsonParameters": true,
+                "bodyParameters": {
+                    "parameters": [
+                        {
+                            "name": "request_id",
+                            "value": "={{ $json.pending[0].id }}"
+                        },
+                        {
+                            "name": "success",
+                            "value": true
+                        },
+                        {
+                            "name": "result",
+                            "value": "Instructions sent to Antigravity agent"
+                        }
+                    ]
+                }
+            },
+            "id": "mark-complete",
+            "name": "Mark Complete",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                1050,
+                200
+            ]
+        }
+    ],
+    "connections": {
+        "Hourly Check": {
+            "main": [
+                [
+                    {
+                        "node": "Check Pending Requests",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Check Pending Requests": {
+            "main": [
+                [
+                    {
+                        "node": "Has Pending?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Has Pending?": {
+            "main": [
+                [
+                    {
+                        "node": "LLM Generate Fix",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        },
+        "LLM Generate Fix": {
+            "main": [
+                [
+                    {
+                        "node": "Mark Complete",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1"
+    },
+    "tags": [
+        "RLAIF",
+        "Antigravity",
+        "CodeImprovement"
+    ]
+}

@@ -3,6 +3,7 @@ import sys
 import uuid
 import json
 from datetime import datetime, timezone
+from typing import Dict, List, Any, Optional
 from fastmcp import FastMCP
 from contextlib import asynccontextmanager
 
@@ -530,7 +531,7 @@ def _generate_explanation(prediction: dict, indicators: dict) -> str:
     direction = "LONG" if p_win > 0.5 else "SHORT"
     confidence = "high" if abs(p_win - 0.5) > 0.3 else "moderate" if abs(p_win - 0.5) > 0.15 else "low"
     
-    return explanation
+    return f"ML model ({source}) predicts {direction} with {confidence} confidence ({p_win:.1%} win probability)."
 
 def _get_market_session() -> dict:
     """Detecta la sesin actual y killzones institucionales (UTC)."""

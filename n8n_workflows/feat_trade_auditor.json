@@ -1,0 +1,98 @@
+{
+  "name": "FEAT Trade Auditor",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "feat-audit",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "position": [250, 300],
+      "webhookId": "feat-audit-webhook"
+    },
+    {
+      "parameters": {
+        "operation": "extractFromObject",
+        "values": {
+          "object": "={{ $json }}",
+          "results": [
+            {"name": "trade_id", "value": "={{ $json.trade_id }}"},
+            {"name": "symbol", "value": "={{ $json.symbol }}"},
+            {"name": "direction", "value": "={{ $json.direction }}"},
+            {"name": "nn_confidence", "value": "={{ $json.nn_confidence }}"},
+            {"name": "feat_scores", "value": "={{ JSON.stringify($json.feat_scores) }}"},
+            {"name": "justification", "value": "={{ $json.justification }}"}
+          ]
+        }
+      },
+      "id": "parse-request",
+      "name": "Parse Request",
+      "type": "n8n-nodes-base.set",
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-3-5-sonnet-20241022",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an expert Senior ML Engineer and Trading Strategist supervising a hybrid neural network trading system. Analyze the trade proposal and decide: APPROVE or REJECT.\n\nRules:\n- Only APPROVE if confidence > 70% AND FEAT scores are consistent\n- REJECT if any anomaly detected or low confidence\n- Provide brief, actionable feedback\n\nRespond ONLY in JSON format:\n{\"decision\": \"APPROVE|REJECT\", \"feedback\": \"reason\", \"suggested_sl\": null, \"suggested_tp\": null}"
+            },
+            {
+              "role": "user", 
+              "content": "Trade Proposal:\nID: {{ $json.trade_id }}\nSymbol: {{ $json.symbol }}\nDirection: {{ $json.direction }}\nNN Confidence: {{ $json.nn_confidence }}\nFEAT Scores: {{ $json.feat_scores }}\nJustification: {{ $json.justification }}\n\nAnalyze and decide."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "llm-analysis",
+      "name": "LLM Analysis",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = JSON.parse($input.first().json.text);\nreturn {\n  decision: response.decision || 'REJECT',\n  feedback: response.feedback || 'No feedback',\n  suggested_sl: response.suggested_sl,\n  suggested_tp: response.suggested_tp,\n  confidence_adjustment: response.confidence_adjustment || 0\n};"
+      },
+      "id": "parse-response",
+      "name": "Parse LLM Response",
+      "type": "n8n-nodes-base.code",
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [1050, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [[{"node": "Parse Request", "type": "main", "index": 0}]]
+    },
+    "Parse Request": {
+      "main": [[{"node": "LLM Analysis", "type": "main", "index": 0}]]
+    },
+    "LLM Analysis": {
+      "main": [[{"node": "Parse LLM Response", "type": "main", "index": 0}]]
+    },
+    "Parse LLM Response": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": ["RLAIF", "Trading", "Supervisor"]
+}

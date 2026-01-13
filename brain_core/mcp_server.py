@@ -422,5 +422,148 @@ Resultado: {'GANANCIA' if market_result.get('profit', 0) > 0 else 'PÉRDIDA'} de
     return {"status": "stored", "doc_id": doc_id}
 
 
+# =============================================================================
+# PILLAR 7: ANTIGRAVITY BRIDGE (Code Improvement Requests)
+# =============================================================================
+
+@mcp.tool()
+async def request_code_change(
+    file_path: str,
+    description: str,
+    change_type: str = "improvement",
+    suggested_code: str = None,
+    urgency: str = "normal"
+):
+    """
+    Permite a n8n/LLM solicitar cambios de código.
+    
+    El agente Antigravity monitorea este archivo para ejecutar cambios.
+    
+    Args:
+        file_path: Ruta relativa al archivo a modificar
+        description: Descripción del cambio requerido
+        change_type: Tipo de cambio (bug_fix, improvement, refactor, feature)
+        suggested_code: Código sugerido (opcional)
+        urgency: Nivel de urgencia (low, normal, high, critical)
+    
+    Returns:
+        Ticket de solicitud para tracking
+    """
+    import uuid
+    import json
+    import os
+    
+    request_id = f"CR-{uuid.uuid4().hex[:8].upper()}"
+    
+    request = {
+        "id": request_id,
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "file_path": file_path,
+        "description": description,
+        "change_type": change_type,
+        "suggested_code": suggested_code,
+        "urgency": urgency,
+        "status": "pending",
+        "source": "n8n_llm_supervisor"
+    }
+    
+    # Save to pending requests file (Antigravity monitors this)
+    requests_file = os.path.join("data", "code_change_requests.jsonl")
+    os.makedirs(os.path.dirname(requests_file), exist_ok=True)
+    
+    with open(requests_file, "a") as f:
+        f.write(json.dumps(request) + "\n")
+    
+    logger.info(f"[ANTIGRAVITY] Code change request created: {request_id}")
+    
+    return {
+        "status": "queued",
+        "request_id": request_id,
+        "message": f"Change request {request_id} queued for Antigravity agent",
+        "file": file_path,
+        "urgency": urgency
+    }
+
+
+@mcp.tool()
+async def get_pending_code_changes():
+    """
+    Lista solicitudes de cambio de código pendientes.
+    Útil para que Antigravity poll las solicitudes.
+    """
+    import json
+    import os
+    
+    requests_file = os.path.join("data", "code_change_requests.jsonl")
+    
+    if not os.path.exists(requests_file):
+        return {"pending": [], "count": 0}
+    
+    pending = []
+    with open(requests_file, "r") as f:
+        for line in f:
+            try:
+                req = json.loads(line)
+                if req.get("status") == "pending":
+                    pending.append(req)
+            except:
+                continue
+    
+    return {
+        "pending": pending,
+        "count": len(pending)
+    }
+
+
+@mcp.tool()
+async def complete_code_change(request_id: str, success: bool, result: str = None):
+    """
+    Marca una solicitud de cambio como completada.
+    Llamado por Antigravity después de aplicar el cambio.
+    """
+    import json
+    import os
+    
+    requests_file = os.path.join("data", "code_change_requests.jsonl")
+    completed_file = os.path.join("data", "code_change_completed.jsonl")
+    
+    if not os.path.exists(requests_file):
+        return {"error": "No requests file found"}
+    
+    # Read all requests
+    all_requests = []
+    target_request = None
+    
+    with open(requests_file, "r") as f:
+        for line in f:
+            try:
+                req = json.loads(line)
+                if req.get("id") == request_id:
+                    req["status"] = "completed" if success else "failed"
+                    req["result"] = result
+                    req["completed_at"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                    target_request = req
+                    
+                    # Log to completed file
+                    with open(completed_file, "a") as cf:
+                        cf.write(json.dumps(req) + "\n")
+                else:
+                    all_requests.append(req)
+            except:
+                continue
+    
+    # Rewrite pending file without the completed request
+    with open(requests_file, "w") as f:
+        for req in all_requests:
+            if req.get("status") == "pending":
+                f.write(json.dumps(req) + "\n")
+    
+    if target_request:
+        logger.info(f"[ANTIGRAVITY] Code change {request_id}: {'SUCCESS' if success else 'FAILED'}")
+        return {"status": "updated", "request": target_request}
+    
+    return {"error": f"Request {request_id} not found"}
+
+
 if __name__ == "__main__":
     mcp.run()
