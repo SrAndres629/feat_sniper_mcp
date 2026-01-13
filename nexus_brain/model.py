@@ -33,7 +33,11 @@ class NexusBrain:
     def predict_probability(self, features: Dict[str, float]) -> Dict[str, Any]:
         """
         Returns calibrated probability and execution parameters for cBot.
+        Now integrated with MLOps Guardian (Drift + Registry).
         """
+        from brain_core.drift_monitor import drift_monitor
+        from nexus_brain.model_registry import model_registry
+        
         if not self.model:
             return {"probability": 0.5, "status": "NO_MODEL"}
 
@@ -43,8 +47,35 @@ class NexusBrain:
         if self.scaler:
             x = self.scaler.transform(x)
             
+        # --- MLOPS: DRIFT DETECTION ---
+        # We use the L2 Norm of the feature vector as a proxy for "Input Anomaly"
+        input_norm = float(np.linalg.norm(x))
+        drift_result = drift_monitor.detect_drift(input_norm)
+        
+        # --- MLOPS: REGISTRY LOOKUP ---
+        active_version = model_registry.get_active_model_id()
+        
+        # Safety Override
+        if drift_result["severity"] == "CRITICAL_DRIFT":
+            logger.warning(f"SURVIVAL MODE TRIGGERED: Drift Score {drift_result['drift_score']:.2f}")
+            return {
+                "symbol": features.get("symbol", "UNKNOWN"),
+                "probability": 0.5, # Neutralize
+                "uncertainty": 1.0, # Max Uncertainty
+                "risk_parameters": {"tp_multiplier": 1.0, "sl_multiplier": 1.0, "lot_multiplier": 0.0},
+                "version": active_version,
+                "status": "SURVIVAL_MODE",
+                "drift_score": drift_result["drift_score"]
+            }
+            
         # Prediction
         prob = self.model.predict_proba(x)[0][1] # Probability of Class 1 (Success)
+        
+        # --- MLOPS: SHADOW LOGGING ---
+        if model_registry.challenger_id:
+            # In a real scenario, we would run the challenger model here
+            # model_registry.log_shadow_inference(features, challenger_prob)
+            pass
         
         # Uncertainty estimate (Rudimentary for baseline)
         uncertainty = 1.0 - abs(prob - 0.5) * 2.0
@@ -54,7 +85,9 @@ class NexusBrain:
             "probability": float(prob),
             "uncertainty": float(uncertainty),
             "risk_parameters": self._calculate_risk_params(prob, uncertainty),
-            "version": "1.1.0-baseline"
+            "version": active_version,
+            "drift_score": drift_result["drift_score"],
+            "drift_severity": drift_result["severity"]
         }
 
     def _calculate_risk_params(self, prob: float, uncertainty: float) -> Dict[str, float]:

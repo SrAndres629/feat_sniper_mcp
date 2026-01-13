@@ -207,21 +207,94 @@ def get_ny_time(utc_time: datetime = None) -> datetime:
 
 
 # =============================================================================
+# NEURAL TIMING INTELLIGENCE
+# =============================================================================
+
+class NeuralKillzone:
+    """
+    Sistema de Timing Dinmico basado en Actividad Real (Ticks/Spread)
+    en lugar de solo horario fijo.
+    """
+    
+    # Thresholds (Percentil 70 del histrico)
+    MIN_TICKS_PER_MIN = 300  # Bajo esto, el mercado est "dormido"
+    MAX_SPREAD_PIPS = 2.5    # Sobre esto, es pre-mercado o cierre
+    
+    @staticmethod
+    def evaluate_activity(ticks_per_min: float, current_spread: float) -> float:
+        """
+        Retorna un 'Activity Score' (0.0 - 1.0).
+        """
+        score = 0.5
+        
+        # Factor Volumen (Ticks)
+        if ticks_per_min > 800: score += 0.4
+        elif ticks_per_min > 500: score += 0.2
+        elif ticks_per_min < 100: score -= 0.3
+        
+        # Factor Costo (Spread)
+        if current_spread < 1.0: score += 0.1
+        elif current_spread > 3.0: score -= 0.4
+        
+        return min(1.0, max(0.0, score))
+
+    @staticmethod
+    def is_killzone_active(hour: int, ticks_per_min: float, spread: float) -> Tuple[bool, str]:
+        """
+        Logic:
+        1. Base Schedule Check (Is it conceptually a Killzone hour?)
+        2. Neural Check (Is the market actually moving?)
+        """
+        base_killzone = 9 <= hour < 13 # NY/London Overlap (Conceptual)
+        
+        if not base_killzone:
+            # Si fuera de hora, exigimos volumen EXTREMO para activar (ej. News)
+            if ticks_per_min > 1200:
+                return True, "INVALID_HOUR_BUT_HIGH_VOLATILITY"
+            return False, "OUTSIDE_SCHEDULE"
+            
+        # Dentro del horario base, verificamos "signos vitales"
+        if ticks_per_min < NeuralKillzone.MIN_TICKS_PER_MIN:
+            return False, "KILLZONE_PAUSED_LOW_VOLUME" # Market sleeping
+            
+        if spread > NeuralKillzone.MAX_SPREAD_PIPS:
+            return False, "KILLZONE_PAUSED_HIGH_SPREAD" # Opening volatility/Bank holiday
+            
+        return True, "NEURAL_KILLZONE_ACTIVE"
+
+# =============================================================================
 # SESSION DETECTION
 # =============================================================================
 
-def get_session_info(bolivia_hour: int) -> Dict[str, Any]:
-    """Obtiene info de sesin basada en hora Bolivia."""
+def get_session_info(bolivia_hour: int, current_ticks: float = 500.0, current_spread: float = 1.5) -> Dict[str, Any]:
+    """Obtiene info de sesin enriquecida con Timing Neuronal."""
+    
+    base_info = SESSION_MATRIX[(18, 19)].copy() # Default
+    
+    # 1. Base Schedule Lookup
     for (start, end), info in SESSION_MATRIX.items():
-        # Handle wrap around midnight
-        if start > end:
+        if start > end: # Wrap midnight
             if bolivia_hour >= start or bolivia_hour < end:
-                return info.copy()
+                base_info = info.copy()
+                break
         else:
             if start <= bolivia_hour < end:
-                return info.copy()
-    
-    return SESSION_MATRIX[(18, 19)].copy()  # Default: pause
+                base_info = info.copy()
+                break
+                
+    # 2. Neural Override for Killzone
+    if base_info["phase"] == SessionPhase.KILLZONE_OVERLAP:
+        is_active, reason = NeuralKillzone.is_killzone_active(bolivia_hour, current_ticks, current_spread)
+        
+        if is_active:
+            base_info["description"] += " [⚡ NEURAL ACTIVE]"
+            base_info["liquidity"] = 1.0
+        else:
+            base_info["description"] += f" [💤 NEURAL PAUSED: {reason}]"
+            base_info["action"] = "WAIT_FOR_VOLUME"
+            base_info["risk_mult"] = 0.5 # Reduce risk if volume is low
+            
+    return base_info
 
 
 def check_near_fix(bolivia_hour: int, bolivia_minute: int) -> Dict[str, Any]:

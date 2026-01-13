@@ -67,10 +67,14 @@ ACTION_TO_MT5_TYPE = {
     "SELL_STOP": mt5.ORDER_TYPE_SELL_STOP
 }
 
-async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderResponse]:
+async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) -> ResponseModel[TradeOrderResponse]:
     """
     Ejecuta una orden (Mercado o Pendiente) con validaciones de seguridad avanzadas.
     Instrumentado con OTel y Mtricas de Ejecucin.
+    
+    Args:
+        order_data: Datos de la orden.
+        urgency_score: 0.0-1.0 (Output Neuronal). >0.9 = Panic/Breakout (Market), <0.6 = Patient (Limit).
     """
     from app.core.observability import obs_engine, tracer
     import time
@@ -165,27 +169,53 @@ async def send_order(order_data: TradeOrderRequest) -> ResponseModel[TradeOrderR
         # 3. CALCULO DE DESVIACIN DINMICA (SLIPPAGE)
         symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
         spread = symbol_info.spread
-        dynamic_deviation = max(20, int(spread * 1.5)) 
-
-        # 4. PREPARAR REQUEST
-        order_type = ACTION_TO_MT5_TYPE.get(action)
         
-        if "LIMIT" in action or "STOP" in action:
-            if not price:
-                return ResponseModel(
-                    status="error",
-                    error=ErrorDetail(code="PRICE_REQUIRED", message="El precio es requerido para rdenes pendientes.", suggestion="Enva un 'price'.")
-                )
-            exec_price = price
+        # SMART DEVIATION: Ms urgencia = Ms slippage permitido
+        base_deviation = max(20, int(spread * 1.5))
+        if urgency_score > 0.9:
+            dynamic_deviation = base_deviation * 3  # Aceptamos pagar spread por entrar YA
         else:
-            tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
-            # Sniper 2.0: Optimization - If suggest buy at 2000.5, we place limit at 2000.0 (better price)
-            # This is done by the caller/agent, but we ensure the price is used if provided.
-            if price and price > 0:
-                exec_price = price
-                order_type = ACTION_TO_MT5_TYPE.get(f"{action}_LIMIT", ACTION_TO_MT5_TYPE.get(action))
+            dynamic_deviation = base_deviation 
+
+        # 4. SMART EXECUTION LOGIC (Hybrid Routing)
+        order_type = ACTION_TO_MT5_TYPE.get(action)
+        tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
+        current_ask = tick.ask
+        current_bid = tick.bid
+        
+        # Determine Routing based on Urgency
+        if "LIMIT" not in action and "STOP" not in action:
+            # Es una orden a mercado (potencialmente)
+            
+            if urgency_score > 0.9:
+                 # HIGH URGENCY -> FORCE MARKET EXECUTION
+                 exec_price = current_ask if action == "BUY" else current_bid
+                 logger.info(f"🔥 HIGH URGENCY ({urgency_score:.2f}) -> FORCING MARKET EXECUTION")
+            
+            elif urgency_score < 0.6:
+                # LOW URGENCY -> CONVERT TO LIMIT (Save Spread cost)
+                # Intentamos entrar 'dentro' del spread
+                spread_val = current_ask - current_bid
+                if action == "BUY":
+                    # Buy Limit un poco abajo del ask (mid price)
+                    exec_price = current_bid + (spread_val * 0.25) 
+                    order_type = mt5.ORDER_TYPE_BUY_LIMIT
+                    logger.info(f"🐢 LOW URGENCY ({urgency_score:.2f}) -> CONVERTING TO LIMIT @ {exec_price}")
+                else:
+                    # Sell Limit un poco arriba del bid
+                    exec_price = current_ask - (spread_val * 0.25)
+                    order_type = mt5.ORDER_TYPE_SELL_LIMIT
+                    logger.info(f"🐢 LOW URGENCY ({urgency_score:.2f}) -> CONVERTING TO LIMIT @ {exec_price}")
+            
             else:
-                exec_price = tick.ask if action == "BUY" else tick.bid
+                # NORMAL EXECUTION
+                exec_price = current_ask if action == "BUY" else current_bid
+                
+        else:
+            # Es pendiente explicita
+            if not price:
+                 return ResponseModel(status="error", error=ErrorDetail(code="PRICE_REQUIRED", message="Price missing for pending order"))
+            exec_price = price
 
         # Detectar Filling Mode
         filling_mode = mt5.ORDER_FILLING_RETURN

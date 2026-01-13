@@ -257,6 +257,68 @@ class MarketPhysicsEngine:
         
         return {"mci_score": 0.0, "mci_type": mci_type, "is_sweep": is_high_sweep or is_low_sweep}
 
+    # =========================================================================
+    # 5. FRACTAL PHYSICS (Hurst & Entropy)
+    # =========================================================================
+
+    def calculate_fractal_metrics(self, df: pd.DataFrame, window: int = 100) -> Dict[str, float]:
+        """
+        Calculates Fractal efficiency metrics.
+        - Hurst Exponent: Persistency (0.5=Random, >0.5=Trend, <0.5=Revert)
+        - Shannon Entropy: Information density / Disorder
+        """
+        if len(df) < window:
+             return {"hurst_exponent": 0.5, "shannon_entropy": 0.0}
+        
+        # 1. Shannon Entropy (Price Distribution)
+        # Bins prices to calculate probability distribution
+        clean_prices = df['close'].tail(window).values
+        hist, bin_edges = np.histogram(clean_prices, bins=20, density=True)
+        # Filter non-zero probs
+        probs = hist[hist > 0]
+        # Normalize to sum to 1 just in case
+        probs = probs / probs.sum()
+        entropy = -np.sum(probs * np.log2(probs))
+        # Normalize Entropy (0-1 approx)
+        max_entropy = np.log2(20)
+        norm_entropy = entropy / max_entropy
+        
+        # 2. Simplified Hurst (R/S Analysis approximation)
+        # H = log(R/S) / log(n)
+        try:
+            returns = np.diff(np.log(clean_prices))
+            if len(returns) < 2: return {"hurst_exponent": 0.5, "shannon_entropy": norm_entropy}
+            
+            # Divide into chunks? No, simple rolling window R/S
+            # R = Range of Cumulative Deviation
+            # S = Std Dev
+            
+            mean_ret = np.mean(returns)
+            cum_dev = np.cumsum(returns - mean_ret)
+            R = np.max(cum_dev) - np.min(cum_dev)
+            S = np.std(returns)
+            
+            if S == 0: S = 1e-9
+            
+            # Using E[R/S] ~ c * n^H -> log(R/S) = log(c) + H*log(n)
+            # This is a point-estimation, not full regression, but suitable for realtime stream
+            
+            # Correct range n
+            n = len(returns)
+            H = np.log(R/S) / np.log(n)
+            
+            # Cap H between 0 and 1
+            hurst = min(1.0, max(0.0, H))
+            
+        except Exception as e:
+            logger.error(f"Fractal Math Error: {e}")
+            hurst = 0.5
+            
+        return {
+            "hurst_exponent": float(hurst),
+            "shannon_entropy": float(norm_entropy)
+        }
+
 # Singleton
 market_physics = MarketPhysicsEngine()
 

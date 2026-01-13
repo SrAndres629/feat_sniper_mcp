@@ -123,6 +123,29 @@ class MarketRegimeFSM:
         # - Value Shift in opposite direction
         if structure_context.get("has_choch", False):
             scores[MarketRegime.REVERSAL] += 0.6
+            
+        # --- FRACTAL OVERRIDE (Physics) ---
+        # "Mathematics doesn't lie. Structures do."
+        hurst = physics_metrics.get("hurst_exponent", 0.5)
+        entropy = physics_metrics.get("shannon_entropy", 0.0)
+        
+        # TRENDING STATE (Hurst > 0.6, Low Entropy)
+        if hurst > 0.6 and entropy < 0.8:
+            scores[MarketRegime.EXPANSION_REAL] += 0.5
+            scores[MarketRegime.ACCUMULATION] -= 0.3
+            
+        # MEAN REVERTING (Hurst < 0.4) "Pink Noise"
+        elif hurst < 0.4:
+            scores[MarketRegime.ACCUMULATION] += 0.4
+            scores[MarketRegime.MANIPULATION] += 0.3
+            scores[MarketRegime.EXPANSION_REAL] -= 0.5
+            
+        # RANDOM WALK (Hurst ~ 0.5, High Entropy) "White Noise"
+        # Danger Zone - The market is confused.
+        elif 0.45 <= hurst <= 0.55 and entropy > 0.9:
+            scores[MarketRegime.NEUTRAL] += 0.8
+            scores[MarketRegime.EXPANSION_REAL] -= 1.0 # Veto trade
+            scores[MarketRegime.EXPANSION_FAKE] += 0.4 # More likely to be fake
         
         # --- PROBABILITY CALCULATION ---
         
@@ -144,7 +167,12 @@ class MarketRegimeFSM:
             "confidence": round(confidence, 2),
             "probabilities": {k: round(v, 2) for k, v in probabilities.items()},
             "is_trap": final_regime in ["MANIPULATION", "EXPANSION_FAKE"],
-            "is_trending": final_regime in ["EXPANSION_REAL", "DISTRIBUTION"]
+            "is_trending": final_regime in ["EXPANSION_REAL", "DISTRIBUTION"],
+            "fractal_state": {
+                "hurst": hurst,
+                "entropy": entropy,
+                "interpretation": "TRENDING" if hurst > 0.6 else ("REVERTING" if hurst < 0.4 else "RANDOM")
+            }
         }
 
 # Singleton

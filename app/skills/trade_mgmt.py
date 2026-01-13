@@ -130,3 +130,55 @@ async def manage_position(data: PositionManageRequest) -> ResponseModel[Position
         )
 
     return ResponseModel(status="error", error=ErrorDetail(code="INVALID_ACTION", message="Accin no soportada.", suggestion="Usa CLOSE o MODIFY."))
+
+async def apply_neuro_trailing(ticket: int, neural_sl_price: float, volatility_regime: str) -> ResponseModel[PositionActionResponse]:
+    """
+    Apply Dynamic Trailing Stop based on Neural Volatility Regime.
+    
+    Args:
+        ticket: Ticket ID.
+        neural_sl_price: Proposed SL price by Neural Net.
+        volatility_regime: 'HIGH', 'NORMAL', 'LOW' (affects buffer).
+    """
+    # 1. Get Position
+    positions = await mt5_conn.execute(mt5.positions_get, ticket=ticket)
+    if not positions:
+        return ResponseModel(status="error", error=ErrorDetail(code="POS_NOT_FOUND", message="Position closing or closed."))
+    pos = positions[0]
+    
+    # 2. Validate Direction
+    is_buy = pos.type == mt5.ORDER_TYPE_BUY
+    current_sl = pos.sl
+    
+    # Logic: Only move SL in favor of trade (Ratchet)
+    if is_buy:
+        if neural_sl_price <= current_sl:
+            return ResponseModel(status="success", data=PositionActionResponse(ticket=ticket, status="SKIPPED", message="New SL < Current SL ( Buy)."))
+    else:
+        if neural_sl_price >= current_sl and current_sl > 0:
+            return ResponseModel(status="success", data=PositionActionResponse(ticket=ticket, status="SKIPPED", message="New SL > Current SL (Sell)."))
+
+    # 3. Apply Volatility Buffer (Guardrails)
+    # If High Volatility, ensure we are not suffocation the trade.
+    symbol_info = await mt5_conn.execute(mt5.symbol_info, pos.symbol)
+    point = symbol_info.point
+    min_dist = 50 * point # 5 pips minimum distance from price
+    
+    current_price = await mt5_conn.execute(mt5.symbol_info_tick, pos.symbol)
+    price = current_price.bid if is_buy else current_price.ask
+    
+    dist_to_price = abs(price - neural_sl_price)
+    
+    if dist_to_price < min_dist:
+        logger.warning(f"NeuroTrailing: SL too close to price ({dist_to_price/point} pips). Buffering.")
+        # Push back
+        if is_buy: neural_sl_price = price - min_dist
+        else: neural_sl_price = price + min_dist
+
+    # 4. Execute Modification
+    return await manage_position(PositionManageRequest(
+        ticket=ticket, 
+        action="MODIFY", 
+        sl=neural_sl_price,
+        symbol=pos.symbol
+    ))
