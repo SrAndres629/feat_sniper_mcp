@@ -58,7 +58,7 @@ class FeatHybridDataset(Dataset):
             self._generate_synthetic_fallback()
     
     def _load_from_db(self, db_path: str):
-        """Load labeled samples from market_data database."""
+        """Load labeled samples from market_data database and calculate fractal features."""
         if not os.path.exists(db_path):
             logger.warning(f"Database not found: {db_path}")
             return
@@ -66,11 +66,9 @@ class FeatHybridDataset(Dataset):
         try:
             conn = sqlite3.connect(db_path)
             
-            # Fetch labeled samples with FEAT features
+            # Fetch labeled samples with OHLC
             query = """
-                SELECT close, open, high, low, volume, rsi, atr, ema_fast, ema_slow,
-                       feat_score, fsm_state, liquidity_ratio, volatility_zscore,
-                       momentum_kinetic_micro, entropy_coefficient, label
+                SELECT tick_time, open, high, low, close, label
                 FROM market_data
                 WHERE label IS NOT NULL
                 ORDER BY tick_time DESC
@@ -83,25 +81,27 @@ class FeatHybridDataset(Dataset):
                 logger.warning("No labeled data in database.")
                 return
             
+            # Sort by time to ensure indicators are calculated correctly
+            df = df.sort_values('tick_time')
+            
+            # Calculate Fractal Features
+            from app.skills.indicators import calculate_feat_layers
+            df_feat = calculate_feat_layers(df)
+            
+            # Merge features back to df
+            df = pd.concat([df, df_feat], axis=1).dropna(subset=['L1_Mean', 'label'])
+            
             # Convert to tensors
             for _, row in df.iterrows():
                 # Create 50x50 energy map from features (simplified)
                 energy_map = self._create_energy_map(row)
                 
-                # Dense features (12 dimensions)
+                # Dense features (4 dimensions: L1_Mean, L1_Width, L4_Slope, Div_L1_L2)
                 dense = np.array([
-                    row['feat_score'], row.get('fsm_state', 0), 
-                    row.get('liquidity_ratio', 1), row.get('volatility_zscore', 0),
-                    row.get('momentum_kinetic_micro', 0), row.get('entropy_coefficient', 0),
-                    row['rsi'] / 100 if row['rsi'] else 0.5,
-                    row['atr'] if row['atr'] else 0,
-                    (row['close'] - row['open']) / row['close'] if row['close'] else 0,
-                    (row['high'] - row['low']) / row['close'] if row['close'] else 0,
-                    row.get('ema_fast', 0) - row.get('ema_slow', 0) if row.get('ema_fast') else 0,
-                    row['volume'] / 1000 if row['volume'] else 0
+                    row['L1_Mean'], row['L1_Width'], row['L4_Slope'], row['Div_L1_L2']
                 ], dtype=np.float32)
                 
-                # Normalize
+                # Normalize (Simple)
                 dense = np.nan_to_num(dense, 0)
                 
                 target = float(row['label'])
@@ -113,7 +113,7 @@ class FeatHybridDataset(Dataset):
                     'weight': 1.0
                 })
             
-            logger.info(f"Loaded {len(self.samples)} samples from database.")
+            logger.info(f"Loaded {len(self.samples)} samples from database with Fractal features.")
             
         except Exception as e:
             logger.error(f"Error loading from DB: {e}")
@@ -131,7 +131,7 @@ class FeatHybridDataset(Dataset):
                     
                     # Create sample from correction
                     energy_map = np.random.randn(50, 50).astype(np.float32) * 0.1
-                    dense = np.array(corr.get('features', [0] * 12), dtype=np.float32)
+                    dense = np.array(corr.get('features', [0] * 4), dtype=np.float32)
                     target = 1.0 if corr.get('correct_direction') == 'BUY' else 0.0
                     
                     self.samples.append({
@@ -165,7 +165,7 @@ class FeatHybridDataset(Dataset):
         for _ in range(n_samples):
             self.samples.append({
                 'energy_map': torch.randn(1, 50, 50),
-                'dense': torch.randn(12),
+                'dense': torch.randn(4),
                 'target': torch.tensor([float(np.random.randint(0, 2))]),
                 'weight': 1.0
             })
@@ -205,7 +205,7 @@ def create_correction_dataset(
         "nn_direction": nn_direction,
         "llm_direction": llm_direction,
         "correct_direction": correct_direction,
-        "features": features[:12] if len(features) >= 12 else features + [0] * (12 - len(features)),
+        "features": features[:4] if len(features) >= 4 else features + [0] * (4 - len(features)),
         "profit": profit,
         "llm_was_correct": (llm_direction != nn_direction and profit > 0)
     }
@@ -251,7 +251,7 @@ def train_hybrid_brain(
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
     
     # Initialize Model
-    model = HybridFEATNetwork(dense_input_dim=12).to(device)
+    model = HybridFEATNetwork(dense_input_dim=4).to(device)
     criterion = nn.BCELoss(reduction='none')  # Per-sample loss for weighting
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     
@@ -270,7 +270,10 @@ def train_hybrid_brain(
             weight = weight.to(device)
             
             optimizer.zero_grad()
-            output = model(energy, dense)
+            outputs = model(energy, dense)
+            
+            # Use the main output head for training
+            output = outputs["p_win"]
             
             # Weighted loss (corrections have higher weight)
             loss = criterion(output, target)

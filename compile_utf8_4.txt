@@ -1,0 +1,82 @@
+﻿
+
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: compiling c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CInterop.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CInterop.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Mql.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Mql.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Error.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Native.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\GlobalVariable.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CInterop.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\ZmqMsg.mqh
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CLiquidity.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,21) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,32) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,26) : error 152: 'symbol' - some operator expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,36) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,49) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,46) : warning 95: expression has no effect
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,52) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,51) : warning 95: expression has no effect
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,65) : error 149: ')' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(87,54) : warning 95: expression has no effect
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,21) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,32) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,26) : error 152: 'symbol' - some operator expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,36) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,48) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,45) : warning 95: expression has no effect
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,52) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,51) : warning 95: expression has no effect
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,65) : error 149: ')' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(88,54) : warning 95: expression has no effect
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,21) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,32) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,26) : error 152: 'symbol' - some operator expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,36) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,49) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,46) : warning 95: expression has no effect
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,52) : error 149: ',' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,51) : warning 95: expression has no effect
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,65) : error 149: ')' - unexpected token
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh(89,54) : warning 95: expression has no effect
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(194,27) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(194,35) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(195,29) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(195,38) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(196,28) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(196,36) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(197,31) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(197,41) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(198,33) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(198,46) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(199,32) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(199,45) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(218,4) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(218,16) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(218,16) : error 152: 'fan' - some operator expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(218,32) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(218,46) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(219,34) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(220,30) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(159,39) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh(159,47) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(160,42) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(160,58) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(160,30) : warning 89: 'struct SEMAGroupMetrics' initialized from type type 'const unknown' using assignment operator, this behavior is deprecated and will be removed in future
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    consider defining constructor 'SEMAGroupMetrics(const const unknown&)'
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(160,42) : error 246: cannot convert parameter 'const unknown' to 'const SEMAGroupMetrics&'
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    implicit void SEMAGroupMetrics::operator=(const SEMAGroupMetrics&)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(160,30) : error 280: 'operator=' - object required
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(161,42) : error 256: undeclared identifier
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(161,64) : error 157: ')' - expression expected
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(161,30) : warning 89: 'struct SEMAGroupMetrics' initialized from type type 'const unknown' using assignment operator, this behavior is deprecated and will be removed in future
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    consider defining constructor 'SEMAGroupMetrics(const const unknown&)'
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(161,42) : error 246: cannot convert parameter 'const unknown' to 'const SEMAGroupMetrics&'
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    implicit void SEMAGroupMetrics::operator=(const SEMAGroupMetrics&)
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh(161,30) : error 280: 'operator=' - object required
+Result: 50 errors, 11 warnings

@@ -2,6 +2,7 @@ import time
 import asyncio
 import logging
 import functools
+import os
 from enum import Enum
 from typing import Optional, Callable, Any, Dict
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
@@ -123,14 +124,18 @@ MODEL_ACCURACY = Gauge(
     ['model_name', 'symbol']
 )
 
-# --- OPENTELEMETRY SETUP ---
+# --- OPENTELEMETRY SETUP (Silent by Default) ---
 resource = Resource(attributes={
     SERVICE_NAME: "FeatSniper_MCP"
 })
 
 provider = TracerProvider(resource=resource)
-processor = BatchSpanProcessor(ConsoleSpanExporter())
-provider.add_span_processor(processor)
+
+# Only export to console if explicitly requested (prevents MCP corruption)
+if os.environ.get("OTEL_CONSOLE_EXPORT") == "1":
+    processor = BatchSpanProcessor(ConsoleSpanExporter())
+    provider.add_span_processor(processor)
+
 trace.set_tracer_provider(provider)
 
 tracer = trace.get_tracer(__name__)
@@ -146,9 +151,9 @@ class ObservabilityEngine:
         # Iniciar servidor Prometheus en puerto 9090 por defecto
         try:
             start_http_server(9090)
-            logger.info("Servidor Prometheus iniciado en puerto 9090.")
+            logger.info("Prometheus server started on port 9090")
         except Exception as e:
-            logger.warning(f"No se pudo iniciar Prometheus: {e}")
+            logger.error(f"Failed to start Prometheus: {e}")
 
     @classmethod
     def get_instance(cls):

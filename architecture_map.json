@@ -1,0 +1,1092 @@
+{
+    "modules": [
+        "mcp_server",
+        "nexus_control",
+        "nexus_auditor",
+        "app.main",
+        "app.__init__",
+        "app.core.auditor_senior",
+        "app.core.config",
+        "app.core.logger",
+        "app.core.math_utils",
+        "app.core.mt5_conn",
+        "app.core.observability",
+        "app.core.validation",
+        "app.core.zmq_bridge",
+        "app.core.zmq_projector",
+        "app.core.__init__",
+        "app.ml.data_collector",
+        "app.ml.feat_processor",
+        "app.ml.fractal_analysis",
+        "app.ml.ml_engine",
+        "app.ml.ml_normalization",
+        "app.ml.multi_time_learning",
+        "app.ml.temporal_features",
+        "app.ml.train_models",
+        "app.ml.train_mtf_models",
+        "app.ml.__init__",
+        "app.models.schemas",
+        "app.models.__init__",
+        "app.services.analytics",
+        "app.services.circuit_breaker",
+        "app.services.n8n_bridge",
+        "app.services.rag_memory",
+        "app.services.risk_engine",
+        "app.services.supabase_sync",
+        "app.services.telemetry",
+        "app.skills.advanced_analytics",
+        "app.skills.calendar",
+        "app.skills.custom_loader",
+        "app.skills.execution",
+        "app.skills.feat_aceleracion",
+        "app.skills.feat_chain",
+        "app.skills.feat_espacio",
+        "app.skills.feat_forma",
+        "app.skills.feat_intent",
+        "app.skills.feat_kiv",
+        "app.skills.feat_regime",
+        "app.skills.feat_sensory",
+        "app.skills.feat_tiempo",
+        "app.skills.history",
+        "app.skills.indicators",
+        "app.skills.killzone_intelligence",
+        "app.skills.liquidity",
+        "app.skills.liquidity_detector",
+        "app.skills.market",
+        "app.skills.market_physics",
+        "app.skills.ml_sniper",
+        "app.skills.quant_coder",
+        "app.skills.remote_compute",
+        "app.skills.skill_deep_auditor",
+        "app.skills.system_ops",
+        "app.skills.tester",
+        "app.skills.trade_mgmt",
+        "app.skills.unified_model",
+        "app.skills.vision",
+        "app.skills.__init__"
+    ],
+    "dependency_graph": {
+        "mcp_server": {
+            "file_path": "mcp_server.py",
+            "imports": [
+                "os",
+                "sys",
+                "io",
+                "warnings",
+                "logging",
+                "logging.handlers",
+                "asyncio",
+                "json",
+                "datetime",
+                "typing",
+                "contextlib",
+                "app.core.logger",
+                "fastmcp",
+                "app.core.mt5_conn",
+                "app.core.zmq_bridge",
+                "app.core.zmq_projector",
+                "app.skills",
+                "app.skills.trade_mgmt",
+                "app.skills.history",
+                "app.skills.unified_model",
+                "app.skills.vision",
+                "app.skills.calendar",
+                "app.skills.custom_loader",
+                "app.skills.advanced_analytics",
+                "app.skills.feat_chain",
+                "app.skills.feat_kiv",
+                "app.skills.skill_deep_auditor",
+                "app.skills.quant_coder",
+                "app.skills.remote_compute",
+                "app.skills.system_ops",
+                "app.skills.tester",
+                "app.services.n8n_bridge",
+                "app.services.rag_memory",
+                "app.services.supabase_sync",
+                "app.services.telemetry",
+                "app.ml.data_collector",
+                "app.ml.feat_processor",
+                "app.ml.ml_normalization",
+                "app.ml.temporal_features",
+                "app.ml.train_mtf_models",
+                "nexus_brain.hybrid_model",
+                "psutil",
+                "nexus_brain.hybrid_model",
+                "app.skills.rag_memory"
+            ],
+            "imported_by": []
+        },
+        "nexus_control": {
+            "file_path": "nexus_control.py",
+            "imports": [
+                "os",
+                "sys",
+                "socket",
+                "subprocess",
+                "time",
+                "signal",
+                "json",
+                "webbrowser",
+                "datetime",
+                "enum",
+                "dataclasses",
+                "typing",
+                "psutil",
+                "dotenv",
+                "app.core.config",
+                "asyncio",
+                "app.services.risk_engine",
+                "app.skills.execution",
+                "app.models.schemas",
+                "zmq.asyncio",
+                "app.ml.ml_engine"
+            ],
+            "imported_by": []
+        },
+        "nexus_auditor": {
+            "file_path": "nexus_auditor.py",
+            "imports": [
+                "sys",
+                "os",
+                "json",
+                "subprocess",
+                "time"
+            ],
+            "imported_by": []
+        },
+        "app.main": {
+            "file_path": "app\\main.py",
+            "imports": [
+                "logging",
+                "contextlib",
+                "fastapi",
+                "fastapi.responses",
+                "fastapi.middleware.cors",
+                "datetime",
+                "app.core.config",
+                "app.core.mt5_conn",
+                "app.models.schemas",
+                "app.skills",
+                "MetaTrader5",
+                "app.services.analytics",
+                "app.services.risk_engine",
+                "app.skills.ml_sniper",
+                "app.skills.liquidity",
+                "app.services.circuit_breaker",
+                "unittest.mock"
+            ],
+            "imported_by": []
+        },
+        "app.__init__": {
+            "file_path": "app\\__init__.py",
+            "imports": [],
+            "imported_by": []
+        },
+        "app.core.auditor_senior": {
+            "file_path": "app\\core\\auditor_senior.py",
+            "imports": [],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.core.config": {
+            "file_path": "app\\core\\config.py",
+            "imports": [
+                "pydantic_settings",
+                "typing",
+                "pathlib"
+            ],
+            "imported_by": [
+                "nexus_control",
+                "app.main",
+                "app.core.mt5_conn",
+                "app.core.validation",
+                "app.ml.ml_engine",
+                "app.ml.train_models",
+                "app.ml.train_mtf_models",
+                "app.services.circuit_breaker",
+                "app.services.risk_engine",
+                "app.services.supabase_sync",
+                "app.services.telemetry",
+                "app.skills.execution",
+                "app.skills.indicators",
+                "app.skills.liquidity",
+                "app.skills.market",
+                "app.skills.quant_coder",
+                "app.skills.remote_compute",
+                "app.skills.tester"
+            ]
+        },
+        "app.core.logger": {
+            "file_path": "app\\core\\logger.py",
+            "imports": [
+                "logging",
+                "logging.handlers",
+                "pathlib",
+                "sys",
+                "os"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.core.math_utils": {
+            "file_path": "app\\core\\math_utils.py",
+            "imports": [
+                "numpy",
+                "numba",
+                "scipy.stats"
+            ],
+            "imported_by": [
+                "app.skills.market_physics"
+            ]
+        },
+        "app.core.mt5_conn": {
+            "file_path": "app\\core\\mt5_conn.py",
+            "imports": [
+                "asyncio",
+                "logging",
+                "threading",
+                "typing",
+                "anyio",
+                "app.core.config",
+                "app.core.observability",
+                "MetaTrader5",
+                "app.core.observability",
+                "time"
+            ],
+            "imported_by": [
+                "mcp_server",
+                "app.main",
+                "app.core.validation",
+                "app.services.analytics",
+                "app.services.risk_engine",
+                "app.skills.calendar",
+                "app.skills.execution",
+                "app.skills.history",
+                "app.skills.liquidity",
+                "app.skills.market",
+                "app.skills.quant_coder",
+                "app.skills.tester",
+                "app.skills.trade_mgmt"
+            ]
+        },
+        "app.core.observability": {
+            "file_path": "app\\core\\observability.py",
+            "imports": [
+                "time",
+                "asyncio",
+                "logging",
+                "functools",
+                "os",
+                "enum",
+                "typing",
+                "prometheus_client",
+                "opentelemetry",
+                "opentelemetry.sdk.resources",
+                "opentelemetry.sdk.trace",
+                "opentelemetry.sdk.trace.export"
+            ],
+            "imported_by": [
+                "app.core.mt5_conn",
+                "app.core.mt5_conn",
+                "app.services.supabase_sync",
+                "app.skills.advanced_analytics",
+                "app.skills.execution",
+                "app.skills.liquidity"
+            ]
+        },
+        "app.core.validation": {
+            "file_path": "app\\core\\validation.py",
+            "imports": [
+                "logging",
+                "typing",
+                "app.core.mt5_conn",
+                "app.core.config",
+                "MetaTrader5",
+                "unittest.mock"
+            ],
+            "imported_by": [
+                "app.skills.execution"
+            ]
+        },
+        "app.core.zmq_bridge": {
+            "file_path": "app\\core\\zmq_bridge.py",
+            "imports": [
+                "sys",
+                "asyncio",
+                "zmq",
+                "zmq.asyncio",
+                "logging",
+                "json"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.core.zmq_projector": {
+            "file_path": "app\\core\\zmq_projector.py",
+            "imports": [
+                "zmq",
+                "json",
+                "logging",
+                "asyncio",
+                "typing"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.core.__init__": {
+            "file_path": "app\\core\\__init__.py",
+            "imports": [],
+            "imported_by": []
+        },
+        "app.ml.data_collector": {
+            "file_path": "app\\ml\\data_collector.py",
+            "imports": [
+                "os",
+                "sqlite3",
+                "logging",
+                "contextlib",
+                "threading",
+                "typing",
+                "pandas",
+                "numpy",
+                "datetime",
+                "app.skills.liquidity_detector",
+                "csv",
+                "MetaTrader5"
+            ],
+            "imported_by": [
+                "mcp_server",
+                "app.ml.train_mtf_models"
+            ]
+        },
+        "app.ml.feat_processor": {
+            "file_path": "app\\ml\\feat_processor.py",
+            "imports": [
+                "pandas",
+                "numpy",
+                "json",
+                "gzip",
+                "os",
+                "typing",
+                "nexus_core.structure_engine",
+                "nexus_core.acceleration"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.ml.fractal_analysis": {
+            "file_path": "app\\ml\\fractal_analysis.py",
+            "imports": [
+                "numpy",
+                "pandas",
+                "logging",
+                "typing"
+            ],
+            "imported_by": [
+                "app.ml.ml_engine"
+            ]
+        },
+        "app.ml.ml_engine": {
+            "file_path": "app\\ml\\ml_engine.py",
+            "imports": [
+                "os",
+                "json",
+                "logging",
+                "numpy",
+                "typing",
+                "datetime",
+                "torch.nn",
+                "app.core.config",
+                "app.ml.fractal_analysis",
+                "app.skills.liquidity_detector",
+                "sklearn.ensemble",
+                "torch",
+                "joblib",
+                "torch",
+                "app.ml.train_models"
+            ],
+            "imported_by": [
+                "nexus_control"
+            ]
+        },
+        "app.ml.ml_normalization": {
+            "file_path": "app\\ml\\ml_normalization.py",
+            "imports": [
+                "numpy",
+                "typing"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.ml.multi_time_learning": {
+            "file_path": "app\\ml\\multi_time_learning.py",
+            "imports": [
+                "os",
+                "pandas",
+                "numpy",
+                "logging",
+                "typing",
+                "datetime"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.ml.temporal_features": {
+            "file_path": "app\\ml\\temporal_features.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "numpy"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.ml.train_models": {
+            "file_path": "app\\ml\\train_models.py",
+            "imports": [
+                "os",
+                "sys",
+                "csv",
+                "logging",
+                "joblib",
+                "numpy",
+                "pandas",
+                "typing",
+                "datetime",
+                "app.core.config",
+                "argparse",
+                "app.skills.indicators",
+                "torch",
+                "torch.nn",
+                "sqlite3",
+                "sklearn.model_selection",
+                "sklearn.preprocessing",
+                "sklearn.ensemble",
+                "sklearn.metrics",
+                "sklearn.impute",
+                "torch",
+                "torch.nn",
+                "torch.utils.data",
+                "numpy"
+            ],
+            "imported_by": [
+                "app.ml.ml_engine"
+            ]
+        },
+        "app.ml.train_mtf_models": {
+            "file_path": "app\\ml\\train_mtf_models.py",
+            "imports": [
+                "os",
+                "sys",
+                "logging",
+                "joblib",
+                "sqlite3",
+                "numpy",
+                "pandas",
+                "argparse",
+                "typing",
+                "datetime",
+                "app.core.config",
+                "app.ml.data_collector",
+                "sklearn.ensemble",
+                "sklearn.model_selection",
+                "sklearn.metrics",
+                "sklearn.ensemble"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.ml.__init__": {
+            "file_path": "app\\ml\\__init__.py",
+            "imports": [],
+            "imported_by": []
+        },
+        "app.models.schemas": {
+            "file_path": "app\\models\\schemas.py",
+            "imports": [
+                "datetime",
+                "typing",
+                "pydantic"
+            ],
+            "imported_by": [
+                "nexus_control",
+                "app.main",
+                "app.skills.advanced_analytics",
+                "app.skills.calendar",
+                "app.skills.execution",
+                "app.skills.history",
+                "app.skills.quant_coder",
+                "app.skills.trade_mgmt"
+            ]
+        },
+        "app.models.__init__": {
+            "file_path": "app\\models\\__init__.py",
+            "imports": [],
+            "imported_by": []
+        },
+        "app.services.analytics": {
+            "file_path": "app\\services\\analytics.py",
+            "imports": [
+                "logging",
+                "pandas",
+                "numpy",
+                "typing",
+                "MetaTrader5",
+                "app.core.mt5_conn"
+            ],
+            "imported_by": [
+                "app.main"
+            ]
+        },
+        "app.services.circuit_breaker": {
+            "file_path": "app\\services\\circuit_breaker.py",
+            "imports": [
+                "logging",
+                "time",
+                "typing",
+                "app.core.config"
+            ],
+            "imported_by": [
+                "app.main",
+                "app.skills.execution"
+            ]
+        },
+        "app.services.n8n_bridge": {
+            "file_path": "app\\services\\n8n_bridge.py",
+            "imports": [
+                "logging",
+                "asyncio",
+                "aiohttp",
+                "json",
+                "os",
+                "datetime",
+                "typing",
+                "dataclasses",
+                "socket"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.services.rag_memory": {
+            "file_path": "app\\services\\rag_memory.py",
+            "imports": [
+                "logging",
+                "os",
+                "typing",
+                "datetime",
+                "chromadb.utils",
+                "chromadb",
+                "chromadb.config"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.services.risk_engine": {
+            "file_path": "app\\services\\risk_engine.py",
+            "imports": [
+                "logging",
+                "MetaTrader5",
+                "json",
+                "os",
+                "datetime",
+                "typing",
+                "app.core.config",
+                "app.core.mt5_conn",
+                "app.skills.market"
+            ],
+            "imported_by": [
+                "nexus_control",
+                "app.main",
+                "app.skills.execution",
+                "app.skills.execution"
+            ]
+        },
+        "app.services.supabase_sync": {
+            "file_path": "app\\services\\supabase_sync.py",
+            "imports": [
+                "logging",
+                "typing",
+                "supabase",
+                "app.core.config",
+                "app.core.observability",
+                "anyio",
+                "anyio",
+                "anyio",
+                "anyio"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.services.telemetry": {
+            "file_path": "app\\services\\telemetry.py",
+            "imports": [
+                "logging",
+                "httpx",
+                "asyncio",
+                "datetime",
+                "app.core.config"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.advanced_analytics": {
+            "file_path": "app\\skills\\advanced_analytics.py",
+            "imports": [
+                "logging",
+                "httpx",
+                "asyncio",
+                "typing",
+                "app.core.observability",
+                "app.models.schemas"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.calendar": {
+            "file_path": "app\\skills\\calendar.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "pandas",
+                "app.core.mt5_conn",
+                "app.models.schemas",
+                "MetaTrader5",
+                "unittest.mock"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.custom_loader": {
+            "file_path": "app\\skills\\custom_loader.py",
+            "imports": [
+                "os",
+                "json",
+                "logging",
+                "pandas",
+                "pathlib",
+                "typing",
+                "subprocess",
+                "sys"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.execution": {
+            "file_path": "app\\skills\\execution.py",
+            "imports": [
+                "logging",
+                "typing",
+                "app.core.mt5_conn",
+                "app.models.schemas",
+                "app.core.validation",
+                "MetaTrader5",
+                "app.core.observability",
+                "time",
+                "app.core.config",
+                "app.services.risk_engine",
+                "unittest.mock",
+                "app.services.circuit_breaker",
+                "app.skills.liquidity",
+                "app.services.risk_engine"
+            ],
+            "imported_by": [
+                "nexus_control"
+            ]
+        },
+        "app.skills.feat_aceleracion": {
+            "file_path": "app\\skills\\feat_aceleracion.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "enum",
+                "pandas",
+                "numpy",
+                "typing"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.skills.feat_chain": {
+            "file_path": "app\\skills\\feat_chain.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "asyncio",
+                "pandas",
+                "app.skills.feat_tiempo",
+                "app.skills.market_physics",
+                "app.skills.feat_regime",
+                "app.skills.feat_forma",
+                "app.skills.feat_espacio",
+                "app.skills.feat_aceleracion",
+                "app.skills.feat_intent",
+                "app.ml.multi_time_learning",
+                "app.skills.killzone_intelligence",
+                "app.skills.feat_sensory",
+                "app.skills.liquidity",
+                "app.core.auditor_senior"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.feat_espacio": {
+            "file_path": "app\\skills\\feat_espacio.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "enum",
+                "pandas",
+                "numpy"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.skills.feat_forma": {
+            "file_path": "app\\skills\\feat_forma.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "enum",
+                "pandas",
+                "numpy"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.skills.feat_intent": {
+            "file_path": "app\\skills\\feat_intent.py",
+            "imports": [
+                "logging",
+                "typing"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.skills.feat_kiv": {
+            "file_path": "app\\skills\\feat_kiv.py",
+            "imports": [],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.feat_regime": {
+            "file_path": "app\\skills\\feat_regime.py",
+            "imports": [
+                "logging",
+                "typing",
+                "enum",
+                "math"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.skills.feat_sensory": {
+            "file_path": "app\\skills\\feat_sensory.py",
+            "imports": [
+                "pandas",
+                "numpy",
+                "logging",
+                "typing",
+                "app.skills.market_physics",
+                "app.skills.indicators"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.skills.feat_tiempo": {
+            "file_path": "app\\skills\\feat_tiempo.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "enum",
+                "pytz"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.skills.history": {
+            "file_path": "app\\skills\\history.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "pandas",
+                "app.core.mt5_conn",
+                "app.models.schemas",
+                "MetaTrader5",
+                "unittest.mock"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.indicators": {
+            "file_path": "app\\skills\\indicators.py",
+            "imports": [
+                "pandas",
+                "numpy",
+                "app.core.config"
+            ],
+            "imported_by": [
+                "app.ml.train_models",
+                "app.skills.feat_sensory",
+                "app.skills.market_physics"
+            ]
+        },
+        "app.skills.killzone_intelligence": {
+            "file_path": "app\\skills\\killzone_intelligence.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "enum",
+                "pytz"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.skills.liquidity": {
+            "file_path": "app\\skills\\liquidity.py",
+            "imports": [
+                "logging",
+                "MetaTrader5",
+                "typing",
+                "app.core.mt5_conn",
+                "app.core.config",
+                "app.core.observability"
+            ],
+            "imported_by": [
+                "app.main",
+                "app.skills.execution",
+                "app.skills.feat_chain"
+            ]
+        },
+        "app.skills.liquidity_detector": {
+            "file_path": "app\\skills\\liquidity_detector.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "pandas",
+                "numpy"
+            ],
+            "imported_by": [
+                "app.ml.data_collector",
+                "app.ml.ml_engine"
+            ]
+        },
+        "app.skills.market": {
+            "file_path": "app\\skills\\market.py",
+            "imports": [
+                "logging",
+                "time",
+                "typing",
+                "pandas",
+                "app.core.mt5_conn",
+                "app.core.config",
+                "MetaTrader5",
+                "unittest.mock"
+            ],
+            "imported_by": [
+                "app.services.risk_engine"
+            ]
+        },
+        "app.skills.market_physics": {
+            "file_path": "app\\skills\\market_physics.py",
+            "imports": [
+                "pandas",
+                "numpy",
+                "logging",
+                "typing",
+                "scipy.stats",
+                "app.core.math_utils",
+                "app.skills.indicators"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain",
+                "app.skills.feat_sensory"
+            ]
+        },
+        "app.skills.ml_sniper": {
+            "file_path": "app\\skills\\ml_sniper.py",
+            "imports": [
+                "logging",
+                "numpy",
+                "typing",
+                "app.skills"
+            ],
+            "imported_by": [
+                "app.main"
+            ]
+        },
+        "app.skills.quant_coder": {
+            "file_path": "app\\skills\\quant_coder.py",
+            "imports": [
+                "logging",
+                "os",
+                "subprocess",
+                "typing",
+                "app.core.mt5_conn",
+                "app.models.schemas",
+                "app.core.config",
+                "MetaTrader5",
+                "unittest.mock"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.remote_compute": {
+            "file_path": "app\\skills\\remote_compute.py",
+            "imports": [
+                "logging",
+                "paramiko",
+                "os",
+                "typing",
+                "app.core.config",
+                "anyio"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.skill_deep_auditor": {
+            "file_path": "app\\skills\\skill_deep_auditor.py",
+            "imports": [
+                "logging",
+                "os",
+                "sys",
+                "json",
+                "sqlite3",
+                "pandas",
+                "datetime",
+                "typing",
+                "psutil"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.system_ops": {
+            "file_path": "app\\skills\\system_ops.py",
+            "imports": [
+                "logging",
+                "os",
+                "asyncio",
+                "typing",
+                "datetime",
+                "sys",
+                "platform",
+                "gc",
+                "psutil",
+                "psutil"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.tester": {
+            "file_path": "app\\skills\\tester.py",
+            "imports": [
+                "logging",
+                "os",
+                "subprocess",
+                "configparser",
+                "typing",
+                "app.core.config",
+                "app.core.mt5_conn",
+                "MetaTrader5",
+                "unittest.mock"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.trade_mgmt": {
+            "file_path": "app\\skills\\trade_mgmt.py",
+            "imports": [
+                "logging",
+                "typing",
+                "app.core.mt5_conn",
+                "app.models.schemas",
+                "MetaTrader5",
+                "unittest.mock"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.unified_model": {
+            "file_path": "app\\skills\\unified_model.py",
+            "imports": [
+                "logging",
+                "sqlite3",
+                "pandas",
+                "typing",
+                "os"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.vision": {
+            "file_path": "app\\skills\\vision.py",
+            "imports": [
+                "base64",
+                "io",
+                "logging",
+                "json",
+                "typing",
+                "PIL",
+                "anyio",
+                "pyautogui"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.skills.__init__": {
+            "file_path": "app\\skills\\__init__.py",
+            "imports": [],
+            "imported_by": []
+        }
+    },
+    "orphans": [
+        "mcp_server",
+        "nexus_control",
+        "nexus_auditor"
+    ],
+    "scan_timestamp": "NOW"
+}

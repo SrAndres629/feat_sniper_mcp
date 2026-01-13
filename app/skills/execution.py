@@ -172,7 +172,7 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
         
         # SMART DEVIATION: Ms urgencia = Ms slippage permitido
         base_deviation = max(20, int(spread * 1.5))
-        if urgency_score > 0.9:
+        if urgency_score > 0.8:
             dynamic_deviation = base_deviation * 3  # Aceptamos pagar spread por entrar YA
         else:
             dynamic_deviation = base_deviation 
@@ -187,25 +187,25 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
         if "LIMIT" not in action and "STOP" not in action:
             # Es una orden a mercado (potencialmente)
             
-            if urgency_score > 0.9:
-                 # HIGH URGENCY -> FORCE MARKET EXECUTION
+            if urgency_score > 0.8:
+                 # HIGH URGENCY (> 0.8) -> FORCE MARKET EXECUTION
                  exec_price = current_ask if action == "BUY" else current_bid
                  logger.info(f"🔥 HIGH URGENCY ({urgency_score:.2f}) -> FORCING MARKET EXECUTION")
             
-            elif urgency_score < 0.6:
-                # LOW URGENCY -> CONVERT TO LIMIT (Save Spread cost)
-                # Intentamos entrar 'dentro' del spread
-                spread_val = current_ask - current_bid
-                if action == "BUY":
-                    # Buy Limit un poco abajo del ask (mid price)
-                    exec_price = current_bid + (spread_val * 0.25) 
-                    order_type = mt5.ORDER_TYPE_BUY_LIMIT
-                    logger.info(f"🐢 LOW URGENCY ({urgency_score:.2f}) -> CONVERTING TO LIMIT @ {exec_price}")
-                else:
-                    # Sell Limit un poco arriba del bid
-                    exec_price = current_ask - (spread_val * 0.25)
-                    order_type = mt5.ORDER_TYPE_SELL_LIMIT
-                    logger.info(f"🐢 LOW URGENCY ({urgency_score:.2f}) -> CONVERTING TO LIMIT @ {exec_price}")
+            elif urgency_score < 0.5:
+                 # LOW URGENCY (< 0.5) -> CONVERT TO LIMIT (Save Spread cost)
+                 # Intentamos entrar 'dentro' del spread
+                 spread_val = current_ask - current_bid
+                 if action == "BUY":
+                     # Buy Limit un poco abajo del ask (mid price)
+                     exec_price = current_bid + (spread_val * 0.25) 
+                     order_type = mt5.ORDER_TYPE_BUY_LIMIT
+                     logger.info(f"🐢 LOW URGENCY ({urgency_score:.2f}) -> CONVERTING TO LIMIT @ {exec_price}")
+                 else:
+                     # Sell Limit un poco arriba del bid
+                     exec_price = current_ask - (spread_val * 0.25)
+                     order_type = mt5.ORDER_TYPE_SELL_LIMIT
+                     logger.info(f"🐢 LOW URGENCY ({urgency_score:.2f}) -> CONVERTING TO LIMIT @ {exec_price}")
             
             else:
                 # NORMAL EXECUTION

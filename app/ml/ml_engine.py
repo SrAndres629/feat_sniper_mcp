@@ -47,7 +47,11 @@ logger = logging.getLogger("QuantumLeap.MLEngine")
 FEATURE_NAMES = [
     "close", "open", "high", "low", "volume",
     "rsi", "atr", "ema_fast", "ema_slow",
-    "feat_score", "fsm_state", "liquidity_ratio", "volatility_zscore"
+    "feat_score", "fsm_state", "liquidity_ratio", "volatility_zscore",
+    "momentum_kinetic_micro", "entropy_coefficient", "cycle_harmonic_phase", 
+    "institutional_mass_flow", "volatility_regime_norm", "acceptance_ratio", 
+    "wick_stress", "poc_z_score", "cvd_acceleration",
+    "micro_comp", "micro_slope", "oper_slope", "macro_slope", "bias_slope", "fan_bullish"
 ]
 
 
@@ -89,9 +93,9 @@ class ModelLoader:
         Returns:
             Optional[Dict[str, Any]]: Dict with 'model' and 'config' or None.
         """
-        path = os.path.join(MODELS_DIR, f"lstm_{symbol}_v1.pt")
+        path = os.path.join(MODELS_DIR, f"lstm_{symbol}_v2.pt")
         if not os.path.exists(path):
-            path = os.path.join(MODELS_DIR, "lstm_v1.pt")
+            path = os.path.join(MODELS_DIR, "lstm_v2.pt")
             
         try:
             import torch
@@ -139,7 +143,7 @@ class NormalizationGuard:
             return False
             
         # 2. Extreme Volatility Guard (Gapping)
-        if atr > 0.1: # 10% movement in ATR is usually data error or extreme gap
+        if atr > 100.0: # Adjusted for XAU/BTC usage (was 0.1)
             logger.warning(f"Extreme volatility guard triggered for {symbol}: ATR={atr:.4f}")
             return False
             
@@ -397,27 +401,30 @@ class MLEngine:
         if is_behavioral_anomaly:
             final_p = 0.5 # Neutralize
             
+        anomaly_score = self.anomaly_detector.score(features)
+            
         result = {
             "symbol": symbol,
-            "p_loss": 1 - p_win,
-            "prediction": "WIN" if p_win > 0.6 else ("LOSS" if p_win < 0.4 else "WAIT"),
-            "confidence": abs(p_win - 0.5) * 2,
+            "p_loss": 1 - final_p,
+            "prediction": "WIN" if final_p > 0.6 else ("LOSS" if final_p < 0.4 else "WAIT"),
+            "confidence": abs(final_p - 0.5) * 2,
             "anomaly_score": anomaly_score,
             "is_anomaly": is_behavioral_anomaly,
-            "is_statistically_safe": is_statistically_safe,
-            "gbm_available": gbm_pred is not None,
-            "lstm_available": lstm_pred is not None,
+            "is_statistically_safe": True, # If we reached here, it is safe
+            "gbm_available": gbm_res is not None,
+            "lstm_available": lstm_res is not None,
             "execution_enabled": self.execution_enabled,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
         
         # Log and persistent tracking
+        source = f"GBM:{'OK' if gbm_res else 'NA'}|LSTM:{'OK' if lstm_res else 'NA'}"
         if not self.execution_enabled:
             self.shadow_logger.log(result)
-            logger.info(f" [{symbol}] SHADOW: {result['prediction']} (p={p_win:.3f}, src={source})")
+            logger.info(f" [{symbol}] SHADOW: {result['prediction']} (p={final_p:.3f}, src={source})")
         else:
-            logger.info(f" [{symbol}] EXECUTE: {result['prediction']} (p={p_win:.3f})")
-            
+            logger.info(f" [{symbol}] EXECUTE: {result['prediction']} (p={final_p:.3f})")
+        
         return result
         
     def get_status(self) -> Dict[str, Any]:

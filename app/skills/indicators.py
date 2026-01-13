@@ -1,126 +1,65 @@
-import logging
-from typing import Dict, Any, List, Optional
-try:
-    import MetaTrader5 as mt5
-except ImportError:
-    from unittest.mock import MagicMock
-    mt5 = MagicMock()
 import pandas as pd
 import numpy as np
-from app.core.mt5_conn import mt5_conn
-from app.models.schemas import IndicatorRequest, ResponseModel, ErrorDetail
+from app.core.config import settings
 
-logger = logging.getLogger("MT5_Bridge.Skills.Indicators")
-
-# Mapeo de Timeframes (reutilizado)
-from app.skills.market import TIMEFRAME_MAP
-
-async def get_technical_indicator(req: IndicatorRequest) -> Dict[str, Any]:
+def _smma(series: pd.Series, period: int) -> pd.Series:
     """
-    Calcula indicadores tcnicos usando datos directos de MT5.
+    Smoothed Moving Average (SMMA).
+    Formula: SMMA(i) = (Sum - SMMA(i-1) + Close(i)) / period
     """
-    symbol = req.symbol
-    tf_str = req.timeframe.upper()
-    indicator = req.indicator.upper()
+    return series.ewm(alpha=1/period, adjust=False).mean()
+
+def calculate_feat_layers(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Calcula las capas de la Física de Capas Multifractales (FEAT).
+    """
+    if df.empty or len(df) < max(settings.LAYER_MACRO_PERIODS):
+        return pd.DataFrame()
+
+    results = pd.DataFrame(index=df.index)
     
-    if tf_str not in TIMEFRAME_MAP:
-        return {"status": "error", "message": f"Timeframe {tf_str} no vlido."}
+    # --- LAYER 1: MICRO ---
+    l1_smmas = []
+    for p in settings.LAYER_MICRO_PERIODS:
+        l1_smmas.append(_smma(df['close'], p))
+    l1_df = pd.concat(l1_smmas, axis=1)
+    results['L1_Mean'] = l1_df.mean(axis=1)
+    results['L1_Width'] = l1_df.std(axis=1)
     
-    mt5_tf = TIMEFRAME_MAP[tf_str]
+    # --- LAYER 2: OPERATIVE ---
+    l2_smmas = []
+    for p in settings.LAYER_OPERATIVE_PERIODS:
+        l2_smmas.append(_smma(df['close'], p))
+    l2_df = pd.concat(l2_smmas, axis=1)
+    l2_mean = l2_df.mean(axis=1)
+    results['Div_L1_L2'] = results['L1_Mean'] / l2_mean
     
-    # Cantidad de velas necesarias (periodo + margen para clculo)
-    n_candles = req.period + 100
+    # --- LAYER 4: BIAS ---
+    l4_smma = _smma(df['close'], settings.LAYER_BIAS_PERIOD)
+    results['L4_Slope'] = l4_smma.pct_change(periods=3) * 100
     
-    rates = await mt5_conn.execute(mt5.copy_rates_from_pos, symbol, mt5_tf, 0, n_candles)
-    if rates is None or len(rates) < req.period:
-        return {"status": "error", "message": "No hay suficientes datos para el indicador."}
+    return results
+
+def detect_regime(physics_df: pd.DataFrame) -> str:
+    """
+    Modular Engineering: Regime Detection Logic.
+    """
+    if physics_df.empty:
+        return "NO_DATA"
+        
+    latest = physics_df.iloc[-1]
     
-    df = pd.DataFrame(rates)
-    
-    result_data = {"symbol": symbol, "indicator": indicator, "timeframe": tf_str}
-
-    try:
-        if indicator == "RSI":
-            # RSI Simple (Wilder's Smoothing matches MT5 behavior)
-            delta = df['close'].diff()
-            gain = (delta.where(delta > 0, 0))
-            loss = (-delta.where(delta < 0, 0))
-            
-            # Wilder's Smoothing equivalent to EWM with com=period-1 (alpha=1/period)
-            avg_gain = gain.ewm(com=req.period - 1, adjust=False).mean()
-            avg_loss = loss.ewm(com=req.period - 1, adjust=False).mean()
-            
-            rs = avg_gain / avg_loss
-            df['rsi'] = 100 - (100 / (1 + rs))
-            result_data["value"] = float(df['rsi'].iloc[-1])
-            
-        elif indicator == "MA":
-            # Moving Average
-            method = req.ma_method or 0 # 0: SMA
-            price_type = req.ma_price or 0 # 0: Close
-            
-            # Usamos pandas para facilidad si es SMA/EMA
-            if method == 0:
-                df['ma'] = df['close'].rolling(window=req.period).mean()
-            else:
-                df['ma'] = df['close'].ewm(span=req.period, adjust=False).mean()
-                
-            result_data["value"] = float(df['ma'].iloc[-1])
-
-        elif indicator == "ATR":
-            # ATR (Wilder's Smoothing)
-            high_low = df['high'] - df['low']
-            high_cp = np.abs(df['high'] - df['close'].shift())
-            low_cp = np.abs(df['low'] - df['close'].shift())
-            df['tr'] = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
-            
-            # Use EWM for ATR to match MT5
-            df['atr'] = df['tr'].ewm(com=req.period - 1, adjust=False).mean()
-            result_data["value"] = float(df['atr'].iloc[-1])
-
-        elif indicator == "MACD":
-            fast = 12
-            slow = 26
-            signal = 9
-            exp1 = df['close'].ewm(span=fast, adjust=False).mean()
-            exp2 = df['close'].ewm(span=slow, adjust=False).mean()
-            df['macd'] = exp1 - exp2
-            df['signal'] = df['macd'].ewm(span=signal, adjust=False).mean()
-            df['hist'] = df['macd'] - df['signal']
-            result_data["macd"] = float(df['macd'].iloc[-1])
-            result_data["signal"] = float(df['signal'].iloc[-1])
-            result_data["histogram"] = float(df['hist'].iloc[-1])
-
-        elif indicator == "BOLLINGER":
-            df['sma'] = df['close'].rolling(window=req.period).mean()
-            df['std'] = df['close'].rolling(window=req.period).std()
-            df['upper'] = df['sma'] + (df['std'] * 2)
-            df['lower'] = df['sma'] - (df['std'] * 2)
-            result_data["mid"] = float(df['sma'].iloc[-1])
-            result_data["upper"] = float(df['upper'].iloc[-1])
-            result_data["lower"] = float(df['lower'].iloc[-1])
-
-        elif indicator == "OBV":
-            # On-Balance Volume
-            df['obv'] = (np.sign(df['close'].diff()) * df['volume']).fillna(0).cumsum()
-            result_data["value"] = float(df['obv'].iloc[-1])
-            result_data["change"] = float(df['obv'].diff().iloc[-1])
-
-        elif indicator == "ACCEPTANCE_RATIO":
-            body = (df['close'] - df['open']).abs()
-            candle_range = (df['high'] - df['low'])
-            df['acc'] = np.where(candle_range > 0, body / candle_range, 0)
-            result_data["value"] = float(df['acc'].iloc[-1])
-
-        elif indicator == "WICK_STRESS":
-            body = (df['close'] - df['open']).abs()
-            candle_range = (df['high'] - df['low'])
-            acc = np.where(candle_range > 0, body / candle_range, 0)
-            result_data["value"] = float(1.0 - acc.iloc[-1])
-
-        result_data["status"] = "success"
-        return result_data
-
-    except Exception as e:
-        logger.error(f"Error calculando {indicator}: {e}")
-        return {"status": "error", "message": str(e)}
+    # 1. Compression Check (Volatility Alert)
+    rolling_width = physics_df['L1_Width'].rolling(100).mean().iloc[-1]
+    if latest['L1_Width'] < rolling_width * 0.5:
+        return "COMPRESSION"
+        
+    # 2. Expansion Check (Structural Stretch)
+    if latest['Div_L1_L2'] > 1.05 or latest['Div_L1_L2'] < 0.95:
+        return "EXPANSION"
+        
+    # 3. Gravity Check (Macro Trend)
+    if abs(latest['L4_Slope']) > 0.05:
+        return "TREND_GRAVITY"
+        
+    return "NOISE"

@@ -3,7 +3,7 @@ import httpx
 import asyncio
 from typing import Dict, List, Optional
 from app.core.observability import obs_engine, tracer
-from app.skills.indicators import get_technical_indicator
+# from app.skills.indicators import get_technical_indicator # REMOVED: Unused and missing
 from app.models.schemas import IndicatorRequest
 
 logger = logging.getLogger("MT5_Bridge.AdvancedSkills")

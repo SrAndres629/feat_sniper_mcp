@@ -1,33 +1,42 @@
-# FEAT Sniper NEXUS - Docker Image
-# Optimized with Layer Caching for ML dependencies
-
+# ============================================
+# Dockerfile - FEAT NEXUS MCP Brain
+# Optimized: ~2-3GB instead of 13GB
+# ============================================
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# =============================================================================
-# LAYER 1: DEPENDENCIES (Consolidated)
-# =============================================================================
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# System dependencies (cached layer)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# =============================================================================
-# LAYER 3: SOURCE CODE (Changes frequently)
-# This layer rebuilds quickly because previous layers are cached
-# =============================================================================
+# Python dependencies (cached layer)
+# Install PyTorch CPU first (Separate layer for better caching & lighter image)
+RUN pip install --no-cache-dir torch==2.1.2+cpu torchvision==0.16.2+cpu --index-url https://download.pytorch.org/whl/cpu
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# Source code (changes frequently)
 COPY . .
 
-# Create a non-root user to run the app
-# RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Environment
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONWARNINGS=ignore
 
-# Create necessary directories and set ownership
-# RUN mkdir -p /app/data /app/models && chown -R appuser:appuser /app
+# Create logs directory
+RUN mkdir -p logs
 
-# Switch to non-root user
-# USER appuser
-
-# Expose SSE and ZMQ ports
+# Expose ports
 EXPOSE 8000 5555
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # Start MCP Server
 CMD ["python", "mcp_server.py"]

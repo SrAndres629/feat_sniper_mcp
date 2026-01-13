@@ -14,6 +14,7 @@ import csv
 import logging
 import joblib
 import numpy as np
+import pandas as pd
 from typing import Tuple, List, Optional
 from datetime import datetime
 
@@ -37,79 +38,76 @@ logging.basicConfig(
 )
 logger = logging.getLogger("QuantumLeap.Trainer")
 
-# Feature columns (must match data_collector.py)
+# Feature columns (Multifractal Physics Layers)
 FEATURE_NAMES = [
-    "close", "open", "high", "low", "volume",
-    "rsi", "atr", "ema_fast", "ema_slow",
-    "feat_score", "fsm_state", "liquidity_ratio", "volatility_zscore",
-    "momentum_kinetic_micro", "entropy_coefficient", "cycle_harmonic_phase", 
-    "institutional_mass_flow", "volatility_regime_norm", "acceptance_ratio", 
-    "wick_stress", "poc_z_score", "cvd_acceleration"
+    'L1_Mean', 'L1_Width', 'L4_Slope', 'Div_L1_L2'
 ]
 
 
-def load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Carga dataset desde CSV.
-    
-    Returns:
-        X: Features matrix (N, D)
-        y: Labels array (N,)
-    """
-    X, y = [], []
-    
-    with open(path, "r") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            try:
-                features = [float(row[k]) for k in FEATURE_NAMES]
-                label = int(row["label"])
-                X.append(features)
-                y.append(label)
-            except (KeyError, ValueError) as e:
-                logger.warning(f"Skipping malformed row: {e}")
-                continue
-                
-    logger.info(f"Loaded {len(X)} samples from {path}")
-    return np.array(X, dtype=np.float32), np.array(y, dtype=np.int64)
+# ARGUMENT PARSING
+import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("--epochs", type=int, default=20)
+parser.add_argument("--quick_run", action="store_true")
+args, unknown = parser.parse_known_args()
 
+# FEATURE ENGINEERING
+from app.skills.indicators import calculate_feat_layers
+
+def prepare_features(df: pd.DataFrame) -> Tuple[np.ndarray, np.ndarray]:
+    """Generates Multifractal Features and returns X, y."""
+    # 1. Calculate Physical Layers
+    df_feat = calculate_feat_layers(df)
+    
+    # 2. Select Features (The Tensors)
+    feature_cols = [
+        'L1_Mean', 'L1_Width', 'L4_Slope', 'Div_L1_L2'
+    ]
+    
+    # Merge features back to original df to preserve 'label'
+    df = pd.concat([df, df_feat], axis=1)
+    
+    # Check for NaNs created by EMAs/Diff
+    df = df.dropna(subset=feature_cols + ['label'])
+    
+    X = df[feature_cols].values.astype(np.float32)
+    y = df['label'].values.astype(np.int64)
+    
+    logger.info(f"Generated {X.shape[0]} samples with {X.shape[1]} features (Multifractal Physics).")
+    return X, y
+
+def load_dataset(path: str) -> Tuple[np.ndarray, np.ndarray]:
+    """Loads CSV and computes features."""
+    df = pd.read_csv(path)
+    return prepare_features(df)
 
 def load_from_sqlite(db_path: str = "data/market_data.db") -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Carga dataset directamente desde SQLite (ms eficiente que CSV).
-    Lee de la tabla training_samples.
-    
-    Returns:
-        X: Features matrix (N, D)
-        y: Labels array (N,)
-    """
+    """Loads raw OHLC from SQLite and computes features."""
     import sqlite3
     
     if not os.path.exists(db_path):
-        raise FileNotFoundError(f"Database not found: {db_path}")
+        # Fallback to dummy data if DB missing (Genesis Mode)
+        logger.warning(f"Database {db_path} not found. GENERATING DUMMY DATA (Genesis Protocol).")
+        dates = pd.date_range(end=datetime.now(), periods=2500, freq='1min')
+        df = pd.DataFrame({
+            'close': np.random.normal(2000, 10, 2500).cumsum(), # Random walk
+            'tick_time': dates
+        })
+        df['open'] = df['close'] + np.random.normal(0, 1, 2500)
+        df['high'] = df['close'] + 2
+        df['low'] = df['close'] - 2
+        df['label'] = np.random.randint(0, 2, 2500)
+        return prepare_features(df)
         
     conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    
-    query = f"""
-        SELECT {', '.join(FEATURE_NAMES)}, label
-        FROM market_data
-        WHERE label IS NOT NULL
-        ORDER BY tick_time
-    """
-    
-    cursor = conn.execute(query)
-    rows = cursor.fetchall()
+    query = "SELECT tick_time, open, high, low, close, volume, label FROM market_data ORDER BY tick_time"
+    df = pd.read_sql(query, conn)
     conn.close()
     
-    if not rows:
-        raise ValueError("No training samples in database")
-        
-    X = np.array([[row[k] for k in FEATURE_NAMES] for row in rows], dtype=np.float32)
-    y = np.array([row["label"] for row in rows], dtype=np.int64)
-    
-    logger.info(f"Loaded {len(X)} samples from SQLite: {db_path}")
-    return X, y
+    if df.empty:
+         raise ValueError("Database empty.")
+         
+    return prepare_features(df)
 
 
 # =============================================================================
@@ -184,7 +182,7 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
             
     # Guardar mejor modelo con scaler
     os.makedirs(MODELS_DIR, exist_ok=True)
-    model_path = os.path.join(MODELS_DIR, f"gbm_{SYMBOL}_v1.joblib")
+    model_path = os.path.join(MODELS_DIR, f"gbm_{SYMBOL}_v2.joblib")
     
     joblib.dump({
         "model": best_model,
@@ -261,130 +259,125 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
         shuffle=False
     )
     
-    # Modelo LSTM con Atencin
-    class LSTMWithAttention(nn.Module):
-        def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2, num_classes: int = 2):
-            super().__init__()
-            self.lstm = nn.LSTM(
-                input_size=input_dim,
-                hidden_size=hidden_dim,
-                num_layers=num_layers,
-                batch_first=True,
-                bidirectional=True,
-                dropout=0.2
-            )
-            
-            # Self-Attention
-            self.attention = nn.Sequential(
-                nn.Linear(hidden_dim * 2, hidden_dim),
-                nn.Tanh(),
-                nn.Linear(hidden_dim, 1)
-            )
-            
-            # Classifier
-            self.classifier = nn.Sequential(
-                nn.Linear(hidden_dim * 2, hidden_dim),
-                nn.ReLU(),
-                nn.Dropout(0.3),
-                nn.Linear(hidden_dim, num_classes)
-            )
-            
-        def forward(self, x):
-            # LSTM encoding
-            lstm_out, _ = self.lstm(x)  # (B, T, H*2)
-            
-            # Attention weights
-            attn_weights = self.attention(lstm_out)  # (B, T, 1)
-            attn_weights = torch.softmax(attn_weights, dim=1)
-            
-            # Weighted context
-            context = (lstm_out * attn_weights).sum(dim=1)  # (B, H*2)
-            
-            # Classification
-            return self.classifier(context)
-    
+    # Model init
+    input_dim = X.shape[1]
     model = LSTMWithAttention(
-        input_dim=X.shape[1],
+        input_dim=input_dim,
         hidden_dim=64,
-        num_layers=2
+        num_layers=2,
+        num_classes=2
     ).to(device)
     
     criterion = nn.CrossEntropyLoss()
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.5)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
-    # Training loop
-    epochs = 20
-    best_val_loss = float("inf")
-    best_state = None
+    best_acc = 0.0
+    best_model_state = None
     
-    for epoch in range(1, epochs + 1):
-        # Train
+    # Training Loop
+    logger.info("Starting LSTM training...")
+    for epoch in range(20): # 20 Epochs
         model.train()
-        train_loss = 0
-        for X_batch, y_batch in train_loader:
-            X_batch, y_batch = X_batch.to(device), y_batch.to(device)
+        train_loss = 0.0
+        
+        for batch_X, batch_y in train_loader:
+            batch_X, batch_y = batch_X.to(device), batch_y.to(device)
             
             optimizer.zero_grad()
-            logits = model(X_batch)
-            loss = criterion(logits, y_batch)
+            logits = model(batch_X)
+            loss = criterion(logits, batch_y)
             loss.backward()
             optimizer.step()
             
             train_loss += loss.item()
             
-        train_loss /= len(train_loader)
-        
-        # Validate
+        # Validation
         model.eval()
-        val_loss = 0
-        correct = 0
-        total = 0
-        
+        val_correct = 0
+        total_val = 0
         with torch.no_grad():
-            for X_batch, y_batch in val_loader:
-                X_batch, y_batch = X_batch.to(device), y_batch.to(device)
-                logits = model(X_batch)
-                loss = criterion(logits, y_batch)
-                val_loss += loss.item()
+            for batch_X, batch_y in val_loader:
+                batch_X, batch_y = batch_X.to(device), batch_y.to(device)
+                logits = model(batch_X)
+                preds = torch.argmax(logits, dim=1)
+                val_correct += (preds == batch_y).sum().item()
+                total_val += batch_y.size(0)
                 
-                preds = logits.argmax(dim=1)
-                correct += (preds == y_batch).sum().item()
-                total += len(y_batch)
-                
-        val_loss /= len(val_loader)
-        val_acc = correct / total
+        val_acc = val_correct / total_val if total_val > 0 else 0
+        logger.info(f"Epoch {epoch+1}: Loss={(train_loss/len(train_loader)):.4f}, ValAcc={val_acc:.4f}")
         
-        scheduler.step(val_loss)
-        
-        logger.info(f"Epoch {epoch:02d}: Train={train_loss:.5f}, Val={val_loss:.5f}, Acc={val_acc:.4f}")
-        
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            best_state = model.state_dict().copy()
+        if val_acc > best_acc:
+            best_acc = val_acc
+            best_model_state = model.state_dict()
             
-    # Guardar modelo
-    model.load_state_dict(best_state)
-    model_path = os.path.join(MODELS_DIR, f"lstm_{SYMBOL}_v1.pt")
+    # Save Model
+    os.makedirs(MODELS_DIR, exist_ok=True)
+    model_path = os.path.join(MODELS_DIR, f"lstm_{SYMBOL}_v2.pt")
     
     torch.save({
-        "model_state": best_state,
+        "model_state": best_model_state,
         "model_config": {
-            "input_dim": X.shape[1],
+            "input_dim": input_dim,
             "hidden_dim": 64,
             "num_layers": 2,
             "seq_len": seq_len
         },
-        "feature_names": FEATURE_NAMES,
         "trained_at": datetime.utcnow().isoformat(),
-        "best_val_loss": best_val_loss,
-        "n_samples": len(X)
+        "best_acc": best_acc
     }, model_path)
     
-    logger.info(f" LSTM Model saved to {model_path}")
-    logger.info(f"   Best Val Loss: {best_val_loss:.5f}")
-    
+    logger.info(f" LSTM Model saved to {model_path} (Acc: {best_acc:.4f})")
     return model_path
+
+
+# =============================================================================
+# EXPORTED CLASSES
+# =============================================================================
+
+import torch
+import torch.nn as nn
+
+class LSTMWithAttention(nn.Module):
+    def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2, num_classes: int = 2):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=0.2
+        )
+        
+        # Self-Attention
+        self.attention = nn.Sequential(
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 1)
+        )
+        
+        # Classifier
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(hidden_dim, num_classes)
+        )
+        
+    def forward(self, x):
+        # LSTM encoding
+        lstm_out, _ = self.lstm(x)  # (B, T, H*2)
+        
+        # Attention weights
+        attn_weights = self.attention(lstm_out)  # (B, T, 1)
+        attn_weights = torch.softmax(attn_weights, dim=1)
+        
+        # Weighted sum (Context vector)
+        context = torch.sum(lstm_out * attn_weights, dim=1)
+        
+        # Classification
+        logits = self.classifier(context)
+        return logits
 
 
 # =============================================================================

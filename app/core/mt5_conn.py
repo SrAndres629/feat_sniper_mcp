@@ -47,7 +47,7 @@ class MT5Connection:
         if self._initialized:
             return
         self._initialized = True
-        logger.info("MT5Connection Singleton inicializado.")
+        logger.debug("MT5Connection core component initialized.")
 
     async def startup(self) -> bool:
         """Initializes MT5 terminal connectivity and starts the watchdog.
@@ -119,6 +119,18 @@ class MT5Connection:
         
         if settings.MT5_PATH:
             init_params["path"] = settings.MT5_PATH
+
+        # [FIX] Filter out None values to avoid "Invalid argument" error
+        # If login is None, we don't send it, letting MT5 use stored profile
+        init_params = {k: v for k, v in init_params.items() if v is not None}
+        
+        # Ensure login is int if present
+        if "login" in init_params:
+            try:
+                init_params["login"] = int(init_params["login"])
+            except ValueError:
+                logger.error(f"Invalid login format: {init_params['login']}")
+                return False
 
         mt5.shutdown() # Force clean state
 

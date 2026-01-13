@@ -1,95 +1,94 @@
+import sys
+import asyncio
 import zmq
 import zmq.asyncio
-import json
 import logging
-import asyncio
-from typing import Callable, Optional, Any
+import json
 
-from app.core.observability import resilient
+# --- WINDOWS FIX CRÍTICO ---
+# Esto evita el error "Proactor event loop" en Windows
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 logger = logging.getLogger("MT5_Bridge.ZMQ")
 
 class ZMQBridge:
-    """ZeroMQ ultra-low latency event bridge.
-    
-    Replaces CSV polling with a high-speed event-driven architecture.
-    Handles market data ingestion and internal signal broadcasting.
-    
-    Attributes:
-        host (str): Listening host.
-        port (int): Listening port.
-        is_running (bool): Lifecycle flag.
-        addr (str): Full ZMQ address.
-    """
-    def __init__(self, host: str = "0.0.0.0", port: int = 5555):
+    def __init__(self, pub_port=5556, sub_port=5555):
+        self.pub_port = pub_port
+        self.sub_port = sub_port
         self.context = zmq.asyncio.Context()
-        self.socket = self.context.socket(zmq.SUB)
-        self.addr: str = f"tcp://{host}:{port}"
-        self.is_running: bool = False
-        self._task: Optional[asyncio.Task] = None
-        self._callback: Optional[Callable[[dict], Any]] = None
+        self.pub_socket = None
+        self.sub_socket = None
+        self.running = False
+        self.callbacks = []
 
-    @resilient(max_retries=5, failure_threshold=3)
-    async def start(self, callback: Callable[[dict], Any]) -> None:
-        """Starts the ZeroMQ subscriber loop.
-        
-        Args:
-            callback: Async or sync function to handle incoming message dicts.
+    async def start(self, callback=None):
+        """Inicia los sockets ZMQ y el loop de escucha."""
+        if callback:
+            self.add_callback(callback)
             
-        Raises:
-            zmq.ZMQError: If binding fails.
-        """
-        self._callback = callback
         try:
-            self.socket.bind(self.addr)
-            self.socket.subscribe("") # Subscribe to all topics
-            logger.info(f"ZMQ Bridge LISTENING on {self.addr} (BIND mode)")
+            self.pub_socket = self.context.socket(zmq.PUB)
+            self.pub_socket.bind(f"tcp://0.0.0.0:{self.pub_port}")
+
+            self.sub_socket = self.context.socket(zmq.SUB)
+            self.sub_socket.bind(f"tcp://0.0.0.0:{self.sub_port}")
+            self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "")
+
+            self.running = True
+            logger.info(f"ZMQ Bridge LISTENING on tcp://0.0.0.0:{self.sub_port}")
+            
+            asyncio.create_task(self._listen())
+            
         except zmq.ZMQError as e:
-            logger.error(f"ZMQ BIND failed: {e}")
-            raise
-        
-        self.is_running = True
-        self._task = asyncio.create_task(self._listen())
+            # === RESILIENCE FIX ===
+            # Si el puerto está ocupado, no crashear el servidor completo
+            # Solo log warning y continuar sin ZMQ (MCP funciona sin él)
+            logger.warning(f"ZMQ Bridge DISABLED: {e} - El servidor MCP funcionará sin streaming ZMQ.")
+            self.running = False
+            # NO re-raise - permitir que el servidor continúe
 
-    async def stop(self) -> None:
-        """Gracefully shuts down the ZeroMQ bridge and releases resources."""
-        self.is_running = False
-        if self._task:
-            self._task.cancel()
+    async def stop(self):
+        """Cierra conexiones limpiamente."""
+        self.running = False
+        if self.pub_socket: self.pub_socket.close()
+        if self.sub_socket: self.sub_socket.close()
+        self.context.term()
+        logger.info("ZMQ Bridge detenido.")
+
+    def add_callback(self, callback):
+        self.callbacks.append(callback)
+
+    async def _listen(self):
+        while self.running:
             try:
-                await self._task
+                msg_string = await self.sub_socket.recv_string()
+                # [AUDIT] Structured Traceability - INPUT FLOW
+                logger.info("INPUT_FLOW", extra={
+                     "module": "ZMQ_BRIDGE", 
+                     "action": "RECEIVE", 
+                     "size": len(msg_string), 
+                     "target": "internal_callback"
+                })
+                try:
+                    data = json.loads(msg_string)
+                    for cb in self.callbacks:
+                        if asyncio.iscoroutinefunction(cb):
+                            await cb(data)
+                        else:
+                            cb(data)
+                except json.JSONDecodeError:
+                    pass
             except asyncio.CancelledError:
-                pass
-        self.socket.close()
-        logger.info("ZMQ Bridge shut down gracefully.")
+                break
+            except Exception:
+                if self.running:
+                    await asyncio.sleep(1)
 
-    async def _listen(self) -> None:
-        """Asynchronous listening loop for incoming messages."""
-        while self.is_running:
-            try:
-                # Receive message from MT5
-                # Using recv() + decode for UTF-8 robustness
-                message_bytes = await self.socket.recv()
-                message = message_bytes.decode('utf-8', errors='replace')
-                
-                if not message:
-                    continue
+    async def send_command(self, action: str, **params):
+        if not self.running:
+            return
+        payload = {"action": action, "params": params}
+        await self.pub_socket.send_string(json.dumps(payload))
 
-                data = json.loads(message)
-                
-                if self._callback:
-                    if asyncio.iscoroutinefunction(self._callback):
-                        await self._callback(data)
-                    else:
-                        self._callback(data)
-                        
-            except zmq.ZMQError as e:
-                logger.error(f"ZMQ Subscriber Error: {e}")
-                await asyncio.sleep(1) # Backoff
-            except json.JSONDecodeError as e:
-                logger.error(f"ZMQ Payload Decode Error: {e} | Raw: {message[:100]}")
-            except Exception as e:
-                logger.error(f"Unexpected error in ZMQ loop: {e}", exc_info=True)
-
-# Instancia global para streaming
 zmq_bridge = ZMQBridge()

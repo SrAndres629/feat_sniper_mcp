@@ -1,16 +1,119 @@
-FEAT_Sniper_Master_Core/
+# ============================================
+# .dockerignore - Optimizado para mcp-brain
+# Reduce imagen de 13GB a ~2-3GB
+# ============================================
+
+# Python Virtual Environments (CRITICAL - saves 1-2GB)
 .venv/
+venv/
+env/
+.env.local
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Git (saves 50-200MB)
 .git/
+.gitignore
+.gitattributes
+
+# IDE & Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Node.js (if web-dashboard is in same repo)
+node_modules/
+.next/
+.npm/
 *.log
-*.mq5
-*.mqh
-*.ex5
-*.ps1
-*.bat
+
+# ML Models & Data (CRITICAL - saves several GB)
+models/*.pkl
+models/*.joblib
+models/*.h5
+models/*.pt
+models/*.pth
+models/*.onnx
+*.sqlite
+*.db
+data/*.csv
+data/*.parquet
+data/*.arrow
+
+# Logs
+logs/
+*.log
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.docker/
+
+# Documentation
+docs/
+*.md
+LICENSE
+CHANGELOG
+
+# Tests
+tests/
+test_*.py
+*_test.py
+pytest.ini
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Local development
 .env
-Dockerfile
-.dockerignore
-implementation_plan.md
-task.md
-walkthrough.md
+.env.*
+*.local
+secrets/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Chroma Vector DB (recreates on start)
+chroma_db/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# MacOS
+.DS_Store
+
+# Large binary files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+
+# Brain Core (if building main server, this is duplicated)
+brain_core/
+
+# FEAT Master Core subfolder (already in main)
+FEAT_Sniper_Master_Core/
+
+# Tools that don't need to be in Docker
+tools/

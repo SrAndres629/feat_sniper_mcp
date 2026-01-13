@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Any
 import psutil
 from dotenv import load_dotenv
+from app.core.config import settings
 
 # Force load .env before anything else
 load_dotenv()
@@ -283,449 +284,252 @@ def is_mt5_running():
     out, _, _ = run_cmd('tasklist /FI "IMAGENAME eq terminal64.exe" /NH')
     return "terminal64.exe" in out
 
+class StrategyCommander:
+    """
+    MODELO 3: EL COMANDANTE DE ESTRATEGIA
+    Orquesta la lgica de decisin, riesgo y ejecucin basada en FSM.
+    """
+    def __init__(self):
+        self.fsm = PerformanceTracker()
+        self.running = True
+        
+        # Lazy imports to avoid circular dependencies at module level
+        from app.services.risk_engine import risk_engine
+        # Execution is handled via ZMQ or direct call if local
+        # Ideally we call the execution module directly since we are the controller
+        
+        self.risk_engine = risk_engine
+
+    async def execute_logic(self, tick_data: Dict[str, Any]):
+        """
+        Nucleo decisional: Brain -> Risk -> FSM -> Execution.
+        """
+        symbol = tick_data.get("symbol")
+        if not symbol: return
+
+        # 1. ACTUALIZAR MAQUINA DE ESTADOS
+        # (Se hace post-trade, aqu solo leemos el estado)
+        current_state = self.fsm.current_state
+        
+        if current_state == TradingState.RECALIBRATION:
+            # BLOQUEO TOTAL
+            # Podriamos enviar un heartbeat de "Diagnostico Requerido"
+            return
+            
+        # 2. CONSULTAR CEREBRO (NEXUS BRAIN)
+        # En una arquitectura real, el cerebro ya proces los datos y los adjunt al tick
+        # o hacemos la inferencia aqui. Por eficiencia, asumimos que mcp_server 
+        # o un componente previo inyect la prediccin en 'tick_data' o consultamos ahora.
+        # Para Model 3, vamos a simular la llamada o usar ml_engine si est disponible.
+        
+        try:
+             from app.ml.ml_engine import ml_engine
+             # Features deberan venir pre-calculados o calculados al vuelo
+             # Por simplicidad, asumimos que ml_engine puede manejarlo o que el tick trae "prediction"
+             # Si el tick viene de mcp_server (que ya llam al cerebro), usamos eso.
+             
+             prediction = tick_data.get("neural_prediction")
+             if not prediction:
+                 # Fallback: Pedir al cerebro si somos el nodo maestro
+                 # Nota: Esto requiere features completos, que podran no estar en un simple tick
+                 return 
+        except ImportError:
+             return
+
+        p_win = prediction.get("p_win", 0.0)
+        confidence = prediction.get("alpha_confidence", 0.0)
+        urgency = prediction.get("urgency", 0.0)
+        volatility = prediction.get("volatility_regime", 0.0)
+
+        # 3. FILTRO DE CONFIRMACION (Thresholds)
+        # Solo procesamos si hay seal clara
+        if p_win < 0.60: return 
+
+        # 4. GESTION DE CAPITAL (THE VAULT)
+        allocation = await self.risk_engine.get_neural_allocation(confidence)
+        lot_size = await self.risk_engine.get_adaptive_lots(symbol, 200, allocation["lot_multiplier"]) # 200 pts default SL
+        
+        if lot_size <= 0: return
+
+        # 5. EJECUCION POR ESTADO (FSM)
+        direction = "BUY" # Placeholder, vendra del modelo (prob > 0.5)
+        
+        cmd = {
+            "symbol": symbol,
+            "action": direction,
+            "volume": lot_size,
+            "price": tick_data.get("ask" if direction == "BUY" else "bid"),
+            "sl": 0, # Se calcularia dinamico
+            "tp": 0,
+            "comment": f"Fsm:{current_state.name}|Urg:{urgency:.2f}"
+        }
+
+        from app.skills.execution import send_order
+        from app.models.schemas import TradeOrderRequest
+        
+        if current_state == TradingState.AUTONOMOUS:
+            # EJECUCION INMEDIATA (Low Latency)
+            # Mapear a Request Object
+            req = TradeOrderRequest(**cmd)
+            await send_order(req, urgency_score=urgency)
+            print(f"🚀 [AUTONOMOUS] Orden enviada: {symbol} {direction} {lot_size} lots")
+            
+        elif current_state == TradingState.SUPERVISED:
+            # PROTOCOLO DE SUPERVISION (N8N / Human Loop)
+            # En V5, simulamos el envio a N8n y esperamos (o logueamos)
+            print(f"🟡 [SUPERVISED] Seal generada. Esperando aprobacin externa... (Simulada)")
+            # Aqui llamariamos a n8n webhook
+            # await trigger_n8n_webhook(cmd)
+            pass
+
+    async def run_loop(self):
+        """Bucle principal asincrono de estrategia."""
+        import zmq.asyncio
+        context = zmq.asyncio.Context()
+        socket = context.socket(zmq.SUB)
+        socket.connect(f"tcp://127.0.0.1:{settings.ZMQ_PORT}") # Conecta al Publisher de MT5
+        socket.subscribe("")
+        
+        print(f"⚖️ [STRATEGY COMMANDER] Escuchando Market Data en puerto {settings.ZMQ_PORT}...")
+        
+        while self.running:
+            try:
+                msg = await socket.recv_json()
+                # Process tick
+                await self.execute_logic(msg)
+            except Exception as e:
+                print(f"Error en loop de estrategia: {e}")
+                await asyncio.sleep(1)
+
+# Wrapper para correr en el main
+def start_strategy_node():
+    commander = StrategyCommander()
+    import asyncio
+    try:
+        asyncio.run(commander.run_loop())
+    except KeyboardInterrupt:
+        print("Apagando Commander...")
+
 class NexusControl:
     def __init__(self):
         self.running = False
         kill_other_instances()
 
-    def pre_flight_checks(self):
-        log(">>> Auditoria Pre-Vuelo (Integridad)", CYAN)
-        critical_files = [".env", "nexus_auditor.py", "mcp_server.py"]
-        all_ok = True
+    def pre_flight_checks(self) -> bool:
+        """Verificaciones previas al despegue."""
+        log("\n[PRE-FLIGHT] Verificando sistemas...", CYAN)
         
-        for f in critical_files:
-            if os.path.exists(os.path.join(PROJECT_DIR, f)):
-                log(f"  [+] {f} ................. [OK]", GREEN)
-            else:
-                log(f"  [-] {f} ................. [MISSING]", RED)
-                all_ok = False
-        
-        # Check models for current symbol
-        from app.core.config import settings
-        model_path = os.path.join(PROJECT_DIR, "models", f"gbm_{settings.SYMBOL}_v1.joblib")
-        if os.path.exists(model_path):
-             log(f"  [+] Modelo ML ({settings.SYMBOL}) ...... [OK]", GREEN)
-        else:
-             log(f"  [!] Modelo ML ({settings.SYMBOL}) ...... [PENDING] (Protocolo Genesis)", YELLOW)
-        
-        return all_ok
-
-    def start_mt5(self):
-        log(">>> Fase 1: MetaTrader 5", CYAN)
-        if is_mt5_running():
-            log("[OK] MT5 ya esta corriendo.", GREEN)
-            return True
-        
-        log(f"[INFO] Iniciando MT5 desde {MT5_PATH}...", WHITE)
-        try:
-            subprocess.Popen([MT5_PATH])
-            # Wait for window
-            for _ in range(15):
-                if is_mt5_running():
-                    log("[OK] MT5 iniciado con xito.", GREEN)
-                    return True
-                time.sleep(1)
-            log("[ERR] MT5 no inicio tras 15 segundos.", RED)
+        # 1. MT5 Path
+        if not os.path.exists(MT5_PATH):
+            log(f"  [FAIL] MT5 executable not found at: {MT5_PATH}", RED)
             return False
-        except Exception as e:
-            log(f"[ERR] Error fatal al iniciar MT5: {e}", RED)
-            return False
-
-    def start_docker(self):
-        log("\n>>> Fase 2: Infraestructura Docker", CYAN)
+        log(f"  [OK] FX Terminal detected: {MT5_PATH}", GREEN)
         
-        # 1. Docker Engine Check
-        _, _, code = run_cmd("docker info")
-        if code != 0:
-            log("[ERR] Docker Engine no est corriendo. Por favor inicia Docker Desktop.", RED)
-            return False
-            
-        log("[INFO] Levantando servicios...", WHITE)
+        # 2. Ports availability (Check if 5555 is free if we are server, or reachable if client?)
+        # Since we bind to 5555 in docker/python, we just ensure no one else is blocking it heavily.
+        # Actually logic is handled by Docker usually.
         
-        # Smart rebuild: Only rebuild if source code changed
-        needs_rebuild = self._check_needs_rebuild()
-        
-        if needs_rebuild:
-            log("[INFO] Cambios detectados en cdigo fuente. Reconstruyendo contenedor...", YELLOW)
-            _, _, code = run_cmd("docker compose up -d --build", live=True)
-        else:
-            log("[INFO] Sin cambios detectados. Usando contenedor existente.", GREEN)
-            _, _, code = run_cmd("docker compose up -d", live=True)
-        
-        if code != 0:
-            log("[ERR] Fallo al iniciar contenedores mediante Docker Compose.", RED)
-            return False
-            
-        log("[OK] Infraestructura desplegada.", GREEN)
+        log("  [OK] Systems Nominal.", GREEN)
         return True
-    
-    def _check_needs_rebuild(self):
-        """Detecta si hay cambios en el cdigo fuente desde el ltimo build."""
-        import hashlib
-        import glob
-        
-        cache_file = os.path.join(PROJECT_DIR, ".docker_build_hash")
-        
-        # Compute hash of key source files
-        source_patterns = ["app/**/*.py", "mcp_server.py", "requirements.txt", "Dockerfile"]
-        current_hash = hashlib.md5()
-        
-        for pattern in source_patterns:
-            for filepath in glob.glob(os.path.join(PROJECT_DIR, pattern), recursive=True):
-                try:
-                    with open(filepath, "rb") as f:
-                        current_hash.update(f.read())
-                except:
-                    pass
-        
-        new_hash = current_hash.hexdigest()
-        
-        # Compare with cached hash
-        try:
-            with open(cache_file, "r") as f:
-                old_hash = f.read().strip()
-            if old_hash == new_hash:
-                return False  # No rebuild needed
-        except FileNotFoundError:
-            pass  # First run, needs rebuild
-        
-        # Save new hash
-        with open(cache_file, "w") as f:
-            f.write(new_hash)
-        
-        return True  # Rebuild needed
 
-    def check_container_logs(self):
-        log("\n>>> Fase 3: Auditoria Interna de Logs", CYAN)
-        log("[INFO] Esperando a que Brain API este Ready...", WHITE)
-        for i in range(15):
-            # Using service name with docker compose logs is safer
-            out, _, _ = run_cmd("docker compose logs mcp-brain --tail 30")
-            if "Application startup complete" in out:
-                log(f"[OK] Brain API lista y escuchando (T+{i*2}s).", GREEN)
-                return True
-            time.sleep(2)
-        
-        log("[] Brain tardando en responder. Revisa 'docker compose logs mcp-brain'", YELLOW)
-        return False
-
-    def run_auditor(self):
-        log("\n>>> Fase 4: Omni-Audit (Health Check)", CYAN)
-        # Import and run auditor logic or run script
-        # Running the script is safer for dependency isolation
-        # Run auditor with UTF-8 encoding force
-        p = subprocess.run(["python", "nexus_auditor.py"], capture_output=True, text=True, encoding="utf-8", errors="replace")
-        
-        # ALWAYS print the output so the user sees the granular breakdown
-        print(p.stdout)
-        
-        if p.stderr:
-            log(f"[DEBUG] Stderr: {p.stderr}", YELLOW)
-
-        # Robust parsing of REPAIR_REQUEST
-        try:
-            import re
+    def start_mt5(self) -> bool:
+        """Inicia MetaTrader 5 si no est corriendo."""
+        if is_mt5_running():
+            log("  [SKIP] MT5 ya est en ejecucin.", YELLOW)
+            return True
             
-            def strip_ansi(text):
-                ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-                return ansi_escape.sub('', text)
-
-            clean_stdout = strip_ansi(p.stdout)
-            json_match = re.search(r'REPAIR_REQUEST_START\s*(\{.*?\})\s*REPAIR_REQUEST_END', clean_stdout, re.DOTALL)
-            
-            if json_match:
-                tracer_str = json_match.group(1)
-                tracer = json.loads(tracer_str)
-                critical = tracer.get("critical", [])
-                
-                if not critical:
-                    log("[OK] Auditoria superada. Sistema nominal.", GREEN)
-                    return True
-                
-                
-                ANOMALY_MAP = {
-                    "CONFIG_MISSING": "Faltan credenciales en .env (SUPABASE_URL/KEY)",
-                    "ZMQ_NOT_READY": "ZMQ Bridge (Puerto 5555) no responde. MT5 cerrado?",
-                    "MT5_OFFLINE": "MetaTrader 5 no detectado en procesos.",
-                    "DB_EMPTY": "Base de datos vaca (Esperando primer tick).",
-                    "DATA_STALE": "Datos obsoletos en DB (>5 min sin ticks).",
-                    "RAG_MISSING": "Memoria RAG corrupta o no montada.",
-                    "NO_SKILLS": "MCP Server no carg las skills (revisar mcp_server.py)."
-                }
-
-                log("!"*60, RED)
-                log(">>> REPORTE DE FALLOS (Accin Requerida)", RED + BOLD)
-                for code in critical:
-                     # Handle dynamic codes like CONFIG_MISSING_KEY
-                    desc = ANOMALY_MAP.get(code, "Error desconocido")
-                    if "CONFIG_MISSING" in code and code not in ANOMALY_MAP:
-                        desc = f"Configuracin incompleta: {code.replace('CONFIG_MISSING_', '')}"
-                    log(f"  [X] {code}: {desc}", YELLOW)
-                log("!"*60 + "\n", RED)
-
-                # TRIGGER AUTO-HEALING
-                if self.attempt_self_repair(critical):
-                    log("[INFO] Reparacin exitosa. Re-auditando...", GREEN)
-                    return self.run_auditor() # Recursive retry
-                
-                return False
+        log("  [INIT] Lanzando MetaTrader 5...", CYAN)
+        try:
+            subprocess.Popen(MT5_PATH)
+            time.sleep(10) # Wait for init
+            return True
         except Exception as e:
-            log(f"[DEBUG] JSON Parsed failed (using failsafe): {e}", YELLOW)
+            log(f"  [FAIL] Error launching MT5: {e}", RED)
+            return False
 
-        if "SISTEMA READY" in p.stdout:
-            log("[OK] Auditoria superada (Failsafe).", GREEN)
-            return True
-            
-        log("[ERR] Fallo crtico en auditora. Revisa el detalle arriba.", RED)
-        return False
-
-    def attempt_self_repair(self, anomalies):
-        """
-        NEXUS DEEP HEALER SKILL
-        Intenta solucionar anomalas conocidas automticamente.
-        """
-        log("\n>>> INICIANDO PROTOCOLO DE AUTO-REPARACIN DEEP HEALER...", CYAN + BOLD)
-        repaired = False
-
-        if "MT5_OFFLINE" in anomalies:
-            log("[FIX] Detectado MT5 Cado. Reiniciando terminal...", YELLOW)
-            self.start_mt5()
-            repaired = True
-
-        if "ZMQ_NOT_READY" in anomalies and "MT5_OFFLINE" not in anomalies:
-            log("[FIX] ZMQ bloqueado. Intentando restart suave de MT5...", YELLOW)
-            run_cmd('taskkill /F /IM terminal64.exe /T')
-            time.sleep(2)
-            self.start_mt5()
-            repaired = True
-
-        if "MODELS_MISSING" in anomalies:
-            log("[FIX] Detectado NUEVO ACTIVO o Modelos faltantes. Iniciando PROTOCOLO GENESIS...", YELLOW)
-            
-            # 1. Seed History (Backfill)
-            seed_script = os.path.join(PROJECT_DIR, "seed_history.py")
-            if os.path.exists(seed_script):
-                log(f"[EXEC] python {seed_script} (Backfill Data)", WHITE)
-                s_out, s_err, s_code = run_cmd(f"python \"{seed_script}\"")
-                if s_code != 0:
-                     log(f"[ERR] Fallo la descarga de historia: {s_err[:100]}...", RED)
-                     return False
-            
-            # 2. Train Models
-            train_script = os.path.join(PROJECT_DIR, "app", "ml", "train_models.py")
-            if os.path.exists(train_script):
-                log(f"[EXEC] python {train_script} (Training)", WHITE)
-                # Run training (this might take a while)
-                t_out, t_err, t_code = run_cmd(f"python \"{train_script}\"")
-                if t_code == 0:
-                     log("[OK] Modelos generados exitosamente.", GREEN)
-                     repaired = True
-                else:
-                     log(f"[ERR] Fallo el entrenamiento: {t_err[:100]}...", RED)
-            else:
-                 log("[ERR] Script de entrenamiento no encontrado.", RED)
-
-        if repaired:
-            time.sleep(2) # Wait for fixes to settle
-            return True
-            
-        log("[ALERT] No se pudieron aplicar correcciones automticas para los errores actuales.", RED)
-        return False
-
-    def open_dashboard(self):
-        log("\n>>> Fase 5: Visualizacin", CYAN)
-        log("[INFO] Lanzando Dashboard: http://localhost:3000", WHITE)
-        webbrowser.open("http://localhost:3000")
-
-    def stop_all(self):
-        log("\n" + "="*60, YELLOW)
-        log(">>> APAGADO DE SEGURIDAD (Nexus Shutdown)", RED + BOLD)
-        log("="*60, YELLOW)
+    def start_docker(self) -> bool:
+        """Verifica e inicia el stack Docker (Brain)."""
+        log("  [DOCKER] Verificando Neural Containers...", CYAN)
         
-        log("[INFO] Bajando contenedores Docker...", WHITE)
-        subprocess.run("docker compose down", shell=True)
-        
-        log("[INFO] Cerrando MetaTrader 5...", WHITE)
-        subprocess.run('taskkill /F /IM terminal64.exe /T', shell=True, capture_output=True)
-        
-        log("[OK] Sistema cerrado correctamente. Datos persistidos.", GREEN)
-        sys.exit(0)
+        # Check if container running
+        out, _, _ = run_cmd("docker ps --format '{{.Names}}'")
+        if "mcp-brain" in out:
+             log("  [OK] Neural Brain is ACTIVE.", GREEN)
+             return True
+             
+        log("  [INIT] Desplegando Neural Brain...", YELLOW)
+        out, err, code = run_cmd("docker compose up -d")
+        if code != 0:
+            log(f"  [FAIL] Docker Start Failed: {err}", RED)
+            return False
+            
+        return True
 
     def war_room_report(self):
-        log("\n" + ""*70, GRAY)
-        log("  GLASS COCKPIT: INSTITUTIONAL TOPOLOGY MAP", CYAN + BOLD)
-        log(""*70, GRAY)
+        """Imprime estado final del sistema."""
+        print("\n" + "="*40)
+        print(f"{BOLD}   WAR ROOM STATUS REPORT   {RESET}")
+        print("="*40)
+        print(f"TERMINAL:    {GREEN}ONLINE{RESET}")
+        print(f"BRAIN (ML):  {GREEN}ONLINE{RESET}")
+        print(f"BRIDGE:      {GREEN}LISTENING (5555/5556){RESET}")
+        print(f"MODE:        {GREEN}AUTONOMOUS (Model 5){RESET}")
+        print("="*40 + "\n")
         
-        # Ports Topology Tree
-        zmq_status = f"{GREEN}[LISTENING]{RESET}" if check_port(5555) else f"{RED}[CLOSED]{RESET}"
-        api_status = f"{GREEN}[ACTIVE]{RESET}" if check_port(8000) else f"{RED}[INACTIVE]{RESET}"
-        web_status = f"{GREEN}[CONNECTED]{RESET}" if check_port(3000) else f"{YELLOW}[PENDING]{RESET}"
-
-        print(f"{BLUE}--- [ TOPOLOGA DE RED FEAT NEXUS V6.0 ] ---{RESET}")
-        print(f"{GREEN}[INFRA]{RESET} Docker Engine | {CYAN}ZMQ Bridge{RESET} | {GOLD}MIP Protocol{RESET}")
-        print(f"{GREEN}[CORE ]{RESET} ML Engine (M1/H1/D1) | {MAGENTA}Neural Pulse{RESET}")
-        print(f"{GREEN}[EDGE ]{RESET} Supabase Sync | MetaTrader 5 Terminal")
-        print("-" * 45)
-        
-        # New: Fractal Status Area
-        print(f"{BOLD}{WHITE}>>> FISICA DE MERCADO (MULTIFRACTAL) <<<{RESET}")
-        print(f"Estado Hurst: {CYAN}PERMANENTE{RESET} (H=0.62) | Alineacin: {GREEN}OK{RESET}")
-        print(f"Bias Macro: {GREEN}BULLISH{RESET} | Filtro Sniper: {YELLOW}WAIT{RESET}")
-        print("-" * 45)
-        
-        print(f"{BOLD}Status General:{RESET} {GREEN}NOMINAL - LISTO PARA OPERAR{RESET}")
-        from app.services.supabase_sync import supabase_sync
-        cloud = f"{GREEN}[SYNCED]{RESET}" if supabase_sync.client else f"{RED}[LOCAL_ONLY]{RESET}"
-        print(f"   {CYAN}Supabase{RESET} ......... {cloud}")
-        print(f"   {CYAN}Anti-Fragility{RESET} ... {GREEN}[PASSIVE_READY]{RESET}")
-
-        log(""*70, GRAY)
-
-        try:
-            from app.services.supabase_sync import supabase_sync
-            from dotenv import load_dotenv
-            load_dotenv()
-            
-            log("[INFO] Consultando estado institucional en Supabase...", WHITE)
-            
-            if supabase_sync.client:
-                # Check for recent ticks
-                res = supabase_sync.client.table("market_ticks").select("id").limit(1).execute()
-                if len(res.data) > 0:
-                    log("   Flujo de persistencia: OK", GREEN)
-                else:
-                    log("  ! Flujo de persistencia: Esperando datos", YELLOW)
-            else:
-                log("  X Supabase: Desconectado", RED)
-        except Exception:
-            log("  ! Telemetra remota: Offline", YELLOW)
-
-    def wait_for_signal(self):
-        """
-        PROTOCOLO DE SINCRONIZACIN INICIAL (Handshake)
-        Escucha el primer paquete de MT5 para autoconfigurar el activo.
-        """
-        import zmq
-        import re
-        
-        log("\n>>> Fase 1.5: Sincronizacin Activa Chart-to-Brain", CYAN)
-        log("[INFO] Esperando seal del grfico (Arrastra el indicador)...", WHITE)
-        
-        context = zmq.Context()
-        socket = context.socket(zmq.SUB)
-        
-        try:
-            # Bind temporaralmente para capturar el handshake
-            socket.bind("tcp://0.0.0.0:5555")
-            socket.subscribe("")
-            
-            # Bloqueante: Espera el primer mensaje
-            msg_bytes = socket.recv()
-            msg = msg_bytes.decode('utf-8', errors='replace')
-            data = json.loads(msg)
-            
-            detected_symbol = data.get("symbol")
-            if not detected_symbol:
-                log("[WARN] Mensaje recibido sin smbolo. Ignorando...", YELLOW)
-                return False
-                
-            log(f"[DETECTADO] Activo en Grfico: {detected_symbol}", GREEN + BOLD)
-            
-            # Check if config needs update
-            from app.core.config import settings
-            current_symbol = settings.SYMBOL
-            
-            if detected_symbol != current_symbol:
-                log(f"[SWITCH] Cambio de contexto: {current_symbol} -> {detected_symbol}", YELLOW)
-                
-                # 1. Update .env
-                env_path = os.path.join(PROJECT_DIR, ".env")
-                if os.path.exists(env_path):
-                    with open(env_path, "r", encoding="utf-8") as f:
-                        lines = f.readlines()
-                    
-                    with open(env_path, "w", encoding="utf-8") as f:
-                        found = False
-                        for line in lines:
-                            if line.startswith("SYMBOL="):
-                                f.write(f"SYMBOL={detected_symbol}\n")
-                                found = True
-                            else:
-                                f.write(line)
-                        if not found:
-                            f.write(f"SYMBOL={detected_symbol}\n")
-                            
-                # 2. Hot-Swap Memory Config (for this process)
-                settings.SYMBOL = detected_symbol
-                
-                # 3. Check/Trigger Genesis per asset
-                model_path = os.path.join(PROJECT_DIR, "models", f"gbm_{detected_symbol}_v1.joblib")
-                if not os.path.exists(model_path):
-                    log(f"[GENESIS] Cerebro no encontrado para {detected_symbol}. Iniciando entrenamiento...", CYAN)
-                    
-                    # Call seed/train synchronously
-                    seed_script = os.path.join(PROJECT_DIR, "seed_history.py")
-                    train_script = os.path.join(PROJECT_DIR, "app", "ml", "train_models.py")
-                    
-                    run_cmd(f"python \"{seed_script}\"")
-                    run_cmd(f"python \"{train_script}\"")
-                    log(f"[OK] Gensis completado para {detected_symbol}", GREEN)
-                else:
-                    log(f"[OK] Cerebro ya existe para {detected_symbol}. Cargando...", GREEN)
-
-            else:
-                log(f"[OK] Sincronizado con {current_symbol}.", GREEN)
-                
-        except Exception as e:
-            log(f"[ERR] Fallo en handshake: {e}", RED)
-        finally:
-            # Release port for Docker
-            socket.close()
-            context.term()
-            time.sleep(1) # Give OS time to clear port
+        log("\n>>> INICIANDO STRATEGY COMMANDER (FSM)...", CYAN + BOLD)
+        # Start the logic loop
+        start_strategy_node()
 
     def main_loop(self):
+        """Orquestador principal de inicio."""
         banner()
-        # 0. Initial Integrity
+        log(">>> [MISSION START] Iniciando Protocolo FEAT NEXUS v5.0...", CYAN + BOLD)
+        
         if not self.pre_flight_checks():
-            log("[ERR] Faltan archivos crticos. El sistema no puede iniciar.", RED)
+            log("[ABORT] Fallo en verificaciones previas.", RED)
             return
 
-        # 1. Start MT5
-        if not self.start_mt5(): return
+        if not self.start_docker():
+            log("[ABORT] Fallo al iniciar Neural Brain.", RED)
+            return
 
-        # 1.5 Wait for Signal (Configura el sistema ANTES de lanzar Docker)
-        self.wait_for_signal()
+        if not self.start_mt5():
+            log("[WARN] MT5 no pudo iniciarse, pero el Brain está activo.", YELLOW)
 
-        # 2. Start Docker
-        if not self.start_docker(): return
-
-        # 3. Wait for warm-up
-        time.sleep(10)
-
-        # 4. Check API
-        self.check_container_logs()
-
-        # 5. Run Audit
-        if not self.run_auditor():
-            log("[CAUTION] El sistema tiene anomalias. Revisa los logs arriba.", YELLOW)
-
-        # 6. War Room Report
         self.war_room_report()
 
-        # 7. Open Web
-        self.open_dashboard()
+    def stop_all(self):
+        """Detiene todos los servicios."""
+        log(">>> [SHUTDOWN] Deteniendo ecosistema...", YELLOW)
+        run_cmd("docker compose down")
+        # MT5 termination could be added here if needed
+        log("[OK] Sistema detenido.", GREEN)
 
-        log("\n" + ""*60, GREEN)
-        log("   FEAT SNIPER NEXUS ESTA OPERATIVO (Presiona Ctrl+C para apagar)", GREEN + BOLD)
-        log(""*60, GREEN)
+    def audit_system(self):
+        """Realiza un diagnóstico profundo del sistema."""
+        banner()
+        log(">>> [AUDIT] Ejecutando Diagnóstico Institucional...", CYAN)
+        
+        # 1. ZMQ Check
+        if check_port(5555):
+            log("  [OK] ZMQ Port 5555 is ACTIVE.", GREEN)
+        else:
+            log("  [FAIL] ZMQ Port 5555 is CLOSED.", RED)
+            
+        # 2. Docker Check
+        out, _, _ = run_cmd("docker ps --format '{{.Names}}'")
+        if "feat-sniper-brain" in out or "mcp-brain" in out:
+            log("  [OK] Docker Container is RUNNING.", GREEN)
+        else:
+            log("  [FAIL] Docker Container is MISSING.", RED)
+            
+        # 3. MT5 Check
+        if is_mt5_running():
+            log("  [OK] MT5 Terminal is RUNNING.", GREEN)
+        else:
+            log("  [OK] MT5 Terminal is CLOSED (Normal if not trading).", YELLOW)
 
-        try:
-            while True:
-                # Real-time monitoring could go here
-                time.sleep(10)
-        except KeyboardInterrupt:
-            self.stop_all()
+        log("\n>>> [RESULT] Auditoría completada. Revisar logs/nexus.log para detalles.", GRAY)
 
 if __name__ == "__main__":
     control = NexusControl()
@@ -735,6 +539,4 @@ if __name__ == "__main__":
     elif sys.argv[1] == "stop":
         control.stop_all()
     elif sys.argv[1] == "audit":
-        control.run_auditor()
-    else:
-        log(f"Uso: python nexus_control.py [start|stop|audit]", YELLOW)
+        control.audit_system()

@@ -163,18 +163,26 @@ class RiskEngine:
                 self._last_reset_date = today
                 logger.info(f"RiskEngine: Daily balance reset. Base: ${self._daily_opening_balance:.2f}")
 
+    async def calculate_dynamic_lot(self, confidence: float, volatility: float, symbol: str, sl_points: int = 200) -> float:
+        """
+        [MODEL 3 REQUEST] Asignacin Neuronal Dinmica.
+        Wrapper sobre get_neural_allocation + get_adaptive_lots.
+        """
+        allocation = await self.get_neural_allocation(confidence)
+        
+        # Override based on strict Model 3 requirements if needed
+        if confidence < 0.60:
+            # "Riesgo minimo o cero"
+            return 0.01 # Minimum lot
+            
+        return await self.get_adaptive_lots(symbol, sl_points, allocation["lot_multiplier"])
+
     async def get_neural_allocation(self, alpha_confidence: float) -> Dict[str, float]:
         """
         Determina la asignacin de capital basada en la confianza neuronal.
-        
-        Args:
-            alpha_confidence (0.0 - 1.0): Output de la red neuronal.
-            
-        Returns:
-            Dict con 'scalp_pct', 'swing_pct', 'lot_multiplier'
         """
         allocation = {
-            "scalp_pct": 0.50, # Default
+            "scalp_pct": 0.50,
             "swing_pct": 0.50,
             "lot_multiplier": 1.0,
             "can_dual": True,
@@ -182,13 +190,11 @@ class RiskEngine:
         }
         
         # SNIPER MODE (Alpha > 0.85)
-        # "Put the heavy money where the AI sees victory."
         if alpha_confidence > 0.85:
             allocation.update({
-                "scalp_pct": 0.25,      # Menos al scalp
-                "swing_pct": 0.75,      # Ms al swing (Wealth Building)
-                "lot_multiplier": 1.5,  # 50% extra size
-                "can_dual": True,
+                "scalp_pct": 0.25,
+                "swing_pct": 0.75,
+                "lot_multiplier": 1.5,
                 "aggressiveness": "SNIPER"
             })
             
@@ -198,30 +204,19 @@ class RiskEngine:
                 "scalp_pct": 0.40,
                 "swing_pct": 0.60,
                 "lot_multiplier": 1.25,
-                "can_dual": True,
                 "aggressiveness": "ASSERTIVE"
             })
             
-        # MODERATE (Alpha > 0.55)
-        elif alpha_confidence > 0.55:
-            allocation.update({
-                "scalp_pct": 0.60,      # Prioridad Cash Flow
-                "swing_pct": 0.40,
-                "lot_multiplier": 1.0,
-                "can_dual": True,
-                "aggressiveness": "BALANCED"
-            })
-            
-        # DOUBT / WEAK (Alpha <= 0.55)
-        else:
-            allocation.update({
-                "scalp_pct": 0.90,      # Solo scalp rpido
-                "swing_pct": 0.10,      # Casi nada al swing
-                "lot_multiplier": 0.25, # Micro-lot (Quarter size)
-                "can_dual": False,      # Scalp Only
+        # WEAK/DOUBT (< 0.60 per Model 3 check)
+        elif alpha_confidence < 0.60:
+             allocation.update({
+                "scalp_pct": 0.90,
+                "swing_pct": 0.10,
+                "lot_multiplier": 0.0, # Zero risk preferred
+                "can_dual": False,
                 "aggressiveness": "DEFENSIVE"
             })
-            
+
         logger.info(f"[NEURAL RISK] Alpha: {alpha_confidence:.2f} | Mode: {allocation['aggressiveness']} | Size: {allocation['lot_multiplier']}x")
         return allocation
 
@@ -229,33 +224,7 @@ class RiskEngine:
         """
         Calculates lot size based on account equity, risk percent, SL distance AND Neural Multiplier.
         """
-        if not settings.VOLATILITY_ADAPTIVE_LOTS:
-            return 0.01
-
-        account_info = await mt5_conn.execute(mt5.account_info)
-        symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
-
-        if not account_info or not symbol_info:
-            return 0.01
-
-        # Calculate Base Risk (Cash)
-        equity = account_info.equity
-        base_risk_pct = settings.RISK_PER_TRADE_PERCENT 
-        cash_risk = equity * (base_risk_pct / 100.0)
-        
-        # Apply Neural Multiplier to Cash Risk
-        # If AI is confident, we risk more. If doubtful, we risk less.
-        adjusted_cash_risk = cash_risk * neural_multiplier
-        
-        point_value = symbol_info.trade_tick_value / symbol_info.trade_tick_size
-        if sl_points <= 0: sl_points = 100
-
-        # Standard Lot Calculation
-        calculated_lots = adjusted_cash_risk / (sl_points * point_value)
-        final_lots = round(max(symbol_info.volume_min, min(symbol_info.volume_max, calculated_lots)), 2)
-        
-        logger.info(f"RiskEngine: {final_lots} lots (BaseRisk: ${cash_risk:.2f} -> NeuralRisk: ${adjusted_cash_risk:.2f}, Mult: {neural_multiplier}x)")
-        return final_lots
+        if neural_multiplier <= 0: return 0.0
 
     async def check_drawdown_limit(self) -> bool:
         """

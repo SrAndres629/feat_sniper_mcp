@@ -40,7 +40,8 @@ FEATURE_NAMES: List[str] = [
     "feat_score", "fsm_state", "liquidity_ratio", "volatility_zscore",
     "momentum_kinetic_micro", "entropy_coefficient", "cycle_harmonic_phase", 
     "institutional_mass_flow", "volatility_regime_norm", "acceptance_ratio", 
-    "wick_stress", "poc_z_score", "cvd_acceleration"
+    "wick_stress", "poc_z_score", "cvd_acceleration",
+    "micro_comp", "micro_slope", "oper_slope", "macro_slope", "bias_slope", "fan_bullish"
 ]
 
 TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]
@@ -104,7 +105,8 @@ class SQLiteWALConnection:
                 new_cols = [
                     "momentum_kinetic_micro", "entropy_coefficient", "cycle_harmonic_phase",
                     "institutional_mass_flow", "volatility_regime_norm", "acceptance_ratio",
-                    "wick_stress", "poc_z_score", "cvd_acceleration"
+                    "wick_stress", "poc_z_score", "cvd_acceleration",
+                    "micro_comp", "micro_slope", "oper_slope", "macro_slope", "bias_slope", "fan_bullish"
                 ]
                 for col in new_cols:
                     if col not in existing_cols:
@@ -226,6 +228,9 @@ class DataCollector:
         
     def compute_features(self, candle: Dict[str, Any], indicators: Dict[str, Any]) -> Dict[str, float]:
         """Core feature engineering vectorizer for MIP."""
+        # Extract Physics from 'physics' sub-object if present
+        physics = indicators.get("physics", {})
+        
         return {
             "close": float(candle.get("close", 0)),
             "open": float(candle.get("open", 0)),
@@ -249,7 +254,15 @@ class DataCollector:
             "acceptance_ratio": float(indicators.get("acceptance_ratio", 0.0)),
             "wick_stress": float(indicators.get("wick_stress", 0.0)),
             "poc_z_score": float(indicators.get("poc_z_score", 0.0)),
-            "cvd_acceleration": float(indicators.get("cvd_acceleration", 0.0))
+            "cvd_acceleration": float(indicators.get("cvd_acceleration", 0.0)),
+            
+            # Ribbon Physics Mapping (Multifractal Layers)
+            "micro_comp": float(physics.get("l1_c", indicators.get("micro_comp", 0.5))),
+            "micro_slope": float(physics.get("l1_s", indicators.get("micro_slope", 0.0))),
+            "oper_slope": float(physics.get("l2_s", indicators.get("oper_slope", 0.0))),
+            "macro_slope": float(physics.get("l3_s", indicators.get("macro_slope", 0.0))),
+            "bias_slope": float(physics.get("l4_s", indicators.get("bias_slope", 0.0))),
+            "fan_bullish": float(1.0 if (physics.get("l1_m", 0) > physics.get("l2_m", 0) > physics.get("l3_m", 0)) else 0.0)
         }
         
     def collect(self, symbol: str, candle: Dict[str, Any], indicators: Dict[str, Any], timeframe: str = "M1") -> None:
@@ -303,14 +316,16 @@ class DataCollector:
                     liquidity_ratio, volatility_zscore,
                     momentum_kinetic_micro, entropy_coefficient, cycle_harmonic_phase,
                     institutional_mass_flow, volatility_regime_norm, acceptance_ratio,
-                    wick_stress, poc_z_score, cvd_acceleration
+                    wick_stress, poc_z_score, cvd_acceleration,
+                    micro_comp, micro_slope, oper_slope, macro_slope, bias_slope, fan_bullish
                 ) VALUES (
                     :tick_time, :symbol, :timeframe, :close, :open, :high, :low, :volume,
                     :rsi, :atr, :ema_fast, :ema_slow, :fsm_state, :feat_score,
                     :liquidity_ratio, :volatility_zscore,
                     :momentum_kinetic_micro, :entropy_coefficient, :cycle_harmonic_phase,
                     :institutional_mass_flow, :volatility_regime_norm, :acceptance_ratio,
-                    :wick_stress, :poc_z_score, :cvd_acceleration
+                    :wick_stress, :poc_z_score, :cvd_acceleration,
+                    :micro_comp, :micro_slope, :oper_slope, :macro_slope, :bias_slope, :fan_bullish
                 )
             """, self.batch)
             conn.commit()
@@ -352,21 +367,17 @@ class DataCollector:
         path = path or os.path.join(DATA_DIR, "training_dataset.csv")
         
         with self.db.get_connection() as conn:
-            rows = conn.execute("""
-                SELECT timestamp, symbol, close, open, high, low, volume,
-                       rsi, ema_fast, ema_slow, ema_spread, feat_score, fsm_state,
-                       atr, compression, liquidity_above, liquidity_below, label
-                FROM training_samples
-                ORDER BY timestamp
-            """).fetchall()
+            # We select * because the View now defines the exact Training Schema
+            rows = conn.execute("SELECT * FROM training_samples ORDER BY timestamp").fetchall()
             
+            if not rows:
+                logger.warning("No training samples found (maybe no labels yet?)")
+                return path
+
         with open(path, "w", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow([
-                "timestamp", "symbol", "close", "open", "high", "low", "volume",
-                "rsi", "ema_fast", "ema_slow", "ema_spread", "feat_score", "fsm_state",
-                "atr", "compression", "liquidity_above", "liquidity_below", "label"
-            ])
+            # Dynamic header based on View columns
+            writer.writerow(rows[0].keys())
             for row in rows:
                 writer.writerow(row)
                 
@@ -459,7 +470,15 @@ async def fetch_historical_ticks(
     df['time'] = pd.to_datetime(df['time'], unit='s')
     
     # Parse flags to identify aggressive buy/sell
-    # MT5 Flag constants: BUY=32, SELL=64
+    # REAL MT5 FLAGS:
+    # TICK_FLAG_BID (2) - Price changed
+    # TICK_FLAG_ASK (4) - Price changed
+    # TICK_FLAG_LAST (8) - Price changed
+    # TICK_FLAG_VOLUME (16) - Volume changed
+    # TICK_FLAG_BUY (32) - Buy trade
+    # TICK_FLAG_SELL (64) - Sell trade
+    # Note: User request mentioned 8/16, but those are LAST/VOLUME. We use 32/64 to ensure trade direction accuracy.
+    
     df['is_buy'] = (df['flags'] & 32) > 0
     df['is_sell'] = (df['flags'] & 64) > 0
     

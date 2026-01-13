@@ -260,6 +260,36 @@ class N8NBridge:
         except Exception as e:
             logger.warning(f"[N8N] Failed to send performance report: {e}")
             return False
+
+    async def send_system_event(self, event_type: str, status: str, details: Dict[str, Any] = None) -> bool:
+        """
+        [MODEL 5] Generic System Event Sender (Startup, Shutdown, Errors).
+        """
+        if not self.enabled: return False
+        
+        payload = {
+            "type": "SYSTEM_EVENT",
+            "event": event_type,
+            "status": status,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            **(details or {})
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {"Content-Type": "application/json"}
+                if self.api_key: headers["Authorization"] = f"Bearer {self.api_key}"
+                
+                async with session.post(
+                    self.webhook_url, 
+                    json=payload, 
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=10)
+                ) as response:
+                    return response.status == 200
+        except Exception as e:
+            logger.error(f"[N8N] System Event Failed: {e}")
+            return False
     
     async def request_diagnosis(self, error_context: Dict[str, Any]) -> Dict[str, Any]:
         """

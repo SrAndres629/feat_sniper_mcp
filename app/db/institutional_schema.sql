@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS market_data (
     low REAL,
     close REAL,
     volume REAL,
-    -- Technical Tensors (Computed per Timeframe)
+    -- Technical Tensors
     rsi REAL,
     atr REAL,
     ema_fast REAL,
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS market_data (
     -- Contextual Data
     liquidity_ratio REAL,
     volatility_zscore REAL,
-    -- MSS-5 Neural Tensors
+    -- Neural Tensors
     momentum_kinetic_micro REAL,
     entropy_coefficient REAL,
     cycle_harmonic_phase REAL,
@@ -32,19 +32,16 @@ CREATE TABLE IF NOT EXISTS market_data (
     volatility_regime_norm REAL,
     acceptance_ratio REAL,
     wick_stress REAL,
-    -- PVP FEAT Tensors
+    -- PVP / CVD Tensors
     poc_z_score REAL,
     cvd_acceleration REAL,
-    feat_energy_map BLOB, -- 50x50 Tensor (Pickled/Bytes)
-    -- FourJarvis Scores
-    feat_form_score REAL,
-    feat_space_score REAL,
-    feat_acceleration_score REAL,
-    feat_time_score REAL,
-    feat_index REAL, -- 0-100 Global Score
-    accel_trigger INTEGER,
-    accel_type TEXT,
-    accel_score REAL,
+    -- Ribbon Physics (Multifractal Layers)
+    micro_comp REAL,
+    micro_slope REAL,
+    oper_slope REAL,
+    macro_slope REAL,
+    bias_slope REAL,
+    fan_bullish REAL,
     -- ML Meta-info
     label INTEGER DEFAULT NULL,
     labeled_at TIMESTAMP DEFAULT NULL,
@@ -57,9 +54,9 @@ CREATE TABLE IF NOT EXISTS fractal_analysis (
     analysis_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     symbol TEXT NOT NULL,
     timeframe TEXT NOT NULL,
-    hurst_exponent REAL, -- > 0.5 (Trend), < 0.5 (Mean Revert)
-    fractal_dimension REAL, -- Complexity metric
-    regime_mode TEXT, -- TREND, RANGE, ERRATIC
+    hurst_exponent REAL,
+    fractal_dimension REAL,
+    regime_mode TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -68,19 +65,19 @@ CREATE TABLE IF NOT EXISTS bot_activity_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     event TEXT NOT NULL,
-    level TEXT DEFAULT 'INFO', -- INFO, WARNING, ERROR, CRITICAL
-    phase TEXT, -- MIP, GENESIS, EXECUTION
+    level TEXT DEFAULT 'INFO',
+    phase TEXT,
     details JSON,
-    trace_id TEXT -- For correlation across components
+    trace_id TEXT
 );
 
--- 4. PERFORMANCE TRACKING (Enhanced)
+-- 4. PERFORMANCE TRACKING
 CREATE TABLE IF NOT EXISTS model_performance (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     model_id TEXT NOT NULL,
     symbol TEXT NOT NULL,
-    timeframe_context TEXT, -- Multi-temporal context at trade
+    timeframe_context TEXT,
     win_rate REAL,
     profit_factor REAL,
     sharpe_ratio REAL,
@@ -88,7 +85,7 @@ CREATE TABLE IF NOT EXISTS model_performance (
     hyperparameters JSON
 );
 
--- INDEXING FOR HIGH-FREQUENCY RETRIEVAL
+-- INDEXING
 CREATE INDEX IF NOT EXISTS idx_market_lookup ON market_data (symbol, timeframe, tick_time DESC);
 
 CREATE INDEX IF NOT EXISTS idx_fractal_lookup ON fractal_analysis (symbol, timeframe, analysis_time DESC);
@@ -96,3 +93,49 @@ CREATE INDEX IF NOT EXISTS idx_fractal_lookup ON fractal_analysis (symbol, timef
 CREATE INDEX IF NOT EXISTS idx_unlabeled_context ON market_data (label)
 WHERE
     label IS NULL;
+
+-- 5. TRAINING VIEW (Labeled Data Only)
+CREATE VIEW IF NOT EXISTS training_samples AS
+SELECT
+    id,
+    tick_time as timestamp,
+    symbol,
+    timeframe,
+    close,
+    open,
+    high,
+    low,
+    volume,
+    -- Technicals
+    rsi,
+    atr,
+    ema_fast,
+    ema_slow,
+    (ema_fast - ema_slow) as ema_spread,
+    -- Neural Features
+    feat_score,
+    fsm_state,
+    liquidity_ratio,
+    volatility_zscore,
+    momentum_kinetic_micro,
+    entropy_coefficient,
+    cycle_harmonic_phase,
+    institutional_mass_flow,
+    volatility_regime_norm,
+    acceptance_ratio,
+    wick_stress,
+    poc_z_score,
+    cvd_acceleration,
+    -- Physics
+    micro_comp,
+    micro_slope,
+    oper_slope,
+    macro_slope,
+    bias_slope,
+    fan_bullish,
+    -- Target
+    label
+FROM
+    market_data
+WHERE
+    label IS NOT NULL;

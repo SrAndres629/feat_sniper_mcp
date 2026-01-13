@@ -1,0 +1,132 @@
+﻿
+
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: compiling c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFEAT.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CLiquidity.mqh
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CFSM.mqh
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CInterop.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CInterop.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Mql.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Mql.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Error.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\Native.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Mql\Lang\GlobalVariable.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Context.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\SocketOptions.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CInterop.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\Socket.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Zmq\ZmqMsg.mqh
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CMultitemporal.mqh
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5 : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CVisuals.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CVisuals.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\ChartObjects\ChartObjectsTxtControls.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\ChartObjects\ChartObjectsTxtControls.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\ChartObjects\ChartObject.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\ChartObjects\ChartObject.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Object.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\Object.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\StdLibErr.mqh
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CVisuals.mqh : information: including C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\ChartObjects\ChartObjectsShapes.mqh
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(202,9) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(202,22) : error 152: '' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(203,9) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(203,22) : error 152: 'UnifiedModel_LiveFeed.csv' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(268,25) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(268,32) : error 152: '0' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(268,53) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(268,60) : error 152: '1' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(268,81) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(268,88) : error 152: '2' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(268,109) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(268,116) : error 152: '3' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(269,25) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(269,32) : error 152: '4' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(269,53) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(269,60) : error 152: '5' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(269,81) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(269,88) : error 152: '6' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(269,109) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(269,116) : error 152: '7' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(270,25) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(270,32) : error 152: '8' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(270,53) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(270,60) : error 152: '9' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(272,26) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(272,33) : error 152: '10' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(272,56) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(272,63) : error 152: '11' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(272,86) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(272,93) : error 152: '12' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(272,116) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(272,123) : error 152: '13' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(273,26) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(273,33) : error 152: '14' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(273,56) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(273,63) : error 152: '15' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(273,86) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(273,93) : error 152: '16' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(273,116) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(273,123) : error 152: '17' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(274,26) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(274,33) : error 152: '18' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(274,56) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(274,63) : error 152: '19' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(276,26) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(276,33) : error 152: '20' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(276,56) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(276,63) : error 152: '21' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(276,86) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(276,93) : error 152: '22' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(276,116) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(276,123) : error 152: '23' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(277,26) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(277,33) : error 152: '24' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(277,56) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(277,63) : error 152: '25' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(277,86) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(277,93) : error 152: '26' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(277,116) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(277,123) : error 152: '27' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(278,26) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(278,33) : error 152: '28' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(278,56) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(278,63) : error 152: '29' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(280,26) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(280,33) : error 152: '30' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(304,42) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(304,58) : error 157: ')' - expression expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(304,33) : warning 89: 'struct SEMAGroupMetrics' initialized from type type 'const unknown' using assignment operator, this behavior is deprecated and will be removed in future
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    consider defining constructor 'SEMAGroupMetrics(const const unknown&)'
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(304,42) : error 246: cannot convert parameter 'const unknown' to 'const SEMAGroupMetrics&'
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    implicit void SEMAGroupMetrics::operator=(const SEMAGroupMetrics&)
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(304,33) : error 280: 'operator=' - object required
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(305,42) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(305,64) : error 157: ')' - expression expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(305,33) : warning 89: 'struct SEMAGroupMetrics' initialized from type type 'const unknown' using assignment operator, this behavior is deprecated and will be removed in future
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    consider defining constructor 'SEMAGroupMetrics(const const unknown&)'
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(305,42) : error 246: cannot convert parameter 'const unknown' to 'const SEMAGroupMetrics&'
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    implicit void SEMAGroupMetrics::operator=(const SEMAGroupMetrics&)
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(305,33) : error 280: 'operator=' - object required
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(306,42) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(306,58) : error 157: ')' - expression expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(306,33) : warning 89: 'struct SEMAGroupMetrics' initialized from type type 'const unknown' using assignment operator, this behavior is deprecated and will be removed in future
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    consider defining constructor 'SEMAGroupMetrics(const const unknown&)'
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(306,42) : error 246: cannot convert parameter 'const unknown' to 'const SEMAGroupMetrics&'
+C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5\Include\UnifiedModel\CEMAs.mqh : information: info    implicit void SEMAGroupMetrics::operator=(const SEMAGroupMetrics&)
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(306,33) : error 280: 'operator=' - object required
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(307,12) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(307,24) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(307,24) : error 152: 'fan' - some operator expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(307,37) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(307,51) : error 157: ')' - expression expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(313,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(317,36) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(317,49) : error 157: ')' - expression expected
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(319,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(320,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(321,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(321,30) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(322,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(322,31) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(324,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(325,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(326,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(327,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(328,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(329,17) : error 256: undeclared identifier
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core\UnifiedModel_Main.mq5(331,17) : error 256: undeclared identifier
+Result: 100 errors, 3 warnings

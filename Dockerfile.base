@@ -1,0 +1,21 @@
+# BASE IMAGE: feat-sniper-base
+# Contains heavy ML dependencies to speed up daily builds.
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System dependencies for building wheels
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy heavy requirements
+COPY requirements_base.txt .
+
+# Install heavy dependencies (cached layer)
+RUN pip install --no-cache-dir -r requirements_base.txt
+
+# Create non-root user (good practice, can be inherited)
+RUN groupadd -r appuser && useradd -r -g appuser appuser

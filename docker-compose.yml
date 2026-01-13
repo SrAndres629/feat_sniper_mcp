@@ -8,6 +8,8 @@ services:
       - "8000:8000"
       - "5555:5555"
     volumes:
+      - .:/app
+      - /app/__pycache__
       - ./chroma_storage:/app/data/chroma
       - ./data:/app/data
       - ./models:/app/models
@@ -19,9 +21,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 4G
         reservations:
-          memory: 128M
+          memory: 2G
 
   web-dashboard:
     build:

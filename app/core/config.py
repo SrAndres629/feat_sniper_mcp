@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     
     # Connectivity Ports
     ZMQ_PORT: int = 5555
+
+    # FEAT LAYER CONFIGURATION
+    LAYER_MICRO_PERIODS: list = [1, 2, 3, 6, 7, 8, 9, 12, 13, 14]      # Layer 1: Intention/Noise
+    LAYER_OPERATIVE_PERIODS: list = [16, 24, 32, 48, 64, 96, 128, 160, 192, 224] # Layer 2: Structure
+    LAYER_MACRO_PERIODS: list = [256, 320, 384, 448, 512, 640, 768, 896, 1024, 1280] # Layer 3: Memory
+    LAYER_BIAS_PERIOD: int = 2048 # Layer 4: Gravity (SMMA)
     
     # API Settings
     API_HOST: str = "127.0.0.1"  # Security: Bind to localhost by default
@@ -58,6 +64,7 @@ class Settings(BaseSettings):
     # Execution Control (Safety)
     EXECUTION_ENABLED: bool = False  # Master Switch
     SHADOW_MODE: bool = True         # Simulation Mode (Paper Trading)
+    DRY_RUN: bool = False            # LIVE SYSTEM ACTIVE (Model 5 Launch)
     
     # Supabase & Cloud Nexus
     SUPABASE_URL: Optional[str] = None

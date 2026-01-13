@@ -11,7 +11,11 @@ def register_custom_skills(mcp):
     """
     Escanea la carpeta 'indicadores propios' y registra cada .mq5 como una skill de lectura de datos.
     """
-    base_dir = Path(os.getcwd())
+    """
+    Escanea la carpeta 'indicadores propios' y registra cada .mq5 como una skill de lectura de datos.
+    """
+    # Use relative path from this file to find project root (app/skills/custom_loader.py -> app/skills -> app -> root)
+    base_dir = Path(__file__).resolve().parent.parent.parent
     indicators_dir = base_dir / "FEAT_Sniper_Master_Core"
     config_path = indicators_dir / "Python" / "bridge_config.json"
     
@@ -34,7 +38,7 @@ def register_custom_skills(mcp):
 
     # Buscar archivos .mq5
     mq5_files = list(indicators_dir.glob("*.mq5"))
-    logger.info(f"Detectados {len(mq5_files)} indicadores propios.")
+    logger.debug(f"Detectados {len(mq5_files)} indicadores propios.")
 
     for mq5_file in mq5_files:
         indicator_name = mq5_file.stem
@@ -97,7 +101,7 @@ def register_indicator_tool(mcp, indicator_name: str, watch_dir: Optional[Path])
             return {"status": "error", "message": str(e)}
 
     mcp.tool(name=tool_name)(indicator_tool)
-    logger.info(f"Skill registrada: {tool_name}")
+    logger.debug(f"Skill registrada: {tool_name}")
 
 def register_python_pipeline_tools(mcp, python_dir: Path):
     """
@@ -159,4 +163,4 @@ def register_python_pipeline_tools(mcp, python_dir: Path):
             
         return {"status": "success", "results": results}
 
-    logger.info("Pipeline skills registradas: skill_run_unified_analysis, skill_get_analysis_report")
+    logger.debug("Pipeline skills registradas: skill_run_unified_analysis, skill_get_analysis_report")
