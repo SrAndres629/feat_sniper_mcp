@@ -1,0 +1,8 @@
+{
+  "initial_capital": 1000.0,
+  "vault_balance": 500.0,
+  "trading_capital": 1500.0,
+  "total_vault_transfers": 3,
+  "last_trigger_equity": 1500.0,
+  "last_updated": "2026-01-13T12:54:44.780231+00:00"
+}

@@ -1,53 +1,26 @@
-# Python
+# === PERMISSIVE AUDIT MODE ===
+# Allowing everything strictly except Secrets & System Trash
+
+# SECURITY (CRITICAL)
+.env
+.env.local
+
+# SYSTEM TRASH
 __pycache__/
 *.py[cod]
 *$py.class
 .venv/
 venv/
 env/
-.env
-.env.local
-
-# Models & Data (Large Files)
-models/*.pth
-models/*.pt
-models/*.bin
-models/*.joblib
-*.pkl
-*.h5
-data/
-chroma_storage/
-app/db/*.db
-app/db/*.sqlite
-*.log
-*.sqlite3
-
-# RLAIF Persistence (Auto-generated)
-data/fsm_state.json
-data/vault_state.json
-data/llm_corrections.jsonl
-data/llm_feedback_log.jsonl
-data/n8n_config.json
-
-# Node/JS
 node_modules/
-npm-debug.log
-dashboard/node_modules/
-dashboard/.next/
-dashboard/out/
-dashboard/build/
-
-# IDE
+.git/
 .vscode/
 .idea/
-*.swp
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Docker Build Cache
-.docker_build_hash
-
-# Test Outputs
-AUDIT_REPORT.md
+# LARGE BINARIES (GitHub Limit > 100MB)
+*.pth
+*.pt
+*.bin
+# Allowing .pkl and .joblib for audit if small
+# Allowing .log for audit
+# Allowing data/ for audit

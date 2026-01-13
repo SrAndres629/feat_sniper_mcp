@@ -1,0 +1,25 @@
+[2026-01-13 14:40:56,230] [WARNING] [NeuralPulse_Brain] [SYSTEM] MetaTrader5 module not found found. Running in Linux/Docker mode? Some local-only features will be disabled.
+[2026-01-13 14:40:56,280] [INFO] [MT5_Bridge.Observability] [SYSTEM] Servidor Prometheus iniciado en puerto 9090.
+[2026-01-13 14:40:56,281] [INFO] [MT5_Bridge.Core] [SYSTEM] MT5Connection Singleton inicializado.
+[2026-01-13 14:40:57,153] [INFO] [QuantumLeap.DataCollector] [SYSTEM]  Institutional schema applied.
+[2026-01-13 14:41:05,558] [INFO] [QuantumLeap.MLEngine] [SYSTEM] MLEngine V7.0 [FEAT-DEEP] initialized. Multi-TF Veto: ENABLED.
+[2026-01-13 14:41:06,715] [INFO] [MT5_Bridge.SupabaseSync] [SYSTEM]  Cliente Supabase NEXUS inicializado.
+[2026-01-13 14:41:06,736] [WARNING] [MT5_MCP_Server.CustomLoader] [SYSTEM] No se pudo determinar el watch_dir de MT5. Las skills personalizadas podran no funcionar.
+[2026-01-13 14:41:06,739] [INFO] [MT5_MCP_Server.CustomLoader] [SYSTEM] Detectados 4 indicadores propios.
+[2026-01-13 14:41:06,742] [INFO] [MT5_MCP_Server.CustomLoader] [SYSTEM] Skill registrada: skill_feat_visualizer
+[2026-01-13 14:41:08,420] [INFO] [MT5_MCP_Server.CustomLoader] [SYSTEM] Skill registrada: skill_institutionalpvp
+[2026-01-13 14:41:08,421] [INFO] [MT5_MCP_Server.CustomLoader] [SYSTEM] Skill registrada: skill_ping
+[2026-01-13 14:41:08,423] [INFO] [MT5_MCP_Server.CustomLoader] [SYSTEM] Skill registrada: skill_unifiedmodel_main
+[2026-01-13 14:41:08,426] [INFO] [MT5_MCP_Server.CustomLoader] [SYSTEM] Pipeline skills registradas: skill_run_unified_analysis, skill_get_analysis_report
+[2026-01-13 14:41:08,467] [INFO] [NeuralPulse_Brain] [SYSTEM] Modo Docker detectado - Iniciando servidor SSE en puerto 8000...
+[2026-01-13 14:41:08,485] [INFO] [NeuralPulse_Brain] [SYSTEM] Iniciando infraestructura institucional...
+[2026-01-13 14:41:08,486] [INFO] [MT5_Bridge.Core] [SYSTEM] Linux/Docker environment detected. Skipping local MT5 init. Entering Passive Mode.
+[2026-01-13 14:41:08,488] [ERROR] [MT5_Bridge.ZMQ] [SYSTEM] Port killer error: [Errno 2] No such file or directory: 'netstat'
+[2026-01-13 14:41:08,490] [ERROR] [MT5_Bridge.ZMQ] [SYSTEM] Port killer error: [Errno 2] No such file or directory: 'netstat'
+[2026-01-13 14:41:08,993] [INFO] [MT5_Bridge.ZMQ] [SYSTEM] ZMQ Bridge LISTENING on tcp://0.0.0.0:5555 (BIND mode)
+[2026-01-13 14:41:08,994] [INFO] [MT5_Bridge.ZMQ] [SYSTEM] ZMQ Bridge BROADCASTING on tcp://0.0.0.0:5556 (BIND mode)
+[2026-01-13 14:41:10,290] [INFO] [NeuralPulse_Brain] [SYSTEM]  Monitor de Riesgo Institucional ACTIVO
+[2026-01-13 14:41:10,305] [INFO] [docket.worker] [SYSTEM] Starting worker 'a961c242c4dc#1' with the following tasks:
+[2026-01-13 14:41:10,306] [INFO] [docket.worker] [SYSTEM] * trace(message: str, ...)
+[2026-01-13 14:41:10,307] [INFO] [docket.worker] [SYSTEM] * fail(message: str, ...)
+[2026-01-13 14:41:10,307] [INFO] [docket.worker] [SYSTEM] * sleep(seconds: float, ...)

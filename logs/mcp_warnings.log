@@ -1,0 +1,196 @@
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\expressions\parser.py:72: DeprecationWarning: 'enablePackrat' deprecated - use 'enable_packrat'
+  ParserElement.enablePackrat()
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\expressions\parser.py:85: DeprecationWarning: 'escChar' argument is deprecated, use 'esc_char'
+  quoted_identifier = QuotedString('"', escChar="\\", unquoteResults=True)
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\expressions\parser.py:85: DeprecationWarning: 'unquoteResults' argument is deprecated, use 'unquote_results'
+  quoted_identifier = QuotedString('"', escChar="\\", unquoteResults=True)
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\table\metadata.py:365: PydanticDeprecatedSince212: Using `@model_validator` with mode='after' on a classmethod is deprecated. Instead, use an instance method. See the documentation at https://docs.pydantic.dev/2.12/concepts/validators/#model-after-validator. Deprecated in Pydantic V2.12 to be removed in V3.0.
+  @model_validator(mode="after")
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\table\metadata.py:494: PydanticDeprecatedSince212: Using `@model_validator` with mode='after' on a classmethod is deprecated. Instead, use an instance method. See the documentation at https://docs.pydantic.dev/2.12/concepts/validators/#model-after-validator. Deprecated in Pydantic V2.12 to be removed in V3.0.
+  @model_validator(mode="after")
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\table\metadata.py:498: PydanticDeprecatedSince212: Using `@model_validator` with mode='after' on a classmethod is deprecated. Instead, use an instance method. See the documentation at https://docs.pydantic.dev/2.12/concepts/validators/#model-after-validator. Deprecated in Pydantic V2.12 to be removed in V3.0.
+  @model_validator(mode="after")
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\table\metadata.py:502: PydanticDeprecatedSince212: Using `@model_validator` with mode='after' on a classmethod is deprecated. Instead, use an instance method. See the documentation at https://docs.pydantic.dev/2.12/concepts/validators/#model-after-validator. Deprecated in Pydantic V2.12 to be removed in V3.0.
+  @model_validator(mode="after")
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\table\metadata.py:506: PydanticDeprecatedSince212: Using `@model_validator` with mode='after' on a classmethod is deprecated. Instead, use an instance method. See the documentation at https://docs.pydantic.dev/2.12/concepts/validators/#model-after-validator. Deprecated in Pydantic V2.12 to be removed in V3.0.
+  @model_validator(mode="after")
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\table\metadata.py:538: PydanticDeprecatedSince212: Using `@model_validator` with mode='after' on a classmethod is deprecated. Instead, use an instance method. See the documentation at https://docs.pydantic.dev/2.12/concepts/validators/#model-after-validator. Deprecated in Pydantic V2.12 to be removed in V3.0.
+  @model_validator(mode="after")
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\table\metadata.py:542: PydanticDeprecatedSince212: Using `@model_validator` with mode='after' on a classmethod is deprecated. Instead, use an instance method. See the documentation at https://docs.pydantic.dev/2.12/concepts/validators/#model-after-validator. Deprecated in Pydantic V2.12 to be removed in V3.0.
+  @model_validator(mode="after")
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\table\metadata.py:546: PydanticDeprecatedSince212: Using `@model_validator` with mode='after' on a classmethod is deprecated. Instead, use an instance method. See the documentation at https://docs.pydantic.dev/2.12/concepts/validators/#model-after-validator. Deprecated in Pydantic V2.12 to be removed in V3.0.
+  @model_validator(mode="after")
+c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\pyiceberg\table\metadata.py:550: PydanticDeprecatedSince212: Using `@model_validator` with mode='after' on a classmethod is deprecated. Instead, use an instance method. See the documentation at https://docs.pydantic.dev/2.12/concepts/validators/#model-after-validator. Deprecated in Pydantic V2.12 to be removed in V3.0.
+  @model_validator(mode="after")
+
+
++------------------+
+|                  |
+|     \u2584\u2580\u2580 \u2584\u2580\u2588 \u2588    |
+|     \u2588\u2580  \u2588\u2580\u2588 \u2584    |
+|                  |
+|     FastMCP      |
+|     2.14.1       |
+|                  |
+|                  |
+|    \U0001f5a5  Se… MT…    |
+|       na…        |
+|    \U0001f4e6 Tr… ST…    |
+|                  |
+|    \U0001f4da Do… ht…    |
+|    \U0001f680 Ho… ht…    |
+|                  |
++------------------+
+
+
+[01/… INFO  S serve…
+18:0…       t       
+            a       
+            r       
+            t       
+            i       
+            n       
+            g       
+                    
+            M       
+            C       
+            P       
+                    
+            s       
+            e       
+            r       
+            v       
+            e       
+            r       
+                    
+            '       
+            M       
+            T       
+            5       
+            _       
+            N       
+            e       
+            u       
+            r       
+            a       
+            l       
+            _       
+            S       
+            e       
+            n       
+            t       
+            i       
+            n       
+            e       
+            l       
+            '       
+                    
+            w       
+            i       
+            t       
+            h       
+                    
+            t       
+            r       
+            a       
+            n       
+            s       
+            p       
+            o       
+            r       
+            t       
+                    
+            '       
+            s       
+            t       
+            d       
+            i       
+            o       
+            '       
+Traceback (most recent call last):
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\streams\memory.py", line 117, in receive
+    return self.receive_nowait()
+           ~~~~~~~~~~~~~~~~~~~^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\streams\memory.py", line 112, in receive_nowait
+    raise WouldBlock
+anyio.WouldBlock
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\acord\AppData\Local\Programs\Python\Python313\Lib\asyncio\runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\acord\AppData\Local\Programs\Python\Python313\Lib\asyncio\base_events.py", line 720, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 2348, in wrapper
+    return await func(*args)
+           ^^^^^^^^^^^^^^^^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\fastmcp\server\server.py", line 629, in run_async
+    await self.run_stdio_async(
+    ...<2 lines>...
+    )
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\fastmcp\server\server.py", line 2534, in run_stdio_async
+    await self._mcp_server.run(
+    ...<8 lines>...
+    )
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\fastmcp\server\low_level.py", line 177, in run
+    async with AsyncExitStack() as stack:
+               ~~~~~~~~~~~~~~^^
+  File "C:\Users\acord\AppData\Local\Programs\Python\Python313\Lib\contextlib.py", line 768, in __aexit__
+    raise exc
+  File "C:\Users\acord\AppData\Local\Programs\Python\Python313\Lib\contextlib.py", line 751, in __aexit__
+    cb_suppress = await cb(*exc_details)
+                  ^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\mcp\shared\session.py", line 238, in __aexit__
+    return await self._task_group.__aexit__(exc_type, exc_val, exc_tb)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 787, in __aexit__
+    raise exc_val
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\fastmcp\server\low_level.py", line 189, in run
+    async with anyio.create_task_group() as tg:
+               ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 787, in __aexit__
+    raise exc_val
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\fastmcp\server\low_level.py", line 193, in run
+    async for message in session.incoming_messages:
+    ...<6 lines>...
+        )
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\abc\_streams.py", line 41, in __anext__
+    return await self.receive()
+           ^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\streams\memory.py", line 125, in receive
+    await receive_event.wait()
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 1812, in wait
+    await self._event.wait()
+  File "C:\Users\acord\AppData\Local\Programs\Python\Python313\Lib\asyncio\locks.py", line 213, in wait
+    await fut
+asyncio.exceptions.CancelledError
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\mcp_server.py", line 558, in <module>
+    mcp.run()
+    ~~~~~~~^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\fastmcp\server\server.py", line 654, in run
+    anyio.run(
+    ~~~~~~~~~^
+        partial(
+        ^^^^^^^^
+    ...<4 lines>...
+        )
+        ^
+    )
+    ^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\_core\_eventloop.py", line 75, in run
+    return async_backend.run(func, args, {}, backend_options)
+           ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\anyio\_backends\_asyncio.py", line 2365, in run
+    return runner.run(wrapper())
+           ~~~~~~~~~~^^^^^^^^^^^
+  File "C:\Users\acord\AppData\Local\Programs\Python\Python313\Lib\asyncio\runners.py", line 123, in run
+    raise KeyboardInterrupt()
+KeyboardInterrupt
+^C
