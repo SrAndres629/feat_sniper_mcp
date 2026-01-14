@@ -9,12 +9,19 @@ logger = logging.getLogger("feat.trade_mgmt")
 class TradeManager:
     """
     The Executor: Gestiona el ciclo de vida de las ordenes via ZMQ/MT5.
+    Phase 13: Includes Exhaustion Exit & Time-Limit logic.
     """
     def __init__(self, zmq_bridge):
         self.zmq_bridge = zmq_bridge
         self.pending_orders = {}
-        self.start_time = time.time() # For Warm-up Protocol
-        logger.info("[EXECUTION] Trade Manager Online (Warm-up: 60s active)")
+        self.active_positions = {} # {ticket: {open_time, entry_price, atr, regime}}
+        self.start_time = time.time()
+        
+        # Phase 13: Exhaustion Exit Parameters
+        self.exhaustion_atr_threshold = 0.5 # 50% ATR profit triggers BE
+        self.scalp_time_limit_seconds = 300 # 5 minutes
+        
+        logger.info("[EXECUTION] Trade Manager Online (Warm-up: 60s, Exhaustion Exit: ON)")
 
     async def execute_order(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -121,3 +128,68 @@ class TradeManager:
 
     async def close_all_positions(self) -> Dict:
         return await self.execute_order("CLOSE_ALL", {})
+
+    async def check_exhaustion_exit(self, ticket: int, current_price: float, 
+                                     current_l4_slope: float, current_time: datetime) -> Dict:
+        """
+        Phase 13: Exhaustion Exit Logic.
+        Monitors open positions and triggers early exit or breakeven based on physics.
+        
+        Rules:
+        1. If price reaches 0.5 ATR profit AND L4_Slope < 0 (momentum dying), move SL to Breakeven+1pip.
+        2. If position open > 5 minutes AND physics becomes erratic, close at market.
+        """
+        if ticket not in self.active_positions:
+            return {"status": "NO_POSITION", "ticket": ticket}
+        
+        pos = self.active_positions[ticket]
+        entry_price = pos.get("entry_price", current_price)
+        atr = pos.get("atr", 0.0)
+        open_time = pos.get("open_time", current_time)
+        is_buy = pos.get("is_buy", True)
+        
+        # Calculate current profit in ATR units
+        price_diff = (current_price - entry_price) if is_buy else (entry_price - current_price)
+        atr_profit = price_diff / atr if atr > 0 else 0
+        
+        # Time elapsed
+        time_elapsed = (current_time - open_time).total_seconds()
+        
+        result = {"status": "HOLDING", "ticket": ticket, "atr_profit": round(atr_profit, 2)}
+        
+        # Rule 1: Exhaustion Exit (0.5 ATR profit + Slope dying)
+        if atr_profit >= self.exhaustion_atr_threshold:
+            if current_l4_slope < 0:
+                # Physics exhaustion detected - Move to Breakeven
+                new_sl = entry_price + (0.0001 if is_buy else -0.0001) # +1 pip
+                logger.info(f"🛡️ EXHAUSTION EXIT: Ticket {ticket} moving SL to Breakeven (L4_Slope={current_l4_slope:.4f})")
+                await self.modify_position(ticket, sl=new_sl, tp=pos.get("tp", 0))
+                result["status"] = "BREAKEVEN_SET"
+                result["reason"] = "Exhaustion (L4_Slope < 0 at 0.5 ATR)"
+        
+        # Rule 2: Time-Limit Exit (5 minutes for scalping)
+        if time_elapsed > self.scalp_time_limit_seconds:
+            if abs(current_l4_slope) < 0.01: # Physics erratic/neutral
+                logger.warning(f"⏰ TIME-LIMIT EXIT: Ticket {ticket} closed (Elapsed: {time_elapsed:.0f}s, L4_Slope erratic)")
+                await self.close_position(ticket)
+                result["status"] = "TIME_EXIT"
+                result["reason"] = f"Time limit exceeded ({time_elapsed:.0f}s)"
+        
+        return result
+
+    def register_position(self, ticket: int, entry_price: float, atr: float, is_buy: bool, tp: float = 0):
+        """Registers a new position for Exhaustion Exit monitoring."""
+        self.active_positions[ticket] = {
+            "entry_price": entry_price,
+            "atr": atr,
+            "is_buy": is_buy,
+            "tp": tp,
+            "open_time": datetime.now()
+        }
+        logger.info(f"📝 Position Registered: Ticket {ticket}, Entry: {entry_price}, ATR: {atr}")
+
+    def unregister_position(self, ticket: int):
+        """Removes a closed position from monitoring."""
+        if ticket in self.active_positions:
+            del self.active_positions[ticket]
+            logger.info(f"🗑️ Position Unregistered: Ticket {ticket}")
