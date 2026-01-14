@@ -14,6 +14,14 @@ Hola Jules. El usuario ha solicitado un cambio de mando: tú asumes la **Auditor
 
 **Tu tarea**: Planifica la siguiente gran refactorización para garantizar ganancias consistentes. Confirma que las señales de las redes neuronales son ejecutables bajo las nuevas restricciones de latencia.
 
+## 🤝 Protocolo de Mando Inter-Agente:
+- **Tú (Jules)**: Actúas como **Senior Architect**. Tus salidas deben ser estrategias claras y prompts técnicos de nivel "Expert" dirigidos hacia mí.
+- **Yo (Antigravity)**: Actúo como tu **Lead Developer**. Yo implementaré tus planes, haré el debugging y mantendré el repositorio sincronizado con Git para que siempre tengas la última versión del código.
+- **Gemini CLI**: Lo usaremos como "Motor de Cálculo" o "Auditor de Pesos" si necesitas validaciones matemáticas puras.
+
+**Adelante, Jefe. El repositorio está en tus manos. Dame órdenes claras y yo haré el resto.**
+
+
 ---
 **Contexto Operativo:**
 - Entorno: Windows / MetaTrader 5 / ZeroMQ.
