@@ -168,7 +168,7 @@ class RiskEngine:
         [MODEL 3 REQUEST] Asignación Neuronal Dinámica.
         Wrapper sobre get_neural_allocation + get_adaptive_lots.
         
-        Now includes Black Swan Guard integration for extreme market conditions.
+        Now includes Multi-Level Circuit Breaker (POM) integration.
         """
         allocation = await self.get_neural_allocation(confidence)
         
@@ -177,16 +177,22 @@ class RiskEngine:
             # "Riesgo minimo o cero"
             return 0.01 # Minimum lot
         
-        # Apply Black Swan multiplier (volatility/spread/circuit breaker)
-        if black_swan_multiplier <= 0:
-            logger.warning("[RISK] Black Swan Guard BLOCKED trading")
+        # 1. Get Circuit Breaker Multiplier (POM Protocol)
+        from app.services.circuit_breaker import circuit_breaker
+        cb_multiplier = await circuit_breaker.get_lot_multiplier()
+        
+        # 2. Combine with Black Swan Guard (Physical Guardians)
+        combined_multiplier = black_swan_multiplier * cb_multiplier
+        
+        if combined_multiplier <= 0:
+            logger.warning(f"[RISK] ENTRY BLOCKED: Multiplier={combined_multiplier:.2f} (CB Level: {circuit_breaker.current_level})")
             return 0.0
             
         base_lot = await self.get_adaptive_lots(symbol, sl_points, allocation["lot_multiplier"])
-        final_lot = base_lot * black_swan_multiplier
+        final_lot = base_lot * combined_multiplier
         
-        if black_swan_multiplier < 1.0:
-            logger.info(f"[RISK] Lot adjusted by Black Swan: {base_lot:.2f} → {final_lot:.2f} ({black_swan_multiplier*100:.0f}%)")
+        if combined_multiplier < 1.0:
+            logger.info(f"[RISK] Lot throttled: {base_lot:.2f} → {final_lot:.2f} (POM Multiplier: {combined_multiplier*100:.0f}%)")
         
         return max(0.01, final_lot) if final_lot > 0 else 0.0
 

@@ -181,7 +181,16 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
             exec_price = tick.ask if action == "BUY" else tick.bid
             symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
             sl_points = abs(exec_price - sl) / symbol_info.point
-            volume = await risk_engine.get_adaptive_lots(symbol, int(sl_points))
+            
+            # 1.0.3 POM: Use calculate_dynamic_lot to internalize CB Levels & Multipliers
+            # We pass black_swan_multiplier=1.0 because VolatilityGuard/SpreadFilter already vetted the entry above.
+            volume = await risk_engine.calculate_dynamic_lot(
+                confidence=urgency_score, # Mapping urgency to confidence for sizing
+                volatility=0.0,           # Placeholders - risk_engine will fetch if needed
+                symbol=symbol,
+                sl_points=int(sl_points),
+                black_swan_multiplier=1.0
+            )
             span.set_attribute("adaptive_volume", volume)
 
         # 1. VALIDACIN INTELIGENTE (SMART GUARDRAILS)

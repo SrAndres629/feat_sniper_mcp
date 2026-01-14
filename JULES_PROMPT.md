@@ -1,8 +1,32 @@
+# 🏛️ PROTOCOLO DE ORQUESTACIÓN MAESTRA (POM) - 2026
+
+Como **Arquitecto Senior**, tu labor en este ecosistema multi-IA es:
+
+1.  **Validación de Blueprint**: Antes de cada implementación pesada (ej. Multi-Level Circuit Breaker), debes validar que el diseño no viola la causalidad estadística ni la integridad de la cadena FEAT.
+2.  **Auditoría Alpha**: Verificar que los refactors (como el de `itertuples()`) no solo optimizan código, sino que mejoran el EV (Expected Value).
+3.  **Handoff de Ejecución**: Cuando apruebes un diseño, Antigravity proporcionará el contexto al **Gemini CLI** para la codificación quirúrgica.
+
+## 🎯 OBJETIVO INMEDIATO: MULTI-LEVEL CIRCUIT BREAKER
+Diseña la estructura de protección por drawdown escalonado (2%/4%/6%) asegurando que:
+- El nivel 1 reduzca lotaje.
+- El nivel 3 ejecute el 'Order 66' (Cierre total).
+- La lógica sea resistente a reconexiones accidentales de MT5.
+
+---
+
+## 🛰️ REPORTE DE ESTADO ACTUAL
+- **Rendimiento**: Refactor de `itertuples()` completado en historia y calendario.
+- **Guardianes**: `VolatilityGuard` y `SpreadFilter` operativos.
+- **Protocolo**: Activo en modo "Neural Orchestrator".
+
+---
+
 <instruction>You are an expert software engineer. You are working on a WIP branch. Please run `git status` and `git diff` to understand the changes and the current state of the code. Analyze the workspace context and complete the mission brief.</instruction>
 <workspace_context>
 <artifacts>
 --- CURRENT TASK CHECKLIST ---
 # Task: Fix Race Conditions, TTL & Retry in MT5 Execution
+...
 
 ## PHASE 1: Core MT5 Atomic Execution
 - [x] Add `execute_atomic()` method to `mt5_conn.py`
@@ -133,20 +157,6 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
     decision_ts = getattr(order_data, 'decision_ts', None)
     if decision_ts:
         age_ms = (time.time() * 1000) - decision_ts
-        if age_ms > settings.DECISION_TTL_MS:
-            obs_engine.track_order(symbol, action, "TTL_EXPIRED")
-            return ResponseModel(
-                status="error",
-                error=ErrorDetail(code="TTL_EXPIRED", message=f"Decision too old ({age_ms:.0f}ms)")
-            )
-    
-    # ... existing validation ...
-    
-    # NEW: Atomic execution with retry
-    def place_order_atomic(symbol, request_dict, is_buy):
-        """Called inside lock - fetches tick and sends order atomically."""
-        tick = mt5.symbol_info_tick(symbol)
-        if not tick:
             return None
         request_dict["price"] = tick.ask if is_buy else tick.bid
         return mt5.order_send(request_dict)

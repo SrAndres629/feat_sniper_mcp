@@ -40,7 +40,10 @@ class Settings(BaseSettings):
     MESSAGING_BROKER_URL: Optional[str] = None  # For Kafka/RabbitMQ future scaling
     
     # Advanced Risk Management
-    MAX_DAILY_DRAWDOWN_PERCENT: float = 3.0
+    MAX_DAILY_DRAWDOWN_PERCENT: float = 6.0  # Max hard limit
+    CB_LEVEL_1_DD: float = 2.0  # 2% DD -> 25% Lot Reduction
+    CB_LEVEL_2_DD: float = 4.0  # 4% DD -> 75% Lot Reduction
+    CB_LEVEL_3_DD: float = 6.0  # 6% DD -> Total Shutdown
     RISK_PER_TRADE_PERCENT: float = 1.0
     MAX_OPEN_POSITIONS: int = 20  # Increased for multi-asset strategies
     MAX_CORRELATION_LIMIT: float = 0.65 
