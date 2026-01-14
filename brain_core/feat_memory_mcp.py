@@ -1,6 +1,8 @@
 import os
 import logging
 import sys
+import anyio
+import functools
 from fastmcp import FastMCP
 import chromadb
 from chromadb.utils import embedding_functions
@@ -33,37 +35,50 @@ collection = chroma_client.get_or_create_collection(
     embedding_function=sentence_transformer_ef
 )
 
+def _fetch_narratives_thread(db_path: str, days: int) -> List[str]:
+    """Helper to fetch narratives in a thread-safe way (creating new connection)."""
+    db = UnifiedModelDB(db_path)
+    try:
+        return db.get_narrative_history(days=days)
+    finally:
+        db.close()
+
 @mcp.tool()
 async def ingest_memories(days: int = 30):
     """
     Extrae la historia narrativa de la base de datos SQLite y la indexa en la memoria vectorial.
     Llamar periódicamente para mantener la memoria actualizada.
+
+    Thread-Safe / Non-blocking optimization applied.
     """
     logger.info(f"Iniciando ingesta de memorias (últimos {days} días)...")
     
     if not os.path.exists(DB_PATH):
         return f"Error: No se encontró la base de datos en {DB_PATH}"
 
-    db = UnifiedModelDB(DB_PATH)
     try:
-        narratives = db.get_narrative_history(days=days)
+        # Offload blocking SQLite query to a worker thread
+        narratives = await anyio.to_thread.run_sync(_fetch_narratives_thread, DB_PATH, days)
+
         if not narratives:
             return "No se encontraron nuevas memorias narrativas en el periodo especificado."
         
         # Generar IDs únicos basados en timestamp para evitar duplicados en la sesión
         batch_ids = [f"mem_{datetime.now().timestamp()}_{i}" for i in range(len(narratives))]
         
-        collection.add(
-            documents=narratives,
-            ids=batch_ids
+        # Offload blocking ChromaDB insertion (and embedding generation) to a worker thread
+        await anyio.to_thread.run_sync(
+            functools.partial(
+                collection.add,
+                documents=narratives,
+                ids=batch_ids
+            )
         )
         
         return f"Éxito: Se han procesado e indexado {len(narratives)} fragmentos de memoria narrativa en el almacén vectorial."
     except Exception as e:
         logger.error(f"Fallo en la ingesta: {str(e)}")
         return f"Error durante la ingesta: {str(e)}"
-    finally:
-        db.close()
 
 @mcp.tool()
 async def query_memory(question: str):

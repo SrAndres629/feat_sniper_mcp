@@ -510,7 +510,16 @@ class UnifiedModelDB:
         ''', (f'-{days} days',))
         
         for row in cursor.fetchall():
-            ts = row['timestamp'].strftime("%Y-%m-%d %H:%M")
+            ts_val = row['timestamp']
+            if isinstance(ts_val, str):
+                try:
+                    ts_dt = datetime.fromisoformat(ts_val)
+                except ValueError:
+                    ts_dt = datetime.strptime(ts_val, "%Y-%m-%d %H:%M:%S")
+                ts = ts_dt.strftime("%Y-%m-%d %H:%M")
+            else:
+                ts = ts_val.strftime("%Y-%m-%d %H:%M")
+
             narrative = (
                 f"El {ts}, en {row['symbol']} ({row['timeframe']}), el mercado cambió de "
                 f"{row['from_state']} a {row['to_state']} con una confianza del {row['confidence']:.1f}%. "
@@ -530,7 +539,16 @@ class UnifiedModelDB:
         ''', (f'-{days} days',))
         
         for row in cursor.fetchall():
-            ts = row['timestamp'].strftime("%Y-%m-%d %H:%M")
+            ts_val = row['timestamp']
+            if isinstance(ts_val, str):
+                try:
+                    ts_dt = datetime.fromisoformat(ts_val)
+                except ValueError:
+                    ts_dt = datetime.strptime(ts_val, "%Y-%m-%d %H:%M:%S")
+                ts = ts_dt.strftime("%Y-%m-%d %H:%M")
+            else:
+                ts = ts_val.strftime("%Y-%m-%d %H:%M")
+
             narrative = (
                 f"Observación en {ts}: {row['symbol']} en {row['state']}. "
                 f"Score FEAT: {row['feat_score']:.1f}, Compresión: {row['compression']:.2f}, "
