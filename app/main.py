@@ -312,3 +312,85 @@ async def get_system_health():
         status="success",
         data=circuit_breaker.get_status()
     )
+
+# =============================================================================
+# PHASE 14: FEAT INTEGRATION ENDPOINTS
+# =============================================================================
+
+@app.get("/feat/deployment", response_model=ResponseModel[dict])
+async def get_deployment_status():
+    """Estado actual del Deployment Gate y nivel de exposición."""
+    from app.services.deployment_gate import deployment_gate
+    
+    metrics = deployment_gate.get_level_metrics()
+    promotion_check = deployment_gate.check_promotion()
+    
+    return ResponseModel(
+        status="success",
+        data={
+            "current_level": metrics["level"],
+            "exposure_percent": metrics["exposure_pct"],
+            "lot_multiplier": deployment_gate.get_lot_multiplier(),
+            "promotion_eligible": promotion_check["eligible"],
+            "metrics": metrics
+        }
+    )
+
+@app.post("/feat/deployment/promote", response_model=ResponseModel[dict])
+async def promote_deployment():
+    """Promueve al siguiente nivel de deployment si es elegible."""
+    from app.services.deployment_gate import deployment_gate
+    
+    result = deployment_gate.promote()
+    return ResponseModel(
+        status="success" if result.get("success") else "error",
+        data=result
+    )
+
+@app.get("/feat/journal", response_model=ResponseModel[dict])
+async def get_journal_stats():
+    """Estadísticas del Trade Journal."""
+    from app.services.trade_journal import trade_journal
+    
+    stats = trade_journal.get_statistics()
+    exit_analysis = trade_journal.get_exit_analysis()
+    
+    return ResponseModel(
+        status="success",
+        data={
+            "statistics": stats,
+            "exit_reasons": exit_analysis
+        }
+    )
+
+@app.get("/feat/validation", response_model=ResponseModel[dict])
+async def run_statistical_validation():
+    """Ejecuta validación estadística del rendimiento."""
+    from app.services.stat_validator import stat_validator
+    
+    result = stat_validator.run_validation()
+    return ResponseModel(
+        status="success",
+        data=result
+    )
+
+@app.get("/feat/drift", response_model=ResponseModel[dict])
+async def check_model_drift():
+    """Verifica si hay drift en el modelo."""
+    from app.services.drift_monitor import drift_monitor
+    
+    result = drift_monitor.check_drift()
+    return ResponseModel(
+        status="success",
+        data=result
+    )
+
+@app.get("/feat/config", response_model=ResponseModel[dict])
+async def get_feature_config():
+    """Configuración actual del vector de features."""
+    from app.services.feature_config import feature_config
+    
+    return ResponseModel(
+        status="success",
+        data=feature_config.get_config_summary()
+    )
