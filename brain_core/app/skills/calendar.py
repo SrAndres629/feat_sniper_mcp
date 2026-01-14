@@ -44,17 +44,17 @@ async def get_economic_calendar(req: CalendarRequest) -> Dict[str, Any]:
     
     # Limpiar y formatear para el LLM
     results = []
-    for _, row in df.iterrows():
+    for row in df.itertuples():
         # Obtener nombres descriptivos (opcionalmente podramos llamar a calendar_countries_get)
         results.append({
-            "id": int(row['id']),
-            "time": datetime.fromtimestamp(row['time']).strftime('%Y-%m-%d %H:%M:%S'),
-            "currency": row['currency'],
-            "event_name": row['event_name'] if 'event_name' in row else f"Event ID {row['event_id']}",
-            "importance": row['importance'],
-            "actual": row['actual'] if 'actual' in row else None,
-            "forecast": row['forecast'] if 'forecast' in row else None,
-            "prev": row['prev'] if 'prev' in row else None
+            "id": int(row.id),
+            "time": datetime.fromtimestamp(row.time).strftime('%Y-%m-%d %H:%M:%S'),
+            "currency": row.currency,
+            "event_name": row.event_name if hasattr(row, 'event_name') else f"Event ID {row.event_id}",
+            "importance": row.importance,
+            "actual": row.actual if hasattr(row, 'actual') else None,
+            "forecast": row.forecast if hasattr(row, 'forecast') else None,
+            "prev": row.prev if hasattr(row, 'prev') else None
         })
         
     return {

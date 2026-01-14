@@ -56,13 +56,13 @@ async def get_trade_history(req: HistoryRequest) -> Dict[str, Any]:
     
     # Limpiar deals para respuesta
     deals_list = []
-    for _, row in df_out.tail(20).iterrows(): # Solo los ltimos 20 para no saturar contexto
+    for row in df_out.tail(20).itertuples(): # Solo los ltimos 20 para no saturar contexto
         deals_list.append({
-            "ticket": int(row['ticket']),
-            "symbol": row['symbol'],
-            "profit": float(row['profit']),
-            "time": datetime.fromtimestamp(row['time']).strftime('%Y-%m-%d %H:%M:%S'),
-            "comment": row['comment']
+            "ticket": int(row.ticket),
+            "symbol": row.symbol,
+            "profit": float(row.profit),
+            "time": datetime.fromtimestamp(row.time).strftime('%Y-%m-%d %H:%M:%S'),
+            "comment": row.comment
         })
         
     return {
