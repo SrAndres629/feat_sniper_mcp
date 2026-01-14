@@ -321,3 +321,134 @@ asyncio.exceptions.CancelledError
 2026-01-13 22:33:43,651 | INFO | docket.worker | * trace(message: str, ...)
 2026-01-13 22:33:43,652 | INFO | docket.worker | * fail(message: str, ...)
 2026-01-13 22:33:43,652 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-13 18:40:13,131 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-13 18:40:13,973 | INFO | MT5_Bridge.RAGMemory | RAGMemory Singleton inicializado (lazy load).
+2026-01-13 18:40:14,807 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-13 18:40:14,830 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-13 18:40:16,975 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: None)...
+2026-01-13 18:40:16,986 | INFO | MT5_Bridge.Core |  MetaTrader 5 Connection Established.
+2026-01-13 18:40:16,986 | INFO | MT5_Bridge.Core | Watchdog de conexin MT5 iniciado.
+2026-01-13 18:40:17,000 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge LISTENING on tcp://0.0.0.0:5555
+2026-01-13 18:40:17,129 | INFO | docket.worker | Starting worker 'Zhepy#2036' with the following tasks:
+2026-01-13 18:40:17,129 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-13 18:40:17,129 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-13 18:40:17,129 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-13 18:58:36,792 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge detenido.
+2026-01-13 18:58:36,792 | INFO | MT5_Bridge.Core | Watchdog de conexin MT5 detenido.
+2026-01-13 18:58:36,792 | INFO | MT5_Bridge.Core | Cerrando conexin con MT5...
+2026-01-13 18:58:36,792 | ERROR | asyncio | Exception in callback _AsyncSocket._deserialize.<locals>._chain() at c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\zmq\_future.py:341
+handle: <Handle _AsyncSocket._deserialize.<locals>._chain() at c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\zmq\_future.py:341>
+Traceback (most recent call last):
+  File "C:\Users\acord\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\zmq\_future.py", line 355, in _chain
+    if recvd.exception():
+       ~~~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+2026-01-13 18:58:36,795 | INFO | MT5_Bridge.Core |  MT5 desconectado.
+2026-01-13 19:56:31,258 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-13 20:00:05,950 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-13 20:04:33,715 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-13 20:18:02,422 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-13 20:24:31,083 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-13 20:24:34,117 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-13 20:24:34,153 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-13 20:29:38,223 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-13 20:29:40,489 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-13 20:29:40,496 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-14 00:33:26,944 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-14 00:33:27,629 | INFO | feat.chain | 🧠 FEAT Logic Chain Assembled (F->E->A->T)
+2026-01-14 00:33:29,459 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-14 00:33:29,985 | INFO | MT5_Bridge.Core | Linux/Docker environment detected. Skipping local MT5 init. Entering Passive Mode.
+2026-01-14 00:33:30,232 | INFO | docket.worker | Starting worker '652c6abab7b3#1' with the following tasks:
+2026-01-14 00:33:30,243 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-14 00:33:30,245 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-14 00:33:30,246 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-14 08:09:58,715 | INFO | MT5_Bridge.Core | Cerrando conexin con MT5...
+2026-01-14 08:09:58,752 | INFO | MT5_Bridge.Core |  MT5 desconectado.
+2026-01-14 04:13:56,485 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-14 04:13:58,132 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-14 04:13:58,141 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-14 04:15:02,047 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-14 04:15:02,622 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (F->E->A->T)
+2026-01-14 04:15:03,527 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-14 04:15:03,533 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-14 04:15:05,725 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: None)...
+2026-01-14 04:15:10,432 | INFO | MT5_Bridge.Core |  MetaTrader 5 Connection Established.
+2026-01-14 04:15:10,433 | INFO | MT5_Bridge.Core | Watchdog de conexin MT5 iniciado.
+2026-01-14 04:15:10,505 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-14 04:15:10,537 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge LISTENING on tcp://0.0.0.0:5555
+2026-01-14 04:15:10,720 | INFO | docket.worker | Starting worker 'Zhepy#25308' with the following tasks:
+2026-01-14 04:15:10,721 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-14 04:15:10,721 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-14 04:15:10,721 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-14 04:17:13,009 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-14 04:17:13,508 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (F->E->A->T)
+2026-01-14 04:17:14,354 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-14 04:17:14,366 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-14 04:17:16,255 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: None)...
+2026-01-14 04:17:16,272 | INFO | MT5_Bridge.Core |  MetaTrader 5 Connection Established.
+2026-01-14 04:17:16,273 | INFO | MT5_Bridge.Core | Watchdog de conexin MT5 iniciado.
+2026-01-14 04:17:16,280 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-14 04:17:16,306 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge LISTENING on tcp://0.0.0.0:5555
+2026-01-14 04:17:16,374 | INFO | docket.worker | Starting worker 'Zhepy#24828' with the following tasks:
+2026-01-14 04:17:16,374 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-14 04:17:16,374 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-14 04:17:16,374 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-14 04:20:05,313 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-14 04:20:05,886 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (F->E->A->T)
+2026-01-14 04:20:06,989 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-14 04:20:07,006 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-14 04:20:09,139 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: None)...
+2026-01-14 04:20:09,152 | INFO | MT5_Bridge.Core |  MetaTrader 5 Connection Established.
+2026-01-14 04:20:09,153 | INFO | MT5_Bridge.Core | Watchdog de conexin MT5 iniciado.
+2026-01-14 04:20:09,165 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-14 04:20:09,220 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge LISTENING on tcp://0.0.0.0:5555
+2026-01-14 04:20:09,305 | INFO | docket.worker | Starting worker 'Zhepy#32364' with the following tasks:
+2026-01-14 04:20:09,306 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-14 04:20:09,306 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-14 04:20:09,306 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-14 04:21:11,872 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-14 04:21:12,416 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (F->E->A->T)
+2026-01-14 04:21:13,332 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-14 04:21:13,338 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-14 04:21:15,378 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: None)...
+2026-01-14 04:21:15,391 | INFO | MT5_Bridge.Core |  MetaTrader 5 Connection Established.
+2026-01-14 04:21:15,392 | INFO | MT5_Bridge.Core | Watchdog de conexin MT5 iniciado.
+2026-01-14 04:21:15,403 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-14 04:21:15,431 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge LISTENING on tcp://0.0.0.0:5555
+2026-01-14 04:21:15,504 | INFO | docket.worker | Starting worker 'Zhepy#12088' with the following tasks:
+2026-01-14 04:21:15,505 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-14 04:21:15,505 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-14 04:21:15,505 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-14 04:23:16,337 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge detenido.
+2026-01-14 04:23:16,337 | INFO | MT5_Bridge.Core | Watchdog de conexin MT5 detenido.
+2026-01-14 04:23:16,337 | INFO | MT5_Bridge.Core | Cerrando conexin con MT5...
+2026-01-14 04:23:16,337 | ERROR | asyncio | Exception in callback _AsyncSocket._deserialize.<locals>._chain() at c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\zmq\_future.py:341
+handle: <Handle _AsyncSocket._deserialize.<locals>._chain() at c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\zmq\_future.py:341>
+Traceback (most recent call last):
+  File "C:\Users\acord\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\zmq\_future.py", line 355, in _chain
+    if recvd.exception():
+       ~~~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+2026-01-14 04:23:16,341 | INFO | MT5_Bridge.Core |  MT5 desconectado.
+2026-01-14 04:23:31,664 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-14 04:23:32,084 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (F->E->A->T)
+2026-01-14 04:23:32,856 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-14 04:23:32,861 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-14 04:23:34,466 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: None)...
+2026-01-14 04:23:34,477 | INFO | MT5_Bridge.Core |  MetaTrader 5 Connection Established.
+2026-01-14 04:23:34,478 | INFO | MT5_Bridge.Core | Watchdog de conexin MT5 iniciado.
+2026-01-14 04:23:34,480 | INFO | feat.market_physics | [SATELLITE] Market Physics Engine Online (Numpy Accelerated)
+2026-01-14 04:23:34,481 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-14 04:23:34,487 | INFO | feat.brain.inference | [BRAIN] Neural Link Initialized
+2026-01-14 04:23:34,502 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge LISTENING on tcp://0.0.0.0:5555
+2026-01-14 04:23:34,502 | INFO | feat.trade_mgmt | [EXECUTION] Trade Manager Online (Execution Arm)
+2026-01-14 04:23:34,559 | INFO | docket.worker | Starting worker 'Zhepy#19480' with the following tasks:
+2026-01-14 04:23:34,560 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-14 04:23:34,560 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-14 04:23:34,560 | INFO | docket.worker | * sleep(seconds: float, ...)

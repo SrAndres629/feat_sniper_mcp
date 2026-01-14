@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Any
 import os
 
 class HybridFEATNetwork(nn.Module):
@@ -138,3 +138,54 @@ def load_hybrid_model(path: str = "models/feat_hybrid_v2.pth") -> HybridFEATNetw
         return model
     except FileNotFoundError:
         return None
+
+class HybridModel:
+    """
+    Local Wrapper for HybridFEATNetwork.
+    Bypasses Docker dependency by running PyTorch locally.
+    """
+    def __init__(self, model_path: str = "models/feat_hybrid_v2.pth"):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.net = load_hybrid_model(model_path)
+        
+        if not self.net:
+            # Initialize fresh network if no checkpoint
+            self.net = HybridFEATNetwork()
+            
+        self.net.to(self.device)
+        self.net.eval()
+        print(f"🧠 HybridModel Loaded on {self.device}")
+
+    def predict(self, context_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Inference Interface.
+        Converts dictionary data into PyTorch tensors and runs forward pass.
+        """
+        try:
+            # TODO: Real Tensor Construction from FEAT Data.
+            # Currently mocking input for integration testing.
+            
+            # 1. Mock Energy Map (1, 50, 50)
+            energy_map = torch.randn(1, 1, 50, 50).to(self.device)
+            
+            # 2. Mock Dense Features (Batch, 64) - LazyLinear will adapt
+            # If model initialized with 64, we need 64 features.
+            # But LazyLinear adapts on first forward? 
+            # Yes, but we need to match what it expects if loaded.
+            # Assuming 64 dims for now.
+            # 2. Real Dense Features
+            if 'features' in context_data and isinstance(context_data['features'], list):
+                # Convert list to tensor (Batch=1, Dims=10)
+                feat_list = context_data['features']
+                dense_features = torch.tensor([feat_list], dtype=torch.float32).to(self.device)
+            else:
+                # Fallback if no features provided
+                dense_features = torch.randn(1, 10).to(self.device) 
+            
+            # Inference
+            decision = self.net.get_risk_decision(energy_map, dense_features)
+            return decision
+            
+        except Exception as e:
+            print(f"Inference Error: {e}")
+            return {"error": str(e), "execute_trade": False}

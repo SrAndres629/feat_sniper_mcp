@@ -1,0 +1,5960 @@
+{
+  "diagnostic_suite.py": [
+    {
+      "type": "class",
+      "name": "PreFlightQA",
+      "doc": null,
+      "lineno": 20
+    },
+    {
+      "type": "function",
+      "name": "main",
+      "doc": null,
+      "lineno": 132
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 21
+    },
+    {
+      "type": "function",
+      "name": "log_result",
+      "doc": null,
+      "lineno": 30
+    },
+    {
+      "type": "function",
+      "name": "check_infra",
+      "doc": null,
+      "lineno": 36
+    },
+    {
+      "type": "function",
+      "name": "check_neural",
+      "doc": null,
+      "lineno": 67
+    },
+    {
+      "type": "function",
+      "name": "check_execution",
+      "doc": null,
+      "lineno": 93
+    },
+    {
+      "type": "function",
+      "name": "generate_report",
+      "doc": null,
+      "lineno": 118
+    }
+  ],
+  "generate_dummy_models.py": [
+    {
+      "type": "function",
+      "name": "generate_and_train",
+      "doc": null,
+      "lineno": 16
+    }
+  ],
+  "mcp_server.py": [
+    {
+      "type": "function",
+      "name": "app_lifespan",
+      "doc": "Ciclo de vida institucional: MT5 + ZMQ + FEAT + RISK + AI.\nIntegraci\u00f3n total de m\u00f3dulos para Zero Orphans.",
+      "lineno": 235
+    },
+    {
+      "type": "function",
+      "name": "sys_audit_status",
+      "doc": "\ud83d\udee0\ufe0f MASTER TOOL 1: System Audit\nDevuelve salud de Docker, Puertos ZMQ, Memoria y MT5.",
+      "lineno": 312
+    },
+    {
+      "type": "function",
+      "name": "market_get_telemetry",
+      "doc": "\ud83d\udcca MASTER TOOL 2: Market Telemetry\nOHLCV + Fractales (Capas 1-4) + Indicadores + Liquidez en un solo JSON.",
+      "lineno": 339
+    },
+    {
+      "type": "function",
+      "name": "brain_run_inference",
+      "doc": "\ud83e\udde0 MASTER TOOL 3: Neural Inference\nEjecuta modelo h\u00edbrido (GBM+LSTM) y devuelve predicci\u00f3n con confianza.",
+      "lineno": 359
+    },
+    {
+      "type": "function",
+      "name": "risk_analyze_trade",
+      "doc": "\ud83d\udcb0 MASTER TOOL 4: Risk Analysis\nConsulta la B\u00f3veda y devuelve lotaje aprobado basado en riesgo.",
+      "lineno": 383
+    },
+    {
+      "type": "function",
+      "name": "trade_execute_order",
+      "doc": "\ud83d\udd2b MASTER TOOL 5: Trade Execution\nUnifica Buy/Sell/Limit/Modify/Close en una sola herramienta.\n\nActions: BUY, SELL, BUY_LIMIT, SELL_LIMIT, MODIFY, CLOSE, CLOSE_ALL\nParams: symbol, volume, price, sl, tp, ticket (para modify/close)",
+      "lineno": 413
+    },
+    {
+      "type": "function",
+      "name": "trade_get_history",
+      "doc": "\ud83d\udcdc MASTER TOOL 6: Trade History\nDevuelve historial y performance.\n\nFilters: TODAY, WEEK, MONTH, ALL",
+      "lineno": 451
+    },
+    {
+      "type": "function",
+      "name": "visual_update_hud",
+      "doc": "\ud83d\udc41\ufe0f MASTER TOOL 7: HUD Update\nManda datos al Dashboard de MT5 o retorna estado visual.",
+      "lineno": 474
+    },
+    {
+      "type": "function",
+      "name": "data_manage_memory",
+      "doc": "\ud83d\udcc2 MASTER TOOL 8: Memory Management (RAG)\nGuardar/Cargar/Limpiar memoria a largo plazo.\n\nActions: SAVE, LOAD, CLEAR, STATS\nParams: text, category, query, limit",
+      "lineno": 491
+    },
+    {
+      "type": "function",
+      "name": "config_update_parameters",
+      "doc": "\u2699\ufe0f MASTER TOOL 9: Config Update\nAjustar constantes del sistema en caliente.\n\nParams: risk_percent, max_positions, shadow_mode, etc.",
+      "lineno": 530
+    },
+    {
+      "type": "function",
+      "name": "sys_emergency_stop",
+      "doc": "\ud83d\udea8 MASTER TOOL 10: Emergency Stop\nKill switch. Cierra todas las posiciones y cancela \u00f3rdenes pendientes.",
+      "lineno": 558
+    },
+    {
+      "type": "function",
+      "name": "on_zmq_message",
+      "doc": null,
+      "lineno": 255
+    }
+  ],
+  "mcp_server_backup_v1.py": [
+    {
+      "type": "function",
+      "name": "get_correlation_id",
+      "doc": null,
+      "lineno": 78
+    },
+    {
+      "type": "function",
+      "name": "pulse_observer",
+      "doc": null,
+      "lineno": 82
+    },
+    {
+      "type": "function",
+      "name": "app_lifespan",
+      "doc": "Maneja el ciclo de vida institucional: MT5 + ZMQ Bridge.",
+      "lineno": 148
+    },
+    {
+      "type": "function",
+      "name": "create_and_compile_indicator",
+      "doc": "Escribe y compila un nuevo indicador .mq5. \nRetorna el log de compilacin para auto-correccin.",
+      "lineno": 238
+    },
+    {
+      "type": "function",
+      "name": "get_market_snapshot",
+      "doc": "Radiografa completa del mercado: Precio, Vela actual, Volatilidad y Cuenta.\nIdeal para decisiones de alta frecuencia.",
+      "lineno": 252
+    },
+    {
+      "type": "function",
+      "name": "get_candles",
+      "doc": "Obtiene velas histricas (OHLCV).",
+      "lineno": 260
+    },
+    {
+      "type": "function",
+      "name": "get_market_panorama",
+      "doc": "Captura visual del grfico.",
+      "lineno": 265
+    },
+    {
+      "type": "function",
+      "name": "get_fractal_physics",
+      "doc": "Analiza la 'F\u00edsica de Capas' del mercado:\n- L1_Width: Compresi\u00f3n de ruido (Baja = Explosi\u00f3n inminente).\n- Div_L1_L2: Divergencia estructural (Estiramiento).\n- L4_Slope: Sesgo de gravedad macro.",
+      "lineno": 271
+    },
+    {
+      "type": "function",
+      "name": "get_trade_decision",
+      "doc": "Decisin de trading integrada para N8N.\n\nCombina ML (GBM/LSTM) + FEAT Score + FSM State + Indicadores\npara generar una seal unificada con contexto completo.\n\nReturns:\n    JSON con signal, confidence, market_state, data_context",
+      "lineno": 312
+    },
+    {
+      "type": "function",
+      "name": "get_full_market_context",
+      "doc": " SUPER ENDPOINT PARA N8N (SSH Gateway).\n\nConsolida TODO en un nico JSON para que el Agente N8N tome decisiones\nbasadas en la estrategia FEAT completa, no en datos crudos.\n\nIncluye:\n- raw_data: OHLCV actual\n- indicators: FEAT, PVP, EMAs\n- ml_insight: Prediccin + Explicabilidad\n- memory_context: Recuerdos RAG relevantes\n- strategy_guidance: Prompt sugerido para N8N",
+      "lineno": 412
+    },
+    {
+      "type": "function",
+      "name": "_get_top_drivers",
+      "doc": "Extrae los factores principales que influyen en la prediccin.",
+      "lineno": 581
+    },
+    {
+      "type": "function",
+      "name": "_generate_explanation",
+      "doc": "Genera explicacin legible para el agente N8N.",
+      "lineno": 604
+    },
+    {
+      "type": "function",
+      "name": "_get_market_session",
+      "doc": "Detecta la sesin actual y killzones institucionales (UTC).",
+      "lineno": 617
+    },
+    {
+      "type": "function",
+      "name": "run_shadow_backtest",
+      "doc": "Ejecuta una prueba de estrategia en segundo plano usando el Strategy Tester de MT5.",
+      "lineno": 644
+    },
+    {
+      "type": "function",
+      "name": "execute_twin_entry",
+      "doc": "Ejecuta la estrategia Hybrid Twin-Engine.\nAbre 2 operaciones simultneas: Scalp ($2 TP) + Swing ($10+ TP).\nSi no hay margen suficiente, solo abre el Scalp.",
+      "lineno": 669
+    },
+    {
+      "type": "function",
+      "name": "get_twin_engine_status",
+      "doc": "Obtiene el estado actual del motor Twin-Engine.\nIncluye asignacin de capital Scalp vs Swing.",
+      "lineno": 687
+    },
+    {
+      "type": "function",
+      "name": "query_unified_brain",
+      "doc": "Consulta la base de datos de conocimiento unificado (Unified Model).\nSolo permite SELECT.",
+      "lineno": 709
+    },
+    {
+      "type": "function",
+      "name": "execute_trade",
+      "doc": "Ejecuta rdenes: BUY, SELL, LIMIT, STOP.",
+      "lineno": 721
+    },
+    {
+      "type": "function",
+      "name": "manage_trade",
+      "doc": "Gestiona posiciones: CLOSE, MODIFY_SL_TP, DELETE.",
+      "lineno": 728
+    },
+    {
+      "type": "function",
+      "name": "get_account_status",
+      "doc": "Estado financiero de la cuenta.",
+      "lineno": 735
+    },
+    {
+      "type": "function",
+      "name": "get_economic_calendar",
+      "doc": "Eventos econmicos de alto impacto prximos.",
+      "lineno": 740
+    },
+    {
+      "type": "function",
+      "name": "get_financial_performance",
+      "doc": "Obtiene el rendimiento financiero detallado para el Dashboard.\nIncluye PnL Diario, Ganancia por Hora y Diario de Operaciones.",
+      "lineno": 746
+    },
+    {
+      "type": "function",
+      "name": "get_profit_velocity",
+      "doc": "Calcula la velocidad de ganancia ($/Hora) de la sesin actual.\nFrmula: (Beneficio Total Sesin) / (Horas Transcurridas desde el inicio del da).",
+      "lineno": 799
+    },
+    {
+      "type": "function",
+      "name": "remember",
+      "doc": "Almacena informacin en memoria permanente RAG.\nLas memorias persisten entre reinicios del contenedor.\n\nCategoras sugeridas: analysis, trade, news, pattern, lesson, config",
+      "lineno": 827
+    },
+    {
+      "type": "function",
+      "name": "recall",
+      "doc": "Busca informacin relevante en memoria RAG usando bsqueda semntica.\nRetorna los documentos ms similares a la query.",
+      "lineno": 839
+    },
+    {
+      "type": "function",
+      "name": "forget",
+      "doc": "Elimina todas las memorias de una categora especfica.\ntil para limpiar informacin obsoleta.",
+      "lineno": 853
+    },
+    {
+      "type": "function",
+      "name": "memory_stats",
+      "doc": "Obtiene estadsticas de la memoria RAG.",
+      "lineno": 863
+    },
+    {
+      "type": "function",
+      "name": "system_check",
+      "doc": "Revisa la salud del servidor (CPU, RAM, Disco).\ntil para auto-diagnstico antes de operaciones pesadas.",
+      "lineno": 879
+    },
+    {
+      "type": "function",
+      "name": "system_environment",
+      "doc": "Obtiene informacin del entorno de ejecucin.",
+      "lineno": 889
+    },
+    {
+      "type": "function",
+      "name": "system_cleanup",
+      "doc": "Limpia caches de Python para liberar memoria.",
+      "lineno": 898
+    },
+    {
+      "type": "function",
+      "name": "ml_predict",
+      "doc": "Genera prediccin ML usando ensemble GBM+LSTM.\nShadow Mode por defecto (no ejecuta, solo predice).\n\nArgs:\n    features: Dict con close, rsi, ema_fast, ema_slow, volume, feat_score, fsm_state, etc.\n    symbol: Par de divisas (Asset Identity Protocol).",
+      "lineno": 911
+    },
+    {
+      "type": "function",
+      "name": "ml_status",
+      "doc": "Estado del sistema ML: modelos cargados, modo, etc.",
+      "lineno": 925
+    },
+    {
+      "type": "function",
+      "name": "ml_collect_sample",
+      "doc": "Recolecta muestra para training dataset con Oracle labeling.\n\nArgs:\n    symbol: Par de divisas\n    candle: Dict con open, high, low, close, volume\n    indicators: Dict con RSI, EMAs, FEAT score, FSM state, etc.",
+      "lineno": 934
+    },
+    {
+      "type": "function",
+      "name": "ml_train",
+      "doc": "Entrena modelos GBM y LSTM si hay datos suficientes.\nRequiere 1000+ muestras etiquetadas.",
+      "lineno": 948
+    },
+    {
+      "type": "function",
+      "name": "ml_enable_execution",
+      "doc": "(PELIGROSO) Activa/desactiva ejecucin real de rdenes.\nSolo usar despus de verificar predicciones en Shadow Mode.",
+      "lineno": 958
+    },
+    {
+      "type": "function",
+      "name": "get_system_health",
+      "doc": " HEALTH PULSE (Institutional Status)\nRadiografa completa de la salud del ecosistema FEAT NEXUS.",
+      "lineno": 968
+    },
+    {
+      "type": "function",
+      "name": "get_market_state_tensor",
+      "doc": " FEAT-DEEP: Returns the Multi-Temporal Market State Tensor.\nLayers: Macro (H4), Structural (H1/M15), Execution (M5/M1).\nIncludes alignment score and kill zone status.",
+      "lineno": 1008
+    },
+    {
+      "type": "function",
+      "name": "get_h4_veto_status",
+      "doc": " FEAT-DEEP VETO RULE: Checks if a M1/M5 signal is allowed.\nReturns ALLOW or VETO based on H4 trend alignment.\n\nPhilosophy: M1 is noise, H4 is truth. No counter-trend trading.",
+      "lineno": 1034
+    },
+    {
+      "type": "function",
+      "name": "get_kill_zone_status",
+      "doc": " FEAT-DEEP: Returns current Kill Zone status.\nNY: 07:00-11:00 UTC-4 (Best for XAUUSD)",
+      "lineno": 1068
+    },
+    {
+      "type": "function",
+      "name": "get_liquidity_pools",
+      "doc": " FEAT-DEEP: Detects institutional liquidity pools.\nReturns unmitigated Swing Highs/Lows that act as price magnets.",
+      "lineno": 1086
+    },
+    {
+      "type": "function",
+      "name": "feat_check_tiempo",
+      "doc": " FEAT Module T: Tiempo (Kill Switch #1)\nVerifica Kill Zones, alineacin H4, y filtro de noticias.",
+      "lineno": 1115
+    },
+    {
+      "type": "function",
+      "name": "feat_check_tiempo_advanced",
+      "doc": " FEAT Module T ADVANCED: Ciclo Diario de Liquidez XAU/USD\n\nAnaliza fases de liquidez institucional por hora:\n- ASIA_OVERNIGHT, PRE_LONDON, LONDON_KILLZONE, NY_KILLZONE, etc.\n- Intensidad: LOW/MEDIUM/HIGH/VERY_HIGH\n- Modos: WAIT/PREPARE/EXECUTE/MANAGE",
+      "lineno": 1130
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_chrono_features",
+      "doc": " FEAT CHRONO-ANALYST: Genera features numricas para ML.\n\nNO hay kill switches - solo probabilidades y multiplicadores de riesgo.\nIncluye: ciclo semanal, liquidez, volatilidad, proximidad H4.",
+      "lineno": 1150
+    },
+    {
+      "type": "function",
+      "name": "feat_analyze_tiempo_institucional",
+      "doc": " FEAT TIEMPO INSTITUCIONAL: Anlisis completo para GC/XAU.\n\nIntegra:\n- Sesiones: Globex, Asia/SGE, London, NY Overlap\n- LBMA/SGE Fixes (AM/PM benchmarks)\n- Alignment D1+H4+H1 con size multiplier\n- Entry Templates: Confirmation/Post-Fix/Sweep\n\nRetorna checklist institucional completo.",
+      "lineno": 1167
+    },
+    {
+      "type": "function",
+      "name": "feat_get_current_killzone_block",
+      "doc": " KILLZONE BLOCK: Obtiene el bloque actual de 15 minutos (09:00-13:00 Bolivia).\n\n16 bloques con:\n- session_heat (0.0-1.0)\n- expansion_probability\n- liquidity_state (FSM)\n- action_recommendation\n\nPEAK BLOCK: 09:30-09:44 ",
+      "lineno": 1196
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_temporal_ml_features",
+      "doc": " TEMPORAL ML FEATURES: Genera vector de features para red neuronal.\n\nIncluye:\n- session_heat, expansion_prob (priors)\n- alignment_factor (-1.0 to +1.0)\n- posterior_probability (Bayesian)\n- liquidity_state one-hot",
+      "lineno": 1214
+    },
+    {
+      "type": "function",
+      "name": "feat_check_h1_confirmation",
+      "doc": " H1 CONFIRMATION: Verifica nivel de confirmacin H1.\n\nReglas:\n- Close fuera del nivel\n- Retest 5-30 min con rechazo\n- Volume  1.3x\n- Killzone boost\n\nRetorna: level, score, proceed",
+      "lineno": 1238
+    },
+    {
+      "type": "function",
+      "name": "feat_update_bayesian_prior",
+      "doc": " UPDATE PRIOR: Actualiza prior bayesiano basado en resultado.\n\nLlamar despus de cada trade para aprendizaje adaptativo.\nSi accuracy < 40% por 5 das  reduce prior automticamente.",
+      "lineno": 1266
+    },
+    {
+      "type": "function",
+      "name": "feat_get_bayesian_priors",
+      "doc": " GET PRIORS: Obtiene todos los priors bayesianos actuales.\n\nMuestra expansion_prob y confidence por cada bloque de 15-min.",
+      "lineno": 1279
+    },
+    {
+      "type": "function",
+      "name": "feat_analyze_forma",
+      "doc": " FEAT Module F: Forma (Market Structure)\nDetecta tendencia, BOS/CHoCH, y fases Wyckoff.",
+      "lineno": 1295
+    },
+    {
+      "type": "function",
+      "name": "feat_analyze_forma_advanced",
+      "doc": " FEAT Module F ADVANCED: Estructura Chrono-Aware\n\nIntegra contexto temporal para validar BOS/CHoCH:\n- Detecta trampas de Lunes (INDUCTION)\n- SWEEP detection (mechas sin cierre)\n- Spring/Upthrust Wyckoff",
+      "lineno": 1310
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_structure_features",
+      "doc": " FEAT STRUCTURE ML: Genera features numricas de estructura.\n\nOutput listo para red neuronal: alignment_score, trend flags, event flags.",
+      "lineno": 1330
+    },
+    {
+      "type": "function",
+      "name": "feat_map_espacio",
+      "doc": " FEAT Module E: Espacio (Liquidity Zones)\nDetecta FVG, Order Blocks, y Premium/Discount zones.",
+      "lineno": 1348
+    },
+    {
+      "type": "function",
+      "name": "feat_map_espacio_advanced",
+      "doc": " FEAT Module E ADVANCED: Zonas Chrono-Aware\n\nIntegra contexto temporal para validar calidad de zonas:\n- Zonas de Kill Zone tienen +20% score\n- Zonas de Lunes (INDUCTION) tienen -40% score",
+      "lineno": 1363
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_liquidity_features",
+      "doc": "FEAT LIQUIDITY ML: Genera features de liquidez.",
+      "lineno": 1381
+    },
+    {
+      "type": "function",
+      "name": "feat_analyze_physics",
+      "doc": "FEAT PHYSICS: Analiza Masas y Movimientos.\n\nRetorna:\n- PVP Vectorial (POC, VAH, VAL, Skew)\n- MCI (Manipulation Index)\n- Liquidity Primitives (Pools, Sweeps)",
+      "lineno": 1399
+    },
+    {
+      "type": "function",
+      "name": "feat_get_energy_map",
+      "doc": "FEAT ENERGY MAP: Genera el tensor de energ\u00eda institucional (Density * Kinetic * Flow).",
+      "lineno": 1426
+    },
+    {
+      "type": "function",
+      "name": "feat_get_risk_parameters",
+      "doc": "FEAT RISK ENGINE: Retorna TP/SL din\u00e1micos y probabilidad para cBot (C#).",
+      "lineno": 1441
+    },
+    {
+      "type": "function",
+      "name": "feat_get_structure_analysis",
+      "doc": "FEAT STRUCTURE ENGINE: Analiza la estructura institucional (FourJarvis).\nCalcula scores de Forma (F), Espacio (E), Aceleraci\u00f3n (A) y Tiempo (T).",
+      "lineno": 1460
+    },
+    {
+      "type": "function",
+      "name": "feat_analyze_acceleration",
+      "doc": "FEAT ACCELERATION: Analiza el momento e intenci\u00f3n final (Gatillo).\nRetorna score de aceleraci\u00f3n, tipo (breakout/rejection/climax) y trigger.",
+      "lineno": 1479
+    },
+    {
+      "type": "function",
+      "name": "feat_detect_regime",
+      "doc": "FEAT REGIME FSM: Clasifica Estado del Mercado (0-1).\n\nEstados:\n- ACCUMULATION (Low Entropy)\n- MANIPULATION (Trap)\n- EXPANSION_REAL (Trend)\n- EXPANSION_FAKE (Failed Breakout)",
+      "lineno": 1495
+    },
+    {
+      "type": "function",
+      "name": "feat_validate_aceleracion",
+      "doc": "FEAT Module A: Aceleracion (Momentum Validation)\nValida Body/Wick, volumen, y detecta fakeouts.",
+      "lineno": 1516
+    },
+    {
+      "type": "function",
+      "name": "feat_validate_aceleracion_advanced",
+      "doc": "FEAT Module A ADVANCED: Momentum Chrono-Aware\n\nExecution probability ajustada por ciclo temporal:\n- Kill Zone: +15% momentum score\n- INDUCTION (Lunes): -30% momentum score\n- Fakeout y Exhaustion detection",
+      "lineno": 1531
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_momentum_features",
+      "doc": "FEAT MOMENTUM ML: Genera features de momentum para red neuronal.",
+      "lineno": 1550
+    },
+    {
+      "type": "function",
+      "name": "feat_full_chain",
+      "doc": "FEAT COMPLETE CHAIN: Ejecuta T -> F -> E -> A en secuencia.\nSi cualquier modulo falla, la cadena se detiene (Kill Switch).\nRetorna senal de trading si todo pasa.",
+      "lineno": 1565
+    },
+    {
+      "type": "function",
+      "name": "feat_full_chain_institucional",
+      "doc": "FEAT CHAIN INSTITUCIONAL: Pipeline completo MIP.\n\n6 Stages:\n1. TIEMPO -> Session, fixes, D1/H4/H1 alignment\n2. FORMA -> BOS/CHoCH, sweeps, structure  \n3. ESPACIO -> FVG, OB, Premium/Discount\n4. ACELERACION -> Momentum, fakeout, volume\n5. FUSION -> MTF weighted probability\n6. LIQUIDITY -> DoM preflight\n\nRetorna probabilidad 0.0-1.0 y trade_params si >0.55",
+      "lineno": 1591
+    },
+    {
+      "type": "function",
+      "name": "feat_deep_audit",
+      "doc": "MASTER AUDIT: Deep inspection of FEAT NEXUS ecosystem.\nChecks: Connectivity, Intelligence (ML), Sensors (MSS-5), and Data Flow.",
+      "lineno": 1626
+    },
+    {
+      "type": "function",
+      "name": "feat_analyze_acceptance",
+      "doc": "KIV PROTOCOL: Analyze Acceptance Ratio (Body vs Wick).\nIf zone_price is provided, validates Conquest vs Probe.",
+      "lineno": 1635
+    },
+    {
+      "type": "function",
+      "name": "on_zmq_message",
+      "doc": null,
+      "lineno": 154
+    },
+    {
+      "type": "function",
+      "name": "monitor_risk_loop",
+      "doc": null,
+      "lineno": 184
+    },
+    {
+      "type": "function",
+      "name": "wrapper",
+      "doc": null,
+      "lineno": 86
+    },
+    {
+      "type": "function",
+      "name": "wrapper",
+      "doc": null,
+      "lineno": 104
+    }
+  ],
+  "mcp_server_v2.py": [
+    {
+      "type": "function",
+      "name": "app_lifespan",
+      "doc": "Ciclo de vida institucional: MT5 + ZMQ.",
+      "lineno": 72
+    },
+    {
+      "type": "function",
+      "name": "sys_audit_status",
+      "doc": "\ud83d\udee0\ufe0f MASTER TOOL 1: System Audit\nDevuelve salud de Docker, Puertos ZMQ, Memoria y MT5.",
+      "lineno": 96
+    },
+    {
+      "type": "function",
+      "name": "market_get_telemetry",
+      "doc": "\ud83d\udcca MASTER TOOL 2: Market Telemetry\nOHLCV + Fractales (Capas 1-4) + Indicadores + Liquidez en un solo JSON.",
+      "lineno": 123
+    },
+    {
+      "type": "function",
+      "name": "brain_run_inference",
+      "doc": "\ud83e\udde0 MASTER TOOL 3: Neural Inference\nEjecuta modelo h\u00edbrido (GBM+LSTM) y devuelve predicci\u00f3n con confianza.",
+      "lineno": 143
+    },
+    {
+      "type": "function",
+      "name": "risk_analyze_trade",
+      "doc": "\ud83d\udcb0 MASTER TOOL 4: Risk Analysis\nConsulta la B\u00f3veda y devuelve lotaje aprobado basado en riesgo.",
+      "lineno": 167
+    },
+    {
+      "type": "function",
+      "name": "trade_execute_order",
+      "doc": "\ud83d\udd2b MASTER TOOL 5: Trade Execution\nUnifica Buy/Sell/Limit/Modify/Close en una sola herramienta.\n\nActions: BUY, SELL, BUY_LIMIT, SELL_LIMIT, MODIFY, CLOSE, CLOSE_ALL\nParams: symbol, volume, price, sl, tp, ticket (para modify/close)",
+      "lineno": 197
+    },
+    {
+      "type": "function",
+      "name": "trade_get_history",
+      "doc": "\ud83d\udcdc MASTER TOOL 6: Trade History\nDevuelve historial y performance.\n\nFilters: TODAY, WEEK, MONTH, ALL",
+      "lineno": 235
+    },
+    {
+      "type": "function",
+      "name": "visual_update_hud",
+      "doc": "\ud83d\udc41\ufe0f MASTER TOOL 7: HUD Update\nManda datos al Dashboard de MT5 o retorna estado visual.",
+      "lineno": 258
+    },
+    {
+      "type": "function",
+      "name": "data_manage_memory",
+      "doc": "\ud83d\udcc2 MASTER TOOL 8: Memory Management (RAG)\nGuardar/Cargar/Limpiar memoria a largo plazo.\n\nActions: SAVE, LOAD, CLEAR, STATS\nParams: text, category, query, limit",
+      "lineno": 275
+    },
+    {
+      "type": "function",
+      "name": "config_update_parameters",
+      "doc": "\u2699\ufe0f MASTER TOOL 9: Config Update\nAjustar constantes del sistema en caliente.\n\nParams: risk_percent, max_positions, shadow_mode, etc.",
+      "lineno": 314
+    },
+    {
+      "type": "function",
+      "name": "sys_emergency_stop",
+      "doc": "\ud83d\udea8 MASTER TOOL 10: Emergency Stop\nKill switch. Cierra todas las posiciones y cancela \u00f3rdenes pendientes.",
+      "lineno": 342
+    },
+    {
+      "type": "function",
+      "name": "on_zmq_message",
+      "doc": null,
+      "lineno": 77
+    }
+  ],
+  "nexus_auditor.py": [
+    {
+      "type": "function",
+      "name": "log",
+      "doc": null,
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "run_cartographer",
+      "doc": null,
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "analyze_map",
+      "doc": null,
+      "lineno": 24
+    },
+    {
+      "type": "function",
+      "name": "check_ports",
+      "doc": null,
+      "lineno": 54
+    }
+  ],
+  "nexus_control.py": [
+    {
+      "type": "class",
+      "name": "TradingState",
+      "doc": "M\u00e1quina de Estados Finita para control Maestro-Aprendiz.\n\n\ud83d\udd34 RECALIBRATION: WinRate < 35% - Trading detenido, LLM diagnostica\n\ud83d\udfe1 SUPERVISED: 35% <= WinRate <= 70% - NN propone, LLM aprueba\n\ud83d\udfe2 AUTONOMOUS: WinRate > 70% - NN ejecuta, LLM audita post-mortem",
+      "lineno": 40
+    },
+    {
+      "type": "class",
+      "name": "TradeRecord",
+      "doc": "Registro de trade para c\u00e1lculo de WinRate.",
+      "lineno": 54
+    },
+    {
+      "type": "class",
+      "name": "PerformanceTracker",
+      "doc": "Rastrea el rendimiento de la NN para determinar el estado del FSM.\nUsa ventana deslizante de \u00faltimos N trades.",
+      "lineno": 69
+    },
+    {
+      "type": "function",
+      "name": "banner",
+      "doc": null,
+      "lineno": 234
+    },
+    {
+      "type": "function",
+      "name": "log",
+      "doc": null,
+      "lineno": 246
+    },
+    {
+      "type": "function",
+      "name": "run_cmd",
+      "doc": "Ejecuta un comando con opcin de streaming en vivo para evitar bloqueos visuales.",
+      "lineno": 249
+    },
+    {
+      "type": "function",
+      "name": "kill_other_instances",
+      "doc": "Finds and terminates other running instances of this script to avoid port/resource conflicts.",
+      "lineno": 264
+    },
+    {
+      "type": "function",
+      "name": "check_port",
+      "doc": null,
+      "lineno": 278
+    },
+    {
+      "type": "function",
+      "name": "is_mt5_running",
+      "doc": null,
+      "lineno": 283
+    },
+    {
+      "type": "class",
+      "name": "StrategyCommander",
+      "doc": "MODELO 3: EL COMANDANTE DE ESTRATEGIA\nOrquesta la lgica de decisin, riesgo y ejecucin basada en FSM.",
+      "lineno": 287
+    },
+    {
+      "type": "function",
+      "name": "start_strategy_node",
+      "doc": null,
+      "lineno": 405
+    },
+    {
+      "type": "class",
+      "name": "NexusControl",
+      "doc": null,
+      "lineno": 413
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 80
+    },
+    {
+      "type": "function",
+      "name": "_load_state",
+      "doc": "Carga estado persistido desde disco.",
+      "lineno": 86
+    },
+    {
+      "type": "function",
+      "name": "_save_state",
+      "doc": "Persiste estado a disco.",
+      "lineno": 111
+    },
+    {
+      "type": "function",
+      "name": "record_trade",
+      "doc": "Registra un nuevo trade.",
+      "lineno": 136
+    },
+    {
+      "type": "function",
+      "name": "close_trade",
+      "doc": "Cierra un trade y actualiza su resultado.",
+      "lineno": 144
+    },
+    {
+      "type": "function",
+      "name": "calculate_winrate",
+      "doc": "Calcula WinRate de trades cerrados en la ventana.",
+      "lineno": 155
+    },
+    {
+      "type": "function",
+      "name": "evaluate_and_transition",
+      "doc": "Eval\u00faa rendimiento y transiciona estado si es necesario.",
+      "lineno": 164
+    },
+    {
+      "type": "function",
+      "name": "get_status",
+      "doc": "Retorna estado actual para telemetr\u00eda.",
+      "lineno": 186
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 292
+    },
+    {
+      "type": "function",
+      "name": "execute_logic",
+      "doc": "Nucleo decisional: Brain -> Risk -> FSM -> Execution.",
+      "lineno": 303
+    },
+    {
+      "type": "function",
+      "name": "run_loop",
+      "doc": "Bucle principal asincrono de estrategia.",
+      "lineno": 385
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 414
+    },
+    {
+      "type": "function",
+      "name": "pre_flight_checks",
+      "doc": "Verificaciones previas al despegue.",
+      "lineno": 418
+    },
+    {
+      "type": "function",
+      "name": "start_mt5",
+      "doc": "Inicia MetaTrader 5 si no est corriendo.",
+      "lineno": 435
+    },
+    {
+      "type": "function",
+      "name": "start_docker",
+      "doc": "Verifica e inicia el stack Docker (Brain).",
+      "lineno": 450
+    },
+    {
+      "type": "function",
+      "name": "war_room_report",
+      "doc": "Imprime estado final del sistema.",
+      "lineno": 468
+    },
+    {
+      "type": "function",
+      "name": "main_loop",
+      "doc": "Orquestador principal de inicio.",
+      "lineno": 483
+    },
+    {
+      "type": "function",
+      "name": "stop_all",
+      "doc": "Detiene todos los servicios.",
+      "lineno": 501
+    },
+    {
+      "type": "function",
+      "name": "audit_system",
+      "doc": "Realiza un diagn\u00f3stico profundo del sistema.",
+      "lineno": 508
+    }
+  ],
+  "nexus_indexer.py": [
+    {
+      "type": "function",
+      "name": "parse_file",
+      "doc": "Extracts classes, functions, and docstrings from a python file.",
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "scan_project",
+      "doc": "Recursively scans the project and builds the index.",
+      "lineno": 42
+    }
+  ],
+  "nexus_query.py": [
+    {
+      "type": "function",
+      "name": "search_index",
+      "doc": null,
+      "lineno": 7
+    }
+  ],
+  "repair_local_db.py": [
+    {
+      "type": "function",
+      "name": "init_db",
+      "doc": null,
+      "lineno": 6
+    }
+  ],
+  "safe_sanitize.py": [
+    {
+      "type": "function",
+      "name": "safe_clean",
+      "doc": null,
+      "lineno": 5
+    }
+  ],
+  "seed_history.py": [
+    {
+      "type": "function",
+      "name": "get_last_timestamp",
+      "doc": null,
+      "lineno": 22
+    },
+    {
+      "type": "function",
+      "name": "main",
+      "doc": null,
+      "lineno": 33
+    },
+    {
+      "type": "function",
+      "name": "calculate_rsi",
+      "doc": null,
+      "lineno": 123
+    },
+    {
+      "type": "function",
+      "name": "calculate_atr",
+      "doc": null,
+      "lineno": 132
+    }
+  ],
+  "setup_nexus_db.py": [
+    {
+      "type": "function",
+      "name": "print_header",
+      "doc": null,
+      "lineno": 24
+    },
+    {
+      "type": "function",
+      "name": "get_credentials",
+      "doc": "Prompt user for new Supabase credentials.",
+      "lineno": 33
+    },
+    {
+      "type": "function",
+      "name": "test_connection",
+      "doc": "Test Supabase connection.",
+      "lineno": 57
+    },
+    {
+      "type": "function",
+      "name": "create_env_file",
+      "doc": "Create or update .env file with new credentials.",
+      "lineno": 93
+    },
+    {
+      "type": "function",
+      "name": "run_schema",
+      "doc": "Execute the institutional schema on the new database.",
+      "lineno": 145
+    },
+    {
+      "type": "function",
+      "name": "print_summary",
+      "doc": "Print setup summary.",
+      "lineno": 178
+    },
+    {
+      "type": "function",
+      "name": "main",
+      "doc": null,
+      "lineno": 197
+    }
+  ],
+  "simulate_full_flow.py": [
+    {
+      "type": "function",
+      "name": "run_simulation",
+      "doc": null,
+      "lineno": 45
+    }
+  ],
+  "test_debug.py": [
+    {
+      "type": "function",
+      "name": "debug_main",
+      "doc": null,
+      "lineno": 9
+    }
+  ],
+  "test_n8n.py": [
+    {
+      "type": "function",
+      "name": "test_n8n_connection",
+      "doc": null,
+      "lineno": 9
+    }
+  ],
+  "test_strategy_logic.py": [
+    {
+      "type": "function",
+      "name": "test_validation_gate",
+      "doc": null,
+      "lineno": 18
+    },
+    {
+      "type": "function",
+      "name": "mock_get_adaptive_lots",
+      "doc": null,
+      "lineno": 42
+    }
+  ],
+  "verify_system.py": [
+    {
+      "type": "function",
+      "name": "verify_ml_engine",
+      "doc": null,
+      "lineno": 15
+    }
+  ],
+  "app\\main.py": [
+    {
+      "type": "function",
+      "name": "lifespan",
+      "doc": "Gestiona el ciclo de vida de la aplicacin:\n- Conecta con MT5 al iniciar.\n- Desconecta al cerrar.",
+      "lineno": 41
+    },
+    {
+      "type": "function",
+      "name": "add_correlation_id_header",
+      "doc": null,
+      "lineno": 81
+    },
+    {
+      "type": "function",
+      "name": "global_exception_handler",
+      "doc": "Captura cualquier error no controlado y lo devuelve en el formato Envelope.\nGarantiza que n8n nunca reciba un error plano.",
+      "lineno": 93
+    },
+    {
+      "type": "function",
+      "name": "health_check",
+      "doc": "Verifica el estado de la conexin con MetaTrader 5.",
+      "lineno": 121
+    },
+    {
+      "type": "function",
+      "name": "get_candles",
+      "doc": "Obtiene datos OHLC con sistema de cach.",
+      "lineno": 136
+    },
+    {
+      "type": "function",
+      "name": "get_account_metrics",
+      "doc": "Obtiene mtricas clave de la cuenta para gestin de riesgo.",
+      "lineno": 158
+    },
+    {
+      "type": "function",
+      "name": "capture_panorama",
+      "doc": "Captura la pantalla actual de MT5 para anlisis visual.",
+      "lineno": 175
+    },
+    {
+      "type": "function",
+      "name": "create_indicator",
+      "doc": "Crea, guarda y compila un nuevo indicador nativo (.mq5) en MetaTrader 5.",
+      "lineno": 192
+    },
+    {
+      "type": "function",
+      "name": "get_indicators",
+      "doc": "Calcula indicadores tcnicos (RSI, Moving Average, MACD, etc).",
+      "lineno": 200
+    },
+    {
+      "type": "function",
+      "name": "get_calendar",
+      "doc": "Obtiene el calendario econmico de MT5 para anlisis fundamental.",
+      "lineno": 211
+    },
+    {
+      "type": "function",
+      "name": "get_history",
+      "doc": "Obtiene el historial de trading y mtricas de rendimiento (Win Rate, Profit Factor).",
+      "lineno": 217
+    },
+    {
+      "type": "function",
+      "name": "place_order",
+      "doc": "Enva una orden al mercado (Market o Pending) con validaciones pre-flight.",
+      "lineno": 223
+    },
+    {
+      "type": "function",
+      "name": "get_volatility",
+      "doc": "Calcula mtricas de ATR y Spread.",
+      "lineno": 228
+    },
+    {
+      "type": "function",
+      "name": "manage_position",
+      "doc": "Gestiona una posicin abierta (Cierre o Modificacin).",
+      "lineno": 249
+    },
+    {
+      "type": "function",
+      "name": "get_performance",
+      "doc": "Auditora cuantitativa de rendimiento (Sharpe, Win Rate, etc).",
+      "lineno": 258
+    },
+    {
+      "type": "function",
+      "name": "get_risk_status",
+      "doc": "Estado actual de exposicin y riesgo de la cuenta.",
+      "lineno": 272
+    },
+    {
+      "type": "function",
+      "name": "get_ml_score",
+      "doc": "Clasificacin de setups con ML-Lite y deteccin de anomalas.",
+      "lineno": 293
+    },
+    {
+      "type": "function",
+      "name": "get_liquidity",
+      "doc": "Anlisis de profundidad de mercado (DoM) institucional.",
+      "lineno": 300
+    },
+    {
+      "type": "function",
+      "name": "get_system_health",
+      "doc": "Monitoreo de Circuit Breaker y estado de latencia p99.",
+      "lineno": 307
+    }
+  ],
+  "app\\core\\config.py": [
+    {
+      "type": "class",
+      "name": "Settings",
+      "doc": "Configuracin global del sistema cargada desde variables de entorno o archivo .env.",
+      "lineno": 5
+    }
+  ],
+  "app\\core\\logger.py": [
+    {
+      "type": "function",
+      "name": "setup_logger",
+      "doc": null,
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "hijack_streams",
+      "doc": null,
+      "lineno": 52
+    },
+    {
+      "type": "class",
+      "name": "NoRecursionFilter",
+      "doc": null,
+      "lineno": 36
+    },
+    {
+      "type": "function",
+      "name": "filter",
+      "doc": null,
+      "lineno": 37
+    }
+  ],
+  "app\\core\\math_utils.py": [
+    {
+      "type": "function",
+      "name": "fast_bin_indices",
+      "doc": "Numba-accelerated pricing bin calculation.",
+      "lineno": 12
+    },
+    {
+      "type": "function",
+      "name": "bin_volume_numba",
+      "doc": "High-speed Volume Profile binning.",
+      "lineno": 23
+    },
+    {
+      "type": "function",
+      "name": "calculate_weighted_kde",
+      "doc": "Weighted KDE using effective sample size (n_eff).",
+      "lineno": 44
+    },
+    {
+      "type": "function",
+      "name": "triple_barrier_label",
+      "doc": "Triple Barrier Method for Institutional Labeling.\n- +1: Hits Profit Target\n- -1: Hits Stop Loss\n-  0: Time Horizon Exhausted (Vertical Barrier)",
+      "lineno": 66
+    }
+  ],
+  "app\\core\\mt5_conn.py": [
+    {
+      "type": "class",
+      "name": "MT5Connection",
+      "doc": "Singleton connection manager for MetaTrader 5.\n\nProvides a thread-safe (threading.Lock) and non-blocking (anyio.to_thread)\nenvironment for interacting with the synchronous MT5 C-API.\n\nAttributes:\n    _instance: Singleton instance.\n    _lock: Singleton lifecycle lock.\n    _mt5_lock: API access synchronization lock.\n    _watchdog_task: Background connectivity monitor.",
+      "lineno": 22
+    },
+    {
+      "type": "function",
+      "name": "__new__",
+      "doc": null,
+      "lineno": 39
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 46
+    },
+    {
+      "type": "function",
+      "name": "startup",
+      "doc": "Initializes MT5 terminal connectivity and starts the watchdog.\n\nEnters passive mode in Linux/Docker environments.\n\nReturns:\n    bool: True if initialization was successful or skipped (Docker).",
+      "lineno": 52
+    },
+    {
+      "type": "function",
+      "name": "start_watchdog",
+      "doc": "Inicia la tarea de monitoreo en segundo plano.",
+      "lineno": 69
+    },
+    {
+      "type": "function",
+      "name": "_connection_watchdog",
+      "doc": "Tarea peridica que verifica y restaura la conexin con Backoff Exponencial.",
+      "lineno": 75
+    },
+    {
+      "type": "function",
+      "name": "_initialize_mt5",
+      "doc": "Internal initialization logic (Blocking).\n\nReturns:\n    bool: True if connection established.",
+      "lineno": 102
+    },
+    {
+      "type": "function",
+      "name": "shutdown",
+      "doc": "Cierra la conexin con MT5 y detiene el watchdog.",
+      "lineno": 145
+    },
+    {
+      "type": "function",
+      "name": "execute",
+      "doc": "Punto de entrada maestro para ejecutar cualquier funcin de mt5.\nInstrumentado con OTel y Mtricas de Latencia.\nEn Docker/Linux retorna None gracefully.",
+      "lineno": 155
+    },
+    {
+      "type": "function",
+      "name": "_locked_execution",
+      "doc": "Envuelve la ejecucin de la funcin dentro del lock de MT5.",
+      "lineno": 190
+    }
+  ],
+  "app\\core\\observability.py": [
+    {
+      "type": "class",
+      "name": "CircuitState",
+      "doc": null,
+      "lineno": 17
+    },
+    {
+      "type": "function",
+      "name": "resilient",
+      "doc": "Decorador de grado industrial para resiliencia (Circuit Breaker + Retries).\n\nArgs:\n    max_retries: Reintentos inmediatos con jitter.\n    failure_threshold: Fallos necesarios para abrir el circuito.\n    recovery_timeout: Segundos antes de pasar a HALF_OPEN.",
+      "lineno": 22
+    },
+    {
+      "type": "class",
+      "name": "ObservabilityEngine",
+      "doc": "Controlador maestro de telemetra y mtricas institucionales.",
+      "lineno": 143
+    },
+    {
+      "type": "function",
+      "name": "decorator",
+      "doc": null,
+      "lineno": 35
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 149
+    },
+    {
+      "type": "function",
+      "name": "get_instance",
+      "doc": null,
+      "lineno": 159
+    },
+    {
+      "type": "function",
+      "name": "track_latency",
+      "doc": "Registra la latencia de una operacin.",
+      "lineno": 164
+    },
+    {
+      "type": "function",
+      "name": "track_order",
+      "doc": "Registra el resultado de una orden.",
+      "lineno": 168
+    },
+    {
+      "type": "function",
+      "name": "update_model_health",
+      "doc": "Actualiza el estado de salud del alpha.",
+      "lineno": 172
+    },
+    {
+      "type": "function",
+      "name": "wrapper",
+      "doc": null,
+      "lineno": 44
+    },
+    {
+      "type": "function",
+      "name": "wrapper",
+      "doc": null,
+      "lineno": 78
+    }
+  ],
+  "app\\core\\validation.py": [
+    {
+      "type": "class",
+      "name": "OrderValidator",
+      "doc": "Motor de validacin inteligente para rdenes de trading y gestin de riesgo.",
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "validate_order",
+      "doc": "Valida que una orden cumpla con los requisitos del broker y las reglas de riesgo.",
+      "lineno": 19
+    },
+    {
+      "type": "function",
+      "name": "validate_margin",
+      "doc": "Verifica si hay margen suficiente antes de enviar la orden.",
+      "lineno": 101
+    }
+  ],
+  "app\\core\\zmq_bridge.py": [
+    {
+      "type": "class",
+      "name": "ZMQBridge",
+      "doc": null,
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "start",
+      "doc": "Inicia los sockets ZMQ y el loop de escucha.",
+      "lineno": 25
+    },
+    {
+      "type": "function",
+      "name": "stop",
+      "doc": "Cierra conexiones limpiamente.",
+      "lineno": 51
+    },
+    {
+      "type": "function",
+      "name": "add_callback",
+      "doc": null,
+      "lineno": 59
+    },
+    {
+      "type": "function",
+      "name": "_listen",
+      "doc": null,
+      "lineno": 62
+    },
+    {
+      "type": "function",
+      "name": "send_command",
+      "doc": null,
+      "lineno": 88
+    }
+  ],
+  "app\\core\\zmq_projector.py": [
+    {
+      "type": "class",
+      "name": "ZMQProjector",
+      "doc": "Projector sends 'HUD' updates to MT5 using ZMQ Publish pattern.\nMT5 acts as a Subscriber to this feed.",
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 21
+    },
+    {
+      "type": "function",
+      "name": "start",
+      "doc": "Bind the PUB socket.",
+      "lineno": 27
+    },
+    {
+      "type": "function",
+      "name": "project_hud",
+      "doc": "Sends HUD snapshot to MT5.\n\nArgs:\n    data: {\n        \"fsm_state\": \"autonomous\",\n        \"pilot\": \"Neural Net\",\n        \"confidence\": 0.87,\n        \"vault\": {\"balance\": 150.0, \"status\": \"LOCKED\"},\n        \"regime\": \"TRENDING\",\n        \"ema_colors\": {\"wind\": \"#00FF00\", ...}\n    }",
+      "lineno": 36
+    },
+    {
+      "type": "function",
+      "name": "stop",
+      "doc": null,
+      "lineno": 59
+    }
+  ],
+  "app\\ml\\data_collector.py": [
+    {
+      "type": "class",
+      "name": "SQLiteWALConnection",
+      "doc": "Thread-safe SQLite connection with WAL mode.\nPermite lecturas y escrituras simultneas.",
+      "lineno": 54
+    },
+    {
+      "type": "class",
+      "name": "OracleLabeler",
+      "doc": "Oracle que etiqueta datos mirando N velas hacia el futuro.\nUsa queries SQL eficientes en lugar de cargar todo en memoria.",
+      "lineno": 120
+    },
+    {
+      "type": "class",
+      "name": "Resampler",
+      "doc": "Engine for Multi-Timeframe (MTF) Candle Aggregation.",
+      "lineno": 168
+    },
+    {
+      "type": "class",
+      "name": "DataCollector",
+      "doc": "Colector principal con batch inserts para alta frecuencia.",
+      "lineno": 216
+    },
+    {
+      "type": "function",
+      "name": "collect_sample",
+      "doc": "MCP Tool: Recolecta muestra.",
+      "lineno": 396
+    },
+    {
+      "type": "function",
+      "name": "get_collection_stats",
+      "doc": "MCP Tool: Obtiene estadsticas.",
+      "lineno": 402
+    },
+    {
+      "type": "function",
+      "name": "export_for_training",
+      "doc": "MCP Tool: Exporta datos a CSV para training.",
+      "lineno": 407
+    },
+    {
+      "type": "function",
+      "name": "flush_pending",
+      "doc": "MCP Tool: Fuerza flush del batch pendiente.",
+      "lineno": 413
+    },
+    {
+      "type": "function",
+      "name": "fetch_historical_ticks",
+      "doc": "Extrae ticks hist\u00f3ricos con Bid/Ask/Flags desde MT5.\nLos flags permiten identificar Buy/Sell agresivo para CVD real.\n\nArgs:\n    symbol: S\u00edmbolo del instrumento (ej: \"XAUUSD\")\n    date_from: Fecha inicial (datetime con timezone)\n    date_to: Fecha final (datetime con timezone)\n    mt5_conn: Opcional, conexi\u00f3n MT5 existente\n    \nReturns:\n    DataFrame con columnas: time, bid, ask, last, volume, flags, is_buy, is_sell\n    \nMT5 Tick Flags Reference:\n    - TICK_FLAG_BID = 2 (bid price changed)\n    - TICK_FLAG_ASK = 4 (ask price changed)  \n    - TICK_FLAG_LAST = 8 (last deal price changed)\n    - TICK_FLAG_VOLUME = 16 (volume changed)\n    - TICK_FLAG_BUY = 32 (last deal was buy)\n    - TICK_FLAG_SELL = 64 (last deal was sell)",
+      "lineno": 423
+    },
+    {
+      "type": "function",
+      "name": "compute_real_cvd",
+      "doc": "Calcula CVD (Cumulative Volume Delta) real usando flags de MT5.\n\nA diferencia de la aproximaci\u00f3n tick-rule, esto usa los flags reales\nde MT5 que indican si cada tick fue una compra o venta agresiva.\n\nArgs:\n    tick_df: DataFrame de ticks con columnas 'volume', 'is_buy', 'is_sell'\n    \nReturns:\n    Dict con m\u00e9tricas CVD:\n    - cvd: Valor acumulado final\n    - cvd_series: Serie temporal del CVD\n    - buy_volume: Volumen total de compras\n    - sell_volume: Volumen total de ventas\n    - imbalance_ratio: Ratio de desbalance (-1 a 1)\n    - acceleration: Tasa de cambio del CVD",
+      "lineno": 490
+    },
+    {
+      "type": "function",
+      "name": "fetch_tick_data",
+      "doc": "MCP Tool: Extrae ticks y calcula CVD real.\n\nArgs:\n    symbol: S\u00edmbolo del instrumento\n    minutes_back: Minutos hacia atr\u00e1s para extraer\n    \nReturns:\n    Dict con ticks y m\u00e9tricas CVD",
+      "lineno": 556
+    },
+    {
+      "type": "function",
+      "name": "fetch_multi_tf_data",
+      "doc": "FEAT-DEEP Protocol: Fetches market data across all timeframes simultaneously.\n\nReturns a dict with candles for: H4, H1, M15, M5, M1\nUsed to build the Market State Tensor.",
+      "lineno": 598
+    },
+    {
+      "type": "function",
+      "name": "get_h4_bias",
+      "doc": "FEAT-DEEP Protocol: Returns the current H4 trend bias for Veto Rule.",
+      "lineno": 651
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 60
+    },
+    {
+      "type": "function",
+      "name": "_ensure_directory",
+      "doc": "Creates data directory if non-existent.",
+      "lineno": 66
+    },
+    {
+      "type": "function",
+      "name": "get_connection",
+      "doc": "Thread-local connection context manager.",
+      "lineno": 71
+    },
+    {
+      "type": "function",
+      "name": "_init_db",
+      "doc": "Initialize database schema from institutional_schema.sql.",
+      "lineno": 92
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 126
+    },
+    {
+      "type": "function",
+      "name": "process_pending_labels",
+      "doc": "Labels pending records using bulk SQL operations.",
+      "lineno": 132
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 171
+    },
+    {
+      "type": "function",
+      "name": "push_tick",
+      "doc": "Aggregates M1 candles into larger timeframes.\n\nReturns:\n    List[Tuple[str, Dict]]: List of completed candles (timeframe, data).",
+      "lineno": 176
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 221
+    },
+    {
+      "type": "function",
+      "name": "compute_features",
+      "doc": "Core feature engineering vectorizer for MIP.",
+      "lineno": 229
+    },
+    {
+      "type": "function",
+      "name": "collect",
+      "doc": "Captures a new tick/candle and triggers resampling if M1.",
+      "lineno": 268
+    },
+    {
+      "type": "function",
+      "name": "_flush_batch",
+      "doc": "Inserta batch en la nueva tabla market_data.",
+      "lineno": 306
+    },
+    {
+      "type": "function",
+      "name": "force_flush",
+      "doc": "Fuerza flush del batch pendiente.",
+      "lineno": 342
+    },
+    {
+      "type": "function",
+      "name": "get_stats",
+      "doc": "Estadsticas de recoleccin multitemporal.",
+      "lineno": 347
+    },
+    {
+      "type": "function",
+      "name": "export_training_csv",
+      "doc": "Exporta training_samples a CSV para compatibilidad.",
+      "lineno": 363
+    }
+  ],
+  "app\\ml\\feat_processor.py": [
+    {
+      "type": "class",
+      "name": "FeatProcessor",
+      "doc": null,
+      "lineno": 19
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 20
+    },
+    {
+      "type": "function",
+      "name": "process_ticks_to_ohlcv",
+      "doc": "Aggregates raw ticks into OHLCV bars with FEAT indicators.",
+      "lineno": 26
+    },
+    {
+      "type": "function",
+      "name": "apply_feat_engineering",
+      "doc": "Applies Structure, Acceleration, and Space logic to the DataFrame.",
+      "lineno": 53
+    },
+    {
+      "type": "function",
+      "name": "export_parquet",
+      "doc": "Saves DataFrame to Parquet format (Snappy compression).",
+      "lineno": 78
+    },
+    {
+      "type": "function",
+      "name": "export_ticks_jsonl",
+      "doc": "Saves dictionary list to Compressed JSONL (.jsonl.gz).",
+      "lineno": 90
+    }
+  ],
+  "app\\ml\\fractal_analysis.py": [
+    {
+      "type": "class",
+      "name": "FractalAnalyzer",
+      "doc": "Computes fractal metrics for a given time series.",
+      "lineno": 19
+    },
+    {
+      "type": "function",
+      "name": "compute_hurst",
+      "doc": "Calculates the Hurst Exponent using Rescaled Range (R/S) analysis.\n\nArgs:\n    series: Price series (e.g., closing prices).\n    max_lags: Maximum number of lags for R/S calculation.\n    \nReturns:\n    float: Hurst exponent.",
+      "lineno": 23
+    },
+    {
+      "type": "function",
+      "name": "detect_regime",
+      "doc": "Categorizes market regime based on Hurst exponent.",
+      "lineno": 48
+    },
+    {
+      "type": "function",
+      "name": "analyze_timeframe",
+      "doc": "Performs full fractal analysis on a dataframe of price data.\n\nArgs:\n    df: Dataframe with 'close' column.\n    \nReturns:\n    Dict: Hurst and regime information.",
+      "lineno": 57
+    }
+  ],
+  "app\\ml\\ml_engine.py": [
+    {
+      "type": "class",
+      "name": "ModelLoader",
+      "doc": "Secure model loader with cryptographic-grade fallback and dynamic asset identification.\n\nHandles both joblib (Scikit-Learn) and torch models with state-dict reconstruction.",
+      "lineno": 58
+    },
+    {
+      "type": "class",
+      "name": "NormalizationGuard",
+      "doc": "Validates data scales and feature ranges before inference.\n\nPrevents garbage-in-garbage-out by checking ATR-relative scales\nand detecting statistical drift in input features.",
+      "lineno": 119
+    },
+    {
+      "type": "class",
+      "name": "AnomalyDetector",
+      "doc": "IsolationForest-based anomaly detection for market manipulation.\n\nIdentifies non-linear erratic behavior and volumetric anomalies.",
+      "lineno": 152
+    },
+    {
+      "type": "class",
+      "name": "ShadowLogger",
+      "doc": "Logger para predicciones en Shadow Mode.",
+      "lineno": 195
+    },
+    {
+      "type": "class",
+      "name": "MLEngine",
+      "doc": "Master ML Inference Engine with Asset Identity Protocol.\n\nOrchestrates ensemble predictions from GBM and LSTM models\nwhile enforcing statistical and behavioral safety guards.",
+      "lineno": 213
+    },
+    {
+      "type": "function",
+      "name": "predict",
+      "doc": "MCP Tool: Generates high-confidence ML prediction with autonomous guards.\n\nArgs:\n    features: Feature vector.\n    symbol: Target asset symbol.",
+      "lineno": 449
+    },
+    {
+      "type": "function",
+      "name": "get_ml_status",
+      "doc": "MCP Tool: Estado del sistema ML.",
+      "lineno": 459
+    },
+    {
+      "type": "function",
+      "name": "enable_execution",
+      "doc": "MCP Tool: Activa/desactiva ejecucin real.",
+      "lineno": 464
+    },
+    {
+      "type": "function",
+      "name": "load_gbm",
+      "doc": "Loads a GBM model with Asset Identity and Role support.",
+      "lineno": 65
+    },
+    {
+      "type": "function",
+      "name": "load_lstm",
+      "doc": "Loads a Torch LSTM model for a specific symbol.\n\nArgs:\n    symbol: Target asset symbol.\n    \nReturns:\n    Optional[Dict[str, Any]]: Dict with 'model' and 'config' or None.",
+      "lineno": 87
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 126
+    },
+    {
+      "type": "function",
+      "name": "is_statistically_safe",
+      "doc": "Validates if current features are within reasonable statistical bounds.\n\nArgs:\n    features: Vector of features.\n    symbol: Active symbol context.\n    \nReturns:\n    bool: True if safe to infer.",
+      "lineno": 129
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 158
+    },
+    {
+      "type": "function",
+      "name": "fit",
+      "doc": "Trains detector on normal regime data.",
+      "lineno": 170
+    },
+    {
+      "type": "function",
+      "name": "score",
+      "doc": "Calculates anomaly probability.\n\nReturns:\n    float: Score normalized to [0, 1].",
+      "lineno": 176
+    },
+    {
+      "type": "function",
+      "name": "is_anomaly",
+      "doc": "Final boolean anomaly assessment.",
+      "lineno": 190
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 198
+    },
+    {
+      "type": "function",
+      "name": "log",
+      "doc": "Guarda prediccin para anlisis posterior.",
+      "lineno": 202
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 220
+    },
+    {
+      "type": "function",
+      "name": "apply_feat_veto",
+      "doc": "FEAT-DEEP Veto Rule: Prevents counter-trend trading.\n\nIF H4_BEARISH + M1_BUY -> Force HOLD (Veto)\nIF H4_BULLISH + M1_SELL -> Force HOLD (Veto)\n\nReturns:\n    (should_trade: bool, reason: str)",
+      "lineno": 242
+    },
+    {
+      "type": "function",
+      "name": "update_macro_bias",
+      "doc": "Updates the H4 macro bias for a symbol.",
+      "lineno": 273
+    },
+    {
+      "type": "function",
+      "name": "_ensure_models",
+      "doc": "Lazily loads models for the requested symbol with Role Separation.",
+      "lineno": 278
+    },
+    {
+      "type": "function",
+      "name": "predict_gbm",
+      "doc": "Predicts using the sniper GBM model.",
+      "lineno": 301
+    },
+    {
+      "type": "function",
+      "name": "predict_lstm",
+      "doc": "Predicts using the sniper LSTM model.",
+      "lineno": 316
+    },
+    {
+      "type": "function",
+      "name": "_neutral_response",
+      "doc": "Returns a neutral prediction response.",
+      "lineno": 344
+    },
+    {
+      "type": "function",
+      "name": "ensemble_predict",
+      "doc": "Orchestrates the full Multifractal Fusion prediction pipeline.",
+      "lineno": 358
+    },
+    {
+      "type": "function",
+      "name": "get_status",
+      "doc": "Diagnostic snapshot of the MLEngine state.",
+      "lineno": 430
+    }
+  ],
+  "app\\ml\\ml_normalization.py": [
+    {
+      "type": "class",
+      "name": "ATRNormalizer",
+      "doc": "Normalizes market data using ATR (Average True Range).\n\nBenefits:\n- Asset-agnostic features (model trained on Gold works on Euro)\n- Scale-invariant signals (pip differences become irrelevant)\n- Better generalization across volatility regimes",
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "get_asset_profile",
+      "doc": "Get asset profile for normalization and context.\nReturns default profile if symbol not found.",
+      "lineno": 165
+    },
+    {
+      "type": "function",
+      "name": "get_asset_profile_tool",
+      "doc": "MCP Tool: Get asset profile and metadata.",
+      "lineno": 196
+    },
+    {
+      "type": "function",
+      "name": "normalize_features_tool",
+      "doc": "MCP Tool: Normalize raw features to ATR-relative values.",
+      "lineno": 201
+    },
+    {
+      "type": "function",
+      "name": "calculate_position_size",
+      "doc": "MCP Tool: Calculate position size based on ATR risk.\n\nArgs:\n    account_balance: Total account balance\n    risk_percent: Risk per trade (e.g., 1.0 = 1%)\n    stop_loss_atr: How many ATRs for stop loss (e.g., 1.5)\n    current_atr: Current ATR value\n    pip_value: Value per pip for this asset",
+      "lineno": 206
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 25
+    },
+    {
+      "type": "function",
+      "name": "set_current_atr",
+      "doc": "Set the current ATR for normalization.",
+      "lineno": 30
+    },
+    {
+      "type": "function",
+      "name": "set_volume_ma",
+      "doc": "Set the 20-period volume moving average.",
+      "lineno": 34
+    },
+    {
+      "type": "function",
+      "name": "normalize_features",
+      "doc": "Convert raw features to ATR-normalized features.\n\nInput (raw):\n    close, open, high, low, volume, price_change, etc.\n    \nOutput (normalized):\n    close_atr_ratio, candle_range_atr, volume_relative, etc.",
+      "lineno": 38
+    },
+    {
+      "type": "function",
+      "name": "normalize_stop_loss",
+      "doc": "Convert ATR-based stop loss to price points.\n\nExample:\n    desired_atr_distance = 1.5  # 1.5 ATR\n    atr = 2.5  # Current ATR for XAUUSD\n    Returns: 3.75 price points",
+      "lineno": 102
+    },
+    {
+      "type": "function",
+      "name": "normalize_take_profit",
+      "doc": "Convert ATR-based take profit to price points.\n\nExample:\n    desired_atr_distance = 3.0  # 3 ATR (1:2 RR with 1.5 ATR stop)\n    atr = 2.5  # Current ATR for XAUUSD\n    Returns: 7.5 price points",
+      "lineno": 113
+    }
+  ],
+  "app\\ml\\multi_time_learning.py": [
+    {
+      "type": "class",
+      "name": "MultiTimeLearningManager",
+      "doc": "Orchestrates datasets and dynamic weights for MTF Intelligence.\n\nNow with killzone awareness for H4 weight boosting.",
+      "lineno": 39
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 46
+    },
+    {
+      "type": "function",
+      "name": "update_killzone_context",
+      "doc": "Update weights based on killzone context.\n\nIf H4 close is within killzone (09:00-13:00 Bolivia),\nboost H4 weight significantly.",
+      "lineno": 64
+    },
+    {
+      "type": "function",
+      "name": "get_fractal_weights",
+      "doc": "Adjusts weights dynamically based on market physics (Hurst).",
+      "lineno": 99
+    },
+    {
+      "type": "function",
+      "name": "calculate_attention_weights",
+      "doc": "FEAT ATTENTION LAYER: Dynamically distributes influence based on 'Heat'.\nHeat = (ATR / Price) * Volume_Relative.\n\nUses Softmax-like normalization.",
+      "lineno": 115
+    },
+    {
+      "type": "function",
+      "name": "calculate_alignment_score",
+      "doc": "Calculate alignment score for size multiplier.\n\nReturns:\n    Dict with score, size_multiplier, and alignment_type",
+      "lineno": 147
+    },
+    {
+      "type": "function",
+      "name": "resolve_conflicts",
+      "doc": "Applies Fusion Layer logic to generate a final Trade Probability.",
+      "lineno": 208
+    },
+    {
+      "type": "function",
+      "name": "get_confirmation_requirements",
+      "doc": "Get confirmation requirements for a timeframe signal.\n\nBased on domain knowledge:\n- H1: Close + 5-30min retest + vol 1.3x\n- H4: Close in killzone = instant confirmation, else wait 4h\n- D1: Confirm in next killzone (09:00-13:00)",
+      "lineno": 249
+    },
+    {
+      "type": "function",
+      "name": "dir_to_val",
+      "doc": null,
+      "lineno": 159
+    }
+  ],
+  "app\\ml\\temporal_features.py": [
+    {
+      "type": "class",
+      "name": "BayesianPriors",
+      "doc": "Adaptive priors based on domain knowledge.\n\nThese are initialized with your expert knowledge and adjusted\nnightly based on actual performance.",
+      "lineno": 27
+    },
+    {
+      "type": "class",
+      "name": "TemporalFeatureGenerator",
+      "doc": "Generates ML-ready feature vectors from temporal and market data.",
+      "lineno": 162
+    },
+    {
+      "type": "function",
+      "name": "feat_get_ml_feature_vector",
+      "doc": "MCP Tool: Generate ML feature vector.",
+      "lineno": 303
+    },
+    {
+      "type": "function",
+      "name": "feat_update_bayesian_prior",
+      "doc": "MCP Tool: Update Bayesian prior based on trade outcome.",
+      "lineno": 325
+    },
+    {
+      "type": "function",
+      "name": "feat_get_all_priors",
+      "doc": "MCP Tool: Get all current Bayesian priors.",
+      "lineno": 338
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 35
+    },
+    {
+      "type": "function",
+      "name": "get_prior",
+      "doc": "Get prior for a specific block.",
+      "lineno": 73
+    },
+    {
+      "type": "function",
+      "name": "update_prior",
+      "doc": "Update prior based on actual outcome.\nCalled nightly by the audit system.",
+      "lineno": 77
+    },
+    {
+      "type": "function",
+      "name": "calculate_posterior",
+      "doc": "Calculate posterior probability using Bayes' theorem approximation.\n\nP(success | evidence)  P(success)  P(evidence | success)",
+      "lineno": 107
+    },
+    {
+      "type": "function",
+      "name": "to_dict",
+      "doc": "Serialize priors for persistence.",
+      "lineno": 149
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 167
+    },
+    {
+      "type": "function",
+      "name": "one_hot_state",
+      "doc": "One-hot encode liquidity state.",
+      "lineno": 177
+    },
+    {
+      "type": "function",
+      "name": "generate_features",
+      "doc": "Generate complete feature vector for ML model.\n\nReturns:\n    Dict with 'vector' (numpy array) and 'labels' (feature names)",
+      "lineno": 186
+    },
+    {
+      "type": "function",
+      "name": "get_feature_importance_hints",
+      "doc": "Provide hints to the neural network about feature importance.\nUsed for attention mechanisms.",
+      "lineno": 276
+    },
+    {
+      "type": "function",
+      "name": "dir_to_val",
+      "doc": null,
+      "lineno": 208
+    }
+  ],
+  "app\\ml\\train_models.py": [
+    {
+      "type": "function",
+      "name": "prepare_features",
+      "doc": "Generates Multifractal Features and returns X, y.",
+      "lineno": 57
+    },
+    {
+      "type": "function",
+      "name": "load_dataset",
+      "doc": "Loads CSV and computes features.",
+      "lineno": 79
+    },
+    {
+      "type": "function",
+      "name": "load_from_sqlite",
+      "doc": "Loads raw OHLC from SQLite and computes features.",
+      "lineno": 84
+    },
+    {
+      "type": "function",
+      "name": "train_gbm",
+      "doc": "Entrena GradientBoostingClassifier con TimeSeriesSplit.\n\nObjetivo: Minimizar LogLoss para clasificacin binaria.\nValidacin: Walk-forward para evitar look-ahead bias.\n\nReturns:\n    Path al modelo guardado",
+      "lineno": 117
+    },
+    {
+      "type": "function",
+      "name": "train_lstm",
+      "doc": "Entrena LSTM con Attention para capturar patrones secuenciales.\n\nArquitectura:\n- LSTM bidireccional con 2 capas\n- Self-Attention para ponderar velas relevantes\n- Clasificacin binaria (WIN/LOSS)\n\nReturns:\n    Path al modelo guardado",
+      "lineno": 207
+    },
+    {
+      "type": "class",
+      "name": "LSTMWithAttention",
+      "doc": null,
+      "lineno": 340
+    },
+    {
+      "type": "function",
+      "name": "train_all",
+      "doc": "Ejecuta pipeline de entrenamiento completo.",
+      "lineno": 387
+    },
+    {
+      "type": "function",
+      "name": "make_sequences",
+      "doc": "Convierte datos tabulares a secuencias 3D.",
+      "lineno": 231
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 341
+    },
+    {
+      "type": "function",
+      "name": "forward",
+      "doc": null,
+      "lineno": 367
+    }
+  ],
+  "app\\ml\\train_mtf_models.py": [
+    {
+      "type": "function",
+      "name": "load_data_mtf",
+      "doc": "Loads multitemporal data from institutional schema.",
+      "lineno": 33
+    },
+    {
+      "type": "function",
+      "name": "train_sniper",
+      "doc": "Trains a precision GBM model for entry timing.",
+      "lineno": 64
+    },
+    {
+      "type": "function",
+      "name": "train_strategist",
+      "doc": "Trains a structural bias model for trend identification.",
+      "lineno": 89
+    }
+  ],
+  "app\\models\\schemas.py": [
+    {
+      "type": "class",
+      "name": "ErrorDetail",
+      "doc": null,
+      "lineno": 11
+    },
+    {
+      "type": "class",
+      "name": "ResponseModel",
+      "doc": "Modelo de respuesta global. Garantiza que n8n siempre reciba\nla misma estructura, facilitando el parseo y la resiliencia.",
+      "lineno": 16
+    },
+    {
+      "type": "class",
+      "name": "MarketDataRequest",
+      "doc": null,
+      "lineno": 30
+    },
+    {
+      "type": "class",
+      "name": "TradeOrderRequest",
+      "doc": null,
+      "lineno": 36
+    },
+    {
+      "type": "class",
+      "name": "IndicatorRequest",
+      "doc": null,
+      "lineno": 45
+    },
+    {
+      "type": "class",
+      "name": "MQL5CodeRequest",
+      "doc": null,
+      "lineno": 53
+    },
+    {
+      "type": "class",
+      "name": "CalendarRequest",
+      "doc": null,
+      "lineno": 58
+    },
+    {
+      "type": "class",
+      "name": "HistoryRequest",
+      "doc": null,
+      "lineno": 63
+    },
+    {
+      "type": "class",
+      "name": "PanoramaRequest",
+      "doc": null,
+      "lineno": 66
+    },
+    {
+      "type": "class",
+      "name": "VolatilityRequest",
+      "doc": null,
+      "lineno": 69
+    },
+    {
+      "type": "class",
+      "name": "PositionManageRequest",
+      "doc": null,
+      "lineno": 74
+    },
+    {
+      "type": "class",
+      "name": "AccountMetrics",
+      "doc": null,
+      "lineno": 86
+    },
+    {
+      "type": "class",
+      "name": "Candle",
+      "doc": null,
+      "lineno": 96
+    },
+    {
+      "type": "class",
+      "name": "MarketDataResponse",
+      "doc": null,
+      "lineno": 104
+    },
+    {
+      "type": "class",
+      "name": "TradeOrderResponse",
+      "doc": null,
+      "lineno": 109
+    },
+    {
+      "type": "class",
+      "name": "VisionResponse",
+      "doc": null,
+      "lineno": 116
+    },
+    {
+      "type": "class",
+      "name": "VolatilityMetrics",
+      "doc": null,
+      "lineno": 122
+    },
+    {
+      "type": "class",
+      "name": "PositionActionResponse",
+      "doc": null,
+      "lineno": 129
+    }
+  ],
+  "app\\services\\analytics.py": [
+    {
+      "type": "class",
+      "name": "AnalyticsEngine",
+      "doc": "Institutional Analytics Engine for Strategy Audition.",
+      "lineno": 10
+    },
+    {
+      "type": "function",
+      "name": "get_performance_metrics",
+      "doc": "Calculates Sharpe Ratio, Win Rate, and Profit Factor from raw history.",
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "run_monte_carlo",
+      "doc": "Simulates strategy outcomes by shuffling returns.",
+      "lineno": 55
+    }
+  ],
+  "app\\services\\circuit_breaker.py": [
+    {
+      "type": "class",
+      "name": "CircuitBreaker",
+      "doc": "Institutional Circuit Breaker System.\nPrevents execution cascade failures during market anomalies or API downtime.",
+      "lineno": 8
+    },
+    {
+      "type": "function",
+      "name": "record_failure",
+      "doc": "Increments failure count and trips if threshold reached.",
+      "lineno": 19
+    },
+    {
+      "type": "function",
+      "name": "record_success",
+      "doc": "Resets failures and closes the circuit.",
+      "lineno": 32
+    },
+    {
+      "type": "function",
+      "name": "can_execute",
+      "doc": "Determines if the system is allowed to perform operations.",
+      "lineno": 41
+    },
+    {
+      "type": "function",
+      "name": "get_status",
+      "doc": null,
+      "lineno": 57
+    }
+  ],
+  "app\\services\\n8n_bridge.py": [
+    {
+      "type": "class",
+      "name": "AuditRequest",
+      "doc": "Solicitud de auditor\u00eda de trade para el LLM.",
+      "lineno": 26
+    },
+    {
+      "type": "class",
+      "name": "AuditResponse",
+      "doc": "Respuesta del LLM a la solicitud de auditor\u00eda.",
+      "lineno": 43
+    },
+    {
+      "type": "class",
+      "name": "N8NBridge",
+      "doc": "Puente de comunicaci\u00f3n con n8n para el ciclo RLAIF.",
+      "lineno": 53
+    },
+    {
+      "type": "function",
+      "name": "configure_n8n",
+      "doc": "MCP Tool: Configura el bridge de n8n.",
+      "lineno": 370
+    },
+    {
+      "type": "function",
+      "name": "get_n8n_status",
+      "doc": "MCP Tool: Obtiene estado del bridge n8n.",
+      "lineno": 376
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 61
+    },
+    {
+      "type": "function",
+      "name": "_load_config",
+      "doc": "Carga configuraci\u00f3n de n8n desde archivo, variables de entorno, o auto-discovery.",
+      "lineno": 68
+    },
+    {
+      "type": "function",
+      "name": "_auto_discover",
+      "doc": "Auto-discovery de n8n webhook.\nBusca n8n en puertos locales comunes y configura autom\u00e1ticamente.",
+      "lineno": 95
+    },
+    {
+      "type": "function",
+      "name": "save_config",
+      "doc": "Guarda configuraci\u00f3n de n8n.",
+      "lineno": 142
+    },
+    {
+      "type": "function",
+      "name": "request_audit",
+      "doc": "Solicita auditor\u00eda del LLM para un trade propuesto.\n\nEn modo SUPERVISED, el trade NO se ejecuta sin aprobaci\u00f3n.",
+      "lineno": 158
+    },
+    {
+      "type": "function",
+      "name": "send_performance_report",
+      "doc": "Env\u00eda reporte peri\u00f3dico de rendimiento al LLM.\nEl LLM puede monitorear sin bloquear operaciones.",
+      "lineno": 229
+    },
+    {
+      "type": "function",
+      "name": "send_system_event",
+      "doc": "[MODEL 5] Generic System Event Sender (Startup, Shutdown, Errors).",
+      "lineno": 264
+    },
+    {
+      "type": "function",
+      "name": "request_diagnosis",
+      "doc": "Solicita diagn\u00f3stico del LLM cuando el sistema entra en RECALIBRATION.\n\nEl LLM puede:\n- Sugerir cambios de par\u00e1metros\n- Solicitar reentrenamiento\n- Invocar herramientas MCP via Antigravity",
+      "lineno": 294
+    },
+    {
+      "type": "function",
+      "name": "_log_feedback",
+      "doc": "Guarda feedback del LLM para aprendizaje futuro.",
+      "lineno": 336
+    },
+    {
+      "type": "function",
+      "name": "get_status",
+      "doc": "Retorna estado del bridge.",
+      "lineno": 353
+    }
+  ],
+  "app\\services\\rag_memory.py": [
+    {
+      "type": "function",
+      "name": "_get_embedding_function",
+      "doc": "Lazy load del modelo de embeddings.",
+      "lineno": 21
+    },
+    {
+      "type": "function",
+      "name": "_get_collection",
+      "doc": "Lazy load de la coleccin ChromaDB.",
+      "lineno": 37
+    },
+    {
+      "type": "class",
+      "name": "RAGMemory",
+      "doc": "Singleton para gestin de memoria RAG.\n\nUso:\n    from app.services.rag_memory import rag_memory\n    \n    # Almacenar\n    rag_memory.store(\"El EUR/USD tiene soporte en 1.0850\", category=\"analysis\")\n    \n    # Buscar\n    results = rag_memory.search(\"soporte EUR/USD\", k=5)\n    \n    # Olvidar\n    rag_memory.forget(category=\"analysis\")",
+      "lineno": 66
+    },
+    {
+      "type": "function",
+      "name": "__new__",
+      "doc": null,
+      "lineno": 85
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 91
+    },
+    {
+      "type": "function",
+      "name": "store",
+      "doc": "Almacena texto en memoria permanente.\n\nArgs:\n    text: Texto a almacenar\n    category: Categora para organizacin (analysis, trade, news, etc.)\n    metadata: Metadatos adicionales opcionales\n\nReturns:\n    ID nico del documento almacenado",
+      "lineno": 97
+    },
+    {
+      "type": "function",
+      "name": "search",
+      "doc": "Bsqueda semntica en memoria.\n\nArgs:\n    query: Texto de bsqueda\n    k: Nmero mximo de resultados\n    category: Filtrar por categora (opcional)\n\nReturns:\n    Lista de documentos relevantes con score",
+      "lineno": 135
+    },
+    {
+      "type": "function",
+      "name": "forget",
+      "doc": "Elimina memorias por categora o IDs especficos.\n\nArgs:\n    category: Eliminar todas las memorias de esta categora\n    doc_ids: Lista de IDs especficos a eliminar\n\nReturns:\n    Nmero de documentos eliminados",
+      "lineno": 176
+    },
+    {
+      "type": "function",
+      "name": "count",
+      "doc": "Cuenta el nmero de memorias almacenadas.",
+      "lineno": 214
+    },
+    {
+      "type": "function",
+      "name": "get_categories",
+      "doc": "Obtiene lista de categoras nicas en la memoria.",
+      "lineno": 222
+    }
+  ],
+  "app\\services\\risk_engine.py": [
+    {
+      "type": "class",
+      "name": "TheVault",
+      "doc": "Sistema de protecci\u00f3n de capital estilo \"banco\".\n\nAl duplicar el capital inicial:\n- 50% de las ganancias se \"bloquean\" (vault_balance)\n- 50% se reinvierten para inter\u00e9s compuesto\n- Se genera alerta para transferir a cuenta de resguardo",
+      "lineno": 17
+    },
+    {
+      "type": "class",
+      "name": "RiskEngine",
+      "doc": "Institutional Risk Management Engine.\nHandles adaptive lot sizing, drawdown protection, exposure limits, and Vault integration.",
+      "lineno": 143
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 31
+    },
+    {
+      "type": "function",
+      "name": "_load_state",
+      "doc": "Carga estado persistido del Vault.",
+      "lineno": 40
+    },
+    {
+      "type": "function",
+      "name": "_save_state",
+      "doc": "Persiste estado del Vault.",
+      "lineno": 55
+    },
+    {
+      "type": "function",
+      "name": "check_vault_trigger",
+      "doc": "Verifica si se debe activar el Vault (al duplicar capital).\n\nReturns:\n    Dict con detalles de transferencia si se activa, None si no.",
+      "lineno": 69
+    },
+    {
+      "type": "function",
+      "name": "get_effective_margin",
+      "doc": "Retorna el margen efectivo para trading (excluyendo vault virtual).\nEl bot NO debe usar el vault_balance como margen.",
+      "lineno": 110
+    },
+    {
+      "type": "function",
+      "name": "get_status",
+      "doc": "Retorna estado completo del Vault.",
+      "lineno": 119
+    },
+    {
+      "type": "function",
+      "name": "pop_pending_alert",
+      "doc": "Extrae y retorna la siguiente alerta pendiente.",
+      "lineno": 132
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 149
+    },
+    {
+      "type": "function",
+      "name": "_ensure_daily_balance",
+      "doc": "Calcula o recupera el balance inicial del da para el drawdown.",
+      "lineno": 154
+    },
+    {
+      "type": "function",
+      "name": "calculate_dynamic_lot",
+      "doc": "[MODEL 3 REQUEST] Asignacin Neuronal Dinmica.\nWrapper sobre get_neural_allocation + get_adaptive_lots.",
+      "lineno": 166
+    },
+    {
+      "type": "function",
+      "name": "get_neural_allocation",
+      "doc": "Determina la asignacin de capital basada en la confianza neuronal.",
+      "lineno": 180
+    },
+    {
+      "type": "function",
+      "name": "get_adaptive_lots",
+      "doc": "Calculates lot size based on account equity, risk percent, SL distance AND Neural Multiplier.",
+      "lineno": 223
+    },
+    {
+      "type": "function",
+      "name": "check_drawdown_limit",
+      "doc": "Vetoes trading if the daily drawdown limit is reached.\nPhantom Mode: Pauses execution but continues analysis.",
+      "lineno": 229
+    },
+    {
+      "type": "function",
+      "name": "apply_trailing_stop",
+      "doc": "Aplica Trailing Stop basado en volatilidad (ATR).\nSi el precio se mueve 1.5 * ATR a favor, mueve el SL a Break Even.",
+      "lineno": 249
+    },
+    {
+      "type": "function",
+      "name": "_modify_sl",
+      "doc": null,
+      "lineno": 293
+    },
+    {
+      "type": "function",
+      "name": "get_capital_allocation",
+      "doc": "Regla 50/50 Dinmica: Divide el margen libre para Scalp vs Swing.",
+      "lineno": 308
+    },
+    {
+      "type": "function",
+      "name": "can_open_dual_trade",
+      "doc": "Verifica si hay margen suficiente para 2 operaciones de 0.01.",
+      "lineno": 335
+    },
+    {
+      "type": "function",
+      "name": "max_positions_allowed",
+      "doc": "Growth Trigger: Determina cuntas posiciones podemos tener basado en equity.",
+      "lineno": 354
+    }
+  ],
+  "app\\services\\supabase_sync.py": [
+    {
+      "type": "class",
+      "name": "SupabaseSync",
+      "doc": "Master Cloud Persistence Manager for the NEXUS Ecosystem.\n\nOrchestrates signal logging, institutional tick auditing, and performance\ntracking with built-in circuit breakers for cloud-latency resilience.\n\nAttributes:\n    _client: Supabase client instance.",
+      "lineno": 10
+    },
+    {
+      "type": "function",
+      "name": "client",
+      "doc": "Provides access to the raw Supabase client.",
+      "lineno": 22
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 26
+    },
+    {
+      "type": "function",
+      "name": "_initialize_client",
+      "doc": null,
+      "lineno": 29
+    },
+    {
+      "type": "function",
+      "name": "log_signal",
+      "doc": "Synchronizes a Sniper signal to the cloud.\n\nArgs:\n    data: Signal raw data and engineered reason.",
+      "lineno": 41
+    },
+    {
+      "type": "function",
+      "name": "log_tick",
+      "doc": "Asynchronously logs an institutional market tick.\n\nOptimized for high frequency with loose circuit breaker thresholds.",
+      "lineno": 77
+    },
+    {
+      "type": "function",
+      "name": "update_performance",
+      "doc": "Updates ML model performance track-record.",
+      "lineno": 101
+    },
+    {
+      "type": "function",
+      "name": "log_activity",
+      "doc": "Logs high-level bot activity events.\n\nArgs:\n    event: Event description.\n    level: INFO, WARNING, ERROR, CRITICAL.\n    details: Structured JSON metadata.",
+      "lineno": 119
+    }
+  ],
+  "app\\services\\telemetry.py": [
+    {
+      "type": "class",
+      "name": "TelemetryEngine",
+      "doc": "High-fidelity data pipeline to n8n for AI analysis.\nDispatches market state and bot performance.",
+      "lineno": 9
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "send_to_n8n",
+      "doc": "Dispatches structured JSON to n8n webhook.",
+      "lineno": 18
+    }
+  ],
+  "app\\skills\\advanced_analytics.py": [
+    {
+      "type": "class",
+      "name": "AdvancedAnalytics",
+      "doc": "Skills institucionales: Shadow Testing y Sentiment Proxy.",
+      "lineno": 11
+    },
+    {
+      "type": "function",
+      "name": "run_shadow_test",
+      "doc": "ML Shadow Testing: Ejecuta modelos en sombra para medir performance \nsin riesgo financiero.",
+      "lineno": 17
+    },
+    {
+      "type": "function",
+      "name": "get_market_sentiment",
+      "doc": "Sentiment Proxy: Obtiene el sentimiento del mercado desde fuentes externas.\nFiltro de seguridad ante eventos macro.",
+      "lineno": 42
+    },
+    {
+      "type": "function",
+      "name": "get_alpha_health_report",
+      "doc": "Health of the Alpha: Reporte consolidado de decaimiento del modelo \ny precisin institucional.",
+      "lineno": 67
+    }
+  ],
+  "app\\skills\\calendar.py": [
+    {
+      "type": "function",
+      "name": "get_economic_calendar",
+      "doc": "Obtiene eventos del calendario econmico de MT5.",
+      "lineno": 24
+    }
+  ],
+  "app\\skills\\custom_loader.py": [
+    {
+      "type": "function",
+      "name": "register_custom_skills",
+      "doc": "Escanea la carpeta 'indicadores propios' y registra cada .mq5 como una skill de lectura de datos.",
+      "lineno": 10
+    },
+    {
+      "type": "function",
+      "name": "register_indicator_tool",
+      "doc": "Registra dinmicamente una herramienta MCP para un indicador especfico.",
+      "lineno": 52
+    },
+    {
+      "type": "function",
+      "name": "register_python_pipeline_tools",
+      "doc": "Registra herramientas para ejecutar el pipeline de anlisis de Python.",
+      "lineno": 106
+    },
+    {
+      "type": "function",
+      "name": "indicator_tool",
+      "doc": "Obtiene los datos exportados por el indicador personalizado.\n- symbol: Smbolo del activo (ej: EURUSD)\n- timeframe: Temporalidad (ej: H1, M15)\n- n_rows: Nmero de registros ms recientes a retornar.",
+      "lineno": 59
+    },
+    {
+      "type": "function",
+      "name": "run_unified_analysis",
+      "doc": "Ejecuta el pipeline institucional completo: Ingesta, ML Training, Optimizacin y Dashboard.\n- symbol: Smbolo para el anlisis.\n- timeframe: Temporalidad.\n- data_path: (Opcional) Ruta al CSV especfico. Si no se da, usar la exportacin ms reciente.",
+      "lineno": 114
+    },
+    {
+      "type": "function",
+      "name": "get_analysis_report",
+      "doc": "Devuelve el estado de los ltimos resultados del pipeline (thresholds y mtricas ML).",
+      "lineno": 146
+    }
+  ],
+  "app\\skills\\execution.py": [
+    {
+      "type": "function",
+      "name": "send_order",
+      "doc": "Ejecuta una orden (Mercado o Pendiente) con validaciones de seguridad avanzadas.\nInstrumentado con OTel y Mtricas de Ejecucin.\n\nArgs:\n    order_data: Datos de la orden.\n    urgency_score: 0.0-1.0 (Output Neuronal). >0.9 = Panic/Breakout (Market), <0.6 = Patient (Limit).",
+      "lineno": 70
+    },
+    {
+      "type": "function",
+      "name": "execute_twin_trade",
+      "doc": "Protocolo Twin-Entry: Abre 2 rdenes simultneas con diferentes objetivos.\n- Orden A (Scalp): TP corto ($2 target), Magic = MAGIC_SCALP\n- Orden B (Swing): TP largo ($10+ target), Magic = MAGIC_SWING",
+      "lineno": 304
+    }
+  ],
+  "app\\skills\\feat_aceleracion.py": [
+    {
+      "type": "class",
+      "name": "MomentumType",
+      "doc": null,
+      "lineno": 31
+    },
+    {
+      "type": "class",
+      "name": "CandlePattern",
+      "doc": null,
+      "lineno": 39
+    },
+    {
+      "type": "function",
+      "name": "analyze_candle_structure",
+      "doc": "Analiza estructura de una vela individual.",
+      "lineno": 55
+    },
+    {
+      "type": "function",
+      "name": "classify_candle_pattern",
+      "doc": "Clasifica patrn de vela con score de confianza.",
+      "lineno": 101
+    },
+    {
+      "type": "function",
+      "name": "analyze_volume",
+      "doc": "Analiza volumen relativo.",
+      "lineno": 151
+    },
+    {
+      "type": "function",
+      "name": "detect_fakeout",
+      "doc": "Detecta si hubo un Fakeout en un nivel.\nFakeout = precio rompe nivel pero cierra con mecha volviendo al rango.",
+      "lineno": 191
+    },
+    {
+      "type": "function",
+      "name": "calculate_atr",
+      "doc": "Calcula Average True Range.",
+      "lineno": 241
+    },
+    {
+      "type": "function",
+      "name": "analyze_aceleracion",
+      "doc": " FEAT MODULE A: Validacin de Momentum (Chrono-Aware).\n\nConfirma si hay aceleracin real o es una trampa.\nEste es el ltimo filtro antes de ejecutar.",
+      "lineno": 266
+    },
+    {
+      "type": "function",
+      "name": "generate_momentum_features",
+      "doc": "Genera vector de features de momentum para ML.",
+      "lineno": 468
+    },
+    {
+      "type": "function",
+      "name": "feat_validate_aceleracion",
+      "doc": "MCP Tool: FEAT Module A - Aceleracin (legacy).",
+      "lineno": 488
+    },
+    {
+      "type": "function",
+      "name": "feat_validate_aceleracion_advanced",
+      "doc": "MCP Tool: FEAT Module A - Aceleracin (chrono-aware).",
+      "lineno": 497
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_momentum_features",
+      "doc": "MCP Tool: Generate ML-ready momentum features.",
+      "lineno": 506
+    }
+  ],
+  "app\\skills\\feat_chain.py": [
+    {
+      "type": "class",
+      "name": "FEATChain",
+      "doc": "The Rule Engine: Implementaci\u00f3n estricta de la estrategia FEAT.\nValida secuencialmente: Forma -> Espacio -> Aceleraci\u00f3n -> Tiempo.",
+      "lineno": 14
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 20
+    },
+    {
+      "type": "function",
+      "name": "analyze",
+      "doc": "Analiza si se cumplen las 4 condiciones del FEAT para entrar.\nReturn: True si (Forma & Espacio & Aceleracion & Tiempo).",
+      "lineno": 23
+    },
+    {
+      "type": "function",
+      "name": "_check_forma",
+      "doc": "Valida Estructura (BOS/CHOCH/Fractal).",
+      "lineno": 55
+    },
+    {
+      "type": "function",
+      "name": "_check_espacio",
+      "doc": "Valida Zona de Liquidez (FVG/OrderBlock).",
+      "lineno": 61
+    },
+    {
+      "type": "function",
+      "name": "_check_aceleracion",
+      "doc": "Valida Momentum y Volumen (Physics).",
+      "lineno": 66
+    },
+    {
+      "type": "function",
+      "name": "_check_tiempo",
+      "doc": "Valida Killzone Operativa (London/NY).",
+      "lineno": 84
+    }
+  ],
+  "app\\skills\\feat_espacio.py": [
+    {
+      "type": "class",
+      "name": "ZoneType",
+      "doc": null,
+      "lineno": 31
+    },
+    {
+      "type": "class",
+      "name": "ZoneStatus",
+      "doc": null,
+      "lineno": 40
+    },
+    {
+      "type": "class",
+      "name": "ZoneQuality",
+      "doc": null,
+      "lineno": 46
+    },
+    {
+      "type": "function",
+      "name": "detect_fvg",
+      "doc": "Detecta Fair Value Gaps con quality scoring.",
+      "lineno": 56
+    },
+    {
+      "type": "function",
+      "name": "detect_order_blocks",
+      "doc": "Detecta Order Blocks con validacin de FVG.",
+      "lineno": 147
+    },
+    {
+      "type": "function",
+      "name": "calculate_premium_discount",
+      "doc": "Calcula si el precio est en Premium (vender) o Discount (comprar).\nEquilibrium = 50%",
+      "lineno": 237
+    },
+    {
+      "type": "function",
+      "name": "analyze_espacio",
+      "doc": " FEAT MODULE E: Mapeo de Zonas de Liquidez (Chrono-Aware).\n\nBusca FVGs, Order Blocks y calcula Premium/Discount.\nIntegra contexto temporal para validar calidad de zonas.",
+      "lineno": 295
+    },
+    {
+      "type": "function",
+      "name": "generate_liquidity_features",
+      "doc": "Genera vector de features de liquidez para ML.",
+      "lineno": 451
+    },
+    {
+      "type": "function",
+      "name": "feat_map_espacio",
+      "doc": "MCP Tool: FEAT Module E - Espacio (legacy).",
+      "lineno": 471
+    },
+    {
+      "type": "function",
+      "name": "feat_map_espacio_advanced",
+      "doc": "MCP Tool: FEAT Module E - Espacio (chrono-aware).",
+      "lineno": 481
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_liquidity_features",
+      "doc": "MCP Tool: Generate ML-ready liquidity features.",
+      "lineno": 491
+    }
+  ],
+  "app\\skills\\feat_forma.py": [
+    {
+      "type": "class",
+      "name": "Trend",
+      "doc": null,
+      "lineno": 32
+    },
+    {
+      "type": "class",
+      "name": "StructuralEvent",
+      "doc": null,
+      "lineno": 39
+    },
+    {
+      "type": "class",
+      "name": "WyckoffPhase",
+      "doc": null,
+      "lineno": 49
+    },
+    {
+      "type": "function",
+      "name": "find_swing_points",
+      "doc": "Identifica Swing Highs y Swing Lows usando mtodo N-velas.",
+      "lineno": 65
+    },
+    {
+      "type": "function",
+      "name": "detect_structure",
+      "doc": "Analiza secuencia de swing points para determinar tendencia.\n\nReturns:\n    Tuple[Trend, reason, confidence_score]",
+      "lineno": 112
+    },
+    {
+      "type": "function",
+      "name": "detect_bos_choch",
+      "doc": "Detecta BOS/CHoCH con validacin temporal.\n\nREGLA CRTICA: \n- Solo cuenta como BOS si el CUERPO cierra ms all del nivel\n- Una MECHA es un SWEEP (toma de liquidez), no un BOS\n- En INDUCTION (Lunes), los BOS tienen menor confianza",
+      "lineno": 152
+    },
+    {
+      "type": "function",
+      "name": "detect_wyckoff_phase",
+      "doc": "Identifica fase de Wyckoff con score de confianza.",
+      "lineno": 285
+    },
+    {
+      "type": "function",
+      "name": "analyze_forma",
+      "doc": " FEAT MODULE F: Anlisis de Estructura de Mercado (Chrono-Aware).\n\nAnaliza en 3 temporalidades (fractalidad):\n- Macro (H4): Tendencia dominante\n- Intermedio (H1): Estructura operativa\n- Micro (M15): Confirmaciones tempranas\n\nINTEGRA contexto temporal de Module T para validar seales.",
+      "lineno": 342
+    },
+    {
+      "type": "function",
+      "name": "generate_structure_features",
+      "doc": "Genera vector de features para ML desde anlisis estructural.",
+      "lineno": 490
+    },
+    {
+      "type": "function",
+      "name": "feat_analyze_forma",
+      "doc": "MCP Tool: FEAT Module F - Forma (legacy).",
+      "lineno": 512
+    },
+    {
+      "type": "function",
+      "name": "feat_analyze_forma_advanced",
+      "doc": "MCP Tool: FEAT Module F - Forma (chrono-aware).",
+      "lineno": 522
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_structure_features",
+      "doc": "MCP Tool: Generate ML-ready structure features.",
+      "lineno": 532
+    }
+  ],
+  "app\\skills\\feat_intent.py": [
+    {
+      "type": "class",
+      "name": "TemporalTrendIntent",
+      "doc": "Decides if a signal has 'Institutional Intent' behind it.",
+      "lineno": 19
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 24
+    },
+    {
+      "type": "function",
+      "name": "calculate_intent_score",
+      "doc": "Calculates the TTI Score (0.0 - 1.0).\n\nArgs:\n    killzone_block: Output from killzone_intelligence\n    h4_direction: \"BULLISH\", \"BEARISH\", \"NEUTRAL\"\n    regime_context: Output from feat_regime (is_trending, is_trap)\n\nReturns:\n    Dict: {score, is_aligned, discount_factor}",
+      "lineno": 27
+    },
+    {
+      "type": "function",
+      "name": "_get_recommendation",
+      "doc": null,
+      "lineno": 100
+    }
+  ],
+  "app\\skills\\feat_regime.py": [
+    {
+      "type": "class",
+      "name": "MarketRegime",
+      "doc": null,
+      "lineno": 24
+    },
+    {
+      "type": "class",
+      "name": "MarketRegimeFSM",
+      "doc": "Probabilistic Finite State Machine for FEAT NEXUS.\nUses Bayesian-like heuristics to score each regime.",
+      "lineno": 33
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 39
+    },
+    {
+      "type": "function",
+      "name": "detect_regime",
+      "doc": "Detects current market regime.\n\nArgs:\n    physics_metrics: Output from market_physics (PVP, MCI, etc.)\n    temporal_features: Output from killzone_intelligence (Heat, State)\n    structure_context: Output from feat_forma (Trend, BOS)\n\nReturns:\n    Dict with 'best_regime', 'probabilities', 'confidence'",
+      "lineno": 44
+    }
+  ],
+  "app\\skills\\feat_sensory.py": [
+    {
+      "type": "class",
+      "name": "SensoryStack",
+      "doc": null,
+      "lineno": 26
+    },
+    {
+      "type": "function",
+      "name": "calculate_mss5_tensors",
+      "doc": null,
+      "lineno": 122
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 27
+    },
+    {
+      "type": "function",
+      "name": "calculate_mss5_tensors",
+      "doc": "Synthesizes raw data into 8 Neural Tensors.",
+      "lineno": 30
+    },
+    {
+      "type": "function",
+      "name": "_empty_response",
+      "doc": null,
+      "lineno": 111
+    }
+  ],
+  "app\\skills\\feat_tiempo.py": [
+    {
+      "type": "class",
+      "name": "SessionPhase",
+      "doc": null,
+      "lineno": 48
+    },
+    {
+      "type": "class",
+      "name": "WeeklyCycle",
+      "doc": null,
+      "lineno": 61
+    },
+    {
+      "type": "class",
+      "name": "EntryTemplate",
+      "doc": null,
+      "lineno": 69
+    },
+    {
+      "type": "function",
+      "name": "get_bolivia_time",
+      "doc": "Convierte UTC a Bolivia (UTC-4).",
+      "lineno": 179
+    },
+    {
+      "type": "function",
+      "name": "get_ny_time",
+      "doc": "Convierte UTC a NY.",
+      "lineno": 194
+    },
+    {
+      "type": "class",
+      "name": "NeuralKillzone",
+      "doc": "Sistema de Timing Dinmico basado en Actividad Real (Ticks/Spread)\nen lugar de solo horario fijo.",
+      "lineno": 213
+    },
+    {
+      "type": "function",
+      "name": "get_session_info",
+      "doc": "Obtiene info de sesin enriquecida con Timing Neuronal.",
+      "lineno": 269
+    },
+    {
+      "type": "function",
+      "name": "check_near_fix",
+      "doc": "Verifica proximidad a LBMA/SGE fixes.",
+      "lineno": 300
+    },
+    {
+      "type": "function",
+      "name": "calculate_alignment_score",
+      "doc": "Calcula score de alineacin multi-timeframe.\n\nReglas:\n- D1 + H4 aligned = 100% size\n- H4 aligned, D1 neutral = 50% size\n- D1 contrary = AVOID or minimal size",
+      "lineno": 325
+    },
+    {
+      "type": "function",
+      "name": "match_entry_template",
+      "doc": "Determina qu plantilla de entrada aplica.",
+      "lineno": 392
+    },
+    {
+      "type": "function",
+      "name": "analyze_tiempo_institucional",
+      "doc": " FEAT TIEMPO INSTITUCIONAL: Anlisis completo para GC/XAU.\n\nIntegra:\n- Sesiones globales (Globex, Asia, London, NY)\n- LBMA/SGE fixes\n- Ciclo semanal\n- Alineacin multi-timeframe\n- Plantillas de entrada",
+      "lineno": 465
+    },
+    {
+      "type": "function",
+      "name": "analyze_tiempo",
+      "doc": "Wrapper legacy.",
+      "lineno": 641
+    },
+    {
+      "type": "function",
+      "name": "generate_chrono_features",
+      "doc": "Wrapper para ML features.",
+      "lineno": 654
+    },
+    {
+      "type": "function",
+      "name": "feat_check_tiempo",
+      "doc": null,
+      "lineno": 670
+    },
+    {
+      "type": "function",
+      "name": "feat_check_tiempo_advanced",
+      "doc": null,
+      "lineno": 673
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_chrono_features",
+      "doc": null,
+      "lineno": 676
+    },
+    {
+      "type": "function",
+      "name": "feat_analyze_tiempo_institucional",
+      "doc": "MCP Tool: Anlisis institucional completo.",
+      "lineno": 679
+    },
+    {
+      "type": "function",
+      "name": "evaluate_activity",
+      "doc": "Retorna un 'Activity Score' (0.0 - 1.0).",
+      "lineno": 224
+    },
+    {
+      "type": "function",
+      "name": "is_killzone_active",
+      "doc": "Logic:\n1. Base Schedule Check (Is it conceptually a Killzone hour?)\n2. Neural Check (Is the market actually moving?)",
+      "lineno": 242
+    }
+  ],
+  "app\\skills\\history.py": [
+    {
+      "type": "function",
+      "name": "get_trade_history",
+      "doc": "Obtiene el historial de rdenes cerradas y calcula mtricas de rendimiento.",
+      "lineno": 15
+    }
+  ],
+  "app\\skills\\indicators.py": [
+    {
+      "type": "function",
+      "name": "_smma",
+      "doc": "Smoothed Moving Average (SMMA).\nFormula: SMMA(i) = (Sum - SMMA(i-1) + Close(i)) / period",
+      "lineno": 5
+    },
+    {
+      "type": "function",
+      "name": "calculate_feat_layers",
+      "doc": "Calcula las capas de la F\u00edsica de Capas Multifractales (FEAT).",
+      "lineno": 12
+    },
+    {
+      "type": "function",
+      "name": "detect_regime",
+      "doc": "Modular Engineering: Regime Detection Logic.",
+      "lineno": 43
+    }
+  ],
+  "app\\skills\\killzone_intelligence.py": [
+    {
+      "type": "class",
+      "name": "LiquidityState",
+      "doc": null,
+      "lineno": 39
+    },
+    {
+      "type": "class",
+      "name": "ActionRecommendation",
+      "doc": null,
+      "lineno": 51
+    },
+    {
+      "type": "class",
+      "name": "ConfirmationLevel",
+      "doc": null,
+      "lineno": 268
+    },
+    {
+      "type": "function",
+      "name": "get_bolivia_time",
+      "doc": "Convert UTC to Bolivia time (UTC-4).",
+      "lineno": 302
+    },
+    {
+      "type": "function",
+      "name": "get_current_block",
+      "doc": "Get the current 15-min killzone block.\nReturns block info or None if outside killzone (09:00-13:00).",
+      "lineno": 317
+    },
+    {
+      "type": "function",
+      "name": "get_all_blocks_ml_features",
+      "doc": "Generate ML features for all blocks.\nUsed for training the neural network.",
+      "lineno": 371
+    },
+    {
+      "type": "function",
+      "name": "calculate_alignment_factor",
+      "doc": "Calculate alignment factor (-1.0 to +1.0) for ML input.\n\n+1.0 = All bullish aligned\n-1.0 = All bearish aligned\n0.0 = Conflict or neutral",
+      "lineno": 392
+    },
+    {
+      "type": "function",
+      "name": "check_h1_confirmation",
+      "doc": "Check H1 confirmation level.\n\nReturns confirmation level and whether to proceed.",
+      "lineno": 451
+    },
+    {
+      "type": "function",
+      "name": "generate_temporal_ml_features",
+      "doc": "Generate complete ML feature vector for current moment.\nThis is what the neural network receives as input.",
+      "lineno": 511
+    },
+    {
+      "type": "function",
+      "name": "feat_get_current_killzone_block",
+      "doc": "MCP Tool: Get current 15-min killzone block.",
+      "lineno": 606
+    },
+    {
+      "type": "function",
+      "name": "feat_generate_temporal_features",
+      "doc": "MCP Tool: Generate temporal ML features.",
+      "lineno": 620
+    },
+    {
+      "type": "function",
+      "name": "feat_check_h1_confirmation",
+      "doc": "MCP Tool: Check H1 confirmation level.",
+      "lineno": 633
+    },
+    {
+      "type": "function",
+      "name": "direction_to_value",
+      "doc": null,
+      "lineno": 404
+    }
+  ],
+  "app\\skills\\liquidity.py": [
+    {
+      "type": "class",
+      "name": "LiquidityEngine",
+      "doc": "Sniper 2.0 Liquidity Analysis.\nAnalyzes Depth of Market (DoM) to ensure institutional fill quality.",
+      "lineno": 9
+    },
+    {
+      "type": "function",
+      "name": "check_liquidity_preflight",
+      "doc": "Institutional Guard: Pre-flight check for liquidity.",
+      "lineno": 58
+    },
+    {
+      "type": "function",
+      "name": "get_market_depth",
+      "doc": "Retrieves and analyzes the Depth of Market (if supported by broker).\nInstrumentado con OTel.",
+      "lineno": 16
+    }
+  ],
+  "app\\skills\\liquidity_detector.py": [
+    {
+      "type": "function",
+      "name": "get_current_kill_zone",
+      "doc": "Determina la Kill Zone activa basndose en la hora actual.\n\nReturns:\n    \"NY\", \"LONDON\", \"ASIA\" o None si no hay KZ activa.",
+      "lineno": 31
+    },
+    {
+      "type": "function",
+      "name": "is_in_kill_zone",
+      "doc": "Verifica si estamos dentro de una Kill Zone especfica.",
+      "lineno": 55
+    },
+    {
+      "type": "function",
+      "name": "detect_liquidity_pools",
+      "doc": "Detecta piscinas de liquidez basadas en Swing Highs/Lows no mitigados.\n\nArgs:\n    candles: DataFrame con columnas ['high', 'low', 'close', 'time']\n    lookback: Nmero de velas a analizar\n    min_touches: Mnimo de toques para considerar zona vlida\n    \nReturns:\n    Dict con liquidity_above, liquidity_below, y pools list",
+      "lineno": 63
+    },
+    {
+      "type": "function",
+      "name": "detect_asian_sweep",
+      "doc": "Detecta si el precio ha barrido (sweep) el rango de la sesin asitica.\n\nUn sweep ocurre cuando el precio rompe el High/Low de Asia y \nluego vuelve a entrar en el rango con fuerza.",
+      "lineno": 138
+    },
+    {
+      "type": "function",
+      "name": "detect_fvg",
+      "doc": "Detecta Fair Value Gaps (FVG) - zonas de ineficiencia de precio.\n\nBullish FVG: Candle1.high < Candle3.low (gap alcista)\nBearish FVG: Candle1.low > Candle3.high (gap bajista)",
+      "lineno": 163
+    },
+    {
+      "type": "function",
+      "name": "calculate_body_wick_ratio",
+      "doc": "Calcula el ratio Cuerpo/Mecha de una vela.\nVelas de intencin tienen > 70% cuerpo.",
+      "lineno": 206
+    },
+    {
+      "type": "function",
+      "name": "is_intention_candle",
+      "doc": "Determina si una vela es de \"intencin\" (cuerpo > 70% del rango).",
+      "lineno": 222
+    },
+    {
+      "type": "class",
+      "name": "MarketStateTensor",
+      "doc": "Construye un tensor de estado de mercado multidimensional.\nCapas: Macro (H4/D1), Structural (H1/M15), Execution (M5/M1)",
+      "lineno": 233
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 239
+    },
+    {
+      "type": "function",
+      "name": "build_tensor",
+      "doc": "Construye el tensor completo de estado de mercado.",
+      "lineno": 244
+    },
+    {
+      "type": "function",
+      "name": "_build_macro_layer",
+      "doc": "H4/D1: Bias y Espacio (POI)",
+      "lineno": 273
+    },
+    {
+      "type": "function",
+      "name": "_build_structural_layer",
+      "doc": "H1/M15: Forma y Sincrona (CHoCH, W/M patterns)",
+      "lineno": 310
+    },
+    {
+      "type": "function",
+      "name": "_build_execution_layer",
+      "doc": "M5/M1: Aceleracin y Tiempo (Volume, Intention)",
+      "lineno": 335
+    },
+    {
+      "type": "function",
+      "name": "_calculate_alignment",
+      "doc": "Calcula el score de alineacin entre capas (0-100).\n100 = Todas las capas alineadas en la misma direccin.",
+      "lineno": 362
+    },
+    {
+      "type": "function",
+      "name": "_simple_rsi",
+      "doc": "Clculo simple de RSI.",
+      "lineno": 399
+    }
+  ],
+  "app\\skills\\market.py": [
+    {
+      "type": "function",
+      "name": "_clean_cache",
+      "doc": "Mantiene el tamao del cach bajo control.",
+      "lineno": 46
+    },
+    {
+      "type": "function",
+      "name": "get_candles",
+      "doc": "Obtiene las ltimas N velas con sistema de cach de 3 segundos.\nSoporta formato CSV para ahorrar tokens en la ventana de contexto de la IA.",
+      "lineno": 55
+    },
+    {
+      "type": "function",
+      "name": "get_account_metrics",
+      "doc": "Obtiene mtricas de la cuenta con cach de 0.5 segundos.",
+      "lineno": 123
+    },
+    {
+      "type": "function",
+      "name": "get_volatility_metrics",
+      "doc": "Calcula mtricas de volatilidad (ATR y Spread) para un smbolo.",
+      "lineno": 163
+    },
+    {
+      "type": "function",
+      "name": "get_market_snapshot",
+      "doc": "Obtiene una radiografa completa del mercado en un solo llamado.\nCombina: ltima vela, Quote actual, Mtricas de Cuenta y Volatilidad.\nEsencial para que el agente tome decisiones rpidas (Ojo de Halcn).",
+      "lineno": 229
+    }
+  ],
+  "app\\skills\\market_physics.py": [
+    {
+      "type": "class",
+      "name": "MarketRegime",
+      "doc": null,
+      "lineno": 12
+    },
+    {
+      "type": "class",
+      "name": "MarketPhysics",
+      "doc": "The Sensory Cortex: Procesa ticks en tiempo real para detectar Aceleraci\u00f3n.\nInput: Ticks Crudos (ZMQ).\nOutput: Se\u00f1ales F\u00edsicas (Aceleraci\u00f3n, Inercia, Fricci\u00f3n).",
+      "lineno": 17
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 24
+    },
+    {
+      "type": "function",
+      "name": "ingest_tick",
+      "doc": "Punto de entrada principal para datos de ZMQ.\n\nArgs:\n    data (dict): JSON crudo del bridge ZMQ.\n                 Estructura esperada: {'symbol': 'XAUUSD', 'bid': 2030.5, 'tick_vol': 15, ...}",
+      "lineno": 31
+    },
+    {
+      "type": "function",
+      "name": "calculate_acceleration",
+      "doc": "L\u00f3gica FEAT: Aceleraci\u00f3n = Volumen > 2x Media(20) + Desplazamiento.",
+      "lineno": 59
+    }
+  ],
+  "app\\skills\\ml_sniper.py": [
+    {
+      "type": "class",
+      "name": "MLSniper",
+      "doc": "ML-Lite Setup Classifier 2.0.\nUses pattern confluence to score trading setups.",
+      "lineno": 8
+    },
+    {
+      "type": "function",
+      "name": "score_setup",
+      "doc": "Calculates a 'Confidence Score' using multiple indicator convergences.\nSimulates supervised classification (RandomForest logic).",
+      "lineno": 15
+    }
+  ],
+  "app\\skills\\quant_coder.py": [
+    {
+      "type": "function",
+      "name": "create_native_indicator",
+      "doc": "Toma cdigo MQL5, lo guarda en la carpeta de indicadores de MT5 e intenta compilarlo.",
+      "lineno": 16
+    }
+  ],
+  "app\\skills\\remote_compute.py": [
+    {
+      "type": "class",
+      "name": "RemoteWorker",
+      "doc": "Gestor de ejecucin remota va SSH para Offloading de cmputo.",
+      "lineno": 9
+    },
+    {
+      "type": "function",
+      "name": "register_remote_skills",
+      "doc": "Registra las herramientas de cmputo remoto en el MCP.",
+      "lineno": 66
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "_get_client",
+      "doc": null,
+      "lineno": 19
+    },
+    {
+      "type": "function",
+      "name": "execute_remote_cmd",
+      "doc": "Ejecuta un comando en el servidor remoto y retorna la salida.",
+      "lineno": 39
+    },
+    {
+      "type": "function",
+      "name": "execute_remote_task",
+      "doc": "Ejecuta una tarea de computo pesado (ML training, Optuna) en un servidor remoto via SSH.\nRequiere configuracin previa en .env (SSH_HOST, SSH_USER, SSH_KEY_PATH).",
+      "lineno": 70
+    },
+    {
+      "type": "function",
+      "name": "check_remote_status",
+      "doc": "Verifica la conectividad con el servidor de compute offloading.",
+      "lineno": 78
+    },
+    {
+      "type": "function",
+      "name": "run_cmd",
+      "doc": null,
+      "lineno": 49
+    }
+  ],
+  "app\\skills\\skill_deep_auditor.py": [
+    {
+      "type": "class",
+      "name": "DeepAuditor",
+      "doc": "\ud83d\udd2c INSTITUTIONAL GRADE AUDITOR\nAnalyzes system health, ML performance, and data integrity.",
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "run_deep_audit",
+      "doc": null,
+      "lineno": 113
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 18
+    },
+    {
+      "type": "function",
+      "name": "run_comprehensive_audit",
+      "doc": null,
+      "lineno": 23
+    },
+    {
+      "type": "function",
+      "name": "_audit_database",
+      "doc": null,
+      "lineno": 53
+    },
+    {
+      "type": "function",
+      "name": "_audit_ml_features",
+      "doc": "Check for NaN or Dead features in the last batch.",
+      "lineno": 76
+    },
+    {
+      "type": "function",
+      "name": "_audit_infrastructure",
+      "doc": null,
+      "lineno": 105
+    }
+  ],
+  "app\\skills\\system_ops.py": [
+    {
+      "type": "function",
+      "name": "system_health_check",
+      "doc": "Revisa la salud del servidor (CPU, RAM, Disco).\ntil para auto-diagnstico antes de operaciones pesadas.",
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "get_process_info",
+      "doc": "Obtiene informacin sobre los procesos del contenedor.",
+      "lineno": 87
+    },
+    {
+      "type": "function",
+      "name": "get_environment_info",
+      "doc": "Obtiene informacin del entorno de ejecucin.",
+      "lineno": 110
+    },
+    {
+      "type": "function",
+      "name": "list_running_tasks",
+      "doc": "Lista las tareas asyncio activas.\ntil para debugging de procesos colgados.",
+      "lineno": 128
+    },
+    {
+      "type": "function",
+      "name": "cleanup_cache",
+      "doc": "Limpia caches de Python para liberar memoria.",
+      "lineno": 147
+    },
+    {
+      "type": "function",
+      "name": "restart_internal_service",
+      "doc": "(PELIGROSO) Intenta reiniciar servicios internos.\nSolo debe usarse como ltimo recurso.\n\nServicios vlidos: zmq_bridge, rag_memory, watchdog",
+      "lineno": 163
+    }
+  ],
+  "app\\skills\\tester.py": [
+    {
+      "type": "function",
+      "name": "run_strategy_test",
+      "doc": "Automates the MT5 Strategy Tester by creating an INI file and running terminal64.exe via CLI.",
+      "lineno": 16
+    }
+  ],
+  "app\\skills\\trade_mgmt.py": [
+    {
+      "type": "function",
+      "name": "manage_position",
+      "doc": "Gestiona posiciones abiertas: Cierre total/parcial o modificacin de SL/TP.",
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "apply_neuro_trailing",
+      "doc": "Apply Dynamic Trailing Stop based on Neural Volatility Regime.\n\nArgs:\n    ticket: Ticket ID.\n    neural_sl_price: Proposed SL price by Neural Net.\n    volatility_regime: 'HIGH', 'NORMAL', 'LOW' (affects buffer).",
+      "lineno": 134
+    }
+  ],
+  "app\\skills\\unified_model.py": [
+    {
+      "type": "class",
+      "name": "UnifiedModelDB",
+      "doc": null,
+      "lineno": 12
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "_get_connection",
+      "doc": null,
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "query_custom_sql",
+      "doc": "Ejecuta una consulta SQL de solo lectura sobre el Unified Model.",
+      "lineno": 21
+    },
+    {
+      "type": "function",
+      "name": "get_fsm_transition_matrix",
+      "doc": "Recupera la matriz de probabilidad de transicin de estados de la FSM.",
+      "lineno": 43
+    }
+  ],
+  "app\\skills\\vision.py": [
+    {
+      "type": "function",
+      "name": "capture_panorama",
+      "doc": "Captura la pantalla actual de la terminal MT5 de forma segura.",
+      "lineno": 17
+    }
+  ],
+  "brain_core\\db_engine.py": [
+    {
+      "type": "class",
+      "name": "StateRecord",
+      "doc": "Record of a single state observation.",
+      "lineno": 23
+    },
+    {
+      "type": "class",
+      "name": "TransitionRecord",
+      "doc": "Record of a state transition.",
+      "lineno": 39
+    },
+    {
+      "type": "class",
+      "name": "CalibrationRecord",
+      "doc": "Record of a calibration run.",
+      "lineno": 51
+    },
+    {
+      "type": "class",
+      "name": "UnifiedModelDB",
+      "doc": "SQLite database for Unified Model state history and calibration.\n\nTables:\n- state_history: All state observations\n- transitions: State transition events\n- calibrations: Calibration runs and parameters",
+      "lineno": 61
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 71
+    },
+    {
+      "type": "function",
+      "name": "_connect",
+      "doc": "Establish database connection.",
+      "lineno": 77
+    },
+    {
+      "type": "function",
+      "name": "_transaction",
+      "doc": "Context manager for transactions.",
+      "lineno": 88
+    },
+    {
+      "type": "function",
+      "name": "_create_tables",
+      "doc": "Create database schema.",
+      "lineno": 97
+    },
+    {
+      "type": "function",
+      "name": "log_state",
+      "doc": "Log current state to database.\n\nArgs:\n    symbol: Trading symbol (e.g., 'EURUSD')\n    timeframe: Timeframe (e.g., 'H1')\n    state: Current state name\n    confidence: Confidence score (0-100)\n    metrics: Dictionary with effort, result, compression, slope, speed, feat_score\n\nReturns:\n    ID of inserted record",
+      "lineno": 154
+    },
+    {
+      "type": "function",
+      "name": "log_state_batch",
+      "doc": "Log multiple state records efficiently.",
+      "lineno": 190
+    },
+    {
+      "type": "function",
+      "name": "get_state_history",
+      "doc": "Get state history for a symbol/timeframe.",
+      "lineno": 205
+    },
+    {
+      "type": "function",
+      "name": "get_state_distribution",
+      "doc": "Get distribution of states over time period.",
+      "lineno": 231
+    },
+    {
+      "type": "function",
+      "name": "log_transition",
+      "doc": "Log a state transition.",
+      "lineno": 251
+    },
+    {
+      "type": "function",
+      "name": "get_transition_stats",
+      "doc": "Get transition statistics for analysis.",
+      "lineno": 267
+    },
+    {
+      "type": "function",
+      "name": "get_transition_matrix",
+      "doc": "Get transition count matrix.",
+      "lineno": 289
+    },
+    {
+      "type": "function",
+      "name": "save_calibration",
+      "doc": "Save a calibration configuration.",
+      "lineno": 312
+    },
+    {
+      "type": "function",
+      "name": "get_active_calibration",
+      "doc": "Get the currently active calibration.",
+      "lineno": 341
+    },
+    {
+      "type": "function",
+      "name": "get_calibration_history",
+      "doc": "Get calibration history.",
+      "lineno": 359
+    },
+    {
+      "type": "function",
+      "name": "get_performance_summary",
+      "doc": "Get performance summary for a symbol/timeframe.",
+      "lineno": 382
+    },
+    {
+      "type": "function",
+      "name": "export_to_csv",
+      "doc": "Export table data to CSV.",
+      "lineno": 423
+    },
+    {
+      "type": "function",
+      "name": "cleanup_old_data",
+      "doc": "Remove data older than specified days.",
+      "lineno": 461
+    },
+    {
+      "type": "function",
+      "name": "get_table_stats",
+      "doc": "Get row counts for all tables.",
+      "lineno": 486
+    },
+    {
+      "type": "function",
+      "name": "get_narrative_history",
+      "doc": "Extrae la historia del modelo y la convierte en una narrativa natural para RAG.\nCombina estados y transiciones en una serie cronolgica legible.",
+      "lineno": 497
+    },
+    {
+      "type": "function",
+      "name": "close",
+      "doc": "Close database connection.",
+      "lineno": 543
+    },
+    {
+      "type": "function",
+      "name": "__enter__",
+      "doc": null,
+      "lineno": 549
+    },
+    {
+      "type": "function",
+      "name": "__exit__",
+      "doc": null,
+      "lineno": 552
+    }
+  ],
+  "brain_core\\drift_monitor.py": [
+    {
+      "type": "class",
+      "name": "DriftDetector",
+      "doc": "Monitors statistical distance between Recent Market Data (Live)\nand Training Data (Baseline).",
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 21
+    },
+    {
+      "type": "function",
+      "name": "update_baseline",
+      "doc": "Updates the baseline statistics from new training data.",
+      "lineno": 27
+    },
+    {
+      "type": "function",
+      "name": "detect_drift",
+      "doc": "Checks if the current value (e.g., Volatility, Error Rate, Feature Vector Norm)\nhas drifted from the baseline.\n\nReturns:\n    Dict with drift_score, is_drift, severity.",
+      "lineno": 42
+    }
+  ],
+  "brain_core\\feat_memory_mcp.py": [
+    {
+      "type": "function",
+      "name": "ingest_memories",
+      "doc": "Extrae la historia narrativa de la base de datos SQLite y la indexa en la memoria vectorial.\nLlamar peridicamente para mantener la memoria actualizada.",
+      "lineno": 37
+    },
+    {
+      "type": "function",
+      "name": "query_memory",
+      "doc": "Realiza una bsqueda semntica en la memoria histrica del bot. \nEjemplo: 'Qu pas la ltima vez que el score fue bajo?' o 'Busca patrones de expansin en EURUSD'.",
+      "lineno": 69
+    }
+  ],
+  "brain_core\\mcp_server.py": [
+    {
+      "type": "function",
+      "name": "app_lifespan",
+      "doc": "Maneja el ciclo de vida institucional: MT5 + ZMQ Bridge.",
+      "lineno": 42
+    },
+    {
+      "type": "function",
+      "name": "create_and_compile_indicator",
+      "doc": "Escribe y compila un nuevo indicador .mq5. \nRetorna el log de compilacin para auto-correccin.",
+      "lineno": 86
+    },
+    {
+      "type": "function",
+      "name": "get_market_snapshot",
+      "doc": "Radiografa completa del mercado: Precio, Vela actual, Volatilidad y Cuenta.\nIdeal para decisiones de alta frecuencia.",
+      "lineno": 99
+    },
+    {
+      "type": "function",
+      "name": "get_candles",
+      "doc": "Obtiene velas histricas (OHLCV).",
+      "lineno": 107
+    },
+    {
+      "type": "function",
+      "name": "get_market_panorama",
+      "doc": "Captura visual del grfico.",
+      "lineno": 112
+    },
+    {
+      "type": "function",
+      "name": "run_shadow_backtest",
+      "doc": "Ejecuta una prueba de estrategia en segundo plano usando el Strategy Tester de MT5.",
+      "lineno": 121
+    },
+    {
+      "type": "function",
+      "name": "query_unified_brain",
+      "doc": "Consulta la base de datos de conocimiento unificado (Unified Model).\nSolo permite SELECT.",
+      "lineno": 150
+    },
+    {
+      "type": "function",
+      "name": "execute_trade",
+      "doc": "Ejecuta rdenes: BUY, SELL, LIMIT, STOP.",
+      "lineno": 162
+    },
+    {
+      "type": "function",
+      "name": "manage_trade",
+      "doc": "Gestiona posiciones: CLOSE, MODIFY_SL_TP, DELETE.",
+      "lineno": 169
+    },
+    {
+      "type": "function",
+      "name": "get_account_status",
+      "doc": "Estado financiero de la cuenta.",
+      "lineno": 176
+    },
+    {
+      "type": "function",
+      "name": "get_economic_calendar",
+      "doc": "Eventos econmicos de alto impacto prximos.",
+      "lineno": 181
+    },
+    {
+      "type": "function",
+      "name": "get_live_signals",
+      "doc": "Stream de seales ZMQ disponibles.",
+      "lineno": 191
+    },
+    {
+      "type": "function",
+      "name": "ingest_memories",
+      "doc": "Sincroniza el historial de SQLite con la memoria vectorial RAG. \nPermite al bot recordar eventos pasados.",
+      "lineno": 200
+    },
+    {
+      "type": "function",
+      "name": "query_memory",
+      "doc": "Consulta la memoria histrica usando lenguaje natural.\nEjemplo: 'Cmo nos fue con la ltima divergencia?'",
+      "lineno": 223
+    },
+    {
+      "type": "function",
+      "name": "get_inference_full_context",
+      "doc": "Expone el 'pensamiento' completo de la Red Neuronal para auditor\u00eda del LLM.\n\nReturns:\n    - input_tensors: Datos normalizados que entraron al modelo\n    - feat_scores: Vectores FEAT (Form, Espacio, Aceleraci\u00f3n, Tiempo)\n    - prediction: Probabilidad y propuesta de trade\n    - justification: Explicaci\u00f3n textual del razonamiento",
+      "lineno": 243
+    },
+    {
+      "type": "function",
+      "name": "_generate_justification",
+      "doc": "Genera explicaci\u00f3n textual del razonamiento de la NN.",
+      "lineno": 311
+    },
+    {
+      "type": "function",
+      "name": "get_neural_state",
+      "doc": "Retorna el estado actual del FSM y m\u00e9tricas de rendimiento.\nUsado por n8n para decidir el modo de operaci\u00f3n.",
+      "lineno": 344
+    },
+    {
+      "type": "function",
+      "name": "get_vault_status",
+      "doc": "Retorna estado del sistema de protecci\u00f3n de capital (The Vault).",
+      "lineno": 378
+    },
+    {
+      "type": "function",
+      "name": "store_trade_reflection",
+      "doc": "Guarda la reflexi\u00f3n de un trade para aprendizaje futuro.\nIndexa en ChromaDB para futuras consultas sem\u00e1nticas.",
+      "lineno": 390
+    },
+    {
+      "type": "function",
+      "name": "request_code_change",
+      "doc": "Permite a n8n/LLM solicitar cambios de c\u00f3digo.\n\nEl agente Antigravity monitorea este archivo para ejecutar cambios.\n\nArgs:\n    file_path: Ruta relativa al archivo a modificar\n    description: Descripci\u00f3n del cambio requerido\n    change_type: Tipo de cambio (bug_fix, improvement, refactor, feature)\n    suggested_code: C\u00f3digo sugerido (opcional)\n    urgency: Nivel de urgencia (low, normal, high, critical)\n\nReturns:\n    Ticket de solicitud para tracking",
+      "lineno": 430
+    },
+    {
+      "type": "function",
+      "name": "get_pending_code_changes",
+      "doc": "Lista solicitudes de cambio de c\u00f3digo pendientes.\n\u00datil para que Antigravity poll las solicitudes.",
+      "lineno": 489
+    },
+    {
+      "type": "function",
+      "name": "complete_code_change",
+      "doc": "Marca una solicitud de cambio como completada.\nLlamado por Antigravity despu\u00e9s de aplicar el cambio.",
+      "lineno": 519
+    },
+    {
+      "type": "function",
+      "name": "on_signal",
+      "doc": null,
+      "lineno": 48
+    }
+  ],
+  "brain_core\\app\\main.py": [
+    {
+      "type": "function",
+      "name": "lifespan",
+      "doc": "Gestiona el ciclo de vida de la aplicacin:\n- Conecta con MT5 al iniciar.\n- Desconecta al cerrar.",
+      "lineno": 37
+    },
+    {
+      "type": "function",
+      "name": "add_correlation_id_header",
+      "doc": null,
+      "lineno": 77
+    },
+    {
+      "type": "function",
+      "name": "global_exception_handler",
+      "doc": "Captura cualquier error no controlado y lo devuelve en el formato Envelope.\nGarantiza que n8n nunca reciba un error plano.",
+      "lineno": 89
+    },
+    {
+      "type": "function",
+      "name": "health_check",
+      "doc": "Verifica el estado de la conexin con MetaTrader 5.",
+      "lineno": 117
+    },
+    {
+      "type": "function",
+      "name": "get_candles",
+      "doc": "Obtiene datos OHLC con sistema de cach.",
+      "lineno": 132
+    },
+    {
+      "type": "function",
+      "name": "get_account_metrics",
+      "doc": "Obtiene mtricas clave de la cuenta para gestin de riesgo.",
+      "lineno": 154
+    },
+    {
+      "type": "function",
+      "name": "capture_panorama",
+      "doc": "Captura la pantalla actual de MT5 para anlisis visual.",
+      "lineno": 171
+    },
+    {
+      "type": "function",
+      "name": "create_indicator",
+      "doc": "Crea, guarda y compila un nuevo indicador nativo (.mq5) en MetaTrader 5.",
+      "lineno": 188
+    },
+    {
+      "type": "function",
+      "name": "get_indicators",
+      "doc": "Calcula indicadores tcnicos (RSI, Moving Average, MACD, etc).",
+      "lineno": 196
+    },
+    {
+      "type": "function",
+      "name": "get_calendar",
+      "doc": "Obtiene el calendario econmico de MT5 para anlisis fundamental.",
+      "lineno": 207
+    },
+    {
+      "type": "function",
+      "name": "get_history",
+      "doc": "Obtiene el historial de trading y mtricas de rendimiento (Win Rate, Profit Factor).",
+      "lineno": 213
+    },
+    {
+      "type": "function",
+      "name": "place_order",
+      "doc": "Enva una orden al mercado (Market o Pending) con validaciones pre-flight.",
+      "lineno": 219
+    },
+    {
+      "type": "function",
+      "name": "get_volatility",
+      "doc": "Calcula mtricas de ATR y Spread.",
+      "lineno": 224
+    },
+    {
+      "type": "function",
+      "name": "manage_position",
+      "doc": "Gestiona una posicin abierta (Cierre o Modificacin).",
+      "lineno": 245
+    },
+    {
+      "type": "function",
+      "name": "get_performance",
+      "doc": "Auditora cuantitativa de rendimiento (Sharpe, Win Rate, etc).",
+      "lineno": 254
+    },
+    {
+      "type": "function",
+      "name": "get_risk_status",
+      "doc": "Estado actual de exposicin y riesgo de la cuenta.",
+      "lineno": 268
+    },
+    {
+      "type": "function",
+      "name": "get_ml_score",
+      "doc": "Clasificacin de setups con ML-Lite y deteccin de anomalas.",
+      "lineno": 289
+    },
+    {
+      "type": "function",
+      "name": "get_liquidity",
+      "doc": "Anlisis de profundidad de mercado (DoM) institucional.",
+      "lineno": 296
+    },
+    {
+      "type": "function",
+      "name": "get_system_health",
+      "doc": "Monitoreo de Circuit Breaker y estado de latencia p99.",
+      "lineno": 303
+    }
+  ],
+  "brain_core\\app\\core\\config.py": [
+    {
+      "type": "class",
+      "name": "Settings",
+      "doc": "Configuracin global del sistema cargada desde variables de entorno o archivo .env.",
+      "lineno": 5
+    }
+  ],
+  "brain_core\\app\\core\\mt5_conn.py": [
+    {
+      "type": "class",
+      "name": "MT5Connection",
+      "doc": "Gestor de conexin Singleton para MetaTrader 5.\n\nProporciona un entorno seguro para hilos (threading.Lock) y no bloqueante\n(anyio.to_thread) para interactuar con la librera sncrona de MT5.",
+      "lineno": 20
+    },
+    {
+      "type": "function",
+      "name": "__new__",
+      "doc": null,
+      "lineno": 32
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 39
+    },
+    {
+      "type": "function",
+      "name": "startup",
+      "doc": "Inicializa la conexin con el terminal MT5 e inicia el watchdog.",
+      "lineno": 45
+    },
+    {
+      "type": "function",
+      "name": "start_watchdog",
+      "doc": "Inicia la tarea de monitoreo en segundo plano.",
+      "lineno": 54
+    },
+    {
+      "type": "function",
+      "name": "_connection_watchdog",
+      "doc": "Tarea peridica que verifica y restaura la conexin con Backoff Exponencial.",
+      "lineno": 60
+    },
+    {
+      "type": "function",
+      "name": "_initialize_mt5",
+      "doc": "Lgica interna de inicializacin (bloqueante).",
+      "lineno": 86
+    },
+    {
+      "type": "function",
+      "name": "shutdown",
+      "doc": "Cierra la conexin con MT5 y detiene el watchdog.",
+      "lineno": 114
+    },
+    {
+      "type": "function",
+      "name": "execute",
+      "doc": "Punto de entrada maestro para ejecutar cualquier funcin de mt5.\nInstrumentado con OTel y Mtricas de Latencia.",
+      "lineno": 124
+    },
+    {
+      "type": "function",
+      "name": "_locked_execution",
+      "doc": "Envuelve la ejecucin de la funcin dentro del lock de MT5.",
+      "lineno": 152
+    }
+  ],
+  "brain_core\\app\\core\\observability.py": [
+    {
+      "type": "class",
+      "name": "ObservabilityEngine",
+      "doc": "Controlador maestro de telemetra y mtricas institucionales.",
+      "lineno": 47
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 53
+    },
+    {
+      "type": "function",
+      "name": "get_instance",
+      "doc": null,
+      "lineno": 63
+    },
+    {
+      "type": "function",
+      "name": "track_latency",
+      "doc": "Registra la latencia de una operacin.",
+      "lineno": 68
+    },
+    {
+      "type": "function",
+      "name": "track_order",
+      "doc": "Registra el resultado de una orden.",
+      "lineno": 72
+    },
+    {
+      "type": "function",
+      "name": "update_model_health",
+      "doc": "Actualiza el estado de salud del alpha.",
+      "lineno": 76
+    }
+  ],
+  "brain_core\\app\\core\\validation.py": [
+    {
+      "type": "class",
+      "name": "OrderValidator",
+      "doc": "Motor de validacin inteligente para rdenes de trading y gestin de riesgo.",
+      "lineno": 9
+    },
+    {
+      "type": "function",
+      "name": "validate_order",
+      "doc": "Valida que una orden cumpla con los requisitos del broker y las reglas de riesgo.",
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "validate_margin",
+      "doc": "Verifica si hay margen suficiente antes de enviar la orden.",
+      "lineno": 97
+    }
+  ],
+  "brain_core\\app\\core\\zmq_bridge.py": [
+    {
+      "type": "class",
+      "name": "ZMQBridge",
+      "doc": "Puente de ultra-baja latencia usando ZeroMQ.\nSustituye el polling de archivos CSV por una arquitectura Event-Driven.",
+      "lineno": 10
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "start",
+      "doc": "Inicia el suscriptor ZeroMQ.",
+      "lineno": 23
+    },
+    {
+      "type": "function",
+      "name": "stop",
+      "doc": "Detiene el bridge.",
+      "lineno": 32
+    },
+    {
+      "type": "function",
+      "name": "_listen",
+      "doc": "Loop de escucha asncrono.",
+      "lineno": 40
+    }
+  ],
+  "brain_core\\app\\models\\schemas.py": [
+    {
+      "type": "class",
+      "name": "ErrorDetail",
+      "doc": null,
+      "lineno": 11
+    },
+    {
+      "type": "class",
+      "name": "ResponseModel",
+      "doc": "Modelo de respuesta global. Garantiza que n8n siempre reciba\nla misma estructura, facilitando el parseo y la resiliencia.",
+      "lineno": 16
+    },
+    {
+      "type": "class",
+      "name": "MarketDataRequest",
+      "doc": null,
+      "lineno": 30
+    },
+    {
+      "type": "class",
+      "name": "TradeOrderRequest",
+      "doc": null,
+      "lineno": 36
+    },
+    {
+      "type": "class",
+      "name": "IndicatorRequest",
+      "doc": null,
+      "lineno": 45
+    },
+    {
+      "type": "class",
+      "name": "MQL5CodeRequest",
+      "doc": null,
+      "lineno": 53
+    },
+    {
+      "type": "class",
+      "name": "CalendarRequest",
+      "doc": null,
+      "lineno": 58
+    },
+    {
+      "type": "class",
+      "name": "HistoryRequest",
+      "doc": null,
+      "lineno": 63
+    },
+    {
+      "type": "class",
+      "name": "PanoramaRequest",
+      "doc": null,
+      "lineno": 66
+    },
+    {
+      "type": "class",
+      "name": "VolatilityRequest",
+      "doc": null,
+      "lineno": 69
+    },
+    {
+      "type": "class",
+      "name": "PositionManageRequest",
+      "doc": null,
+      "lineno": 74
+    },
+    {
+      "type": "class",
+      "name": "AccountMetrics",
+      "doc": null,
+      "lineno": 86
+    },
+    {
+      "type": "class",
+      "name": "Candle",
+      "doc": null,
+      "lineno": 96
+    },
+    {
+      "type": "class",
+      "name": "MarketDataResponse",
+      "doc": null,
+      "lineno": 104
+    },
+    {
+      "type": "class",
+      "name": "TradeOrderResponse",
+      "doc": null,
+      "lineno": 109
+    },
+    {
+      "type": "class",
+      "name": "VisionResponse",
+      "doc": null,
+      "lineno": 116
+    },
+    {
+      "type": "class",
+      "name": "VolatilityMetrics",
+      "doc": null,
+      "lineno": 122
+    },
+    {
+      "type": "class",
+      "name": "PositionActionResponse",
+      "doc": null,
+      "lineno": 129
+    }
+  ],
+  "brain_core\\app\\services\\analytics.py": [
+    {
+      "type": "class",
+      "name": "AnalyticsEngine",
+      "doc": "Institutional Analytics Engine for Strategy Audition.",
+      "lineno": 10
+    },
+    {
+      "type": "function",
+      "name": "get_performance_metrics",
+      "doc": "Calculates Sharpe Ratio, Win Rate, and Profit Factor from raw history.",
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "run_monte_carlo",
+      "doc": "Simulates strategy outcomes by shuffling returns.",
+      "lineno": 55
+    }
+  ],
+  "brain_core\\app\\services\\circuit_breaker.py": [
+    {
+      "type": "class",
+      "name": "CircuitBreaker",
+      "doc": "Institutional Circuit Breaker System.\nPrevents execution cascade failures during market anomalies or API downtime.",
+      "lineno": 8
+    },
+    {
+      "type": "function",
+      "name": "record_failure",
+      "doc": "Increments failure count and trips if threshold reached.",
+      "lineno": 19
+    },
+    {
+      "type": "function",
+      "name": "record_success",
+      "doc": "Resets failures and closes the circuit.",
+      "lineno": 32
+    },
+    {
+      "type": "function",
+      "name": "can_execute",
+      "doc": "Determines if the system is allowed to perform operations.",
+      "lineno": 41
+    },
+    {
+      "type": "function",
+      "name": "get_status",
+      "doc": null,
+      "lineno": 57
+    }
+  ],
+  "brain_core\\app\\services\\risk_engine.py": [
+    {
+      "type": "class",
+      "name": "RiskEngine",
+      "doc": "Institutional Risk Management Engine.\nHandles adaptive lot sizing, drawdown protection, and exposure limits.",
+      "lineno": 9
+    },
+    {
+      "type": "function",
+      "name": "get_adaptive_lots",
+      "doc": "Calculates lot size based on account equity, risk percent, and SL distance.\nUses volatility adjustment if enabled.",
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "check_drawdown_limit",
+      "doc": "Vetoes trading if the daily drawdown limit is reached.",
+      "lineno": 55
+    },
+    {
+      "type": "function",
+      "name": "get_total_exposure",
+      "doc": "Calculates total margin used vs total equity.",
+      "lineno": 71
+    }
+  ],
+  "brain_core\\app\\services\\supabase_sync.py": [
+    {
+      "type": "class",
+      "name": "SupabaseSync",
+      "doc": "Gestor de sincronizacin con Supabase para el ecosistema NEXUS.\nCentraliza el logging de seales y trades en la nube.",
+      "lineno": 8
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "_initialize_client",
+      "doc": null,
+      "lineno": 18
+    },
+    {
+      "type": "function",
+      "name": "log_signal",
+      "doc": "Registra una seal del Sniper en Supabase.",
+      "lineno": 29
+    },
+    {
+      "type": "function",
+      "name": "update_performance",
+      "doc": "Actualiza mtricas de performance del modelo ML en la nube.",
+      "lineno": 55
+    }
+  ],
+  "brain_core\\app\\skills\\advanced_analytics.py": [
+    {
+      "type": "class",
+      "name": "AdvancedAnalytics",
+      "doc": "Skills institucionales: Shadow Testing y Sentiment Proxy.",
+      "lineno": 11
+    },
+    {
+      "type": "function",
+      "name": "run_shadow_test",
+      "doc": "ML Shadow Testing: Ejecuta modelos en sombra para medir performance \nsin riesgo financiero.",
+      "lineno": 17
+    },
+    {
+      "type": "function",
+      "name": "get_market_sentiment",
+      "doc": "Sentiment Proxy: Obtiene el sentimiento del mercado desde fuentes externas.\nFiltro de seguridad ante eventos macro.",
+      "lineno": 42
+    },
+    {
+      "type": "function",
+      "name": "get_alpha_health_report",
+      "doc": "Health of the Alpha: Reporte consolidado de decaimiento del modelo \ny precisin institucional.",
+      "lineno": 67
+    }
+  ],
+  "brain_core\\app\\skills\\calendar.py": [
+    {
+      "type": "function",
+      "name": "get_economic_calendar",
+      "doc": "Obtiene eventos del calendario econmico de MT5.",
+      "lineno": 20
+    }
+  ],
+  "brain_core\\app\\skills\\custom_loader.py": [
+    {
+      "type": "function",
+      "name": "register_custom_skills",
+      "doc": "Escanea la carpeta 'indicadores propios' y registra cada .mq5 como una skill de lectura de datos.",
+      "lineno": 10
+    },
+    {
+      "type": "function",
+      "name": "register_indicator_tool",
+      "doc": "Registra dinmicamente una herramienta MCP para un indicador especfico.",
+      "lineno": 48
+    },
+    {
+      "type": "function",
+      "name": "register_python_pipeline_tools",
+      "doc": "Registra herramientas para ejecutar el pipeline de anlisis de Python.",
+      "lineno": 102
+    },
+    {
+      "type": "function",
+      "name": "indicator_tool",
+      "doc": "Obtiene los datos exportados por el indicador personalizado.\n- symbol: Smbolo del activo (ej: EURUSD)\n- timeframe: Temporalidad (ej: H1, M15)\n- n_rows: Nmero de registros ms recientes a retornar.",
+      "lineno": 55
+    },
+    {
+      "type": "function",
+      "name": "run_unified_analysis",
+      "doc": "Ejecuta el pipeline institucional completo: Ingesta, ML Training, Optimizacin y Dashboard.\n- symbol: Smbolo para el anlisis.\n- timeframe: Temporalidad.\n- data_path: (Opcional) Ruta al CSV especfico. Si no se da, usar la exportacin ms reciente.",
+      "lineno": 110
+    },
+    {
+      "type": "function",
+      "name": "get_analysis_report",
+      "doc": "Devuelve el estado de los ltimos resultados del pipeline (thresholds y mtricas ML).",
+      "lineno": 142
+    }
+  ],
+  "brain_core\\app\\skills\\execution.py": [
+    {
+      "type": "function",
+      "name": "send_order",
+      "doc": "Ejecuta una orden (Mercado o Pendiente) con validaciones de seguridad avanzadas.\nInstrumentado con OTel y Mtricas de Ejecucin.",
+      "lineno": 66
+    }
+  ],
+  "brain_core\\app\\skills\\history.py": [
+    {
+      "type": "function",
+      "name": "get_trade_history",
+      "doc": "Obtiene el historial de rdenes cerradas y calcula mtricas de rendimiento.",
+      "lineno": 11
+    }
+  ],
+  "brain_core\\app\\skills\\indicators.py": [
+    {
+      "type": "function",
+      "name": "get_technical_indicator",
+      "doc": "Calcula indicadores tcnicos usando datos directos de MT5.",
+      "lineno": 14
+    }
+  ],
+  "brain_core\\app\\skills\\liquidity.py": [
+    {
+      "type": "class",
+      "name": "LiquidityEngine",
+      "doc": "Sniper 2.0 Liquidity Analysis.\nAnalyzes Depth of Market (DoM) to ensure institutional fill quality.",
+      "lineno": 9
+    },
+    {
+      "type": "function",
+      "name": "check_liquidity_preflight",
+      "doc": "Institutional Guard: Pre-flight check for liquidity.",
+      "lineno": 58
+    },
+    {
+      "type": "function",
+      "name": "get_market_depth",
+      "doc": "Retrieves and analyzes the Depth of Market (if supported by broker).\nInstrumentado con OTel.",
+      "lineno": 16
+    }
+  ],
+  "brain_core\\app\\skills\\market.py": [
+    {
+      "type": "function",
+      "name": "_clean_cache",
+      "doc": "Mantiene el tamao del cach bajo control.",
+      "lineno": 42
+    },
+    {
+      "type": "function",
+      "name": "get_candles",
+      "doc": "Obtiene las ltimas N velas con sistema de cach de 3 segundos.\nSoporta formato CSV para ahorrar tokens en la ventana de contexto de la IA.",
+      "lineno": 51
+    },
+    {
+      "type": "function",
+      "name": "get_account_metrics",
+      "doc": "Obtiene mtricas de la cuenta con cach de 0.5 segundos.",
+      "lineno": 119
+    },
+    {
+      "type": "function",
+      "name": "get_volatility_metrics",
+      "doc": "Calcula mtricas de volatilidad (ATR y Spread) para un smbolo.",
+      "lineno": 159
+    },
+    {
+      "type": "function",
+      "name": "get_market_snapshot",
+      "doc": "Obtiene una radiografa completa del mercado en un solo llamado.\nCombina: ltima vela, Quote actual, Mtricas de Cuenta y Volatilidad.\nEsencial para que el agente tome decisiones rpidas (Ojo de Halcn).",
+      "lineno": 225
+    }
+  ],
+  "brain_core\\app\\skills\\ml_sniper.py": [
+    {
+      "type": "class",
+      "name": "MLSniper",
+      "doc": "ML-Lite Setup Classifier 2.0.\nUses pattern confluence to score trading setups.",
+      "lineno": 8
+    },
+    {
+      "type": "function",
+      "name": "score_setup",
+      "doc": "Calculates a 'Confidence Score' using multiple indicator convergences.\nSimulates supervised classification (RandomForest logic).",
+      "lineno": 15
+    }
+  ],
+  "brain_core\\app\\skills\\quant_coder.py": [
+    {
+      "type": "function",
+      "name": "create_native_indicator",
+      "doc": "Toma cdigo MQL5, lo guarda en la carpeta de indicadores de MT5 e intenta compilarlo.",
+      "lineno": 12
+    }
+  ],
+  "brain_core\\app\\skills\\remote_compute.py": [
+    {
+      "type": "class",
+      "name": "RemoteWorker",
+      "doc": "Gestor de ejecucin remota va SSH para Offloading de cmputo.",
+      "lineno": 9
+    },
+    {
+      "type": "function",
+      "name": "register_remote_skills",
+      "doc": "Registra las herramientas de cmputo remoto en el MCP.",
+      "lineno": 66
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "_get_client",
+      "doc": null,
+      "lineno": 19
+    },
+    {
+      "type": "function",
+      "name": "execute_remote_cmd",
+      "doc": "Ejecuta un comando en el servidor remoto y retorna la salida.",
+      "lineno": 39
+    },
+    {
+      "type": "function",
+      "name": "execute_remote_task",
+      "doc": "Ejecuta una tarea de computo pesado (ML training, Optuna) en un servidor remoto via SSH.\nRequiere configuracin previa en .env (SSH_HOST, SSH_USER, SSH_KEY_PATH).",
+      "lineno": 70
+    },
+    {
+      "type": "function",
+      "name": "check_remote_status",
+      "doc": "Verifica la conectividad con el servidor de compute offloading.",
+      "lineno": 78
+    },
+    {
+      "type": "function",
+      "name": "run_cmd",
+      "doc": null,
+      "lineno": 49
+    }
+  ],
+  "brain_core\\app\\skills\\tester.py": [
+    {
+      "type": "function",
+      "name": "run_strategy_test",
+      "doc": "Automates the MT5 Strategy Tester by creating an INI file and running terminal64.exe via CLI.",
+      "lineno": 12
+    }
+  ],
+  "brain_core\\app\\skills\\trade_mgmt.py": [
+    {
+      "type": "function",
+      "name": "manage_position",
+      "doc": "Gestiona posiciones abiertas: Cierre total/parcial o modificacin de SL/TP.",
+      "lineno": 9
+    }
+  ],
+  "brain_core\\app\\skills\\unified_model.py": [
+    {
+      "type": "class",
+      "name": "UnifiedModelDB",
+      "doc": null,
+      "lineno": 12
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "_get_connection",
+      "doc": null,
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "query_custom_sql",
+      "doc": "Ejecuta una consulta SQL de solo lectura sobre el Unified Model.",
+      "lineno": 21
+    },
+    {
+      "type": "function",
+      "name": "get_fsm_transition_matrix",
+      "doc": "Recupera la matriz de probabilidad de transicin de estados de la FSM.",
+      "lineno": 43
+    }
+  ],
+  "brain_core\\app\\skills\\vision.py": [
+    {
+      "type": "function",
+      "name": "capture_panorama",
+      "doc": "Captura la pantalla actual de la terminal MT5 de forma segura.",
+      "lineno": 17
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\db_engine.py": [
+    {
+      "type": "class",
+      "name": "StateRecord",
+      "doc": "Record of a single state observation.",
+      "lineno": 23
+    },
+    {
+      "type": "class",
+      "name": "TransitionRecord",
+      "doc": "Record of a state transition.",
+      "lineno": 39
+    },
+    {
+      "type": "class",
+      "name": "CalibrationRecord",
+      "doc": "Record of a calibration run.",
+      "lineno": 51
+    },
+    {
+      "type": "class",
+      "name": "UnifiedModelDB",
+      "doc": "SQLite database for Unified Model state history and calibration.\n\nTables:\n- state_history: All state observations\n- transitions: State transition events\n- calibrations: Calibration runs and parameters",
+      "lineno": 61
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 71
+    },
+    {
+      "type": "function",
+      "name": "_connect",
+      "doc": "Establish database connection.",
+      "lineno": 77
+    },
+    {
+      "type": "function",
+      "name": "_transaction",
+      "doc": "Context manager for transactions.",
+      "lineno": 88
+    },
+    {
+      "type": "function",
+      "name": "_create_tables",
+      "doc": "Create database schema.",
+      "lineno": 97
+    },
+    {
+      "type": "function",
+      "name": "log_state",
+      "doc": "Log current state to database.\n\nArgs:\n    symbol: Trading symbol (e.g., 'EURUSD')\n    timeframe: Timeframe (e.g., 'H1')\n    state: Current state name\n    confidence: Confidence score (0-100)\n    metrics: Dictionary with effort, result, compression, slope, speed, feat_score\n\nReturns:\n    ID of inserted record",
+      "lineno": 154
+    },
+    {
+      "type": "function",
+      "name": "log_state_batch",
+      "doc": "Log multiple state records efficiently.",
+      "lineno": 190
+    },
+    {
+      "type": "function",
+      "name": "get_state_history",
+      "doc": "Get state history for a symbol/timeframe.",
+      "lineno": 205
+    },
+    {
+      "type": "function",
+      "name": "get_state_distribution",
+      "doc": "Get distribution of states over time period.",
+      "lineno": 231
+    },
+    {
+      "type": "function",
+      "name": "log_transition",
+      "doc": "Log a state transition.",
+      "lineno": 251
+    },
+    {
+      "type": "function",
+      "name": "get_transition_stats",
+      "doc": "Get transition statistics for analysis.",
+      "lineno": 267
+    },
+    {
+      "type": "function",
+      "name": "get_transition_matrix",
+      "doc": "Get transition count matrix.",
+      "lineno": 289
+    },
+    {
+      "type": "function",
+      "name": "save_calibration",
+      "doc": "Save a calibration configuration.",
+      "lineno": 312
+    },
+    {
+      "type": "function",
+      "name": "get_active_calibration",
+      "doc": "Get the currently active calibration.",
+      "lineno": 341
+    },
+    {
+      "type": "function",
+      "name": "get_calibration_history",
+      "doc": "Get calibration history.",
+      "lineno": 359
+    },
+    {
+      "type": "function",
+      "name": "get_performance_summary",
+      "doc": "Get performance summary for a symbol/timeframe.",
+      "lineno": 382
+    },
+    {
+      "type": "function",
+      "name": "export_to_csv",
+      "doc": "Export table data to CSV.",
+      "lineno": 423
+    },
+    {
+      "type": "function",
+      "name": "cleanup_old_data",
+      "doc": "Remove data older than specified days.",
+      "lineno": 461
+    },
+    {
+      "type": "function",
+      "name": "get_table_stats",
+      "doc": "Get row counts for all tables.",
+      "lineno": 486
+    },
+    {
+      "type": "function",
+      "name": "get_narrative_history",
+      "doc": "Extrae la historia del modelo y la convierte en una narrativa natural para RAG.\nCombina estados y transiciones en una serie cronolgica legible.",
+      "lineno": 497
+    },
+    {
+      "type": "function",
+      "name": "close",
+      "doc": "Close database connection.",
+      "lineno": 543
+    },
+    {
+      "type": "function",
+      "name": "__enter__",
+      "doc": null,
+      "lineno": 549
+    },
+    {
+      "type": "function",
+      "name": "__exit__",
+      "doc": null,
+      "lineno": 552
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\feat_memory_mcp.py": [
+    {
+      "type": "function",
+      "name": "ingest_memories",
+      "doc": "Extrae la historia narrativa de la base de datos SQLite y la indexa en la memoria vectorial.\nLlamar peridicamente para mantener la memoria actualizada.",
+      "lineno": 37
+    },
+    {
+      "type": "function",
+      "name": "query_memory",
+      "doc": "Realiza una bsqueda semntica en la memoria histrica del bot. \nEjemplo: 'Qu pas la ltima vez que el score fue bajo?' o 'Busca patrones de expansin en EURUSD'.",
+      "lineno": 69
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\institutional_bridge.py": [
+    {
+      "type": "class",
+      "name": "BridgeHandler",
+      "doc": null,
+      "lineno": 42
+    },
+    {
+      "type": "function",
+      "name": "main",
+      "doc": null,
+      "lineno": 127
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 43
+    },
+    {
+      "type": "function",
+      "name": "on_created",
+      "doc": null,
+      "lineno": 49
+    },
+    {
+      "type": "function",
+      "name": "on_modified",
+      "doc": null,
+      "lineno": 52
+    },
+    {
+      "type": "function",
+      "name": "_process_event",
+      "doc": null,
+      "lineno": 55
+    },
+    {
+      "type": "function",
+      "name": "run_pipeline",
+      "doc": null,
+      "lineno": 73
+    },
+    {
+      "type": "function",
+      "name": "deploy_artifacts",
+      "doc": "Deploy generated .txt files to MT5 Common/Files if configured.",
+      "lineno": 108
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\mathematical_validation.py": [
+    {
+      "type": "class",
+      "name": "ValidationMetrics",
+      "doc": "Metrics from a validation run.",
+      "lineno": 30
+    },
+    {
+      "type": "class",
+      "name": "PhaseResult",
+      "doc": "Result from a validation phase.",
+      "lineno": 40
+    },
+    {
+      "type": "function",
+      "name": "validate_percentiles",
+      "doc": "Phase 1: Validate percentile calculations.\n\nTests:\n- P20, P50, P80 accuracy against numpy reference\n- Rolling buffer correctness\n- Threshold application in FSM context",
+      "lineno": 53
+    },
+    {
+      "type": "function",
+      "name": "validate_ema_feat",
+      "doc": "Phase 2: Validate EMA and FEAT calculations.\n\nTests:\n- Compression ratio calculation\n- Curvature detection (Form)\n- Distance metrics (Space)\n- Acceleration detection",
+      "lineno": 189
+    },
+    {
+      "type": "function",
+      "name": "validate_liquidity",
+      "doc": "Phase 3: Validate liquidity detection.\n\nTests:\n- Swing high/low detection\n- Equal level identification\n- FVG (imbalance) detection\n- Mitigation tracking",
+      "lineno": 326
+    },
+    {
+      "type": "function",
+      "name": "validate_fsm",
+      "doc": "Phase 4: Validate Finite State Machine.\n\nTests:\n- State transitions are deterministic\n- Correct classification of known scenarios\n- Hysteresis prevents flip-flop\n- Percentile integration works",
+      "lineno": 471
+    },
+    {
+      "type": "function",
+      "name": "validate_efficiency",
+      "doc": "Phase 5: Validate computational efficiency.\n\nTests:\n- Average execution time per tick < 1ms\n- Memory efficiency (no reallocation)\n- Reproducibility",
+      "lineno": 661
+    },
+    {
+      "type": "function",
+      "name": "validate_extreme_cases",
+      "doc": "Phase 6: Validate behavior under extreme conditions.\n\nTests:\n- Gaps: TrueRange > 3*ATR\n- Zero volume\n- High volatility spikes\n- Edge values (0, inf, nan handling)",
+      "lineno": 840
+    },
+    {
+      "type": "function",
+      "name": "run_full_validation",
+      "doc": "Run complete mathematical validation suite.",
+      "lineno": 1027
+    },
+    {
+      "type": "function",
+      "name": "convert_to_native",
+      "doc": null,
+      "lineno": 1128
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\ml_engine.py": [
+    {
+      "type": "class",
+      "name": "MultifractalAI",
+      "doc": null,
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 17
+    },
+    {
+      "type": "function",
+      "name": "extract_layer_features",
+      "doc": "Transforms raw data into multifractal questions:\n1. Compresin de Micro Nube\n2. Separacin entre Operativa y Macro\n3. Inclinacin de Capa 2 (Estructura)\n4. Relacin de Capas (Acercamiento vs Alejamiento)",
+      "lineno": 25
+    },
+    {
+      "type": "function",
+      "name": "train_on_layers",
+      "doc": null,
+      "lineno": 45
+    },
+    {
+      "type": "function",
+      "name": "predict_regime",
+      "doc": "Cognitive prediction based on real-time layer data.",
+      "lineno": 76
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\optuna_optimizer.py": [
+    {
+      "type": "class",
+      "name": "OptimizationConfig",
+      "doc": "Configuration for Optuna optimization.",
+      "lineno": 38
+    },
+    {
+      "type": "class",
+      "name": "OptunaOptimizer",
+      "doc": "Bayesian optimization for FSM thresholds using Optuna.\n\nAdvantages over brute force:\n1. Intelligent sampling with TPE (Tree-structured Parzen Estimator)\n2. Early pruning of unpromising trials\n3. Parallelizable\n4. Built-in visualization",
+      "lineno": 49
+    },
+    {
+      "type": "function",
+      "name": "run_quick_optimization",
+      "doc": "Quick optimization with default settings.\n\nArgs:\n    effort: Volume effort array\n    result: Price result array\n    compression: EMA compression array\n    slope: EMA slope array\n    speed: Price velocity array\n    n_trials: Number of trials\n\nReturns:\n    Best ThresholdSet",
+      "lineno": 329
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 60
+    },
+    {
+      "type": "function",
+      "name": "set_data",
+      "doc": "Set the data to optimize on.",
+      "lineno": 76
+    },
+    {
+      "type": "function",
+      "name": "_objective",
+      "doc": "Optuna objective function.",
+      "lineno": 94
+    },
+    {
+      "type": "function",
+      "name": "_evaluate",
+      "doc": "Evaluate a threshold configuration.",
+      "lineno": 142
+    },
+    {
+      "type": "function",
+      "name": "optimize",
+      "doc": "Run Bayesian optimization.\n\nReturns:\n    Best ThresholdSet found",
+      "lineno": 175
+    },
+    {
+      "type": "function",
+      "name": "get_results",
+      "doc": "Get optimization results.",
+      "lineno": 228
+    },
+    {
+      "type": "function",
+      "name": "export_calibration",
+      "doc": "Export best configuration to file for MQL5.",
+      "lineno": 242
+    },
+    {
+      "type": "function",
+      "name": "plot_optimization_history",
+      "doc": "Plot optimization history (requires plotly).",
+      "lineno": 292
+    },
+    {
+      "type": "function",
+      "name": "plot_param_importances",
+      "doc": "Plot parameter importances.",
+      "lineno": 310
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\run_pipeline.py": [
+    {
+      "type": "class",
+      "name": "PipelineError",
+      "doc": "Custom exception for pipeline failures.",
+      "lineno": 41
+    },
+    {
+      "type": "function",
+      "name": "load_and_validate_csv",
+      "doc": "Load data from CSV and validate required columns.\n\nExpected columns:\n- time (or timestamp)\n- effort (volume/normalized)\n- result (price change/atr)\n- compression (0-1)\n- slope (normalized)\n- speed (normalized)",
+      "lineno": 45
+    },
+    {
+      "type": "function",
+      "name": "ingest_to_db",
+      "doc": "Ingest DataFrame into SQLite database.",
+      "lineno": 82
+    },
+    {
+      "type": "function",
+      "name": "run_ml_pipeline",
+      "doc": "Train and export ML model.",
+      "lineno": 130
+    },
+    {
+      "type": "function",
+      "name": "run_optimization_pipeline",
+      "doc": "Run Optuna optimization for thresholds.",
+      "lineno": 165
+    },
+    {
+      "type": "function",
+      "name": "run_viz_pipeline",
+      "doc": "Generate comprehensive dashboard.",
+      "lineno": 197
+    },
+    {
+      "type": "function",
+      "name": "main",
+      "doc": null,
+      "lineno": 250
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\stats_engine.py": [
+    {
+      "type": "class",
+      "name": "RollingBuffer",
+      "doc": "Circular buffer for efficient rolling statistics.",
+      "lineno": 14
+    },
+    {
+      "type": "class",
+      "name": "PercentileStats",
+      "doc": "Percentile statistics container.",
+      "lineno": 43
+    },
+    {
+      "type": "class",
+      "name": "StatsEngine",
+      "doc": "Statistical engine for computing rolling percentiles and calibration metrics.\nUsed for brute force calibration of FSM thresholds.",
+      "lineno": 54
+    },
+    {
+      "type": "function",
+      "name": "load_csv_data",
+      "doc": "Load effort/result data from CSV file exported by MQL5.\nExpected format: index,effort,result",
+      "lineno": 200
+    },
+    {
+      "type": "function",
+      "name": "validate_data",
+      "doc": "Validate data for common issues.",
+      "lineno": 211
+    },
+    {
+      "type": "function",
+      "name": "__post_init__",
+      "doc": null,
+      "lineno": 21
+    },
+    {
+      "type": "function",
+      "name": "add",
+      "doc": "Add value to buffer.",
+      "lineno": 24
+    },
+    {
+      "type": "function",
+      "name": "get_data",
+      "doc": "Get valid data from buffer.",
+      "lineno": 31
+    },
+    {
+      "type": "function",
+      "name": "is_ready",
+      "doc": "Check if buffer has minimum data for statistics.",
+      "lineno": 37
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 60
+    },
+    {
+      "type": "function",
+      "name": "add_observation",
+      "doc": "Add a new observation to all buffers.",
+      "lineno": 70
+    },
+    {
+      "type": "function",
+      "name": "is_ready",
+      "doc": "Check if engine has enough data for reliable statistics.",
+      "lineno": 82
+    },
+    {
+      "type": "function",
+      "name": "compute_percentiles",
+      "doc": "Compute percentile statistics for an array.",
+      "lineno": 86
+    },
+    {
+      "type": "function",
+      "name": "get_effort_stats",
+      "doc": "Get effort percentile statistics.",
+      "lineno": 101
+    },
+    {
+      "type": "function",
+      "name": "get_result_stats",
+      "doc": "Get result percentile statistics.",
+      "lineno": 107
+    },
+    {
+      "type": "function",
+      "name": "get_compression_stats",
+      "doc": "Get compression percentile statistics.",
+      "lineno": 113
+    },
+    {
+      "type": "function",
+      "name": "get_slope_stats",
+      "doc": "Get slope percentile statistics.",
+      "lineno": 117
+    },
+    {
+      "type": "function",
+      "name": "get_percentile_value",
+      "doc": "Get the percentile position of a value within a buffer.",
+      "lineno": 121
+    },
+    {
+      "type": "function",
+      "name": "export_calibration",
+      "doc": "Export calibration data as dictionary.",
+      "lineno": 140
+    },
+    {
+      "type": "function",
+      "name": "save_calibration",
+      "doc": "Save calibration to file in key=value format for MQL5.",
+      "lineno": 180
+    },
+    {
+      "type": "function",
+      "name": "save_calibration_json",
+      "doc": "Save calibration to JSON file.",
+      "lineno": 190
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\test_zmq_node.py": [
+    {
+      "type": "function",
+      "name": "simulate_mt5_signal",
+      "doc": "Simulates a signal being sent from MT5 via ZMQ.",
+      "lineno": 6
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\validator.py": [
+    {
+      "type": "class",
+      "name": "ValidationResult",
+      "doc": "Result from a validation test.",
+      "lineno": 15
+    },
+    {
+      "type": "class",
+      "name": "Validator",
+      "doc": "Comprehensive validation suite for Unified Model.\nTests data integrity, state coherence, and determinism.",
+      "lineno": 23
+    },
+    {
+      "type": "function",
+      "name": "validate_cross_asset",
+      "doc": "Validate thresholds work across multiple assets.\n\nArgs:\n    data_files: List of CSV file paths\n    thresholds: Threshold configuration to test\n\nReturns:\n    Dictionary mapping filename to validation summary",
+      "lineno": 342
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 29
+    },
+    {
+      "type": "function",
+      "name": "add_result",
+      "doc": "Add validation result.",
+      "lineno": 32
+    },
+    {
+      "type": "function",
+      "name": "clear",
+      "doc": "Clear all results.",
+      "lineno": 37
+    },
+    {
+      "type": "function",
+      "name": "validate_no_nan",
+      "doc": "Check for NaN values.",
+      "lineno": 43
+    },
+    {
+      "type": "function",
+      "name": "validate_no_inf",
+      "doc": "Check for infinite values.",
+      "lineno": 53
+    },
+    {
+      "type": "function",
+      "name": "validate_positive",
+      "doc": "Check all values are positive.",
+      "lineno": 63
+    },
+    {
+      "type": "function",
+      "name": "validate_sufficient_data",
+      "doc": "Check sufficient data points.",
+      "lineno": 73
+    },
+    {
+      "type": "function",
+      "name": "validate_variance",
+      "doc": "Check data has sufficient variance.",
+      "lineno": 85
+    },
+    {
+      "type": "function",
+      "name": "validate_data_integrity",
+      "doc": "Run all data integrity checks.",
+      "lineno": 98
+    },
+    {
+      "type": "function",
+      "name": "validate_ema_order",
+      "doc": "Validate EMA ordering for trend.\nBullish: Fast > Medium > Slow\nBearish: Fast < Medium < Slow",
+      "lineno": 117
+    },
+    {
+      "type": "function",
+      "name": "validate_compression_range",
+      "doc": "Validate compression is in expected range [0, 1].",
+      "lineno": 146
+    },
+    {
+      "type": "function",
+      "name": "validate_state_determinism",
+      "doc": "Verify FSM produces identical results on repeated runs.\nCritical for no-repaint guarantee.",
+      "lineno": 158
+    },
+    {
+      "type": "function",
+      "name": "validate_state_coverage",
+      "doc": "Verify FSM visits multiple states (not stuck).",
+      "lineno": 192
+    },
+    {
+      "type": "function",
+      "name": "validate_no_rapid_flipflop",
+      "doc": "Verify FSM doesn't flip-flop rapidly (instability check).",
+      "lineno": 218
+    },
+    {
+      "type": "function",
+      "name": "validate_calibration_file",
+      "doc": "Validate calibration file format and content.",
+      "lineno": 247
+    },
+    {
+      "type": "function",
+      "name": "run_full_validation",
+      "doc": "Run complete validation suite.",
+      "lineno": 283
+    },
+    {
+      "type": "function",
+      "name": "get_summary",
+      "doc": "Get validation summary.",
+      "lineno": 303
+    },
+    {
+      "type": "function",
+      "name": "print_report",
+      "doc": "Print validation report.",
+      "lineno": 324
+    }
+  ],
+  "FEAT_Sniper_Master_Core\\Python\\viz_engine.py": [
+    {
+      "type": "class",
+      "name": "InstitutionalDashboard",
+      "doc": "Plotly-based institutional dashboard for Unified Model visualization.",
+      "lineno": 43
+    },
+    {
+      "type": "function",
+      "name": "create_sample_dashboard",
+      "doc": "Create sample dashboard with synthetic data.",
+      "lineno": 484
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 48
+    },
+    {
+      "type": "function",
+      "name": "create_state_timeline",
+      "doc": "Create state timeline with confidence overlay.\n\nArgs:\n    timestamps: List of timestamps\n    states: List of state names\n    confidences: List of confidence values (0-100)\n    prices: Optional list of prices\n\nReturns:\n    Plotly Figure",
+      "lineno": 55
+    },
+    {
+      "type": "function",
+      "name": "create_feat_radar",
+      "doc": "Create FEAT radar chart.\n\nArgs:\n    form_score: Form score (0-100)\n    space_score: Space score (0-100)\n    accel_score: Acceleration score (0-100)\n    time_score: Time score (0-100)\n    title: Chart title\n\nReturns:\n    Plotly Figure",
+      "lineno": 165
+    },
+    {
+      "type": "function",
+      "name": "create_transition_heatmap",
+      "doc": "Create transition probability heatmap.\n\nArgs:\n    transition_matrix: N x N matrix of transition counts\n    state_names: List of state names\n\nReturns:\n    Plotly Figure",
+      "lineno": 225
+    },
+    {
+      "type": "function",
+      "name": "create_feature_importance",
+      "doc": "Create feature importance bar chart.\n\nArgs:\n    importances: Dictionary of feature name to importance score\n    title: Chart title\n\nReturns:\n    Plotly Figure",
+      "lineno": 268
+    },
+    {
+      "type": "function",
+      "name": "create_metrics_panel",
+      "doc": "Create metrics indicator panel.\n\nArgs:\n    metrics: Dictionary of metric names to values\n    title: Panel title\n\nReturns:\n    Plotly Figure",
+      "lineno": 310
+    },
+    {
+      "type": "function",
+      "name": "create_full_dashboard",
+      "doc": "Create full dashboard with all components.\n\nReturns:\n    Plotly Figure with all panels",
+      "lineno": 363
+    },
+    {
+      "type": "function",
+      "name": "save_dashboard",
+      "doc": "Save dashboard as standalone HTML.",
+      "lineno": 473
+    }
+  ],
+  "nexus_brain\\hybrid_model.py": [
+    {
+      "type": "class",
+      "name": "HybridFEATNetwork",
+      "doc": "Neural Risk-Aware Trading Network.\n\nOutputs 3 tensors for dynamic risk management:\n- p_win: Trade success probability\n- alpha_confidence: Directional certainty for lot sizing\n- volatility_regime: For adaptive SL/TP",
+      "lineno": 7
+    },
+    {
+      "type": "function",
+      "name": "save_hybrid_model",
+      "doc": null,
+      "lineno": 121
+    },
+    {
+      "type": "function",
+      "name": "load_hybrid_model",
+      "doc": null,
+      "lineno": 129
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 17
+    },
+    {
+      "type": "function",
+      "name": "forward",
+      "doc": null,
+      "lineno": 46
+    },
+    {
+      "type": "function",
+      "name": "forward_legacy",
+      "doc": "Backward-compatible single output (p_win only).",
+      "lineno": 74
+    },
+    {
+      "type": "function",
+      "name": "get_risk_decision",
+      "doc": null,
+      "lineno": 79
+    }
+  ],
+  "nexus_brain\\model.py": [
+    {
+      "type": "class",
+      "name": "NexusBrain",
+      "doc": null,
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "get_brain_inference",
+      "doc": null,
+      "lineno": 121
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "load_model",
+      "doc": null,
+      "lineno": 23
+    },
+    {
+      "type": "function",
+      "name": "predict_probability",
+      "doc": "Returns calibrated probability and execution parameters for cBot.\nNow integrated with MLOps Guardian (Drift + Registry).",
+      "lineno": 33
+    },
+    {
+      "type": "function",
+      "name": "_calculate_risk_params",
+      "doc": "AI RISK ENGINE: Adapts TP/SL based on model confidence.\nLogic for C# cBot integration.",
+      "lineno": 93
+    }
+  ],
+  "nexus_brain\\model_registry.py": [
+    {
+      "type": "class",
+      "name": "ModelRegistry",
+      "doc": "Central authority for Model Versioning and Promotion.",
+      "lineno": 16
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 21
+    },
+    {
+      "type": "function",
+      "name": "register_model",
+      "doc": "Registers a new model version.",
+      "lineno": 26
+    },
+    {
+      "type": "function",
+      "name": "get_active_model_id",
+      "doc": null,
+      "lineno": 45
+    },
+    {
+      "type": "function",
+      "name": "log_shadow_inference",
+      "doc": "Logs a prediction from the Challenger model without executing it.",
+      "lineno": 48
+    },
+    {
+      "type": "function",
+      "name": "promote_challenger",
+      "doc": "Promotes the current Challenger to Champion.",
+      "lineno": 64
+    },
+    {
+      "type": "function",
+      "name": "_generate_hash",
+      "doc": null,
+      "lineno": 78
+    }
+  ],
+  "nexus_brain\\test_inference.py": [
+    {
+      "type": "function",
+      "name": "run_test",
+      "doc": null,
+      "lineno": 23
+    }
+  ],
+  "nexus_core\\acceleration.py": [
+    {
+      "type": "class",
+      "name": "AccelerationEngine",
+      "doc": null,
+      "lineno": 13
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 14
+    },
+    {
+      "type": "function",
+      "name": "compute_acceleration_features",
+      "doc": "Main API for context-aware acceleration analysis.\nIncorporates FEAT acceleration logic: Momentum, RVOL, CVD Proxy.",
+      "lineno": 27
+    },
+    {
+      "type": "function",
+      "name": "_classify_accel",
+      "doc": "Categorizes acceleration into institutional types.",
+      "lineno": 96
+    }
+  ],
+  "nexus_core\\features.py": [
+    {
+      "type": "class",
+      "name": "FEATFeatures",
+      "doc": null,
+      "lineno": 14
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "generate_energy_map",
+      "doc": "Synthesizes the FEAT Energy Map: Composite of Density, Volatility, and Flow.\nReturns tensors ready for CNN/LSTM consumption.\n\nArgs:\n    df: DataFrame with OHLCV data\n    bins_n: Number of bins for price discretization\n    tick_cvd: Optional dict from compute_real_cvd() for real CVD flow field",
+      "lineno": 18
+    },
+    {
+      "type": "function",
+      "name": "extract_scalar_features",
+      "doc": "Legacy scalar features for LightGBM baseline.",
+      "lineno": 96
+    },
+    {
+      "type": "function",
+      "name": "apply_feat_engineering",
+      "doc": "Orchestrates Structure and Acceleration engines to produce the full FEAT feature set.\nReturns the DataFrame enriched with all institutional metrics.",
+      "lineno": 127
+    }
+  ],
+  "nexus_core\\math_engine.py": [
+    {
+      "type": "function",
+      "name": "fast_bin_indices",
+      "doc": "Numba-accelerated price-to-bin conversion.\nThroughput: >10M ticks/s.",
+      "lineno": 17
+    },
+    {
+      "type": "function",
+      "name": "bin_volume_fast",
+      "doc": "High-speed Volume Profile construction.",
+      "lineno": 29
+    },
+    {
+      "type": "function",
+      "name": "calculate_weighted_kde",
+      "doc": "Volume-Weighted Kernel Density Estimation with Adaptive Bandwidth.\nUses effective sample size (n_eff) for accurate smoothing.",
+      "lineno": 50
+    },
+    {
+      "type": "function",
+      "name": "calculate_z_score_fast",
+      "doc": null,
+      "lineno": 76
+    },
+    {
+      "type": "function",
+      "name": "get_math_engine_stats",
+      "doc": "Returns math engine telemetry.",
+      "lineno": 79
+    }
+  ],
+  "nexus_core\\structure_engine.py": [
+    {
+      "type": "class",
+      "name": "StructureEngine",
+      "doc": null,
+      "lineno": 14
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": null,
+      "lineno": 15
+    },
+    {
+      "type": "function",
+      "name": "detect_structure",
+      "doc": "Identifies Bill Williams Fractals and Break of Structure (BOS).",
+      "lineno": 24
+    },
+    {
+      "type": "function",
+      "name": "detect_zones",
+      "doc": "Detects FVG and Order Blocks using vectorized logic.",
+      "lineno": 49
+    },
+    {
+      "type": "function",
+      "name": "score_phase_form",
+      "doc": "FASE 1: Forma (F) - Score based on BOS and Fractals",
+      "lineno": 82
+    },
+    {
+      "type": "function",
+      "name": "score_phase_space",
+      "doc": "FASE 2: Espacio (E) - Based on FVG and Liquidity Pools",
+      "lineno": 103
+    },
+    {
+      "type": "function",
+      "name": "score_phase_acceleration",
+      "doc": "FASE 3: Aceleraci\u00f3n (A) - Now delegated to AccelerationEngine mostly, but for FEAT Index we keep simple check",
+      "lineno": 117
+    },
+    {
+      "type": "function",
+      "name": "compute_feat_index",
+      "doc": "Final FEAT Index calculation (0-100).",
+      "lineno": 131
+    }
+  ],
+  "nexus_training\\labeling.py": [
+    {
+      "type": "function",
+      "name": "apply_triple_barrier",
+      "doc": "Core Triple Barrier Logic.\n1.0: Profit Target hit first.\n-1.0: Stop Loss hit first.\n0.0: Time horizon reached.",
+      "lineno": 12
+    },
+    {
+      "type": "function",
+      "name": "label_dataset_triple_barrier",
+      "doc": "Labels a set of entry points using the Triple Barrier protocol.",
+      "lineno": 42
+    },
+    {
+      "type": "function",
+      "name": "get_labeling_parameters",
+      "doc": "Dynamically adjust barriers based on ATR.",
+      "lineno": 57
+    }
+  ],
+  "nexus_training\\train_hybrid.py": [
+    {
+      "type": "class",
+      "name": "FeatHybridDataset",
+      "doc": "Dataset for Hybrid Training with RLAIF support.\nLoads from real DB and incorporates LLM correction samples.",
+      "lineno": 35
+    },
+    {
+      "type": "function",
+      "name": "create_correction_dataset",
+      "doc": "Create a correction sample when LLM corrected NN's prediction.\nThese samples will have higher weight in future training.",
+      "lineno": 182
+    },
+    {
+      "type": "function",
+      "name": "train_hybrid_brain",
+      "doc": "Train the FEAT Hybrid Network with RLAIF-enabled dataset.\n\nReturns:\n    Training metrics including loss history and model path.",
+      "lineno": 223
+    },
+    {
+      "type": "function",
+      "name": "trigger_retraining",
+      "doc": "MCP Tool: Trigger model retraining.\nCan be called by n8n to recalibrate the neural network.\n\nArgs:\n    dataset_id: Optional identifier for specific correction dataset\n    epochs: Number of training epochs\n    learning_rate: Learning rate for optimizer",
+      "lineno": 311
+    },
+    {
+      "type": "function",
+      "name": "add_correction_sample",
+      "doc": "MCP Tool: Add a correction sample for future training.\nCalled when LLM feedback differs from NN prediction.",
+      "lineno": 340
+    },
+    {
+      "type": "function",
+      "name": "__init__",
+      "doc": "Args:\n    db_path: Path to SQLite market data\n    correction_weight: Weight multiplier for LLM correction samples",
+      "lineno": 41
+    },
+    {
+      "type": "function",
+      "name": "_load_from_db",
+      "doc": "Load labeled samples from market_data database and calculate fractal features.",
+      "lineno": 60
+    },
+    {
+      "type": "function",
+      "name": "_load_corrections",
+      "doc": "Load LLM correction samples with higher weight.",
+      "lineno": 121
+    },
+    {
+      "type": "function",
+      "name": "_create_energy_map",
+      "doc": "Create simplified 50x50 energy map from OHLCV.",
+      "lineno": 150
+    },
+    {
+      "type": "function",
+      "name": "_generate_synthetic_fallback",
+      "doc": "Generate synthetic data as fallback.",
+      "lineno": 163
+    },
+    {
+      "type": "function",
+      "name": "__len__",
+      "doc": null,
+      "lineno": 174
+    },
+    {
+      "type": "function",
+      "name": "__getitem__",
+      "doc": null,
+      "lineno": 177
+    }
+  ],
+  "tools\\gemini_bulk_improver.py": [
+    {
+      "type": "function",
+      "name": "get_python_files",
+      "doc": "Obtiene todos los archivos Python del proyecto.",
+      "lineno": 17
+    },
+    {
+      "type": "function",
+      "name": "run_gemini_audit",
+      "doc": "Ejecuta Gemini CLI para auditar un archivo.",
+      "lineno": 30
+    },
+    {
+      "type": "function",
+      "name": "main",
+      "doc": null,
+      "lineno": 62
+    }
+  ],
+  "tools\\gemini_client.py": [
+    {
+      "type": "function",
+      "name": "clean_markdown",
+      "doc": "Removes markdown code blocks (```python ... ```).",
+      "lineno": 7
+    },
+    {
+      "type": "function",
+      "name": "run_gemini",
+      "doc": null,
+      "lineno": 15
+    }
+  ],
+  "tools\\map_project.py": [
+    {
+      "type": "function",
+      "name": "get_python_files",
+      "doc": "Recursively find all Python files in the given directory.",
+      "lineno": 14
+    },
+    {
+      "type": "function",
+      "name": "get_module_name",
+      "doc": "Convert file path to dot-notation module name.",
+      "lineno": 32
+    },
+    {
+      "type": "function",
+      "name": "analyze_imports",
+      "doc": "Parse a file and extract all imported module names.",
+      "lineno": 42
+    },
+    {
+      "type": "function",
+      "name": "build_architecture_map",
+      "doc": "Scan the project and build the dependency map.",
+      "lineno": 61
+    }
+  ]
+}

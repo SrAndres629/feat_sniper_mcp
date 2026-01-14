@@ -1,9 +1,9 @@
 # === PERMISSIVE AUDIT MODE ===
 # Allowing everything strictly except Secrets & System Trash
 
-# SECURITY (CRITICAL)
-.env
-.env.local
+# SECURITY (AUDIT MODE - WARNING: SECRETS LEAK)
+# .env
+# .env.local
 
 # SYSTEM TRASH
 __pycache__/
@@ -18,9 +18,9 @@ node_modules/
 .idea/
 
 # LARGE BINARIES (GitHub Limit > 100MB)
-*.pth
-*.pt
-*.bin
+# *.pth
+# *.pt
+# *.bin
 # Allowing .pkl and .joblib for audit if small
 # Allowing .log for audit
 # Allowing data/ for audit

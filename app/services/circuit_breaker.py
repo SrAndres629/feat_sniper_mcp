@@ -1,65 +1,64 @@
+import asyncio
 import logging
 import time
-from typing import Dict, Any
-from app.core.config import settings
+from typing import Optional, Any
 
-logger = logging.getLogger("MT5_Bridge.Services.CircuitBreaker")
+logger = logging.getLogger("feat.sre")
 
 class CircuitBreaker:
     """
-    Institutional Circuit Breaker System.
-    Prevents execution cascade failures during market anomalies or API downtime.
+    Módulo 9: The Circuit Breaker.
+    Monitores de seguridad SRE.
     """
-    _state: str = "CLOSED"  # CLOSED, OPEN, HALF_OPEN
-    _failures: int = 0
-    _last_failure_time: float = 0
-    _recovery_timeout: int = 60 # Seconds to wait before HALF_OPEN
+    def __init__(self):
+        self.last_tick_time = time.time()
+        self.is_tripped = False
+        # Tolerance: 15 seconds of silence = DEATH
+        self.max_latency = 15.0 
+        self.trade_manager: Optional[Any] = None 
 
-    @classmethod
-    def record_failure(cls):
-        """Increments failure count and trips if threshold reached."""
-        if not settings.ENABLE_CIRCUIT_BREAKER:
-            return
+    def set_trade_manager(self, manager):
+        self.trade_manager = manager
 
-        cls._failures += 1
-        cls._last_failure_time = time.time()
-        
-        if cls._failures >= settings.CB_FAILURE_THRESHOLD:
-            cls._state = "OPEN"
-            logger.critical(f"CIRCUIT BREAKER: TRIPPED! State: {cls._state}. Failures: {cls._failures}")
+    def heartbeat(self):
+        """Llamado por cada tick ZMQ recibido."""
+        self.last_tick_time = time.time()
+        if self.is_tripped:
+            # Auto-Reset if data flows again? 
+            # Risk policy: Manual reset preferred. But for now auto-recover logic.
+            # self.is_tripped = False
+            pass
 
-    @classmethod
-    def record_success(cls):
-        """Resets failures and closes the circuit."""
-        if cls._state != "CLOSED":
-            logger.info(f"CIRCUIT BREAKER: RECOVERY DETECTED. Closing circuit.")
-        
-        cls._failures = 0
-        cls._state = "CLOSED"
+    async def monitor_heartbeat(self):
+        """Tarea de fondo (Background Task)."""
+        logger.info("🛡️ Circuit Breaker ARMED (Latency Limit: 15s)")
+        try:
+            while True:
+                if not self.is_tripped:
+                    latency = time.time() - self.last_tick_time
+                    
+                    if latency > self.max_latency:
+                        # TRIGGER EMERGENCY
+                        logger.critical(f"🚨 CIRCUIT TRIP: Dead Silence ({latency:.1f}s > {self.max_latency}s)")
+                        await self.emergency_shutdown()
+                        # Wait before checking again/resetting
+                        await asyncio.sleep(10)
+                        
+                await asyncio.sleep(1.0)
+        except asyncio.CancelledError:
+            logger.info("🛡️ Circuit Breaker Disarmed")
 
-    @classmethod
-    def can_execute(cls) -> bool:
-        """Determines if the system is allowed to perform operations."""
-        if not settings.ENABLE_CIRCUIT_BREAKER or cls._state == "CLOSED":
-            return True
+    async def emergency_shutdown(self):
+        self.is_tripped = True
+        logger.critical("⛔ SRE PROTOCOL: EXECUTE ORDER 66 (Close All)")
+        if self.trade_manager:
+            try:
+                # Assuming TradeManager has close_all_positions
+                await self.trade_manager.close_all_positions()
+            except Exception as e:
+                logger.error(f"SRE Execution Failed: {e}")
+        else:
+            logger.error("SRE Error: TradeManager not linked!")
 
-        # Check for recovery timeout
-        if cls._state == "OPEN":
-            if (time.time() - cls._last_failure_time) > cls._recovery_timeout:
-                cls._state = "HALF_OPEN"
-                logger.warning("CIRCUIT BREAKER: Transitioning to HALF_OPEN. Probing system...")
-                return True
-            return False
-        
-        return True
-
-    @classmethod
-    def get_status(cls) -> Dict[str, Any]:
-        return {
-            "state": cls._state,
-            "failures": cls._failures,
-            "last_failure": cls._last_failure_time,
-            "healthy": cls._state != "OPEN"
-        }
-
+# Singleton Global
 circuit_breaker = CircuitBreaker()

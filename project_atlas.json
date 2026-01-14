@@ -1,0 +1,2319 @@
+{
+    "diagnostic_suite.py": {
+        "classes": {
+            "PreFlightQA": {
+                "methods": [
+                    "__init__",
+                    "log_result",
+                    "generate_report"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "generate_dummy_models.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "generate_and_train",
+                "docstring": null
+            }
+        ]
+    },
+    "mcp_server.py": {
+        "classes": {},
+        "functions": []
+    },
+    "mcp_server_backup_v1.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "get_correlation_id",
+                "docstring": null
+            },
+            {
+                "name": "pulse_observer",
+                "docstring": null
+            },
+            {
+                "name": "_get_top_drivers",
+                "docstring": "Extrae los factores principales que influyen en la prediccin."
+            },
+            {
+                "name": "_generate_explanation",
+                "docstring": "Genera explicacin legible para el agente N8N."
+            },
+            {
+                "name": "_get_market_session",
+                "docstring": "Detecta la sesin actual y killzones institucionales (UTC)."
+            }
+        ]
+    },
+    "mcp_server_v2.py": {
+        "classes": {},
+        "functions": []
+    },
+    "nexus_auditor.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "log",
+                "docstring": null
+            },
+            {
+                "name": "run_cartographer",
+                "docstring": null
+            },
+            {
+                "name": "analyze_map",
+                "docstring": null
+            },
+            {
+                "name": "check_ports",
+                "docstring": null
+            }
+        ]
+    },
+    "nexus_control.py": {
+        "classes": {
+            "TradingState": {
+                "methods": [],
+                "docstring": "M\u00e1quina de Estados Finita para control Maestro-Aprendiz.\n\n\ud83d\udd34 RECALIBRATION: WinRate < 35% - Trading detenido, LLM diagnostica\n\ud83d\udfe1 SUPERVISED: 35% <= WinRate <= 70% - NN propone, LLM aprueba\n\ud83d\udfe2 AUTONOMOUS: WinRate > 70% - NN ejecuta, LLM audita post-mortem"
+            },
+            "TradeRecord": {
+                "methods": [],
+                "docstring": "Registro de trade para c\u00e1lculo de WinRate."
+            },
+            "PerformanceTracker": {
+                "methods": [
+                    "__init__",
+                    "_load_state",
+                    "_save_state",
+                    "record_trade",
+                    "close_trade",
+                    "calculate_winrate",
+                    "evaluate_and_transition",
+                    "get_status"
+                ],
+                "docstring": "Rastrea el rendimiento de la NN para determinar el estado del FSM.\nUsa ventana deslizante de \u00faltimos N trades."
+            },
+            "StrategyCommander": {
+                "methods": [
+                    "__init__"
+                ],
+                "docstring": "MODELO 3: EL COMANDANTE DE ESTRATEGIA\nOrquesta la lgica de decisin, riesgo y ejecucin basada en FSM."
+            },
+            "NexusControl": {
+                "methods": [
+                    "__init__",
+                    "pre_flight_checks",
+                    "start_mt5",
+                    "start_docker",
+                    "war_room_report",
+                    "main_loop",
+                    "stop_all",
+                    "audit_system"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": [
+            {
+                "name": "banner",
+                "docstring": null
+            },
+            {
+                "name": "log",
+                "docstring": null
+            },
+            {
+                "name": "run_cmd",
+                "docstring": "Ejecuta un comando con opcin de streaming en vivo para evitar bloqueos visuales."
+            },
+            {
+                "name": "kill_other_instances",
+                "docstring": "Finds and terminates other running instances of this script to avoid port/resource conflicts."
+            },
+            {
+                "name": "check_port",
+                "docstring": null
+            },
+            {
+                "name": "is_mt5_running",
+                "docstring": null
+            },
+            {
+                "name": "start_strategy_node",
+                "docstring": null
+            }
+        ]
+    },
+    "nexus_indexer.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "parse_file",
+                "docstring": "Extracts classes, functions, and docstrings from a python file."
+            },
+            {
+                "name": "scan_project",
+                "docstring": "Recursively scans the project and builds the index."
+            }
+        ]
+    },
+    "nexus_query.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "search_index",
+                "docstring": null
+            }
+        ]
+    },
+    "repair_local_db.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "init_db",
+                "docstring": null
+            }
+        ]
+    },
+    "safe_sanitize.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "safe_clean",
+                "docstring": null
+            }
+        ]
+    },
+    "seed_history.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "get_last_timestamp",
+                "docstring": null
+            },
+            {
+                "name": "main",
+                "docstring": null
+            },
+            {
+                "name": "calculate_rsi",
+                "docstring": null
+            },
+            {
+                "name": "calculate_atr",
+                "docstring": null
+            }
+        ]
+    },
+    "setup_nexus_db.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "print_header",
+                "docstring": null
+            },
+            {
+                "name": "get_credentials",
+                "docstring": "Prompt user for new Supabase credentials."
+            },
+            {
+                "name": "test_connection",
+                "docstring": "Test Supabase connection."
+            },
+            {
+                "name": "create_env_file",
+                "docstring": "Create or update .env file with new credentials."
+            },
+            {
+                "name": "run_schema",
+                "docstring": "Execute the institutional schema on the new database."
+            },
+            {
+                "name": "print_summary",
+                "docstring": "Print setup summary."
+            },
+            {
+                "name": "main",
+                "docstring": null
+            }
+        ]
+    },
+    "simulate_full_flow.py": {
+        "classes": {},
+        "functions": []
+    },
+    "test_debug.py": {
+        "classes": {},
+        "functions": []
+    },
+    "test_n8n.py": {
+        "classes": {},
+        "functions": []
+    },
+    "test_strategy_logic.py": {
+        "classes": {},
+        "functions": []
+    },
+    "verify_system.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\main.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\core\\auditor_senior.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\core\\config.py": {
+        "classes": {
+            "Settings": {
+                "methods": [],
+                "docstring": "Configuracin global del sistema cargada desde variables de entorno o archivo .env."
+            }
+        },
+        "functions": []
+    },
+    "app\\core\\logger.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "setup_logger",
+                "docstring": null
+            },
+            {
+                "name": "hijack_streams",
+                "docstring": null
+            }
+        ]
+    },
+    "app\\core\\math_utils.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "fast_bin_indices",
+                "docstring": "Numba-accelerated pricing bin calculation."
+            },
+            {
+                "name": "bin_volume_numba",
+                "docstring": "High-speed Volume Profile binning."
+            },
+            {
+                "name": "calculate_weighted_kde",
+                "docstring": "Weighted KDE using effective sample size (n_eff)."
+            },
+            {
+                "name": "triple_barrier_label",
+                "docstring": "Triple Barrier Method for Institutional Labeling.\n- +1: Hits Profit Target\n- -1: Hits Stop Loss\n-  0: Time Horizon Exhausted (Vertical Barrier)"
+            }
+        ]
+    },
+    "app\\core\\mt5_conn.py": {
+        "classes": {
+            "MT5Connection": {
+                "methods": [
+                    "__new__",
+                    "__init__",
+                    "start_watchdog",
+                    "_initialize_mt5",
+                    "_locked_execution"
+                ],
+                "docstring": "Singleton connection manager for MetaTrader 5.\n\nProvides a thread-safe (threading.Lock) and non-blocking (anyio.to_thread)\nenvironment for interacting with the synchronous MT5 C-API.\n\nAttributes:\n    _instance: Singleton instance.\n    _lock: Singleton lifecycle lock.\n    _mt5_lock: API access synchronization lock.\n    _watchdog_task: Background connectivity monitor."
+            }
+        },
+        "functions": []
+    },
+    "app\\core\\observability.py": {
+        "classes": {
+            "CircuitState": {
+                "methods": [],
+                "docstring": null
+            },
+            "ObservabilityEngine": {
+                "methods": [
+                    "__init__",
+                    "get_instance",
+                    "track_latency",
+                    "track_order",
+                    "update_model_health"
+                ],
+                "docstring": "Controlador maestro de telemetra y mtricas institucionales."
+            }
+        },
+        "functions": [
+            {
+                "name": "resilient",
+                "docstring": "Decorador de grado industrial para resiliencia (Circuit Breaker + Retries).\n\nArgs:\n    max_retries: Reintentos inmediatos con jitter.\n    failure_threshold: Fallos necesarios para abrir el circuito.\n    recovery_timeout: Segundos antes de pasar a HALF_OPEN."
+            }
+        ]
+    },
+    "app\\core\\validation.py": {
+        "classes": {
+            "OrderValidator": {
+                "methods": [],
+                "docstring": "Motor de validacin inteligente para rdenes de trading y gestin de riesgo."
+            }
+        },
+        "functions": []
+    },
+    "app\\core\\zmq_bridge.py": {
+        "classes": {
+            "ZMQBridge": {
+                "methods": [
+                    "__init__",
+                    "add_callback"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "app\\core\\zmq_projector.py": {
+        "classes": {
+            "ZMQProjector": {
+                "methods": [
+                    "__init__",
+                    "start",
+                    "project_hud",
+                    "stop"
+                ],
+                "docstring": "Projector sends 'HUD' updates to MT5 using ZMQ Publish pattern.\nMT5 acts as a Subscriber to this feed."
+            }
+        },
+        "functions": []
+    },
+    "app\\core\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\ml\\data_collector.py": {
+        "classes": {
+            "SQLiteWALConnection": {
+                "methods": [
+                    "__init__",
+                    "_ensure_directory",
+                    "get_connection",
+                    "_init_db"
+                ],
+                "docstring": "Thread-safe SQLite connection with WAL mode.\nPermite lecturas y escrituras simultneas."
+            },
+            "OracleLabeler": {
+                "methods": [
+                    "__init__",
+                    "process_pending_labels"
+                ],
+                "docstring": "Oracle que etiqueta datos mirando N velas hacia el futuro.\nUsa queries SQL eficientes en lugar de cargar todo en memoria."
+            },
+            "Resampler": {
+                "methods": [
+                    "__init__",
+                    "push_tick"
+                ],
+                "docstring": "Engine for Multi-Timeframe (MTF) Candle Aggregation."
+            },
+            "DataCollector": {
+                "methods": [
+                    "__init__",
+                    "compute_features",
+                    "collect",
+                    "_flush_batch",
+                    "force_flush",
+                    "get_stats",
+                    "export_training_csv"
+                ],
+                "docstring": "Colector principal con batch inserts para alta frecuencia."
+            }
+        },
+        "functions": [
+            {
+                "name": "compute_real_cvd",
+                "docstring": "Calcula CVD (Cumulative Volume Delta) real usando flags de MT5.\n\nA diferencia de la aproximaci\u00f3n tick-rule, esto usa los flags reales\nde MT5 que indican si cada tick fue una compra o venta agresiva.\n\nArgs:\n    tick_df: DataFrame de ticks con columnas 'volume', 'is_buy', 'is_sell'\n    \nReturns:\n    Dict con m\u00e9tricas CVD:\n    - cvd: Valor acumulado final\n    - cvd_series: Serie temporal del CVD\n    - buy_volume: Volumen total de compras\n    - sell_volume: Volumen total de ventas\n    - imbalance_ratio: Ratio de desbalance (-1 a 1)\n    - acceleration: Tasa de cambio del CVD"
+            }
+        ]
+    },
+    "app\\ml\\feat_processor.py": {
+        "classes": {
+            "FeatProcessor": {
+                "methods": [
+                    "__init__",
+                    "process_ticks_to_ohlcv",
+                    "apply_feat_engineering",
+                    "export_parquet",
+                    "export_ticks_jsonl"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "app\\ml\\fractal_analysis.py": {
+        "classes": {
+            "FractalAnalyzer": {
+                "methods": [
+                    "compute_hurst",
+                    "detect_regime",
+                    "analyze_timeframe"
+                ],
+                "docstring": "Computes fractal metrics for a given time series."
+            }
+        },
+        "functions": []
+    },
+    "app\\ml\\ml_engine.py": {
+        "classes": {
+            "ModelLoader": {
+                "methods": [
+                    "load_gbm",
+                    "load_lstm"
+                ],
+                "docstring": "Secure model loader with cryptographic-grade fallback and dynamic asset identification.\n\nHandles both joblib (Scikit-Learn) and torch models with state-dict reconstruction."
+            },
+            "NormalizationGuard": {
+                "methods": [
+                    "__init__",
+                    "is_statistically_safe"
+                ],
+                "docstring": "Validates data scales and feature ranges before inference.\n\nPrevents garbage-in-garbage-out by checking ATR-relative scales\nand detecting statistical drift in input features."
+            },
+            "AnomalyDetector": {
+                "methods": [
+                    "__init__",
+                    "fit",
+                    "score",
+                    "is_anomaly"
+                ],
+                "docstring": "IsolationForest-based anomaly detection for market manipulation.\n\nIdentifies non-linear erratic behavior and volumetric anomalies."
+            },
+            "ShadowLogger": {
+                "methods": [
+                    "__init__",
+                    "log"
+                ],
+                "docstring": "Logger para predicciones en Shadow Mode."
+            },
+            "MLEngine": {
+                "methods": [
+                    "__init__",
+                    "apply_feat_veto",
+                    "update_macro_bias",
+                    "_ensure_models",
+                    "predict_gbm",
+                    "predict_lstm",
+                    "_neutral_response",
+                    "ensemble_predict",
+                    "get_status"
+                ],
+                "docstring": "Master ML Inference Engine with Asset Identity Protocol.\n\nOrchestrates ensemble predictions from GBM and LSTM models\nwhile enforcing statistical and behavioral safety guards."
+            }
+        },
+        "functions": []
+    },
+    "app\\ml\\ml_normalization.py": {
+        "classes": {
+            "ATRNormalizer": {
+                "methods": [
+                    "__init__",
+                    "set_current_atr",
+                    "set_volume_ma",
+                    "normalize_features",
+                    "normalize_stop_loss",
+                    "normalize_take_profit"
+                ],
+                "docstring": "Normalizes market data using ATR (Average True Range).\n\nBenefits:\n- Asset-agnostic features (model trained on Gold works on Euro)\n- Scale-invariant signals (pip differences become irrelevant)\n- Better generalization across volatility regimes"
+            }
+        },
+        "functions": [
+            {
+                "name": "get_asset_profile",
+                "docstring": "Get asset profile for normalization and context.\nReturns default profile if symbol not found."
+            }
+        ]
+    },
+    "app\\ml\\multi_time_learning.py": {
+        "classes": {
+            "MultiTimeLearningManager": {
+                "methods": [
+                    "__init__",
+                    "update_killzone_context",
+                    "get_fractal_weights",
+                    "calculate_attention_weights",
+                    "calculate_alignment_score",
+                    "resolve_conflicts",
+                    "get_confirmation_requirements"
+                ],
+                "docstring": "Orchestrates datasets and dynamic weights for MTF Intelligence.\n\nNow with killzone awareness for H4 weight boosting."
+            }
+        },
+        "functions": []
+    },
+    "app\\ml\\temporal_features.py": {
+        "classes": {
+            "BayesianPriors": {
+                "methods": [
+                    "__init__",
+                    "get_prior",
+                    "update_prior",
+                    "calculate_posterior",
+                    "to_dict"
+                ],
+                "docstring": "Adaptive priors based on domain knowledge.\n\nThese are initialized with your expert knowledge and adjusted\nnightly based on actual performance."
+            },
+            "TemporalFeatureGenerator": {
+                "methods": [
+                    "__init__",
+                    "one_hot_state",
+                    "generate_features",
+                    "get_feature_importance_hints"
+                ],
+                "docstring": "Generates ML-ready feature vectors from temporal and market data."
+            }
+        },
+        "functions": []
+    },
+    "app\\ml\\train_models.py": {
+        "classes": {
+            "LSTMWithAttention": {
+                "methods": [
+                    "__init__",
+                    "forward"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": [
+            {
+                "name": "prepare_features",
+                "docstring": "Generates Multifractal Features and returns X, y."
+            },
+            {
+                "name": "load_dataset",
+                "docstring": "Loads CSV and computes features."
+            },
+            {
+                "name": "load_from_sqlite",
+                "docstring": "Loads raw OHLC from SQLite and computes features."
+            },
+            {
+                "name": "train_gbm",
+                "docstring": "Entrena GradientBoostingClassifier con TimeSeriesSplit.\n\nObjetivo: Minimizar LogLoss para clasificacin binaria.\nValidacin: Walk-forward para evitar look-ahead bias.\n\nReturns:\n    Path al modelo guardado"
+            },
+            {
+                "name": "train_lstm",
+                "docstring": "Entrena LSTM con Attention para capturar patrones secuenciales.\n\nArquitectura:\n- LSTM bidireccional con 2 capas\n- Self-Attention para ponderar velas relevantes\n- Clasificacin binaria (WIN/LOSS)\n\nReturns:\n    Path al modelo guardado"
+            },
+            {
+                "name": "train_all",
+                "docstring": "Ejecuta pipeline de entrenamiento completo."
+            }
+        ]
+    },
+    "app\\ml\\train_mtf_models.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "load_data_mtf",
+                "docstring": "Loads multitemporal data from institutional schema."
+            },
+            {
+                "name": "train_sniper",
+                "docstring": "Trains a precision GBM model for entry timing."
+            },
+            {
+                "name": "train_strategist",
+                "docstring": "Trains a structural bias model for trend identification."
+            }
+        ]
+    },
+    "app\\ml\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\models\\schemas.py": {
+        "classes": {
+            "ErrorDetail": {
+                "methods": [],
+                "docstring": null
+            },
+            "ResponseModel": {
+                "methods": [],
+                "docstring": "Modelo de respuesta global. Garantiza que n8n siempre reciba\nla misma estructura, facilitando el parseo y la resiliencia."
+            },
+            "MarketDataRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "TradeOrderRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "IndicatorRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "MQL5CodeRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "CalendarRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "HistoryRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "PanoramaRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "VolatilityRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "PositionManageRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "AccountMetrics": {
+                "methods": [],
+                "docstring": null
+            },
+            "Candle": {
+                "methods": [],
+                "docstring": null
+            },
+            "MarketDataResponse": {
+                "methods": [],
+                "docstring": null
+            },
+            "TradeOrderResponse": {
+                "methods": [],
+                "docstring": null
+            },
+            "VisionResponse": {
+                "methods": [],
+                "docstring": null
+            },
+            "VolatilityMetrics": {
+                "methods": [],
+                "docstring": null
+            },
+            "PositionActionResponse": {
+                "methods": [],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "app\\models\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\services\\analytics.py": {
+        "classes": {
+            "AnalyticsEngine": {
+                "methods": [],
+                "docstring": "Institutional Analytics Engine for Strategy Audition."
+            }
+        },
+        "functions": []
+    },
+    "app\\services\\circuit_breaker.py": {
+        "classes": {
+            "CircuitBreaker": {
+                "methods": [
+                    "record_failure",
+                    "record_success",
+                    "can_execute",
+                    "get_status"
+                ],
+                "docstring": "Institutional Circuit Breaker System.\nPrevents execution cascade failures during market anomalies or API downtime."
+            }
+        },
+        "functions": []
+    },
+    "app\\services\\n8n_bridge.py": {
+        "classes": {
+            "AuditRequest": {
+                "methods": [],
+                "docstring": "Solicitud de auditor\u00eda de trade para el LLM."
+            },
+            "AuditResponse": {
+                "methods": [],
+                "docstring": "Respuesta del LLM a la solicitud de auditor\u00eda."
+            },
+            "N8NBridge": {
+                "methods": [
+                    "__init__",
+                    "_load_config",
+                    "_auto_discover",
+                    "save_config",
+                    "_log_feedback",
+                    "get_status"
+                ],
+                "docstring": "Puente de comunicaci\u00f3n con n8n para el ciclo RLAIF."
+            }
+        },
+        "functions": []
+    },
+    "app\\services\\rag_memory.py": {
+        "classes": {
+            "RAGMemory": {
+                "methods": [
+                    "__new__",
+                    "__init__",
+                    "store",
+                    "search",
+                    "forget",
+                    "count",
+                    "get_categories"
+                ],
+                "docstring": "Singleton para gestin de memoria RAG.\n\nUso:\n    from app.services.rag_memory import rag_memory\n    \n    # Almacenar\n    rag_memory.store(\"El EUR/USD tiene soporte en 1.0850\", category=\"analysis\")\n    \n    # Buscar\n    results = rag_memory.search(\"soporte EUR/USD\", k=5)\n    \n    # Olvidar\n    rag_memory.forget(category=\"analysis\")"
+            }
+        },
+        "functions": [
+            {
+                "name": "_get_embedding_function",
+                "docstring": "Lazy load del modelo de embeddings."
+            },
+            {
+                "name": "_get_collection",
+                "docstring": "Lazy load de la coleccin ChromaDB."
+            }
+        ]
+    },
+    "app\\services\\risk_engine.py": {
+        "classes": {
+            "TheVault": {
+                "methods": [
+                    "__init__",
+                    "_load_state",
+                    "_save_state",
+                    "check_vault_trigger",
+                    "get_effective_margin",
+                    "get_status",
+                    "pop_pending_alert"
+                ],
+                "docstring": "Sistema de protecci\u00f3n de capital estilo \"banco\".\n\nAl duplicar el capital inicial:\n- 50% de las ganancias se \"bloquean\" (vault_balance)\n- 50% se reinvierten para inter\u00e9s compuesto\n- Se genera alerta para transferir a cuenta de resguardo"
+            },
+            "RiskEngine": {
+                "methods": [
+                    "__init__"
+                ],
+                "docstring": "Institutional Risk Management Engine.\nHandles adaptive lot sizing, drawdown protection, exposure limits, and Vault integration."
+            }
+        },
+        "functions": []
+    },
+    "app\\services\\supabase_sync.py": {
+        "classes": {
+            "SupabaseSync": {
+                "methods": [
+                    "client",
+                    "__init__",
+                    "_initialize_client"
+                ],
+                "docstring": "Master Cloud Persistence Manager for the NEXUS Ecosystem.\n\nOrchestrates signal logging, institutional tick auditing, and performance\ntracking with built-in circuit breakers for cloud-latency resilience.\n\nAttributes:\n    _client: Supabase client instance."
+            }
+        },
+        "functions": []
+    },
+    "app\\services\\telemetry.py": {
+        "classes": {
+            "TelemetryEngine": {
+                "methods": [
+                    "__init__"
+                ],
+                "docstring": "High-fidelity data pipeline to n8n for AI analysis.\nDispatches market state and bot performance."
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\advanced_analytics.py": {
+        "classes": {
+            "AdvancedAnalytics": {
+                "methods": [],
+                "docstring": "Skills institucionales: Shadow Testing y Sentiment Proxy."
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\calendar.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\skills\\custom_loader.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "register_custom_skills",
+                "docstring": "Escanea la carpeta 'indicadores propios' y registra cada .mq5 como una skill de lectura de datos."
+            },
+            {
+                "name": "register_indicator_tool",
+                "docstring": "Registra dinmicamente una herramienta MCP para un indicador especfico."
+            },
+            {
+                "name": "register_python_pipeline_tools",
+                "docstring": "Registra herramientas para ejecutar el pipeline de anlisis de Python."
+            }
+        ]
+    },
+    "app\\skills\\execution.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\skills\\feat_aceleracion.py": {
+        "classes": {
+            "MomentumType": {
+                "methods": [],
+                "docstring": null
+            },
+            "CandlePattern": {
+                "methods": [],
+                "docstring": null
+            }
+        },
+        "functions": [
+            {
+                "name": "analyze_candle_structure",
+                "docstring": "Analiza estructura de una vela individual."
+            },
+            {
+                "name": "classify_candle_pattern",
+                "docstring": "Clasifica patrn de vela con score de confianza."
+            },
+            {
+                "name": "analyze_volume",
+                "docstring": "Analiza volumen relativo."
+            },
+            {
+                "name": "detect_fakeout",
+                "docstring": "Detecta si hubo un Fakeout en un nivel.\nFakeout = precio rompe nivel pero cierra con mecha volviendo al rango."
+            },
+            {
+                "name": "calculate_atr",
+                "docstring": "Calcula Average True Range."
+            },
+            {
+                "name": "analyze_aceleracion",
+                "docstring": " FEAT MODULE A: Validacin de Momentum (Chrono-Aware).\n\nConfirma si hay aceleracin real o es una trampa.\nEste es el ltimo filtro antes de ejecutar."
+            },
+            {
+                "name": "generate_momentum_features",
+                "docstring": "Genera vector de features de momentum para ML."
+            }
+        ]
+    },
+    "app\\skills\\feat_chain.py": {
+        "classes": {
+            "ValidationResult": {
+                "methods": [],
+                "docstring": "Objeto inmutable para auditoria de decisiones."
+            },
+            "FEATRule": {
+                "methods": [
+                    "__init__",
+                    "set_next"
+                ],
+                "docstring": "Clase base para todas las reglas de la estrategia FEAT."
+            },
+            "FormRule": {
+                "methods": [],
+                "docstring": "Regla F: Valida Estructura (Fractales/BOS)."
+            },
+            "AccelerationRule": {
+                "methods": [],
+                "docstring": "Regla A: Valida Fisica de Mercado (Modulo 2)."
+            },
+            "SpaceRule": {
+                "methods": [],
+                "docstring": "Regla E: Valida Espacio (Liquidez/RiskReward)."
+            },
+            "TimeRule": {
+                "methods": [],
+                "docstring": "Regla T: Valida Tiempo (Killzones)."
+            },
+            "FEATChain": {
+                "methods": [
+                    "__init__"
+                ],
+                "docstring": "Coordinador de la cadena de decisi\u00f3n."
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\feat_espacio.py": {
+        "classes": {
+            "ZoneType": {
+                "methods": [],
+                "docstring": null
+            },
+            "ZoneStatus": {
+                "methods": [],
+                "docstring": null
+            },
+            "ZoneQuality": {
+                "methods": [],
+                "docstring": null
+            }
+        },
+        "functions": [
+            {
+                "name": "detect_fvg",
+                "docstring": "Detecta Fair Value Gaps con quality scoring."
+            },
+            {
+                "name": "detect_order_blocks",
+                "docstring": "Detecta Order Blocks con validacin de FVG."
+            },
+            {
+                "name": "calculate_premium_discount",
+                "docstring": "Calcula si el precio est en Premium (vender) o Discount (comprar).\nEquilibrium = 50%"
+            },
+            {
+                "name": "analyze_espacio",
+                "docstring": " FEAT MODULE E: Mapeo de Zonas de Liquidez (Chrono-Aware).\n\nBusca FVGs, Order Blocks y calcula Premium/Discount.\nIntegra contexto temporal para validar calidad de zonas."
+            },
+            {
+                "name": "generate_liquidity_features",
+                "docstring": "Genera vector de features de liquidez para ML."
+            }
+        ]
+    },
+    "app\\skills\\feat_forma.py": {
+        "classes": {
+            "Trend": {
+                "methods": [],
+                "docstring": null
+            },
+            "StructuralEvent": {
+                "methods": [],
+                "docstring": null
+            },
+            "WyckoffPhase": {
+                "methods": [],
+                "docstring": null
+            }
+        },
+        "functions": [
+            {
+                "name": "find_swing_points",
+                "docstring": "Identifica Swing Highs y Swing Lows usando mtodo N-velas."
+            },
+            {
+                "name": "detect_structure",
+                "docstring": "Analiza secuencia de swing points para determinar tendencia.\n\nReturns:\n    Tuple[Trend, reason, confidence_score]"
+            },
+            {
+                "name": "detect_bos_choch",
+                "docstring": "Detecta BOS/CHoCH con validacin temporal.\n\nREGLA CRTICA: \n- Solo cuenta como BOS si el CUERPO cierra ms all del nivel\n- Una MECHA es un SWEEP (toma de liquidez), no un BOS\n- En INDUCTION (Lunes), los BOS tienen menor confianza"
+            },
+            {
+                "name": "detect_wyckoff_phase",
+                "docstring": "Identifica fase de Wyckoff con score de confianza."
+            },
+            {
+                "name": "analyze_forma",
+                "docstring": " FEAT MODULE F: Anlisis de Estructura de Mercado (Chrono-Aware).\n\nAnaliza en 3 temporalidades (fractalidad):\n- Macro (H4): Tendencia dominante\n- Intermedio (H1): Estructura operativa\n- Micro (M15): Confirmaciones tempranas\n\nINTEGRA contexto temporal de Module T para validar seales."
+            },
+            {
+                "name": "generate_structure_features",
+                "docstring": "Genera vector de features para ML desde anlisis estructural."
+            }
+        ]
+    },
+    "app\\skills\\feat_intent.py": {
+        "classes": {
+            "TemporalTrendIntent": {
+                "methods": [
+                    "__init__",
+                    "calculate_intent_score",
+                    "_get_recommendation"
+                ],
+                "docstring": "Decides if a signal has 'Institutional Intent' behind it."
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\feat_kiv.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\skills\\feat_regime.py": {
+        "classes": {
+            "MarketRegime": {
+                "methods": [],
+                "docstring": null
+            },
+            "MarketRegimeFSM": {
+                "methods": [
+                    "__init__",
+                    "detect_regime"
+                ],
+                "docstring": "Probabilistic Finite State Machine for FEAT NEXUS.\nUses Bayesian-like heuristics to score each regime."
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\feat_sensory.py": {
+        "classes": {
+            "SensoryStack": {
+                "methods": [
+                    "__init__",
+                    "calculate_mss5_tensors",
+                    "_empty_response"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": [
+            {
+                "name": "calculate_mss5_tensors",
+                "docstring": null
+            }
+        ]
+    },
+    "app\\skills\\feat_tiempo.py": {
+        "classes": {
+            "SessionPhase": {
+                "methods": [],
+                "docstring": null
+            },
+            "WeeklyCycle": {
+                "methods": [],
+                "docstring": null
+            },
+            "EntryTemplate": {
+                "methods": [],
+                "docstring": null
+            },
+            "NeuralKillzone": {
+                "methods": [
+                    "evaluate_activity",
+                    "is_killzone_active"
+                ],
+                "docstring": "Sistema de Timing Dinmico basado en Actividad Real (Ticks/Spread)\nen lugar de solo horario fijo."
+            }
+        },
+        "functions": [
+            {
+                "name": "get_bolivia_time",
+                "docstring": "Convierte UTC a Bolivia (UTC-4)."
+            },
+            {
+                "name": "get_ny_time",
+                "docstring": "Convierte UTC a NY."
+            },
+            {
+                "name": "get_session_info",
+                "docstring": "Obtiene info de sesin enriquecida con Timing Neuronal."
+            },
+            {
+                "name": "check_near_fix",
+                "docstring": "Verifica proximidad a LBMA/SGE fixes."
+            },
+            {
+                "name": "calculate_alignment_score",
+                "docstring": "Calcula score de alineacin multi-timeframe.\n\nReglas:\n- D1 + H4 aligned = 100% size\n- H4 aligned, D1 neutral = 50% size\n- D1 contrary = AVOID or minimal size"
+            },
+            {
+                "name": "match_entry_template",
+                "docstring": "Determina qu plantilla de entrada aplica."
+            },
+            {
+                "name": "analyze_tiempo_institucional",
+                "docstring": " FEAT TIEMPO INSTITUCIONAL: Anlisis completo para GC/XAU.\n\nIntegra:\n- Sesiones globales (Globex, Asia, London, NY)\n- LBMA/SGE fixes\n- Ciclo semanal\n- Alineacin multi-timeframe\n- Plantillas de entrada"
+            },
+            {
+                "name": "analyze_tiempo",
+                "docstring": "Wrapper legacy."
+            },
+            {
+                "name": "generate_chrono_features",
+                "docstring": "Wrapper para ML features."
+            }
+        ]
+    },
+    "app\\skills\\history.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\skills\\indicators.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "_smma",
+                "docstring": "Smoothed Moving Average (SMMA).\nFormula: SMMA(i) = (Sum - SMMA(i-1) + Close(i)) / period"
+            },
+            {
+                "name": "calculate_feat_layers",
+                "docstring": "Calcula las capas de la F\u00edsica de Capas Multifractales (FEAT)."
+            },
+            {
+                "name": "detect_regime",
+                "docstring": "Modular Engineering: Regime Detection Logic."
+            }
+        ]
+    },
+    "app\\skills\\killzone_intelligence.py": {
+        "classes": {
+            "LiquidityState": {
+                "methods": [],
+                "docstring": null
+            },
+            "ActionRecommendation": {
+                "methods": [],
+                "docstring": null
+            },
+            "ConfirmationLevel": {
+                "methods": [],
+                "docstring": null
+            }
+        },
+        "functions": [
+            {
+                "name": "get_bolivia_time",
+                "docstring": "Convert UTC to Bolivia time (UTC-4)."
+            },
+            {
+                "name": "get_current_block",
+                "docstring": "Get the current 15-min killzone block.\nReturns block info or None if outside killzone (09:00-13:00)."
+            },
+            {
+                "name": "get_all_blocks_ml_features",
+                "docstring": "Generate ML features for all blocks.\nUsed for training the neural network."
+            },
+            {
+                "name": "calculate_alignment_factor",
+                "docstring": "Calculate alignment factor (-1.0 to +1.0) for ML input.\n\n+1.0 = All bullish aligned\n-1.0 = All bearish aligned\n0.0 = Conflict or neutral"
+            },
+            {
+                "name": "check_h1_confirmation",
+                "docstring": "Check H1 confirmation level.\n\nReturns confirmation level and whether to proceed."
+            },
+            {
+                "name": "generate_temporal_ml_features",
+                "docstring": "Generate complete ML feature vector for current moment.\nThis is what the neural network receives as input."
+            }
+        ]
+    },
+    "app\\skills\\liquidity.py": {
+        "classes": {
+            "LiquidityEngine": {
+                "methods": [],
+                "docstring": "Sniper 2.0 Liquidity Analysis.\nAnalyzes Depth of Market (DoM) to ensure institutional fill quality."
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\liquidity_detector.py": {
+        "classes": {
+            "MarketStateTensor": {
+                "methods": [
+                    "__init__",
+                    "build_tensor",
+                    "_build_macro_layer",
+                    "_build_structural_layer",
+                    "_build_execution_layer",
+                    "_calculate_alignment",
+                    "_simple_rsi"
+                ],
+                "docstring": "Construye un tensor de estado de mercado multidimensional.\nCapas: Macro (H4/D1), Structural (H1/M15), Execution (M5/M1)"
+            }
+        },
+        "functions": [
+            {
+                "name": "get_current_kill_zone",
+                "docstring": "Determina la Kill Zone activa basndose en la hora actual.\n\nReturns:\n    \"NY\", \"LONDON\", \"ASIA\" o None si no hay KZ activa."
+            },
+            {
+                "name": "is_in_kill_zone",
+                "docstring": "Verifica si estamos dentro de una Kill Zone especfica."
+            },
+            {
+                "name": "detect_liquidity_pools",
+                "docstring": "Detecta piscinas de liquidez basadas en Swing Highs/Lows no mitigados.\n\nArgs:\n    candles: DataFrame con columnas ['high', 'low', 'close', 'time']\n    lookback: Nmero de velas a analizar\n    min_touches: Mnimo de toques para considerar zona vlida\n    \nReturns:\n    Dict con liquidity_above, liquidity_below, y pools list"
+            },
+            {
+                "name": "detect_asian_sweep",
+                "docstring": "Detecta si el precio ha barrido (sweep) el rango de la sesin asitica.\n\nUn sweep ocurre cuando el precio rompe el High/Low de Asia y \nluego vuelve a entrar en el rango con fuerza."
+            },
+            {
+                "name": "detect_fvg",
+                "docstring": "Detecta Fair Value Gaps (FVG) - zonas de ineficiencia de precio.\n\nBullish FVG: Candle1.high < Candle3.low (gap alcista)\nBearish FVG: Candle1.low > Candle3.high (gap bajista)"
+            },
+            {
+                "name": "calculate_body_wick_ratio",
+                "docstring": "Calcula el ratio Cuerpo/Mecha de una vela.\nVelas de intencin tienen > 70% cuerpo."
+            },
+            {
+                "name": "is_intention_candle",
+                "docstring": "Determina si una vela es de \"intencin\" (cuerpo > 70% del rango)."
+            }
+        ]
+    },
+    "app\\skills\\market.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "_clean_cache",
+                "docstring": "Mantiene el tamao del cach bajo control."
+            }
+        ]
+    },
+    "app\\skills\\market_physics.py": {
+        "classes": {
+            "MarketRegime": {
+                "methods": [],
+                "docstring": null
+            },
+            "MarketPhysics": {
+                "methods": [
+                    "__init__",
+                    "ingest_tick",
+                    "calculate_acceleration_vectorized"
+                ],
+                "docstring": "The Sensory Cortex: Motor de F\u00edsica de Mercado Institucional.\nCalcula Velocidad, Aceleraci\u00f3n y Anomal\u00edas de Volumen en tiempo real."
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\ml_sniper.py": {
+        "classes": {
+            "MLSniper": {
+                "methods": [],
+                "docstring": "ML-Lite Setup Classifier 2.0.\nUses pattern confluence to score trading setups."
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\quant_coder.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\skills\\remote_compute.py": {
+        "classes": {
+            "RemoteWorker": {
+                "methods": [
+                    "__init__",
+                    "_get_client"
+                ],
+                "docstring": "Gestor de ejecucin remota va SSH para Offloading de cmputo."
+            }
+        },
+        "functions": [
+            {
+                "name": "register_remote_skills",
+                "docstring": "Registra las herramientas de cmputo remoto en el MCP."
+            }
+        ]
+    },
+    "app\\skills\\skill_deep_auditor.py": {
+        "classes": {
+            "DeepAuditor": {
+                "methods": [
+                    "__init__",
+                    "run_comprehensive_audit",
+                    "_audit_database",
+                    "_audit_ml_features",
+                    "_audit_infrastructure"
+                ],
+                "docstring": "\ud83d\udd2c INSTITUTIONAL GRADE AUDITOR\nAnalyzes system health, ML performance, and data integrity."
+            }
+        },
+        "functions": [
+            {
+                "name": "run_deep_audit",
+                "docstring": null
+            }
+        ]
+    },
+    "app\\skills\\system_ops.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\skills\\tester.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\skills\\trade_mgmt.py": {
+        "classes": {
+            "TradeManager": {
+                "methods": [
+                    "__init__"
+                ],
+                "docstring": "The Executor: Gestiona el ciclo de vida de las ordenes via ZMQ/MT5."
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\unified_model.py": {
+        "classes": {
+            "UnifiedModelDB": {
+                "methods": [
+                    "__init__",
+                    "_get_connection"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "app\\skills\\vision.py": {
+        "classes": {},
+        "functions": []
+    },
+    "app\\skills\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\db_engine.py": {
+        "classes": {
+            "StateRecord": {
+                "methods": [],
+                "docstring": "Record of a single state observation."
+            },
+            "TransitionRecord": {
+                "methods": [],
+                "docstring": "Record of a state transition."
+            },
+            "CalibrationRecord": {
+                "methods": [],
+                "docstring": "Record of a calibration run."
+            },
+            "UnifiedModelDB": {
+                "methods": [
+                    "__init__",
+                    "_connect",
+                    "_transaction",
+                    "_create_tables",
+                    "log_state",
+                    "log_state_batch",
+                    "get_state_history",
+                    "get_state_distribution",
+                    "log_transition",
+                    "get_transition_stats",
+                    "get_transition_matrix",
+                    "save_calibration",
+                    "get_active_calibration",
+                    "get_calibration_history",
+                    "get_performance_summary",
+                    "export_to_csv",
+                    "cleanup_old_data",
+                    "get_table_stats",
+                    "get_narrative_history",
+                    "close",
+                    "__enter__",
+                    "__exit__"
+                ],
+                "docstring": "SQLite database for Unified Model state history and calibration.\n\nTables:\n- state_history: All state observations\n- transitions: State transition events\n- calibrations: Calibration runs and parameters"
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\drift_monitor.py": {
+        "classes": {
+            "DriftDetector": {
+                "methods": [
+                    "__init__",
+                    "update_baseline",
+                    "detect_drift"
+                ],
+                "docstring": "Monitors statistical distance between Recent Market Data (Live)\nand Training Data (Baseline)."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\feat_memory_mcp.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\mcp_server.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "_generate_justification",
+                "docstring": "Genera explicaci\u00f3n textual del razonamiento de la NN."
+            }
+        ]
+    },
+    "brain_core\\app\\main.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\core\\config.py": {
+        "classes": {
+            "Settings": {
+                "methods": [],
+                "docstring": "Configuracin global del sistema cargada desde variables de entorno o archivo .env."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\core\\mt5_conn.py": {
+        "classes": {
+            "MT5Connection": {
+                "methods": [
+                    "__new__",
+                    "__init__",
+                    "start_watchdog",
+                    "_initialize_mt5",
+                    "_locked_execution"
+                ],
+                "docstring": "Gestor de conexin Singleton para MetaTrader 5.\n\nProporciona un entorno seguro para hilos (threading.Lock) y no bloqueante\n(anyio.to_thread) para interactuar con la librera sncrona de MT5."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\core\\observability.py": {
+        "classes": {
+            "ObservabilityEngine": {
+                "methods": [
+                    "__init__",
+                    "get_instance",
+                    "track_latency",
+                    "track_order",
+                    "update_model_health"
+                ],
+                "docstring": "Controlador maestro de telemetra y mtricas institucionales."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\core\\validation.py": {
+        "classes": {
+            "OrderValidator": {
+                "methods": [],
+                "docstring": "Motor de validacin inteligente para rdenes de trading y gestin de riesgo."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\core\\zmq_bridge.py": {
+        "classes": {
+            "ZMQBridge": {
+                "methods": [
+                    "__init__"
+                ],
+                "docstring": "Puente de ultra-baja latencia usando ZeroMQ.\nSustituye el polling de archivos CSV por una arquitectura Event-Driven."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\core\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\models\\schemas.py": {
+        "classes": {
+            "ErrorDetail": {
+                "methods": [],
+                "docstring": null
+            },
+            "ResponseModel": {
+                "methods": [],
+                "docstring": "Modelo de respuesta global. Garantiza que n8n siempre reciba\nla misma estructura, facilitando el parseo y la resiliencia."
+            },
+            "MarketDataRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "TradeOrderRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "IndicatorRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "MQL5CodeRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "CalendarRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "HistoryRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "PanoramaRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "VolatilityRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "PositionManageRequest": {
+                "methods": [],
+                "docstring": null
+            },
+            "AccountMetrics": {
+                "methods": [],
+                "docstring": null
+            },
+            "Candle": {
+                "methods": [],
+                "docstring": null
+            },
+            "MarketDataResponse": {
+                "methods": [],
+                "docstring": null
+            },
+            "TradeOrderResponse": {
+                "methods": [],
+                "docstring": null
+            },
+            "VisionResponse": {
+                "methods": [],
+                "docstring": null
+            },
+            "VolatilityMetrics": {
+                "methods": [],
+                "docstring": null
+            },
+            "PositionActionResponse": {
+                "methods": [],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\models\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\services\\analytics.py": {
+        "classes": {
+            "AnalyticsEngine": {
+                "methods": [],
+                "docstring": "Institutional Analytics Engine for Strategy Audition."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\services\\circuit_breaker.py": {
+        "classes": {
+            "CircuitBreaker": {
+                "methods": [
+                    "record_failure",
+                    "record_success",
+                    "can_execute",
+                    "get_status"
+                ],
+                "docstring": "Institutional Circuit Breaker System.\nPrevents execution cascade failures during market anomalies or API downtime."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\services\\risk_engine.py": {
+        "classes": {
+            "RiskEngine": {
+                "methods": [],
+                "docstring": "Institutional Risk Management Engine.\nHandles adaptive lot sizing, drawdown protection, and exposure limits."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\services\\supabase_sync.py": {
+        "classes": {
+            "SupabaseSync": {
+                "methods": [
+                    "__init__",
+                    "_initialize_client"
+                ],
+                "docstring": "Gestor de sincronizacin con Supabase para el ecosistema NEXUS.\nCentraliza el logging de seales y trades en la nube."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\skills\\advanced_analytics.py": {
+        "classes": {
+            "AdvancedAnalytics": {
+                "methods": [],
+                "docstring": "Skills institucionales: Shadow Testing y Sentiment Proxy."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\skills\\calendar.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\skills\\custom_loader.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "register_custom_skills",
+                "docstring": "Escanea la carpeta 'indicadores propios' y registra cada .mq5 como una skill de lectura de datos."
+            },
+            {
+                "name": "register_indicator_tool",
+                "docstring": "Registra dinmicamente una herramienta MCP para un indicador especfico."
+            },
+            {
+                "name": "register_python_pipeline_tools",
+                "docstring": "Registra herramientas para ejecutar el pipeline de anlisis de Python."
+            }
+        ]
+    },
+    "brain_core\\app\\skills\\execution.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\skills\\history.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\skills\\indicators.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\skills\\liquidity.py": {
+        "classes": {
+            "LiquidityEngine": {
+                "methods": [],
+                "docstring": "Sniper 2.0 Liquidity Analysis.\nAnalyzes Depth of Market (DoM) to ensure institutional fill quality."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\skills\\market.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "_clean_cache",
+                "docstring": "Mantiene el tamao del cach bajo control."
+            }
+        ]
+    },
+    "brain_core\\app\\skills\\ml_sniper.py": {
+        "classes": {
+            "MLSniper": {
+                "methods": [],
+                "docstring": "ML-Lite Setup Classifier 2.0.\nUses pattern confluence to score trading setups."
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\skills\\quant_coder.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\skills\\remote_compute.py": {
+        "classes": {
+            "RemoteWorker": {
+                "methods": [
+                    "__init__",
+                    "_get_client"
+                ],
+                "docstring": "Gestor de ejecucin remota va SSH para Offloading de cmputo."
+            }
+        },
+        "functions": [
+            {
+                "name": "register_remote_skills",
+                "docstring": "Registra las herramientas de cmputo remoto en el MCP."
+            }
+        ]
+    },
+    "brain_core\\app\\skills\\tester.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\skills\\trade_mgmt.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\skills\\unified_model.py": {
+        "classes": {
+            "UnifiedModelDB": {
+                "methods": [
+                    "__init__",
+                    "_get_connection"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "brain_core\\app\\skills\\vision.py": {
+        "classes": {},
+        "functions": []
+    },
+    "brain_core\\app\\skills\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "FEAT_Sniper_Master_Core\\Python\\db_engine.py": {
+        "classes": {
+            "StateRecord": {
+                "methods": [],
+                "docstring": "Record of a single state observation."
+            },
+            "TransitionRecord": {
+                "methods": [],
+                "docstring": "Record of a state transition."
+            },
+            "CalibrationRecord": {
+                "methods": [],
+                "docstring": "Record of a calibration run."
+            },
+            "UnifiedModelDB": {
+                "methods": [
+                    "__init__",
+                    "_connect",
+                    "_transaction",
+                    "_create_tables",
+                    "log_state",
+                    "log_state_batch",
+                    "get_state_history",
+                    "get_state_distribution",
+                    "log_transition",
+                    "get_transition_stats",
+                    "get_transition_matrix",
+                    "save_calibration",
+                    "get_active_calibration",
+                    "get_calibration_history",
+                    "get_performance_summary",
+                    "export_to_csv",
+                    "cleanup_old_data",
+                    "get_table_stats",
+                    "get_narrative_history",
+                    "close",
+                    "__enter__",
+                    "__exit__"
+                ],
+                "docstring": "SQLite database for Unified Model state history and calibration.\n\nTables:\n- state_history: All state observations\n- transitions: State transition events\n- calibrations: Calibration runs and parameters"
+            }
+        },
+        "functions": []
+    },
+    "FEAT_Sniper_Master_Core\\Python\\feat_memory_mcp.py": {
+        "classes": {},
+        "functions": []
+    },
+    "FEAT_Sniper_Master_Core\\Python\\institutional_bridge.py": {
+        "classes": {
+            "BridgeHandler": {
+                "methods": [
+                    "__init__",
+                    "on_created",
+                    "on_modified",
+                    "_process_event",
+                    "run_pipeline",
+                    "deploy_artifacts"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": [
+            {
+                "name": "main",
+                "docstring": null
+            }
+        ]
+    },
+    "FEAT_Sniper_Master_Core\\Python\\mathematical_validation.py": {
+        "classes": {
+            "ValidationMetrics": {
+                "methods": [],
+                "docstring": "Metrics from a validation run."
+            },
+            "PhaseResult": {
+                "methods": [],
+                "docstring": "Result from a validation phase."
+            }
+        },
+        "functions": [
+            {
+                "name": "validate_percentiles",
+                "docstring": "Phase 1: Validate percentile calculations.\n\nTests:\n- P20, P50, P80 accuracy against numpy reference\n- Rolling buffer correctness\n- Threshold application in FSM context"
+            },
+            {
+                "name": "validate_ema_feat",
+                "docstring": "Phase 2: Validate EMA and FEAT calculations.\n\nTests:\n- Compression ratio calculation\n- Curvature detection (Form)\n- Distance metrics (Space)\n- Acceleration detection"
+            },
+            {
+                "name": "validate_liquidity",
+                "docstring": "Phase 3: Validate liquidity detection.\n\nTests:\n- Swing high/low detection\n- Equal level identification\n- FVG (imbalance) detection\n- Mitigation tracking"
+            },
+            {
+                "name": "validate_fsm",
+                "docstring": "Phase 4: Validate Finite State Machine.\n\nTests:\n- State transitions are deterministic\n- Correct classification of known scenarios\n- Hysteresis prevents flip-flop\n- Percentile integration works"
+            },
+            {
+                "name": "validate_efficiency",
+                "docstring": "Phase 5: Validate computational efficiency.\n\nTests:\n- Average execution time per tick < 1ms\n- Memory efficiency (no reallocation)\n- Reproducibility"
+            },
+            {
+                "name": "validate_extreme_cases",
+                "docstring": "Phase 6: Validate behavior under extreme conditions.\n\nTests:\n- Gaps: TrueRange > 3*ATR\n- Zero volume\n- High volatility spikes\n- Edge values (0, inf, nan handling)"
+            },
+            {
+                "name": "run_full_validation",
+                "docstring": "Run complete mathematical validation suite."
+            }
+        ]
+    },
+    "FEAT_Sniper_Master_Core\\Python\\ml_engine.py": {
+        "classes": {
+            "MultifractalAI": {
+                "methods": [
+                    "__init__",
+                    "extract_layer_features",
+                    "train_on_layers",
+                    "predict_regime"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "FEAT_Sniper_Master_Core\\Python\\optuna_optimizer.py": {
+        "classes": {
+            "OptimizationConfig": {
+                "methods": [],
+                "docstring": "Configuration for Optuna optimization."
+            },
+            "OptunaOptimizer": {
+                "methods": [
+                    "__init__",
+                    "set_data",
+                    "_objective",
+                    "_evaluate",
+                    "optimize",
+                    "get_results",
+                    "export_calibration",
+                    "plot_optimization_history",
+                    "plot_param_importances"
+                ],
+                "docstring": "Bayesian optimization for FSM thresholds using Optuna.\n\nAdvantages over brute force:\n1. Intelligent sampling with TPE (Tree-structured Parzen Estimator)\n2. Early pruning of unpromising trials\n3. Parallelizable\n4. Built-in visualization"
+            }
+        },
+        "functions": [
+            {
+                "name": "run_quick_optimization",
+                "docstring": "Quick optimization with default settings.\n\nArgs:\n    effort: Volume effort array\n    result: Price result array\n    compression: EMA compression array\n    slope: EMA slope array\n    speed: Price velocity array\n    n_trials: Number of trials\n\nReturns:\n    Best ThresholdSet"
+            }
+        ]
+    },
+    "FEAT_Sniper_Master_Core\\Python\\run_pipeline.py": {
+        "classes": {
+            "PipelineError": {
+                "methods": [],
+                "docstring": "Custom exception for pipeline failures."
+            }
+        },
+        "functions": [
+            {
+                "name": "load_and_validate_csv",
+                "docstring": "Load data from CSV and validate required columns.\n\nExpected columns:\n- time (or timestamp)\n- effort (volume/normalized)\n- result (price change/atr)\n- compression (0-1)\n- slope (normalized)\n- speed (normalized)"
+            },
+            {
+                "name": "ingest_to_db",
+                "docstring": "Ingest DataFrame into SQLite database."
+            },
+            {
+                "name": "run_ml_pipeline",
+                "docstring": "Train and export ML model."
+            },
+            {
+                "name": "run_optimization_pipeline",
+                "docstring": "Run Optuna optimization for thresholds."
+            },
+            {
+                "name": "run_viz_pipeline",
+                "docstring": "Generate comprehensive dashboard."
+            },
+            {
+                "name": "main",
+                "docstring": null
+            }
+        ]
+    },
+    "FEAT_Sniper_Master_Core\\Python\\stats_engine.py": {
+        "classes": {
+            "RollingBuffer": {
+                "methods": [
+                    "__post_init__",
+                    "add",
+                    "get_data",
+                    "is_ready"
+                ],
+                "docstring": "Circular buffer for efficient rolling statistics."
+            },
+            "PercentileStats": {
+                "methods": [],
+                "docstring": "Percentile statistics container."
+            },
+            "StatsEngine": {
+                "methods": [
+                    "__init__",
+                    "add_observation",
+                    "is_ready",
+                    "compute_percentiles",
+                    "get_effort_stats",
+                    "get_result_stats",
+                    "get_compression_stats",
+                    "get_slope_stats",
+                    "get_percentile_value",
+                    "export_calibration",
+                    "save_calibration",
+                    "save_calibration_json"
+                ],
+                "docstring": "Statistical engine for computing rolling percentiles and calibration metrics.\nUsed for brute force calibration of FSM thresholds."
+            }
+        },
+        "functions": [
+            {
+                "name": "load_csv_data",
+                "docstring": "Load effort/result data from CSV file exported by MQL5.\nExpected format: index,effort,result"
+            },
+            {
+                "name": "validate_data",
+                "docstring": "Validate data for common issues."
+            }
+        ]
+    },
+    "FEAT_Sniper_Master_Core\\Python\\test_zmq_node.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "simulate_mt5_signal",
+                "docstring": "Simulates a signal being sent from MT5 via ZMQ."
+            }
+        ]
+    },
+    "FEAT_Sniper_Master_Core\\Python\\validator.py": {
+        "classes": {
+            "ValidationResult": {
+                "methods": [],
+                "docstring": "Result from a validation test."
+            },
+            "Validator": {
+                "methods": [
+                    "__init__",
+                    "add_result",
+                    "clear",
+                    "validate_no_nan",
+                    "validate_no_inf",
+                    "validate_positive",
+                    "validate_sufficient_data",
+                    "validate_variance",
+                    "validate_data_integrity",
+                    "validate_ema_order",
+                    "validate_compression_range",
+                    "validate_state_determinism",
+                    "validate_state_coverage",
+                    "validate_no_rapid_flipflop",
+                    "validate_calibration_file",
+                    "run_full_validation",
+                    "get_summary",
+                    "print_report"
+                ],
+                "docstring": "Comprehensive validation suite for Unified Model.\nTests data integrity, state coherence, and determinism."
+            }
+        },
+        "functions": [
+            {
+                "name": "validate_cross_asset",
+                "docstring": "Validate thresholds work across multiple assets.\n\nArgs:\n    data_files: List of CSV file paths\n    thresholds: Threshold configuration to test\n\nReturns:\n    Dictionary mapping filename to validation summary"
+            }
+        ]
+    },
+    "FEAT_Sniper_Master_Core\\Python\\viz_engine.py": {
+        "classes": {
+            "InstitutionalDashboard": {
+                "methods": [
+                    "__init__",
+                    "create_state_timeline",
+                    "create_feat_radar",
+                    "create_transition_heatmap",
+                    "create_feature_importance",
+                    "create_metrics_panel",
+                    "create_full_dashboard",
+                    "save_dashboard"
+                ],
+                "docstring": "Plotly-based institutional dashboard for Unified Model visualization."
+            }
+        },
+        "functions": [
+            {
+                "name": "create_sample_dashboard",
+                "docstring": "Create sample dashboard with synthetic data."
+            }
+        ]
+    },
+    "nexus_brain\\hybrid_model.py": {
+        "classes": {
+            "HybridFEATNetwork": {
+                "methods": [
+                    "__init__",
+                    "forward",
+                    "forward_legacy",
+                    "get_risk_decision"
+                ],
+                "docstring": "Neural Risk-Aware Trading Network.\n\nOutputs 3 tensors for dynamic risk management:\n- p_win: Trade success probability\n- alpha_confidence: Directional certainty for lot sizing\n- volatility_regime: For adaptive SL/TP"
+            }
+        },
+        "functions": [
+            {
+                "name": "save_hybrid_model",
+                "docstring": null
+            },
+            {
+                "name": "load_hybrid_model",
+                "docstring": null
+            }
+        ]
+    },
+    "nexus_brain\\model.py": {
+        "classes": {
+            "NexusBrain": {
+                "methods": [
+                    "__init__",
+                    "load_model",
+                    "predict_probability",
+                    "_calculate_risk_params"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": [
+            {
+                "name": "get_brain_inference",
+                "docstring": null
+            }
+        ]
+    },
+    "nexus_brain\\model_registry.py": {
+        "classes": {
+            "ModelRegistry": {
+                "methods": [
+                    "__init__",
+                    "register_model",
+                    "get_active_model_id",
+                    "log_shadow_inference",
+                    "promote_challenger",
+                    "_generate_hash"
+                ],
+                "docstring": "Central authority for Model Versioning and Promotion."
+            }
+        },
+        "functions": []
+    },
+    "nexus_brain\\test_inference.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "run_test",
+                "docstring": null
+            }
+        ]
+    },
+    "nexus_core\\acceleration.py": {
+        "classes": {
+            "AccelerationEngine": {
+                "methods": [
+                    "__init__",
+                    "compute_acceleration_features",
+                    "_classify_accel"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "nexus_core\\features.py": {
+        "classes": {
+            "FEATFeatures": {
+                "methods": [
+                    "__init__",
+                    "generate_energy_map",
+                    "extract_scalar_features",
+                    "apply_feat_engineering"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "nexus_core\\math_engine.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "fast_bin_indices",
+                "docstring": "Numba-accelerated price-to-bin conversion.\nThroughput: >10M ticks/s."
+            },
+            {
+                "name": "bin_volume_fast",
+                "docstring": "High-speed Volume Profile construction."
+            },
+            {
+                "name": "calculate_weighted_kde",
+                "docstring": "Volume-Weighted Kernel Density Estimation with Adaptive Bandwidth.\nUses effective sample size (n_eff) for accurate smoothing."
+            },
+            {
+                "name": "calculate_z_score_fast",
+                "docstring": null
+            },
+            {
+                "name": "get_math_engine_stats",
+                "docstring": "Returns math engine telemetry."
+            }
+        ]
+    },
+    "nexus_core\\structure_engine.py": {
+        "classes": {
+            "StructureEngine": {
+                "methods": [
+                    "__init__",
+                    "detect_structure",
+                    "detect_zones",
+                    "score_phase_form",
+                    "score_phase_space",
+                    "score_phase_acceleration",
+                    "compute_feat_index"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "nexus_training\\labeling.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "apply_triple_barrier",
+                "docstring": "Core Triple Barrier Logic.\n1.0: Profit Target hit first.\n-1.0: Stop Loss hit first.\n0.0: Time horizon reached."
+            },
+            {
+                "name": "label_dataset_triple_barrier",
+                "docstring": "Labels a set of entry points using the Triple Barrier protocol."
+            },
+            {
+                "name": "get_labeling_parameters",
+                "docstring": "Dynamically adjust barriers based on ATR."
+            }
+        ]
+    },
+    "nexus_training\\train_hybrid.py": {
+        "classes": {
+            "FeatHybridDataset": {
+                "methods": [
+                    "__init__",
+                    "_load_from_db",
+                    "_load_corrections",
+                    "_create_energy_map",
+                    "_generate_synthetic_fallback",
+                    "__len__",
+                    "__getitem__"
+                ],
+                "docstring": "Dataset for Hybrid Training with RLAIF support.\nLoads from real DB and incorporates LLM correction samples."
+            }
+        },
+        "functions": [
+            {
+                "name": "create_correction_dataset",
+                "docstring": "Create a correction sample when LLM corrected NN's prediction.\nThese samples will have higher weight in future training."
+            },
+            {
+                "name": "train_hybrid_brain",
+                "docstring": "Train the FEAT Hybrid Network with RLAIF-enabled dataset.\n\nReturns:\n    Training metrics including loss history and model path."
+            }
+        ]
+    },
+    "tests\\integration\\test_feat_pipeline.py": {
+        "classes": {
+            "TestFEATPipeline": {
+                "methods": [],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "tests\\unit\\test_physics.py": {
+        "classes": {
+            "TestMarketPhysics": {
+                "methods": [
+                    "test_acceleration_trigger"
+                ],
+                "docstring": null
+            }
+        },
+        "functions": []
+    },
+    "tests\\unit\\__init__.py": {
+        "classes": {},
+        "functions": []
+    },
+    "tools\\gemini_bulk_improver.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "get_python_files",
+                "docstring": "Obtiene todos los archivos Python del proyecto."
+            },
+            {
+                "name": "run_gemini_audit",
+                "docstring": "Ejecuta Gemini CLI para auditar un archivo."
+            },
+            {
+                "name": "main",
+                "docstring": null
+            }
+        ]
+    },
+    "tools\\gemini_client.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "clean_markdown",
+                "docstring": "Removes markdown code blocks (```python ... ```)."
+            },
+            {
+                "name": "run_gemini",
+                "docstring": null
+            }
+        ]
+    },
+    "tools\\map_project.py": {
+        "classes": {},
+        "functions": [
+            {
+                "name": "get_python_files",
+                "docstring": "Recursively find all Python files in the given directory."
+            },
+            {
+                "name": "get_module_name",
+                "docstring": "Convert file path to dot-notation module name."
+            },
+            {
+                "name": "analyze_imports",
+                "docstring": "Parse a file and extract all imported module names."
+            },
+            {
+                "name": "build_architecture_map",
+                "docstring": "Scan the project and build the dependency map."
+            }
+        ]
+    }
+}

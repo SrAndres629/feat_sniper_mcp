@@ -1,64 +1,54 @@
-
-# =============================================================================
-# ZMQ PROJECTOR: Python-to-MT5 HUD Bridge
-# =============================================================================
-# Broadcasts system state, pilot status, and neural metrics to MT5 visualizer.
-# Uses ZMQ_PUB to avoid blocking.
-
-import zmq
-import json
 import logging
-import asyncio
-from typing import Dict, Any, Optional
+import json
+from app.core.zmq_bridge import zmq_bridge
 
-logger = logging.getLogger("MT5_Bridge.Projector")
+logger = logging.getLogger("feat.hud")
 
 class ZMQProjector:
     """
-    Projector sends 'HUD' updates to MT5 using ZMQ Publish pattern.
-    MT5 acts as a Subscriber to this feed.
+    Módulo 8: The HUD.
+    Proyección visual en MT5 via ZMQ.
     """
-    def __init__(self, host: str = "0.0.0.0", port: int = 5556):
-        self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.PUB)
-        self.addr = f"tcp://{host}:{port}"
-        self._is_bound = False
+    def __init__(self):
+        self.bridge = None
 
-    def start(self):
-        """Bind the PUB socket."""
-        try:
-            self.socket.bind(self.addr)
-            self._is_bound = True
-            logger.info(f"ZMQ Projector (HUD) BINDING on {self.addr}")
-        except Exception as e:
-            logger.error(f"ZMQ Projector BIND error: {e}")
+    def set_bridge(self, bridge):
+        self.bridge = bridge
 
-    def project_hud(self, data: Dict[str, Any]):
-        """
-        Sends HUD snapshot to MT5.
+    async def draw_zone(self, symbol: str, high: float, low: float, color: str = "clrGreen", name: str = "zone"):
+        """Dibuja rectángulo (FVG/Block)."""
+        await self._send({
+            "sub_action": "DRAW_RECT",
+            "symbol": symbol,
+            "name": name,
+            "price1": high,
+            "price2": low,
+            "color": color,
+            "fill": True
+        })
+
+    async def draw_arrow(self, symbol: str, price: float, direction: str, color: str = None):
+        """Dibuja flecha de señal."""
+        arrow_code = 233 if direction == "BUY" else 234 
+        if not color: color = "clrLime" if direction == "BUY" else "clrRed"
         
-        Args:
-            data: {
-                "fsm_state": "autonomous",
-                "pilot": "Neural Net",
-                "confidence": 0.87,
-                "vault": {"balance": 150.0, "status": "LOCKED"},
-                "regime": "TRENDING",
-                "ema_colors": {"wind": "#00FF00", ...}
-            }
-        """
-        if not self._is_bound:
-            self.start()
-            
-        try:
-            payload = json.dumps(data)
-            self.socket.send_string(payload, zmq.NOBLOCK)
-        except Exception as e:
-            logger.debug(f"HUD Projection failed (normal if no sub): {e}")
+        await self._send({
+            "sub_action": "DRAW_ARROW",
+            "symbol": symbol,
+            "price": price,
+            "code": arrow_code,
+            "color": color
+        })
+    
+    async def clear_all(self):
+        await self._send({"sub_action": "CLEAR_ALL"})
 
-    def stop(self):
-        self.socket.close()
-        self.context.term()
+    async def _send(self, payload: dict):
+        if self.bridge and self.bridge.running:
+             # Wrapper para send_command action="HUD_UPDATE"
+             await self.bridge.send_command("HUD_UPDATE", **payload)
+        else:
+            pass # Silent fail if offline
 
-# Global Instance
-zmq_projector = ZMQProjector()
+# Singleton
+hud_projector = ZMQProjector()
