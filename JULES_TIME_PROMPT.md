@@ -1,23 +1,29 @@
-### 🕰️ PROMPT PARA JULES: IMPLEMENTACIÓN DEL "TIEMPO" (MARKET TIME)
+### 📜 PROMPT PARA JULES: ARQUITECTURA TEMPORAL Y CRONOMETRÍA DE ALFA (FEAT)
 
-> **Role:** Senior Quant Architect & Temporal Data Scientist.
-> **Task:** Diseñar e integrar el cuarto y último pilar del análisis FEAT: **Tiempo (Time)**. El objetivo es que la IA no solo sepa "qué", "dónde" y "cuánto", sino **"cuándo"** una señal tiene mayor probabilidad estadística de expansión.
-> 
+> **Role:** Senior Quant Strategist & Market Microstructure Expert.
+> **Task:** Implementar el pilar del **Tiempo (Time)** en el motor de decisión de **FEAT Sniper**. Debes dotar a la red neuronal **LSTM (1,1,4)** y a la **FEAT Chain** de la capacidad de entender la dinámica temporal del flujo de órdenes y la estacionalidad intradía.
 > **Contexto Técnico:**
-> El tiempo en el trading institucional es cíclico y se rige por la liquidez de sesión (Londres/NY) y los horarios de los bancos centrales. Una señal de aceleración excelente es irrelevante si ocurre en los últimos 2 minutos de la sesión de Londres o durante el "NFP blackout".
-> 
+> El Tiempo es la dimensión que valida o invalida las otras tres (F, E, A). Una señal de Aceleración excelente en un Espacio libre no tiene el mismo valor al cierre de Nueva York que en la apertura de Londres.
 > **Objetivos de Diseño para Jules:**
-> 1. **Detección de 'Session Horizon':**
-> * Calcula la proximidad al cierre de la sesión actual. Si faltan < 30 minutos para el cierre de Londres o NY, activa un `Time_Decay_Filter` que aumente la exigencia de la `p_win`.
+> 1. **Signal Time-to-Live (TTL) & Decay:**
+> * Implementa una función de **Decaimiento de Confianza**: La validez de una señal de la IA debe reducirse linealmente o exponencialmente según el tiempo transcurrido (medido en milisegundos y ticks) desde su generación.
+> * Si el precio no alcanza el primer objetivo en el tiempo  esperado basado en la volatilidad actual, el sistema debe ejecutar un **'Time-Based Exit'**.
 > 
-> 2. **Inercia Cronológica:**
-> * Define el concepto de **'Golden Hours'** (aperturas y solapamientos). Durante estas horas, el factor de confianza de la IA debe recibir un bono multiplicador (ej. 1.1x) debido a la inercia institucional.
+> 2. **Mapeo de Killzones y Ciclos de Sesión:**
+> * Define las ventanas de alta probabilidad (**Killzones**): Londres, Nueva York y el "Overlap".
+> * El vector de entrada debe incluir un `Session_Intensity_Score` que normalice la actividad esperada. La IA debe ser más escéptica ante movimientos rápidos en horas de baja liquidez (Asia).
 > 
-> 3. **Veto de Inactividad Temporal:**
-> * Si el sistema detecta que el precio ha estado plano por más de X periodos (Time Compression), la señal de entrada debe ser degradada hasta que ocurra un evento de expansión.
+> 3. **Análisis de Velocidad Relativa (Time-Relative Velocity):**
+> * Crea una métrica que compare la velocidad actual del precio con la velocidad promedio de la misma hora en los últimos 20 días.
+> * Esto ayudará a detectar **anomalías temporales** que suelen preceder a los movimientos institucionales.
 > 
-> 4. **Input Vector: `Time_Entropy`:**
-> * Añade una feature que represente la "madurez" del movimiento actual: ¿Cuánto tiempo ha pasado desde el último pico de aceleración física?
+> 4. **Filtro de Impacto de Noticias (Temporal Proximity):**
+> * Diseña un hook para que el sistema reduzca el riesgo o entre en **'Safety Mode'** en la proximidad de eventos macroeconómicos (±5 minutos de noticias de alto impacto).
+> * El tiempo de "congelación" debe ser dinámico basado en cuánto tarda el mercado en recuperar el régimen **Laminar**.
+> 
+> 5. **Optimización de Latencia:**
+> * Todos los cálculos temporales deben basarse en el `Decision_TS` del `mcp_server` para garantizar que no haya desfases entre la inferencia y la ejecución en MT5.
 > 
 > **Entregable:**
-> Refactor para `app/skills/calendar.py` y `nexus_brain/inference_api.py`. El sistema debe ser capaz de decir: *"Tengo Física, tengo Espacio, tengo Forma... pero NO tengo Tiempo (Cierre de sesión inminente). Abortando entrada"*.
+> Un esquema de actualización para `app/skills/history.py` y `trade_mgmt.py` que incorpore estas reglas de tiempo. Queremos que el **TradeManager** sea consciente de que el tiempo es un recurso finito y que el Alpha tiene fecha de caducidad.
+> **Restricción:** Mantener la coherencia con el **Protocolo POM**. La lógica temporal debe ser lo suficientemente ligera para no añadir más de 0.1ms a nuestra latencia actual.

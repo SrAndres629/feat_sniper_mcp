@@ -20,6 +20,7 @@
 > * Añade la feature `Space_Ratio`: (Espacio Neto / ATR).
 > * Asegura que el cálculo sea O(1) usando los datos ya cacheados en el `mcp_server`.
 > 
+> 
 > **Entregable:**
 > Un esquema de refactorización para `app/skills/execution.py` y `app/ml/normalization.py`. Queremos que el **TradeManager** bloquee órdenes si el "Espacio" es insuficiente, protegiendo el capital de entradas en rangos comprimidos o "choppy markets".
 > **Restricción:** El cálculo del Espacio debe ser dinámico. Si el ATR se expande (Régimen Turbulento), el Espacio requerido para operar debe expandirse proporcionalmente.
