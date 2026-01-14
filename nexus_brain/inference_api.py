@@ -135,7 +135,11 @@ class NeuralInferenceAPI:
             latency_ms = (time.time() - start_inf) * 1000
             
             # Module 7: RAG Recalibration (Feedback Loop)
-            recal = await recalibration_service.get_confidence_multiplier()
+            current_regime = "UNKNOWN"
+            if physics_regime and hasattr(physics_regime, 'regime'):
+                current_regime = physics_regime.regime
+
+            recal = await recalibration_service.get_confidence_multiplier(current_regime=current_regime)
             p_win_raw = result.get("p_win", 0.0)
             p_win_adj = p_win_raw * recal["multiplier"]
             result["p_win_raw"] = p_win_raw
