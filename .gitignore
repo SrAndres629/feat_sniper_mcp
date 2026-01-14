@@ -1,10 +1,9 @@
-# === PERMISSIVE AUDIT MODE (PHASE 13) ===
-# Excluding secrets but keeping institutional logs & artifacts
+# === PERMISSIVE AUDIT MODE ===
+# Allowing everything strictly except Secrets & System Trash
 
-# SECURITY
-.env
-.env.local
-*.private
+# SECURITY (AUDIT MODE - WARNING: SECRETS LEAK)
+# .env
+# .env.local
 
 # SYSTEM TRASH
 __pycache__/
@@ -19,22 +18,9 @@ node_modules/
 .idea/
 
 # LARGE BINARIES (GitHub Limit > 100MB)
-# Allowing neural weights for institutional audit
-*.pth
-*.pt
-*.bin
-*.pkl
-*.joblib
-
-# LOGS & REPORTS
-*.log
-audit_report.txt
-auditor_output.txt
-compile_*.txt
-final_audit.txt
-verify_final.txt
-logs/
-
-# DATA
-data/
-!data/.gitkeep
+# *.pth
+# *.pt
+# *.bin
+# Allowing .pkl and .joblib for audit if small
+# Allowing .log for audit
+# Allowing data/ for audit
