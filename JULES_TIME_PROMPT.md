@@ -13,8 +13,8 @@
 > 2. **Inercia Cronológica:**
 > * Define el concepto de **'Golden Hours'** (aperturas y solapamientos). Durante estas horas, el factor de confianza de la IA debe recibir un bono multiplicador (ej. 1.1x) debido a la inercia institucional.
 > 
-> 3. **Veto de Ilatencia Temporal:**
-> * Si el sistema detecta que el precio ha estado plano por más de X periodos (Time Compresion), la señal de salida debe ser degradada hasta que ocurra un evento de expansión.
+> 3. **Veto de Inactividad Temporal:**
+> * Si el sistema detecta que el precio ha estado plano por más de X periodos (Time Compression), la señal de entrada debe ser degradada hasta que ocurra un evento de expansión.
 > 
 > 4. **Input Vector: `Time_Entropy`:**
 > * Añade una feature que represente la "madurez" del movimiento actual: ¿Cuánto tiempo ha pasado desde el último pico de aceleración física?
