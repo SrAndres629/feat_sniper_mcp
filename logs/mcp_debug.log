@@ -452,3 +452,17 @@ asyncio.exceptions.CancelledError
 2026-01-14 04:23:34,560 | INFO | docket.worker | * trace(message: str, ...)
 2026-01-14 04:23:34,560 | INFO | docket.worker | * fail(message: str, ...)
 2026-01-14 04:23:34,560 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-14 04:42:38,693 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge detenido.
+2026-01-14 04:42:38,693 | INFO | MT5_Bridge.Core | Watchdog de conexin MT5 detenido.
+2026-01-14 04:42:38,693 | INFO | MT5_Bridge.Core | Cerrando conexin con MT5...
+2026-01-14 04:42:38,693 | ERROR | asyncio | Exception in callback _AsyncSocket._deserialize.<locals>._chain() at c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\zmq\_future.py:341
+handle: <Handle _AsyncSocket._deserialize.<locals>._chain() at c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\zmq\_future.py:341>
+Traceback (most recent call last):
+  File "C:\Users\acord\AppData\Local\Programs\Python\Python313\Lib\asyncio\events.py", line 89, in _run
+    self._context.run(self._callback, *self._args)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.venv\Lib\site-packages\zmq\_future.py", line 355, in _chain
+    if recvd.exception():
+       ~~~~~~~~~~~~~~~^^
+asyncio.exceptions.CancelledError
+2026-01-14 04:42:38,696 | INFO | MT5_Bridge.Core |  MT5 desconectado.

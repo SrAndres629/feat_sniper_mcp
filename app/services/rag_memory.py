@@ -77,5 +77,31 @@ class TradeMemory:
         except Exception as e:
             logger.error(f"Memory Write Error: {e}")
 
+    async def get_hourly_performance(self, hour: int) -> Dict[str, float]:
+        """
+        Consulta el rendimiento histórico para una hora específica.
+        Analiza trades pasados en el mismo bloque horario.
+        """
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                # Query simple para promediar outcome o profi real si existiera
+                # Por ahora usamos 'outcome' (WIN/LOSS) o calculamos de price si outcome es PENDING
+                query = """
+                    SELECT 
+                        COUNT(*) as total_trades,
+                        SUM(CASE WHEN outcome = 'WIN' THEN 1 ELSE 0 END) as wins
+                    FROM trades 
+                    WHERE strftime('%H', timestamp) = ?
+                """
+                async with db.execute(query, (f"{hour:02d}",)) as cursor:
+                    row = await cursor.fetchone()
+                    if row and row[0] > 0:
+                        win_rate = row[1] / row[0]
+                        return {"win_rate": win_rate, "sample_size": row[0]}
+            return {"win_rate": 0.5, "sample_size": 0} # Default neutral
+        except Exception as e:
+            logger.error(f"Memory Read Error (Hourly): {e}")
+            return {"win_rate": 0.5, "sample_size": 0}
+
 # Instancia Global
 rag_memory = TradeMemory()

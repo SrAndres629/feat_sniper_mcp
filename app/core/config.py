@@ -66,6 +66,11 @@ class Settings(BaseSettings):
     SHADOW_MODE: bool = True         # Simulation Mode (Paper Trading)
     DRY_RUN: bool = False            # LIVE SYSTEM ACTIVE (Model 5 Launch)
     
+    # Low-Latency Execution Settings (Race Condition & Retry Fix)
+    DECISION_TTL_MS: int = 300        # Max age of ML decision before rejection (ms)
+    MAX_ORDER_RETRIES: int = 3        # Retry attempts for transient errors (REQUOTE)
+    RETRY_BACKOFF_BASE_MS: int = 50   # Exponential backoff base (50 -> 150 -> 450ms)
+    
     # Supabase & Cloud Nexus
     SUPABASE_URL: Optional[str] = None
     SUPABASE_KEY: Optional[str] = None

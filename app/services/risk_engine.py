@@ -163,10 +163,12 @@ class RiskEngine:
                 self._last_reset_date = today
                 logger.info(f"RiskEngine: Daily balance reset. Base: ${self._daily_opening_balance:.2f}")
 
-    async def calculate_dynamic_lot(self, confidence: float, volatility: float, symbol: str, sl_points: int = 200) -> float:
+    async def calculate_dynamic_lot(self, confidence: float, volatility: float, symbol: str, sl_points: int = 200, black_swan_multiplier: float = 1.0) -> float:
         """
-        [MODEL 3 REQUEST] Asignacin Neuronal Dinmica.
+        [MODEL 3 REQUEST] Asignación Neuronal Dinámica.
         Wrapper sobre get_neural_allocation + get_adaptive_lots.
+        
+        Now includes Black Swan Guard integration for extreme market conditions.
         """
         allocation = await self.get_neural_allocation(confidence)
         
@@ -174,8 +176,19 @@ class RiskEngine:
         if confidence < 0.60:
             # "Riesgo minimo o cero"
             return 0.01 # Minimum lot
+        
+        # Apply Black Swan multiplier (volatility/spread/circuit breaker)
+        if black_swan_multiplier <= 0:
+            logger.warning("[RISK] Black Swan Guard BLOCKED trading")
+            return 0.0
             
-        return await self.get_adaptive_lots(symbol, sl_points, allocation["lot_multiplier"])
+        base_lot = await self.get_adaptive_lots(symbol, sl_points, allocation["lot_multiplier"])
+        final_lot = base_lot * black_swan_multiplier
+        
+        if black_swan_multiplier < 1.0:
+            logger.info(f"[RISK] Lot adjusted by Black Swan: {base_lot:.2f} → {final_lot:.2f} ({black_swan_multiplier*100:.0f}%)")
+        
+        return max(0.01, final_lot) if final_lot > 0 else 0.0
 
     async def get_neural_allocation(self, alpha_confidence: float) -> Dict[str, float]:
         """

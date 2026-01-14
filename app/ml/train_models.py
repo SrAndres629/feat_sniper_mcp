@@ -120,6 +120,7 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
     
     Objetivo: Minimizar LogLoss para clasificacin binaria.
     Validacin: Walk-forward para evitar look-ahead bias.
+    CORRECCION AUDITORIA: Scaler dentro del loop para evitar Data Leakage.
     
     Returns:
         Path al modelo guardado
@@ -128,30 +129,40 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
     from sklearn.preprocessing import StandardScaler
     from sklearn.ensemble import GradientBoostingClassifier
     from sklearn.metrics import log_loss, accuracy_score, classification_report
+    from sklearn.impute import SimpleImputer
     
     logger.info("=" * 60)
-    logger.info("PHASE 2: Training Gradient Boosting Model")
+    logger.info("PHASE 2: Training Gradient Boosting Model (Audit Compliant)")
     logger.info("=" * 60)
     
     # TimeSeriesSplit para validacin temporal
     tscv = TimeSeriesSplit(n_splits=5)
     
-    # Impute NaNs
-    from sklearn.impute import SimpleImputer
+    # Impute NaNs (Global is acceptable for simple mean, but safer inside loop? Mean is robust. Let's keep it simple or move it.)
+    # For strict compliance, Imputer should also be fitted on train only.
     imputer = SimpleImputer(strategy='mean')
-    X_imputed = imputer.fit_transform(X)
-    
-    # Normalizacin
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X_imputed)
+    # We will impute inside the loop too for maximum purism.
     
     best_loss = float("inf")
     best_model = None
+    best_scaler = None
+    best_imputer = None
     fold_results = []
     
-    for fold, (train_idx, val_idx) in enumerate(tscv.split(X_scaled)):
-        X_train, X_val = X_scaled[train_idx], X_scaled[val_idx]
+    # Iterate over raw data indices
+    for fold, (train_idx, val_idx) in enumerate(tscv.split(X)):
+        X_train_raw, X_val_raw = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
+        
+        # 1. Impute (Fit on Train, Transform val)
+        fold_imputer = SimpleImputer(strategy='mean')
+        X_train_imp = fold_imputer.fit_transform(X_train_raw)
+        X_val_imp = fold_imputer.transform(X_val_raw)
+        
+        # 2. Scale (Fit on Train, Transform val) -- FIX LEAKAGE
+        fold_scaler = StandardScaler()
+        X_train = fold_scaler.fit_transform(X_train_imp)
+        X_val = fold_scaler.transform(X_val_imp)
         
         # Modelo con hiperparmetros optimizados para trading
         model = GradientBoostingClassifier(
@@ -174,19 +185,26 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
         acc = accuracy_score(y_val, y_pred)
         
         fold_results.append({"fold": fold + 1, "logloss": loss, "accuracy": acc})
-        logger.info(f"Fold {fold + 1}: LogLoss={loss:.5f}, Accuracy={acc:.4f}")
+        logger.info(f"Fold {fold + 1}: LogLoss={loss:.5f}, Accuracy={acc:.4f} (Strict Causal)")
         
         if loss < best_loss:
             best_loss = loss
             best_model = model
+            best_scaler = fold_scaler
+            best_imputer = fold_imputer
             
-    # Guardar mejor modelo con scaler
+    # Guardar mejor modelo con SU scaler correspondiente
     os.makedirs(MODELS_DIR, exist_ok=True)
     model_path = os.path.join(MODELS_DIR, f"gbm_{SYMBOL}_v2.joblib")
     
+    if best_model is None:
+         logger.error("Training failed to produce a model.")
+         return None
+
     joblib.dump({
         "model": best_model,
-        "scaler": scaler,
+        "scaler": best_scaler,
+        "imputer": best_imputer,
         "feature_names": FEATURE_NAMES,
         "trained_at": datetime.utcnow().isoformat(),
         "best_logloss": best_loss,
@@ -207,43 +225,54 @@ def train_gbm(X: np.ndarray, y: np.ndarray) -> str:
 def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
     """
     Entrena LSTM con Attention para capturar patrones secuenciales.
-    
-    Arquitectura:
-    - LSTM bidireccional con 2 capas
-    - Self-Attention para ponderar velas relevantes
-    - Clasificacin binaria (WIN/LOSS)
-    
-    Returns:
-        Path al modelo guardado
+    CORRECCION AUDITORIA: Scaling Causal (Fit en el 80% inicial).
     """
     import torch
     import torch.nn as nn
     from torch.utils.data import DataLoader, TensorDataset
+    from sklearn.preprocessing import StandardScaler
     
     logger.info("=" * 60)
-    logger.info("PHASE 3: Training LSTM with Attention")
+    logger.info("PHASE 3: Training LSTM with Attention (Causal Scaling)")
     logger.info("=" * 60)
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
     logger.info(f"Using device: {device}")
     
+    # 1. Causal Normalization Strategy
+    # We must fit scaler ONLY on the training portion of the data
+    # LSTM typically uses a time-split (e.g., first 80% train, last 20% val)
+    split_idx = int(len(X) * 0.8)
+    
+    X_train_raw = X[:split_idx]
+    
+    scaler = StandardScaler()
+    scaler.fit(X_train_raw) # Fit only on past
+    
+    X_scaled = scaler.transform(X) # Apply to all (future uses past stats)
+    
+    logger.info(f"Scaler fitted on first {split_idx} samples.")
+    
     # Crear secuencias
-    def make_sequences(X: np.ndarray, y: np.ndarray, seq_len: int):
+    def make_sequences(X_in: np.ndarray, y_in: np.ndarray, seq_len: int):
         """Convierte datos tabulares a secuencias 3D."""
         seqs, labels = [], []
-        for i in range(seq_len, len(X)):
-            seqs.append(X[i - seq_len:i, :])
-            labels.append(y[i])
+        for i in range(seq_len, len(X_in)):
+            seqs.append(X_in[i - seq_len:i, :])
+            labels.append(y_in[i])
         return (
             torch.tensor(np.stack(seqs), dtype=torch.float32),
             torch.tensor(labels, dtype=torch.long)
         )
     
-    X_seq, y_seq = make_sequences(X, y, seq_len)
+    X_seq, y_seq = make_sequences(X_scaled, y, seq_len)
     logger.info(f"Created {len(X_seq)} sequences of length {seq_len}")
     
-    # Split temporal (80/20)
+    # Split temporal (80/20) - Must match the scaling split logic roughly
+    # Actually, X_seq is slightly smaller than X, but the boundary is consistent 
+    # because X_scaled preserves order.
     train_size = int(0.8 * len(X_seq))
+    
     X_train, X_val = X_seq[:train_size], X_seq[train_size:]
     y_train, y_val = y_seq[:train_size], y_seq[train_size:]
     
@@ -314,8 +343,15 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
     os.makedirs(MODELS_DIR, exist_ok=True)
     model_path = os.path.join(MODELS_DIR, f"lstm_{SYMBOL}_v2.pt")
     
+    # Save scaler statistics for inference!
+    scaler_stats = {
+        "mean": scaler.mean_,
+        "scale": scaler.scale_
+    }
+    
     torch.save({
         "model_state": best_model_state,
+        "scaler_stats": scaler_stats, # Persist Causal Scaler
         "model_config": {
             "input_dim": input_dim,
             "hidden_dim": 64,

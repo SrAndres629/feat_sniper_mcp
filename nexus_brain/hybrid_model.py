@@ -142,47 +142,63 @@ def load_hybrid_model(path: str = "models/feat_hybrid_v2.pth") -> HybridFEATNetw
 class HybridModel:
     """
     Local Wrapper for HybridFEATNetwork.
-    Bypasses Docker dependency by running PyTorch locally.
+    Handles Scaler state (preventing State Drift) and PyTorch inference.
     """
     def __init__(self, model_path: str = "models/feat_hybrid_v2.pth"):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.net = load_hybrid_model(model_path)
+        self.scaler_stats = None
         
-        if not self.net:
-            # Initialize fresh network if no checkpoint
-            self.net = HybridFEATNetwork()
-            
-        self.net.to(self.device)
-        self.net.eval()
-        print(f"🧠 HybridModel Loaded on {self.device}")
+        # Load Model and potentially Scaler Stats
+        checkpoint = self._load_checkpoint(model_path)
+        
+        self.net = HybridFEATNetwork()
+        if checkpoint:
+            if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+                self.net.load_state_dict(checkpoint["state_dict"])
+                self.scaler_stats = checkpoint.get("scaler_stats") # FIX STATE DRIFT
+            else:
+                self.net.load_state_dict(checkpoint)
+        
+        self.net.to(self.device).eval()
+        
+        if self.scaler_stats:
+            print(f"🧠 HybridModel Loaded on {self.device} (Scaler Active)")
+        else:
+            print(f"🧠 HybridModel Loaded on {self.device} (Raw Features Mode)")
+
+    def _load_checkpoint(self, path):
+        try:
+            return torch.load(path, map_location=self.device, weights_only=False)
+        except:
+            return None
+
+    def _normalize(self, features: torch.Tensor) -> torch.Tensor:
+        """Aplica normalizacin basada en las estadsticas de entrenamiento."""
+        if self.scaler_stats:
+            mean = torch.tensor(self.scaler_stats["mean"], dtype=torch.float32).to(self.device)
+            scale = torch.tensor(self.scaler_stats["scale"], dtype=torch.float32).to(self.device)
+            return (features - mean) / scale
+        return features
 
     def predict(self, context_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Inference Interface.
-        Converts dictionary data into PyTorch tensors and runs forward pass.
+        Inference Interface with Causal Normalization.
         """
         try:
-            # TODO: Real Tensor Construction from FEAT Data.
-            # Currently mocking input for integration testing.
+            # 1. Mock Energy Map (Placeholder for Conv Stream)
+            energy_map = torch.zeros(1, 1, 50, 50).to(self.device)
             
-            # 1. Mock Energy Map (1, 50, 50)
-            energy_map = torch.randn(1, 1, 50, 50).to(self.device)
-            
-            # 2. Mock Dense Features (Batch, 64) - LazyLinear will adapt
-            # If model initialized with 64, we need 64 features.
-            # But LazyLinear adapts on first forward? 
-            # Yes, but we need to match what it expects if loaded.
-            # Assuming 64 dims for now.
-            # 2. Real Dense Features
+            # 2. Real Dense Features (Batch=1, Dims=10)
             if 'features' in context_data and isinstance(context_data['features'], list):
-                # Convert list to tensor (Batch=1, Dims=10)
                 feat_list = context_data['features']
-                dense_features = torch.tensor([feat_list], dtype=torch.float32).to(self.device)
+                raw_features = torch.tensor([feat_list], dtype=torch.float32).to(self.device)
             else:
-                # Fallback if no features provided
-                dense_features = torch.randn(1, 10).to(self.device) 
+                raw_features = torch.zeros(1, 10).to(self.device) 
             
-            # Inference
+            # 3. Apply Normalization (FIX STATE DRIFT)
+            dense_features = self._normalize(raw_features)
+            
+            # 4. Neural Forward Pass
             decision = self.net.get_risk_decision(energy_map, dense_features)
             return decision
             

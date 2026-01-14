@@ -203,5 +203,71 @@ class MT5Connection:
             
             return func(*args, **kwargs)
 
+    # =========================================================================
+    # ATOMIC EXECUTION - Race Condition Fix
+    # =========================================================================
+    
+    async def execute_atomic(self, func: Callable[..., T], *args, **kwargs) -> T:
+        """
+        Executes a compound function atomically within the MT5 lock.
+        
+        Unlike execute(), which acquires/releases the lock per-call, this method
+        holds the lock for the ENTIRE duration of func, allowing func to make
+        multiple MT5 calls without race conditions.
+        
+        Use case: Fetch tick + send order in a single atomic block.
+        
+        Args:
+            func: A function that internally calls MT5 APIs (e.g., symbol_info_tick, order_send)
+            *args, **kwargs: Arguments passed to func
+            
+        Returns:
+            The return value of func
+        """
+        if not MT5_AVAILABLE:
+            op_name = getattr(func, '__name__', 'atomic_fn')
+            logger.debug(f"[Docker Mode] Atomic op '{op_name}' ignored - MT5 unavailable.")
+            return None
+        
+        from app.core.observability import obs_engine, tracer
+        import time
+
+        start_time = time.time()
+        op_name = f"atomic_{getattr(func, '__name__', 'fn')}"
+        
+        with tracer.start_as_current_span(f"mt5_{op_name}") as span:
+            try:
+                result = await anyio.to_thread.run_sync(
+                    self._atomic_execution, func, *args, **kwargs
+                )
+                
+                duration = time.time() - start_time
+                obs_engine.track_latency(op_name, "GLOBAL", duration)
+                span.set_attribute("atomic", True)
+                
+                return result
+            except Exception as e:
+                span.record_exception(e)
+                raise e
+    
+    def _atomic_execution(self, func: Callable[..., T], *args, **kwargs) -> T:
+        """
+        Executes func while holding the MT5 lock for its entire duration.
+        
+        The function 'func' can make multiple MT5 API calls internally,
+        all protected by a single lock acquisition.
+        """
+        if not MT5_AVAILABLE:
+            logger.error("[Failsafe] _atomic_execution called without MT5.")
+            return None
+            
+        with self._mt5_lock:
+            # Pre-check terminal state
+            if not mt5.terminal_info():
+                logger.warning("Atomic exec: Terminal not active, attempting re-init...")
+                self._initialize_mt5()
+            
+            return func(*args, **kwargs)
+
 # Instancia global exportable
 mt5_conn = MT5Connection()

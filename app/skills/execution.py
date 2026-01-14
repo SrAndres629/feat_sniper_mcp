@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import Dict, Any, Optional
 try:
@@ -57,6 +58,9 @@ RETCODE_HINTS = {
     }
 }
 
+# Retcodes that may succeed on retry (with fresh price and increased slippage)
+TRANSIENT_RETCODES = {mt5.TRADE_RETCODE_REQUOTE}
+
 # Mapeo de tipos de rdenes
 ACTION_TO_MT5_TYPE = {
     "BUY": mt5.ORDER_TYPE_BUY,
@@ -100,6 +104,23 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
                 status="error",
                 error=ErrorDetail(code="CIRCUIT_OPEN", message="System is in emergency isolation mode.", suggestion="Check logs for recent failures.")
             )
+
+        # 0.0.1 TTL VALIDATION (Race Condition Fix)
+        from app.core.config import settings
+        if order_data.decision_ts:
+            age_ms = (time.time() * 1000) - order_data.decision_ts
+            if age_ms > settings.DECISION_TTL_MS:
+                obs_engine.track_order(symbol, action, "TTL_EXPIRED")
+                logger.warning(f"⏰ Order rejected: decision age {age_ms:.0f}ms > TTL {settings.DECISION_TTL_MS}ms")
+                return ResponseModel(
+                    status="error",
+                    error=ErrorDetail(
+                        code="TTL_EXPIRED",
+                        message=f"Decision too old ({age_ms:.0f}ms > {settings.DECISION_TTL_MS}ms TTL)",
+                        suggestion="Reduce latency between ML inference and order execution."
+                    )
+                )
+            span.set_attribute("decision_age_ms", age_ms)
 
         # 0.1 LIQUIDITY PRE-FLIGHT (Sniper 2.0)
         from app.skills.liquidity import check_liquidity_preflight
@@ -243,8 +264,51 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
 
         logger.info(f"Enviando orden {action} de {volume} lots en {symbol} a {exec_price} (Dev: {dynamic_deviation})")
 
-        # 5. EJECUCIN
-        result = await mt5_conn.execute(mt5.order_send, request)
+        # 5. ATOMIC EXECUTION WITH RETRY (Race Condition & REQUOTE Fix)
+        is_buy = (action == "BUY" or action == "BUY_LIMIT" or action == "BUY_STOP")
+        
+        def place_order_atomic(sym, req_dict, buy_flag):
+            """
+            Atomic tick+order_send: Fetches current price and sends order
+            under a single lock acquisition to eliminate race conditions.
+            """
+            tick = mt5.symbol_info_tick(sym)
+            if not tick:
+                return None
+            # Update price with fresh tick data
+            req_dict["price"] = tick.ask if buy_flag else tick.bid
+            return mt5.order_send(req_dict)
+        
+        result = None
+        last_retcode = None
+        
+        for attempt in range(1, settings.MAX_ORDER_RETRIES + 1):
+            result = await mt5_conn.execute_atomic(
+                place_order_atomic, symbol, request, is_buy
+            )
+            
+            if result is None:
+                # Critical MT5 error
+                break
+            
+            if result.retcode == mt5.TRADE_RETCODE_DONE:
+                span.set_attribute("attempts", attempt)
+                break  # Success!
+            
+            last_retcode = result.retcode
+            
+            # Check if retcode is transient (worth retrying)
+            if result.retcode in TRANSIENT_RETCODES and attempt < settings.MAX_ORDER_RETRIES:
+                backoff_ms = settings.RETRY_BACKOFF_BASE_MS * (3 ** (attempt - 1))
+                # Increase slippage tolerance on each retry
+                request["deviation"] = int(dynamic_deviation * (1 + 0.5 * attempt))
+                logger.warning(f"🔄 REQUOTE attempt {attempt}/{settings.MAX_ORDER_RETRIES}, "
+                             f"backoff {backoff_ms}ms, new deviation: {request['deviation']}")
+                await asyncio.sleep(backoff_ms / 1000)
+                continue
+            
+            # Terminal error or max retries reached
+            break
 
         if result is None:
             circuit_breaker.record_failure()
@@ -253,8 +317,8 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
             return ResponseModel(
                 status="error",
                 error=ErrorDetail(
-                    code=f"MT5_INTERNAL_ERROR_{error[0]}",
-                    message=error[1],
+                    code=f"MT5_INTERNAL_ERROR_{error[0] if error else 'UNKNOWN'}",
+                    message=error[1] if error else "Connection lost",
                     suggestion="Error crtico de comunicacin con MetaTrader 5."
                 )
             )

@@ -1,9 +1,12 @@
 import sys
 import asyncio
+import time
 import zmq
 import zmq.asyncio
 import logging
 import json
+
+from app.core.config import settings
 
 # --- WINDOWS FIX CRÍTICO ---
 # Esto evita el error "Proactor event loop" en Windows
@@ -21,6 +24,10 @@ class ZMQBridge:
         self.sub_socket = None
         self.running = False
         self.callbacks = []
+        # Metrics for observability
+        self.messages_processed = 0
+        self.messages_discarded = 0
+        self._last_lag_ms = 0.0
 
     async def start(self, callback=None):
         """Inicia los sockets ZMQ y el loop de escucha."""
@@ -39,6 +46,7 @@ class ZMQBridge:
             logger.info(f"ZMQ Bridge LISTENING on tcp://0.0.0.0:{self.sub_port}")
             
             asyncio.create_task(self._listen())
+            asyncio.create_task(self._heartbeat())
             
         except zmq.ZMQError as e:
             # === RESILIENCE FIX ===
@@ -72,6 +80,18 @@ class ZMQBridge:
                 })
                 try:
                     data = json.loads(msg_string)
+                    
+                    # TTL Validation - Reject stale messages
+                    msg_ts = data.get("timestamp") or data.get("ts") or data.get("decision_ts")
+                    if msg_ts:
+                        age_ms = (time.time() * 1000) - msg_ts
+                        self._last_lag_ms = age_ms
+                        if age_ms > settings.DECISION_TTL_MS:
+                            self.messages_discarded += 1
+                            logger.warning(f"⏰ ZMQ message discarded: age={age_ms:.0f}ms > TTL {settings.DECISION_TTL_MS}ms")
+                            continue
+                    
+                    self.messages_processed += 1
                     for cb in self.callbacks:
                         if asyncio.iscoroutinefunction(cb):
                             await cb(data)
@@ -84,6 +104,21 @@ class ZMQBridge:
             except Exception:
                 if self.running:
                     await asyncio.sleep(1)
+
+    async def _heartbeat(self):
+        """Sends periodic health metrics to MT5 HUD."""
+        while self.running:
+            try:
+                await self.send_command(
+                    "HEARTBEAT",
+                    lag_ms=self._last_lag_ms,
+                    processed=self.messages_processed,
+                    discarded=self.messages_discarded
+                )
+                await asyncio.sleep(1) # Sync every 1s
+            except Exception as e:
+                logger.error(f"Heartbeat failed: {e}")
+                await asyncio.sleep(5)
 
     async def send_command(self, action: str, **params):
         if not self.running:

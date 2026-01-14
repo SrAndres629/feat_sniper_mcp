@@ -8,6 +8,20 @@ from datetime import datetime
 # Logger
 logger = logging.getLogger("feat.chain")
 
+# Black Swan Protection (Imported dynamically to avoid circular deps)
+_black_swan_guard = None
+
+def _get_black_swan_guard():
+    """Lazy import of BlackSwanGuard to avoid circular dependencies."""
+    global _black_swan_guard
+    if _black_swan_guard is None:
+        try:
+            from app.skills.black_swan_guard import get_black_swan_guard
+            _black_swan_guard = get_black_swan_guard()
+        except ImportError:
+            logger.warning("[FEAT] BlackSwanGuard not available")
+    return _black_swan_guard
+
 class MicroStructure:
     """Memoria de corto plazo para detectar BOS/CHOCH en ticks."""
     def __init__(self):
@@ -173,7 +187,7 @@ class TimeRule(FEATRule):
         return result
 
 class FEATChain:
-    """Coordinador de la cadena de decisión."""
+    """Coordinador de la cadena de decisión con protección Black Swan."""
     def __init__(self):
         # Chain Assembly: F -> E -> A -> T
         self.form = FormRule()
@@ -187,48 +201,128 @@ class FEATChain:
                  .set_next(self.time)
         
         self.head = self.form
-        logger.info("[BRAIN] FEAT Logic Chain Assembled (F->E->A->T)")
+        
+        # Black Swan state cache
+        self._last_black_swan_decision = None
+        
+        logger.info("[BRAIN] FEAT Logic Chain Assembled (BlackSwan->F->E->A->T)")
+
+    async def check_black_swan(self, market_data: Dict, physics_output: Optional[Any] = None) -> tuple:
+        """
+        Pre-validate market conditions for Black Swan events.
+        
+        Returns:
+            Tuple of (can_trade: bool, lot_multiplier: float, rejection_reason: str)
+        """
+        guard = _get_black_swan_guard()
+        if not guard:
+            return (True, 1.0, None)  # Guard not available, proceed
+        
+        # Extract ATR from physics or market_data
+        atr = 0.0
+        if physics_output:
+            # Try multiple ATR sources
+            atr = getattr(physics_output, 'atr', 0) or getattr(physics_output, 'atr_14', 0)
+        if atr == 0:
+            atr = market_data.get('atr', 0) or market_data.get('atr_14', 0)
+        
+        # Extract spread if available
+        spread = None
+        if 'ask' in market_data and 'bid' in market_data:
+            spread = float(market_data.get('ask', 0)) - float(market_data.get('bid', 0))
+        
+        # Extract equity (may come from account data)
+        equity = market_data.get('equity', 0) or market_data.get('account_equity', 20.0)
+        
+        # Skip if no ATR data available
+        if atr <= 0:
+            logger.debug("[BLACK_SWAN] No ATR data, skipping guard check")
+            return (True, 1.0, None)
+        
+        # Evaluate all guards
+        try:
+            decision = guard.evaluate(
+                current_atr=atr,
+                current_equity=equity,
+                current_spread=spread
+            )
+            
+            self._last_black_swan_decision = decision
+            
+            if not decision.can_trade:
+                reasons = "; ".join(decision.rejection_reasons)
+                logger.warning(f"🛡️ [BLACK_SWAN] Trading BLOCKED: {reasons}")
+                return (False, 0.0, reasons)
+            
+            if decision.lot_multiplier < 1.0:
+                logger.info(f"⚠️ [BLACK_SWAN] Lot reduced to {decision.lot_multiplier*100:.0f}%")
+            
+            return (True, decision.lot_multiplier, None)
+            
+        except Exception as e:
+            logger.error(f"[BLACK_SWAN] Guard evaluation failed: {e}")
+            return (True, 0.5, None)  # Proceed with caution
 
     async def analyze(self, market_data: Dict, current_price: float, precomputed_physics: Optional[Any] = None) -> bool:
         """Interfaz publica compatible con mcp_server.py"""
+        
+        # =====================================================
+        # PHASE 0: BLACK SWAN GUARD (First line of defense)
+        # =====================================================
+        can_trade, lot_mult, rejection = await self.check_black_swan(market_data, precomputed_physics)
+        
+        if not can_trade:
+            logger.warning(f"🚨 [BLACK_SWAN] TRADING HALTED: {rejection}")
+            return False
+        
+        # Store lot multiplier for downstream use
+        market_data['_black_swan_lot_multiplier'] = lot_mult
+        
+        # =====================================================
+        # PHASE 1: PHYSICS ENGINE
+        # =====================================================
         try:
-            # Dynamic Import
             from app.skills.market_physics import market_physics
             
             if precomputed_physics:
                 physics_output = precomputed_physics
             else:
-                # Determine logic time (Injectable for testing)
                 if 'simulated_time' in market_data:
                     ts = market_data['simulated_time'].timestamp()
                 else:
                     ts = datetime.now().timestamp()
                     
-                # Full Ingest (Update State + Calc)
                 physics_output = market_physics.ingest_tick(market_data, force_timestamp=ts)
-            
-        except ImportError:
-            if 'simulated_time' in market_data:
-                ts = market_data['simulated_time'].timestamp()
-            else:
-                ts = datetime.now().timestamp()
-                
-            # Full Ingest (Update State + Calc)
-            # This ensures velocity is calculated relative to the new tick
-            physics_output = market_physics.ingest_tick(market_data, force_timestamp=ts)
             
         except ImportError:
             physics_output = None
             logger.warning("Physics Engine Missing during analysis")
 
-        # Start Chain
+        # =====================================================
+        # PHASE 2: FEAT CHAIN VALIDATION (F->E->A->T)
+        # =====================================================
         result = await self.head.validate(market_data, physics_output)
         
         if result.is_valid:
-            logger.info(f"✅ FEAT SETUP CONFIRMED: {result.message}")
+            if lot_mult < 1.0:
+                logger.info(f"✅ FEAT SETUP CONFIRMED (Lot: {lot_mult*100:.0f}%): {result.message}")
+            else:
+                logger.info(f"✅ FEAT SETUP CONFIRMED: {result.message}")
             return True
         else:
             logger.debug(f"❌ FEAT REJECT: [{result.rule_name}] {result.message}")
             return False
+    
+    def get_black_swan_status(self) -> Dict[str, Any]:
+        """Get current Black Swan guard status for monitoring."""
+        guard = _get_black_swan_guard()
+        if guard:
+            return guard.get_status()
+        return {"status": "guard_not_available"}
+    
+    def get_last_decision(self) -> Optional[Any]:
+        """Get the last Black Swan decision for inspection."""
+        return self._last_black_swan_decision
 
 feat_full_chain_institucional = FEATChain()
+

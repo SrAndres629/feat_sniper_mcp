@@ -1,8 +1,10 @@
 import logging
 import torch
 import numpy as np
+from datetime import datetime
 from typing import Dict, Any, Optional
 from nexus_brain.hybrid_model import HybridModel
+from app.services.rag_memory import rag_memory
 
 logger = logging.getLogger("feat.brain.inference")
 
@@ -11,69 +13,81 @@ class NeuralInferenceAPI:
     Módulo 4: The Neural Link.
     Puente de inferencia entre MCP Server y HybridModel (PyTorch).
     """
-    def __init__(self, model_path: str = "models/feat_hybrid_v2.pth"):
+    def __init__(self, model_path: str = "models/lstm_XAUUSD_v2.pt"):
         self.brain = HybridModel(model_path)
         logger.info("[BRAIN] Neural Link Initialized")
 
     async def predict_next_candle(self, market_data: Dict[str, Any], physics_regime: Any = None) -> Dict[str, Any]:
         """
         Genera predicción de probabilidad para la siguiente vela.
-        Normaliza datos, convierte a tensores y consulta el modelo.
+        TEMPORAL CONTEXT: Incluye hora, sesión y rendimiento histórico (RAG).
         """
         if not self.brain or not self.brain.net:
             return {"error": "Brain Offline", "p_win": 0.0}
 
         try:
-            # 1. Normalización On-the-Fly (Mapeo de datos RAW a Tensores)
-            # TODO: Usar ml_normalization.py real cuando este disponible.
-            # Por ahora normalización inline robusta.
+            # 0. Temporal Context Retrieval
+            now = datetime.now()
+            hour = now.hour
             
-            # Contexto Físico
-            accel = physics_regime.acceleration_score if physics_regime else 0.0
-            vol_z = physics_regime.vol_z_score if physics_regime else 0.0
+            # Determine Session (0: Asia, 1: London, 2: NY)
+            # Simplified: Asia (0-7), London (8-13), NY (14-23) UTC/Local approximation
+            if 0 <= hour <= 7: session = 0.0
+            elif 8 <= hour <= 13: session = 1.0
+            else: session = 2.0
             
-            # Contexto de Mercado
-            rsi = 50.0 # Placeholder si no viene en data
-            # Si market_data trae indicadores pre-calculados, usarlos.
-            
-            # Construir Feature Vector (Simulado 10 dim por ahora)
-            # [Accel, VolZ, RSI, Spread, Session, ...]
-            # 1. Feature Extraction (Basic V1)
-            # Extract real values from market_data or physics_regime
-            price = float(market_data.get('bid', 0) or market_data.get('close', 0))
-            volume = float(market_data.get('tick_volume', 0) or market_data.get('volume', 0))
-            
+            # Historical Benchmark (RAG)
+            performance = await rag_memory.get_hourly_performance(hour)
+            hist_winrate = performance.get("win_rate", 0.5)
+            sample_count = min(performance.get("sample_size", 0) / 100, 1.0) # Normalized to [0,1]
+
+            # 1. Feature Extraction (Basic V1.1 - Temporal Aware & Robust)
+            def safe_float(val, default=0.0):
+                try:
+                    if val is None: return default
+                    f_val = float(val)
+                    return f_val if not np.isnan(f_val) and not np.isinf(f_val) else default
+                except: return default
+
+            price = safe_float(market_data.get('bid') or market_data.get('close'))
+            volume = safe_float(market_data.get('tick_volume') or market_data.get('volume'))
+            spread = 0.0
+            if 'ask' in market_data and 'bid' in market_data:
+                spread = safe_float(market_data['ask']) - safe_float(market_data['bid'])
+
             # Construct Feature Vector (10 dims)
-            # [Accel, VolZ, Price, Vol, RSI(placeholder), ...]
+            # [Accel, VolZ, Price, Volume, Hour, Session, Hist_Winrate, Sample, RSI, Spread]
             features = [
-                accel, 
-                vol_z, 
-                price, 
-                volume, 
-                rsi, 
-                0.0, 0.0, 0.0, 0.0, 0.0 # Reserved dims
+                safe_float(physics_regime.acceleration_score if physics_regime else 0.0),
+                safe_float(physics_regime.vol_z_score if physics_regime else 0.0),
+                price,
+                volume,
+                float(hour) / 24.0, # Normalizada
+                session / 2.0,      # Normalizada
+                safe_float(hist_winrate),
+                safe_float(sample_count),
+                0.5,                # RSI Placeholder
+                spread
             ]
-            
-            # Convertir a Tensor
-            # El wrapper HybridModel ya espera Dict o Tensores. 
-            # Modificaremos HybridModel.predict para aceptar features explicitas si es necesario.
-            # Pero HybridModel.predict (mi version step 2244) acepta Dict 'context_data'.
             
             context = {
                 "features": features,
-                "raw_data": market_data
+                "raw_data": market_data,
+                "hour": hour,
+                "session": session,
+                "hist_winrate": hist_winrate
             }
             
             # 2. Inferencia
-            # El metodo predict de HybridModel (local wrapper) maneja la conversion a torch device.
-            # No es async per se, asi que lo ejecutamos directo (es rapido en CPU/GPU local)
-            # O en executor para no bloquear loop.
-            
             result = self.brain.predict(context)
             
-            # 3. Denormalización del Output
-            # result trae {execute_trade: bool, p_win: float...}
-            
+            # 3. Decision Refinement (Senior Bias: Small Profit > Any Loss)
+            # Si el winrate historico de esta hora es < 45%, ser mas conservador.
+            if hist_winrate < 0.45:
+                result["p_win"] *= 0.8
+                result["alpha_confidence"] *= 0.8
+                if result["p_win"] < 0.6: result["execute_trade"] = False
+
             return result
 
         except Exception as e:

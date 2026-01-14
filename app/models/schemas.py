@@ -41,6 +41,7 @@ class TradeOrderRequest(BaseModel):
     sl: Optional[float] = None
     tp: Optional[float] = None
     comment: str = "AI_MCP_Order"
+    decision_ts: Optional[float] = None  # Epoch ms from ML inference for TTL validation
 
 class IndicatorRequest(BaseModel):
     symbol: str

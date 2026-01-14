@@ -56,14 +56,65 @@ def check_ports():
     # This logic keeps existing checks if needed
     pass
 
+def check_mql5_compilation():
+    log("[AUDIT] >> Verificando Sincronizacion MQL5/EX5...", YELLOW)
+    search_dir = "FEAT_Sniper_Master_Core"
+    if not os.path.exists(search_dir):
+        # Fallback search in root
+        search_dir = "."
+        
+    outdated_count = 0
+    
+    for root, dirs, files in os.walk(search_dir):
+        for file in files:
+            if file.endswith(".mq5"):
+                mq5_path = os.path.join(root, file)
+                ex5_path = mq5_path.replace(".mq5", ".ex5")
+                
+                if not os.path.exists(ex5_path):
+                    log(f"[WARN] Sin compilar: {file} (No existe .ex5)", RED)
+                    outdated_count += 1
+                else:
+                    mq5_mtime = os.path.getmtime(mq5_path)
+                    ex5_mtime = os.path.getmtime(ex5_path)
+                    
+                    if mq5_mtime > ex5_mtime:
+                        log(f"[WARN] Desactualizado: {file} (Codigo mas nuevo que binario)", RED)
+                        outdated_count += 1
+                        
+    if outdated_count == 0:
+        log("[OK] Indicadores MQL5 Sincronizados.", GREEN)
+    else:
+        log(f"[ALERTA] Se encontraron {outdated_count} indicadores desactualizados. Recompilar en MetaEditor.", RED)
+
+def check_model_freshness():
+    log("[AUDIT] >> Verificando Frescura del Modelo Neuronal...", YELLOW)
+    model_path = "models/feat_hybrid_v2.pth"
+    if os.path.exists(model_path):
+        mtime = os.path.getmtime(model_path)
+        dt = datetime.fromtimestamp(mtime)
+        age_hours = (datetime.now() - dt).total_seconds() / 3600
+        
+        color = GREEN if age_hours < 24 else YELLOW
+        log(f"   - Modelo Activo: {model_path}", color)
+        log(f"   - Ultima Modificacion: {dt} ({age_hours:.1f} horas atras)", color)
+    else:
+        log("[WARN] No se encontro modelo neuronal (.pth). Se usara inicializacion aleatoria.", RED)
+
 if __name__ == "__main__":
-    log("=== NEXUS AUDITOR v2.0 ===", GREEN)
+    from datetime import datetime
+    log("=== NEXUS AUDITOR v2.1 (Deep Scan) ===", GREEN)
     
     # 1. Run The Cartographer
     run_cartographer()
     
     # 2. Analyze Results
     analyze_map()
+    
+    # 3. Version Checks (New)
+    check_mql5_compilation()
+    check_model_freshness()
+
     
     # 3. Final Verification
     log("\n[OK] Auditoría Finalizada.", GREEN)
