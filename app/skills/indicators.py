@@ -63,3 +63,18 @@ def detect_regime(physics_df: pd.DataFrame) -> str:
         return "TREND_GRAVITY"
         
     return "NOISE"
+
+def calculate_atr(df: pd.DataFrame, period: int = 14) -> float:
+    """
+    Calculates Average True Range (ATR) for volatility measurement.
+    """
+    if df.empty or len(df) < period:
+        return 0.0
+        
+    high_low = df['high'] - df['low']
+    high_cp = np.abs(df['high'] - df['close'].shift())
+    low_cp = np.abs(df['low'] - df['close'].shift())
+    tr = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
+    
+    atr = tr.rolling(period).mean().iloc[-1]
+    return float(atr) if not np.isnan(atr) else 0.0

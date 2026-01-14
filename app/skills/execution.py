@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import pandas as pd
 from typing import Dict, Any, Optional
 try:
     import MetaTrader5 as mt5
@@ -122,6 +123,19 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
                 )
             span.set_attribute("decision_age_ms", age_ms)
 
+        # 0.2 INSTITUTIONAL RISK VETO
+        from app.services.risk_engine import risk_engine
+        if not await risk_engine.check_drawdown_limit():
+            obs_engine.track_order(symbol, action, "RISK_VETO")
+            return ResponseModel(
+                status="error",
+                error=ErrorDetail(
+                    code="RISK_VETO",
+                    message="Operación bloqueada por límite de drawdown diario.",
+                    suggestion="Espera a que se recupere la equidad o ajusta el parámetro MAX_DAILY_DRAWDOWN_PERCENT."
+                )
+            )
+
         # 0.1 LIQUIDITY PRE-FLIGHT (Sniper 2.0)
         from app.skills.liquidity import check_liquidity_preflight
         if not await check_liquidity_preflight(symbol):
@@ -131,18 +145,35 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
                 error=ErrorDetail(code="LOW_LIQUIDITY", message=f"Liquidity for {symbol} is below institutional grade.", suggestion="Avoid entries during market roll-over or news.")
             )
 
-        # 0.2 INSTITUTIONAL RISK VETO
-        from app.services.risk_engine import risk_engine
-        if not await risk_engine.check_drawdown_limit():
-            obs_engine.track_order(symbol, action, "RISK_VETO")
-            return ResponseModel(
-                status="error",
-                error=ErrorDetail(
-                    code="RISK_VETO",
-                    message="Operacin bloqueada por lmite de drawdown diario.",
-                    suggestion="Espera a que se recupere la equidad o ajusta el parmetro MAX_DAILY_DRAWDOWN_PERCENT."
+        # 0.2.1 VOLATILITY GUARD (The Quant Flow - Flash Crash Guard)
+        try:
+            from app.skills.indicators import calculate_atr
+            rates = await mt5_conn.execute(mt5.copy_rates_from_pos, symbol, mt5.TIMEFRAME_M1, 0, 50)
+            if rates is not None and len(rates) > 20:
+                df_rates = pd.DataFrame(rates)
+                current_atr = calculate_atr(df_rates)
+                avg_atr = (df_rates['high'] - df_rates['low']).mean()
+                
+                if current_atr > avg_atr * settings.VOLATILITY_THRESHOLD:
+                    obs_engine.track_order(symbol, action, "VOLATILITY_VETO")
+                    logger.warning(f"🚫 VOLATILITY GUARD: Stress too high ({current_atr:.5f} > {avg_atr * settings.VOLATILITY_THRESHOLD:.5f})")
+                    return ResponseModel(
+                        status="error",
+                        error=ErrorDetail(code="VOLATILITY_VETO", message="Market stress (ATR) exceeds safety threshold.", suggestion="Wait for flash crash or news spike to stabilize.")
+                    )
+        except Exception as e:
+            logger.error(f"VolatilityGuard Error: {e}")
+
+        # 0.2.2 SPREAD FILTER (The Quant Flow - Liquidity Guard)
+        symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
+        if symbol_info and hasattr(symbol_info, 'spread'):
+            if symbol_info.spread > settings.SPREAD_MAX_PIPS:
+                 obs_engine.track_order(symbol, action, "SPREAD_VETO")
+                 logger.warning(f"🚫 SPREAD FILTER: Liquidity too low (Spread: {symbol_info.spread} pts > {settings.SPREAD_MAX_PIPS} limit)")
+                 return ResponseModel(
+                    status="error",
+                    error=ErrorDetail(code="SPREAD_VETO", message=f"Spread too high ({symbol_info.spread} points).", suggestion="Avoid trading during roll-over or low liquidity sessions.")
                 )
-            )
 
         # Adaptive Volume Calculation (if volume == 0 or not provided)
         if volume <= 0 and sl:

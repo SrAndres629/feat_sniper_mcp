@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     MAX_ORDER_RETRIES: int = 3        # Retry attempts for transient errors (REQUOTE)
     RETRY_BACKOFF_BASE_MS: int = 50   # Exponential backoff base (50 -> 150 -> 450ms)
     
+    # Physical Guardians (The Quant Flow - Alpha Optimization)
+    VOLATILITY_THRESHOLD: float = 3.0    # ATR % Threshold (Flash Crash Guard)
+    SPREAD_MAX_PIPS: float = 50          # Max Spread in Points/Pips (Liquidity Guard)
+    
     # Supabase & Cloud Nexus
     SUPABASE_URL: Optional[str] = None
     SUPABASE_KEY: Optional[str] = None
