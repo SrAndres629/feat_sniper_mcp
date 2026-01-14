@@ -10,6 +10,8 @@ from nexus_brain.hybrid_model import HybridModel
 from app.services.rag_memory import rag_memory
 from app.skills.indicators import calculate_feat_layers, detect_divergence
 from app.core.config import settings
+from app.ml.drift_monitor import WeightDriftMonitor
+from app.services.recalibration import recalibration_service
 
 logger = logging.getLogger("feat.brain.inference")
 
@@ -37,6 +39,14 @@ class NeuralInferenceAPI:
             "vol_ema_alpha": 0.01  # EMA for rolling stats
         }
         self.initialized = False
+        
+        # Weight Drift Monitor Initialization
+        self.drift_monitor = WeightDriftMonitor(
+            training_stats=self.brain.scaler_stats if self.brain else None,
+            window_size=200,
+            drift_threshold=0.8
+        )
+        
         logger.info(f"[BRAIN] Neural Link Initialized (5D Vector: L1, L1W, L4S, Div, Vol_Z)")
 
     async def predict_next_candle(self, market_data: Dict[str, Any], physics_regime: Any = None) -> Dict[str, Any]:
@@ -104,6 +114,9 @@ class NeuralInferenceAPI:
             
             features = [l1_mean, l1_width, l4_slope, l1_mean / l2_mean if l2_mean != 0 else 1.0, vol_zscore]
 
+            # Update Drift Monitor
+            drift_metrics = self.drift_monitor.update(features)
+
             # PvP Alpha Check (Needs recent history of price/slope, simplified for O(1))
             # [Note: Divergence detection usually needs a window, we can use a small circular buffer for scores]
             pvp_regime = "NEUTRAL" 
@@ -112,7 +125,8 @@ class NeuralInferenceAPI:
                 "features": features,
                 "raw_data": market_data,
                 "hour": datetime.now().hour,
-                "pvp_divergence": pvp_regime
+                "pvp_divergence": pvp_regime,
+                "drift_metrics": drift_metrics
             }
             
             # Inferencia
@@ -120,12 +134,41 @@ class NeuralInferenceAPI:
             result = self.brain.predict(context)
             latency_ms = (time.time() - start_inf) * 1000
             
+            # Module 7: RAG Recalibration (Feedback Loop)
+            recal = await recalibration_service.get_confidence_multiplier()
+            p_win_raw = result.get("p_win", 0.0)
+            p_win_adj = p_win_raw * recal["multiplier"]
+            result["p_win_raw"] = p_win_raw
+            result["p_win"] = round(p_win_adj, 4)
+            result["recalibration"] = recal
+            
+            if recal["drawdown_mode"]:
+                logger.info(f"📉 [RECAL] Confidence penalized ({recal['multiplier']}x): {recal['reason']}")
+
+            # Module 6: Consenso de Desconfianza (Alpha Refinement)
+
+            # Physics vs Neural Veto
+            p_win = result.get("p_win", 0.0)
+            execute_trade = result.get("execute_trade", False)
+            
+            if execute_trade:
+                # Si queremos COMPRAR (p_win > threshold) pero la pendiente macro es negativa (Bajista)
+                if p_win > 0.55 and l4_slope < -0.01:
+                    result["execute_trade"] = False
+                    result["veto_reason"] = "Physics Conflict: Neural BUY vs Macro BEARISH Slope"
+                    logger.info(f"🚫 VETO [Consenso]: Neural BUY contradicted by L4 Slope ({l4_slope:.4f})")
+                
+                # Si queremos VENDER (p_win < threshold_sell) pero la pendiente macro es positiva (Alcista)
+                # Nota: El modelo actual parece ser binario para p_win, asumimos p_win alto = compra.
+                # Si el modelo soporta señales de venta (p_win < 0.45 por ejemplo), aplicaríamos el veto inverso.
+            
             # Auditoria de Latencia (Fase 12 Target: < 5ms)
             if latency_ms > 5:
                 logger.warning(f"⚠️ LATENCY ALERT: {latency_ms:.2f}ms")
             
             result["latency_ms"] = latency_ms
             return result
+
 
         except Exception as e:
             logger.error(f"Inference Failure: {e}")

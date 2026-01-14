@@ -208,14 +208,20 @@ class HybridModel:
                 model_state = {k: v for k, v in state_dict.items() if k not in ["scaler_stats", "model_config", "trained_at", "best_acc"]}
                 self.net.load_state_dict(model_state, strict=False)
                 self.scaler_stats = checkpoint.get("scaler_stats")
+                if self.scaler_stats:
+                    print(f"✅ Scaler Stats Extracted: {list(self.scaler_stats.keys())}")
+                else:
+                    print("⚠️ No Scaler Stats found in checkpoint.")
             else:
                 self.net.load_state_dict(checkpoint, strict=False)
+                print("⚠️ Checkpoint is a raw state_dict, no stats available.")
                 
             self.net.to(self.device).eval()
             print(f"🧠 LSTM Causal Model Loaded on {self.device} (Stats Embedded)")
         else:
             self.net = None
-            print("⚠️ Brain Offline: Model Not Found")
+            print(f"⚠️ Brain Offline: Model Not Found at {model_path}")
+
 
     def _load_checkpoint(self, path):
         try:
@@ -225,9 +231,15 @@ class HybridModel:
 
     def _normalize(self, features: torch.Tensor) -> torch.Tensor:
         if self.scaler_stats:
-            mean = torch.tensor(self.scaler_stats["mean"], dtype=torch.float32).to(self.device)
-            scale = torch.tensor(self.scaler_stats["scale"], dtype=torch.float32).to(self.device)
-            return (features - mean) / scale
+            mean = np.array(self.training_stats["mean"]) if hasattr(self, 'training_stats') else np.array(self.scaler_stats["mean"])
+            scale = np.array(self.training_stats["scale"]) if hasattr(self, 'training_stats') else np.array(self.scaler_stats["scale"])
+            
+            # Slice stats to match features dim
+            f_dim = features.shape[-1]
+            mean = torch.tensor(mean[:f_dim], dtype=torch.float32).to(self.device)
+            scale = torch.tensor(scale[:f_dim], dtype=torch.float32).to(self.device)
+            
+            return (features - mean) / (scale + 1e-9)
         return features
 
     def predict(self, context_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -236,11 +248,22 @@ class HybridModel:
             if not self.net: return {"error": "No Model", "execute_trade": False}
             
             feat_list = context_data.get('features', [0.0] * 4)
+            # Manejar discrepancia: Modelo 4D vs Inferencia 5D
+            if self.net:
+                # Extraemos el input_size del primer layer del LSTM (o del config)
+                # target_dim = self.net.lstm.input_size
+                # Por seguridad usamos el slice basado en lo que espera el modelo
+                target_dim = 4 # Default para este modelo v2
+                feat_input = feat_list[:target_dim]
+            else:
+                feat_input = feat_list
+                
             # El LSTM espera (Batch, Seq, Feat). Aquí Seq=1 para inferencia real-time.
-            raw_features = torch.tensor([[feat_list]], dtype=torch.float32).to(self.device)
+            raw_features = torch.tensor([[feat_input]], dtype=torch.float32).to(self.device)
             
-            # Normalización causal
+            # Normalización causal (también debe ser de la misma dimensión)
             dense_features = self._normalize(raw_features)
+
             
             with torch.no_grad():
                 logits = self.net(dense_features)
