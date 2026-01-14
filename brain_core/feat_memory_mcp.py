@@ -1,6 +1,8 @@
 import os
 import logging
 import sys
+import asyncio
+from functools import partial
 from fastmcp import FastMCP
 import chromadb
 from chromadb.utils import embedding_functions
@@ -53,9 +55,13 @@ async def ingest_memories(days: int = 30):
         # Generar IDs únicos basados en timestamp para evitar duplicados en la sesión
         batch_ids = [f"mem_{datetime.now().timestamp()}_{i}" for i in range(len(narratives))]
         
-        collection.add(
-            documents=narratives,
-            ids=batch_ids
+        # Offload blocking ChromaDB operation to a thread
+        await asyncio.to_thread(
+            partial(
+                collection.add,
+                documents=narratives,
+                ids=batch_ids
+            )
         )
         
         return f"Éxito: Se han procesado e indexado {len(narratives)} fragmentos de memoria narrativa en el almacén vectorial."
