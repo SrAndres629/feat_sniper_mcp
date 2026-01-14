@@ -30,10 +30,14 @@ class NeuralInferenceAPI:
             "micro": np.zeros(len(settings.LAYER_MICRO_PERIODS)),
             "operative": np.zeros(len(settings.LAYER_OPERATIVE_PERIODS)),
             "bias": 0.0,
-            "bias_prev": 0.0 # For slope
+            "bias_prev": 0.0,
+            # Module 5: Volume Z-Score State
+            "vol_mean": 0.0,
+            "vol_std": 1.0,
+            "vol_ema_alpha": 0.01  # EMA for rolling stats
         }
         self.initialized = False
-        logger.info(f"[BRAIN] Neural Link Initialized (Stateful O(1) Enabled)")
+        logger.info(f"[BRAIN] Neural Link Initialized (5D Vector: L1, L1W, L4S, Div, Vol_Z)")
 
     async def predict_next_candle(self, market_data: Dict[str, Any], physics_regime: Any = None) -> Dict[str, Any]:
         """
@@ -85,7 +89,20 @@ class NeuralInferenceAPI:
             l2_mean = np.mean(self.smma_states["operative"])
             l4_slope = (self.smma_states["bias"] / self.smma_states["bias_prev"] - 1) * 100 if self.smma_states["bias_prev"] != 0 else 0.0
             
-            features = [l1_mean, l1_width, l4_slope, l1_mean / l2_mean if l2_mean != 0 else 1.0]
+            # Module 5: Volume Z-Score (5th Dimension)
+            volume = float(market_data.get('volume') or market_data.get('tick_volume') or 0)
+            if volume > 0:
+                # Update rolling mean/std with EMA
+                alpha = self.smma_states["vol_ema_alpha"]
+                self.smma_states["vol_mean"] = (1-alpha) * self.smma_states["vol_mean"] + alpha * volume
+                vol_diff = abs(volume - self.smma_states["vol_mean"])
+                self.smma_states["vol_std"] = (1-alpha) * self.smma_states["vol_std"] + alpha * vol_diff
+                
+                vol_zscore = (volume - self.smma_states["vol_mean"]) / max(self.smma_states["vol_std"], 1e-6)
+            else:
+                vol_zscore = 0.0
+            
+            features = [l1_mean, l1_width, l4_slope, l1_mean / l2_mean if l2_mean != 0 else 1.0, vol_zscore]
 
             # PvP Alpha Check (Needs recent history of price/slope, simplified for O(1))
             # [Note: Divergence detection usually needs a window, we can use a small circular buffer for scores]

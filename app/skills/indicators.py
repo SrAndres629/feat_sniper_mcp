@@ -48,7 +48,18 @@ def calculate_feat_layers(df: pd.DataFrame) -> pd.DataFrame:
     res_df['L1_Width'] = np.std(l1_data, axis=1)
     res_df['L4_Slope'] = pd.Series(l4_ewm, index=tail_df.index).pct_change(periods=3) * 100
     res_df['Div_L1_L2'] = res_df['L1_Mean'] / np.mean(l2_data, axis=1).clip(min=1e-6)
-    res_df['close'] = tail_df['close'].values # Required for PvP Divergence
+    res_df['close'] = tail_df['close'].values
+    
+    # Module 5: Volume Z-Score (5th Dimension) - Visionary Directive
+    # Detects volume anomalies that often precede institutional moves
+    if 'volume' in tail_df.columns or 'tick_volume' in tail_df.columns:
+        vol_col = 'volume' if 'volume' in tail_df.columns else 'tick_volume'
+        vol_series = tail_df[vol_col].astype(float)
+        vol_mean = vol_series.rolling(100).mean()
+        vol_std = vol_series.rolling(100).std()
+        res_df['Vol_ZScore'] = (vol_series - vol_mean) / vol_std.replace(0, 1)
+    else:
+        res_df['Vol_ZScore'] = 0.0  # No volume data available
     
     return res_df.tail(window).fillna(0.0)
 
