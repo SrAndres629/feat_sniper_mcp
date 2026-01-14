@@ -14,6 +14,7 @@ class CircuitBreaker:
         self.last_tick_time = time.time()
         self.is_tripped = False
         self.current_level = 0  # 0: Safe, 1: Defensive, 2: Survival, 3: Shutdown
+        self.pause_until: float = 0.0 # Multi-level operational pause
         # Tolerance: 15 seconds of silence = DEATH
         self.max_latency = 15.0 
         self.trade_manager: Optional[Any] = None 
@@ -45,9 +46,17 @@ class CircuitBreaker:
         return (real_loss / self._daily_opening_balance) * 100 if self._daily_opening_balance > 0 else 0.0
 
     async def get_lot_multiplier(self) -> float:
-        """Retorna el multiplicador de lotaje basado en el nivel de riesgo."""
+        """
+        Retorna el multiplicador de lotaje basado en el nivel de riesgo.
+        Refinado por Gemini Web (Visionary): 2%/4%/6%
+        """
         from app.core.config import settings
         
+        # Check Operational Pause
+        if time.time() < self.pause_until:
+            logger.warning(f"⏳ OPERATIONAL PAUSE ACTIVE: Resuming in {int(self.pause_until - time.time())}s")
+            return 0.0
+
         dd = await self.get_drawdown()
         
         if dd >= settings.CB_LEVEL_3_DD:
@@ -57,21 +66,23 @@ class CircuitBreaker:
             return 0.0
         elif dd >= settings.CB_LEVEL_2_DD:
             self.current_level = 2
-            return 0.25  # 75% Reduction
+            if self.pause_until == 0:
+                self.pause_until = time.time() + 3600 # 1h Operational Pause
+                logger.critical("🚨 LEVEL 2 DD REACHED: Triggering 1-hour operational pause.")
+            return 0.50  # 50% Lot Size (Visionary Target)
         elif dd >= settings.CB_LEVEL_1_DD:
             self.current_level = 1
-            return 0.75  # 25% Reduction
+            return 0.75  # 75% Lot Size (Visionary Target)
         
         self.current_level = 0
         return 1.0
 
     def can_execute(self) -> bool:
         """Veredicto final para la ejecucin de órdenes."""
-        return not self.is_tripped and self.current_level < 3
+        return not self.is_tripped and self.current_level < 3 and time.time() >= self.pause_until
 
     def record_failure(self):
         """Registra un fallo técnico (broker error, timeout)."""
-        # Futura implementación: Escalamiento si hay N fallos seguidos
         pass
 
     def record_success(self):
@@ -84,7 +95,7 @@ class CircuitBreaker:
 
     async def monitor_heartbeat(self):
         """Tarea de fondo: Monitorea latencia y resets diarios."""
-        logger.info(f"🛡️ Multi-Level Circuit Breaker ARMED (POM Protocol Active)")
+        logger.info(f"🛡️ Multi-Level Circuit Breaker ARMED (Visionary Strategy Active)")
         try:
             while True:
                 # 1. Monitoreo de Latencia (Heartbeat)
@@ -96,7 +107,10 @@ class CircuitBreaker:
                 # 2. Monitoreo de Drawdown (Status Check)
                 multiplier = await self.get_lot_multiplier()
                 if self.current_level > 0:
-                     logger.warning(f"⚠️ CB STATUS: Level {self.current_level} (Multiplier: {multiplier})")
+                     status_msg = f"⚠️ CB STATUS: Level {self.current_level}"
+                     if self.pause_until > time.time():
+                         status_msg += f" (PAUSED for {int(self.pause_until - time.time())}s)"
+                     logger.warning(status_msg)
 
                 await asyncio.sleep(5.0)  # Check every 5s
         except asyncio.CancelledError:
@@ -105,7 +119,7 @@ class CircuitBreaker:
     async def emergency_shutdown(self):
         self.is_tripped = True
         self.current_level = 3
-        logger.critical("⛔ SRE PROTOCOL: EXECUTE ORDER 66 (Emergency Shutdown)")
+        logger.critical("⛔ SRE PROTOCOL: EXECUTE ORDER 66 (TOTAL HALT)")
         if self.trade_manager:
             try:
                 # Cerramos todo
@@ -113,7 +127,7 @@ class CircuitBreaker:
             except Exception as e:
                 logger.error(f"Emergency Execution Failed: {e}")
         else:
-            logger.error("SRE Error: TradeManager not linked! Cannot close positions automatically.")
+            logger.error("SRE Error: TradeManager not linked! Manual intervention required.")
 
 # Singleton Global
 circuit_breaker = CircuitBreaker()

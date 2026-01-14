@@ -13,13 +13,18 @@ class TradeManager:
     def __init__(self, zmq_bridge):
         self.zmq_bridge = zmq_bridge
         self.pending_orders = {}
-        logger.info("[EXECUTION] Trade Manager Online (Execution Arm)")
+        self.start_time = time.time() # For Warm-up Protocol
+        logger.info("[EXECUTION] Trade Manager Online (Warm-up: 60s active)")
 
     async def execute_order(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Envia orden al bridge ZMQ.
-        Params: symbol, volume, [price], sl, tp.
+        Warm-up Protocol: Blocks executions for first 60s to stabilize physics.
         """
+        warmup_remaining = 60 - (time.time() - self.start_time)
+        if warmup_remaining > 0:
+            logger.warning(f"🕒 WARM-UP ACTIVE: Blocking {action}. {int(warmup_remaining)}s remaining.")
+            return {"status": "WAITING_FOR_WARMUP", "remaining": int(warmup_remaining)}
         # 0. Check Simulation Mode (Fase 5 Hook)
         import os
         import json

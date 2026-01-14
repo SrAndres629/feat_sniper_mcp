@@ -126,45 +126,83 @@ def save_hybrid_model(model: HybridFEATNetwork, path: str = "models/feat_hybrid_
         "output_heads": ["p_win", "alpha_confidence", "volatility_regime", "urgency"]
     }, path)
     
-def load_hybrid_model(path: str = "models/feat_hybrid_v2.pth") -> HybridFEATNetwork:
-    model = HybridFEATNetwork()
+# Sincronizado con train_models.py (Arquitecto Jules Protocol)
+class LSTMWithAttention(nn.Module):
+    def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2, num_classes: int = 2):
+        super().__init__()
+        self.lstm = nn.LSTM(
+            input_size=input_dim,
+            hidden_size=hidden_dim,
+            num_layers=num_layers,
+            batch_first=True,
+            bidirectional=True,
+            dropout=0.2
+        )
+        self.attention = nn.Sequential(
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.Tanh(),
+            nn.Linear(hidden_dim, 1)
+        )
+        self.classifier = nn.Sequential(
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(hidden_dim, num_classes)
+        )
+
+    def forward(self, x):
+        lstm_out, _ = self.lstm(x)
+        attn_weights = torch.softmax(self.attention(lstm_out), dim=1)
+        context = torch.sum(lstm_out * attn_weights, dim=1)
+        return self.classifier(context)
+
+def load_hybrid_model(path: str = "models/lstm_XAUUSD_v2.pt") -> nn.Module:
+    """Cargador universal sincronizado con el Architect Protocol."""
     try:
-        checkpoint = torch.load(path, weights_only=False)
+        checkpoint = torch.load(path, map_location="cpu", weights_only=False)
+        # Extraer configuración
+        config = checkpoint.get("model_config", {})
+        input_dim = config.get("input_dim", 4)
+        
+        model = LSTMWithAttention(input_dim=input_dim)
+        
         if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
             model.load_state_dict(checkpoint["state_dict"])
         else:
             model.load_state_dict(checkpoint)
+            
         model.eval()
         return model
-    except FileNotFoundError:
+    except Exception as e:
+        print(f"[MODEL ERROR] Load Failed: {e}")
         return None
 
 class HybridModel:
     """
-    Local Wrapper for HybridFEATNetwork.
-    Handles Scaler state (preventing State Drift) and PyTorch inference.
+    Wrapper institucional para inferencia causal.
+    Maneja el escalamiento 4D y la arquitectura LSTMWithAttention.
     """
-    def __init__(self, model_path: str = "models/feat_hybrid_v2.pth"):
+    def __init__(self, model_path: str = "models/lstm_XAUUSD_v2.pt"):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.scaler_stats = None
         
-        # Load Model and potentially Scaler Stats
         checkpoint = self._load_checkpoint(model_path)
         
-        self.net = HybridFEATNetwork()
         if checkpoint:
-            if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
+            config = checkpoint.get("model_config", {"input_dim": 4})
+            self.net = LSTMWithAttention(input_dim=config["input_dim"])
+            
+            if "state_dict" in checkpoint:
                 self.net.load_state_dict(checkpoint["state_dict"])
-                self.scaler_stats = checkpoint.get("scaler_stats") # FIX STATE DRIFT
+                self.scaler_stats = checkpoint.get("scaler_stats")
             else:
                 self.net.load_state_dict(checkpoint)
-        
-        self.net.to(self.device).eval()
-        
-        if self.scaler_stats:
-            print(f"🧠 HybridModel Loaded on {self.device} (Scaler Active)")
+                
+            self.net.to(self.device).eval()
+            print(f"🧠 LSTM Causal Model Loaded on {self.device} (Stats Embedded)")
         else:
-            print(f"🧠 HybridModel Loaded on {self.device} (Raw Features Mode)")
+            self.net = None
+            print("⚠️ Brain Offline: Model Not Found")
 
     def _load_checkpoint(self, path):
         try:
@@ -173,7 +211,6 @@ class HybridModel:
             return None
 
     def _normalize(self, features: torch.Tensor) -> torch.Tensor:
-        """Aplica normalizacin basada en las estadsticas de entrenamiento."""
         if self.scaler_stats:
             mean = torch.tensor(self.scaler_stats["mean"], dtype=torch.float32).to(self.device)
             scale = torch.tensor(self.scaler_stats["scale"], dtype=torch.float32).to(self.device)
@@ -181,26 +218,26 @@ class HybridModel:
         return features
 
     def predict(self, context_data: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Inference Interface with Causal Normalization.
-        """
+        """Inferencia 4D sincronizada."""
         try:
-            # 1. Mock Energy Map (Placeholder for Conv Stream)
-            energy_map = torch.zeros(1, 1, 50, 50).to(self.device)
+            if not self.net: return {"error": "No Model", "execute_trade": False}
             
-            # 2. Real Dense Features (Batch=1, Dims=10)
-            if 'features' in context_data and isinstance(context_data['features'], list):
-                feat_list = context_data['features']
-                raw_features = torch.tensor([feat_list], dtype=torch.float32).to(self.device)
-            else:
-                raw_features = torch.zeros(1, 10).to(self.device) 
+            feat_list = context_data.get('features', [0.0] * 4)
+            # El LSTM espera (Batch, Seq, Feat). Aquí Seq=1 para inferencia real-time.
+            raw_features = torch.tensor([[feat_list]], dtype=torch.float32).to(self.device)
             
-            # 3. Apply Normalization (FIX STATE DRIFT)
+            # Normalización causal
             dense_features = self._normalize(raw_features)
             
-            # 4. Neural Forward Pass
-            decision = self.net.get_risk_decision(energy_map, dense_features)
-            return decision
+            with torch.no_grad():
+                logits = self.net(dense_features)
+                p_win = torch.softmax(logits, dim=1)[:, 1].item()
+                
+            return {
+                "p_win": round(p_win, 4),
+                "execute_trade": p_win > 0.55,
+                "alpha_confidence": round(p_win, 4) # Simplified for alpha sync
+            }
             
         except Exception as e:
             print(f"Inference Error: {e}")

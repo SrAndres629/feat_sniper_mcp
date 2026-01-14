@@ -6,6 +6,8 @@ from datetime import datetime, time as dtime, timezone
 from typing import Dict, Any, Optional, List
 from app.core.config import settings
 from app.core.mt5_conn import mt5_conn
+from app.services.volatility_guard import volatility_guard
+from app.services.spread_filter import spread_filter
 
 logger = logging.getLogger("MT5_Bridge.Services.Risk")
 
@@ -163,36 +165,35 @@ class RiskEngine:
                 self._last_reset_date = today
                 logger.info(f"RiskEngine: Daily balance reset. Base: ${self._daily_opening_balance:.2f}")
 
-    async def calculate_dynamic_lot(self, confidence: float, volatility: float, symbol: str, sl_points: int = 200, black_swan_multiplier: float = 1.0) -> float:
+    async def calculate_dynamic_lot(self, confidence: float, volatility: float, symbol: str, sl_points: int = 200, market_data: Dict[str, Any] = {}) -> float:
         """
         [MODEL 3 REQUEST] Asignación Neuronal Dinámica.
-        Wrapper sobre get_neural_allocation + get_adaptive_lots.
-        
-        Now includes Multi-Level Circuit Breaker (POM) integration.
+        Integrado con Institutional Guards (POM Protocol).
         """
         allocation = await self.get_neural_allocation(confidence)
         
-        # Override based on strict Model 3 requirements if needed
         if confidence < 0.60:
-            # "Riesgo minimo o cero"
-            return 0.01 # Minimum lot
+            return 0.01 # Minimum lot / Survival mode
         
-        # 1. Get Circuit Breaker Multiplier (POM Protocol)
+        # 1. Get Circuit Breaker Multiplier (2%/4%/6% DD)
         from app.services.circuit_breaker import circuit_breaker
         cb_multiplier = await circuit_breaker.get_lot_multiplier()
         
-        # 2. Combine with Black Swan Guard (Physical Guardians)
-        combined_multiplier = black_swan_multiplier * cb_multiplier
+        # 2. Visionary Physical Guardians: Volatility & Spread
+        can_trade_vol, vol_reason = volatility_guard.can_trade(market_data)
         
-        if combined_multiplier <= 0:
-            logger.warning(f"[RISK] ENTRY BLOCKED: Multiplier={combined_multiplier:.2f} (CB Level: {circuit_breaker.current_level})")
+        # Check Spread Toxicity
+        tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
+        current_spread = (tick.ask - tick.bid) if tick else 0
+        avg_spread = market_data.get("avg_spread", 0)
+        is_spread_toxic = spread_filter.is_spread_toxic(symbol, current_spread, avg_spread)
+
+        if not can_trade_vol or is_spread_toxic or cb_multiplier <= 0:
+            logger.warning(f"🛡️ RISK VETO on {symbol}: Vol={can_trade_vol}, SpreadToxic={is_spread_toxic}, CB_Mult={cb_multiplier:.2f}")
             return 0.0
             
         base_lot = await self.get_adaptive_lots(symbol, sl_points, allocation["lot_multiplier"])
-        final_lot = base_lot * combined_multiplier
-        
-        if combined_multiplier < 1.0:
-            logger.info(f"[RISK] Lot throttled: {base_lot:.2f} → {final_lot:.2f} (POM Multiplier: {combined_multiplier*100:.0f}%)")
+        final_lot = base_lot * cb_multiplier
         
         return max(0.01, final_lot) if final_lot > 0 else 0.0
 
