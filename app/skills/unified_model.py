@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 from typing import Dict, Any, List
 import os
+import anyio
 
 logger = logging.getLogger("MT5_Bridge.Skills.UnifiedModel")
 
@@ -18,6 +19,23 @@ class UnifiedModelDB:
             raise FileNotFoundError(f"Database not found at {self.db_path}")
         return sqlite3.connect(self.db_path)
 
+    def _run_query_sync(self, sql_query: str) -> Dict[str, Any]:
+        """Helper sincrónico para ejecutar la query en un hilo separado."""
+        conn = None
+        try:
+            conn = self._get_connection()
+            df = pd.read_sql_query(sql_query, conn)
+            return {
+                "status": "success",
+                "rows_count": len(df),
+                "data": df.to_dict('records')
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+        finally:
+            if conn:
+                conn.close()
+
     async def query_custom_sql(self, sql_query: str) -> Dict[str, Any]:
         """
         Ejecuta una consulta SQL de solo lectura sobre el Unified Model.
@@ -26,19 +44,8 @@ class UnifiedModelDB:
         forbidden = ["DROP", "DELETE", "INSERT", "UPDATE", "ALTER", "TRUNCATE"]
         if any(cmd in sql_query.upper() for cmd in forbidden):
              return {"status": "error", "message": "Only SELECT queries are allowed for safety."}
-        
-        try:
-            conn = self._get_connection()
-            df = pd.read_sql_query(sql_query, conn)
-            conn.close()
-            
-            return {
-                "status": "success",
-                "rows_count": len(df),
-                "data": df.to_dict('records')
-            }
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+
+        return await anyio.to_thread.run_sync(self._run_query_sync, sql_query)
 
     async def get_fsm_transition_matrix(self, period: str = "H1") -> Dict[str, Any]:
         """

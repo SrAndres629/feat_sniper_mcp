@@ -106,3 +106,18 @@ async def get_technical_indicator(req: IndicatorRequest) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error calculando {indicator}: {e}")
         return {"status": "error", "message": str(e)}
+
+
+async def calculate_rsi(symbol: str, timeframe: str, period: int = 14) -> float:
+    """
+    Helper simplificado para calcular solo RSI y devolver un valor float.
+    Usa la función principal get_technical_indicator.
+    """
+    req = IndicatorRequest(symbol=symbol, timeframe=timeframe, indicator="RSI", period=period)
+    result = await get_technical_indicator(req)
+
+    if result.get("status") == "success":
+        return result.get("value", 50.0)
+    else:
+        logger.warning(f"Failed to calculate RSI for {symbol}: {result.get('message')}")
+        return 50.0 # Valor neutro en caso de error
