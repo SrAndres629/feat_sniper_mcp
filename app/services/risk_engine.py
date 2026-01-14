@@ -180,6 +180,7 @@ class RiskEngine:
         cb_multiplier = await circuit_breaker.get_lot_multiplier()
         
         # 2. Visionary Physical Guardians: Volatility & Spread
+        regime = volatility_guard.get_regime(market_data)
         can_trade_vol, vol_reason = volatility_guard.can_trade(market_data)
         
         # Check Spread Toxicity
@@ -189,11 +190,24 @@ class RiskEngine:
         is_spread_toxic = spread_filter.is_spread_toxic(symbol, current_spread, avg_spread)
 
         if not can_trade_vol or is_spread_toxic or cb_multiplier <= 0:
-            logger.warning(f"🛡️ RISK VETO on {symbol}: Vol={can_trade_vol}, SpreadToxic={is_spread_toxic}, CB_Mult={cb_multiplier:.2f}")
+            logger.warning(f"🛡️ RISK VETO on {symbol}: Regime={regime}, VolReason={vol_reason}, SpreadToxic={is_spread_toxic}, CB_Mult={cb_multiplier:.2f}")
             return 0.0
             
+        # 3. Dynamic Scaling by Regime
+        regime_multiplier = 1.0
+        if regime == "TURBULENT":
+            regime_multiplier = 0.5 # 50% Reduction for turbulence
+            logger.info(f"🌪️ TURBULENCE DETECTED: Scaling risk to 50% for {symbol}")
+
         base_lot = await self.get_adaptive_lots(symbol, sl_points, allocation["lot_multiplier"])
-        final_lot = base_lot * cb_multiplier
+        final_lot = base_lot * cb_multiplier * regime_multiplier
+        
+        # 4. Shadow Force (Master Directive)
+        trading_mode = os.getenv("TRADING_MODE", "SHADOW")
+        if trading_mode == "SHADOW":
+            logger.info(f"🌌 SHADOW EXECUTION: Signal valid, simulated lot: {final_lot:.2f}")
+            # Note: We return the lot, but skip execution in TradeManager or similar layers.
+            # For calculate_dynamic_lot, the purpose is the calculation.
         
         return max(0.01, final_lot) if final_lot > 0 else 0.0
 

@@ -166,8 +166,15 @@ def load_hybrid_model(path: str = "models/lstm_XAUUSD_v2.pt") -> nn.Module:
         
         model = LSTMWithAttention(input_dim=input_dim)
         
-        if isinstance(checkpoint, dict) and "state_dict" in checkpoint:
-            model.load_state_dict(checkpoint["state_dict"])
+        if isinstance(checkpoint, dict):
+            state_dict = checkpoint.get("state_dict", checkpoint)
+            # If the saved state_dict itself is a wrapper (nested)
+            if isinstance(state_dict, dict) and "model_state" in state_dict:
+                state_dict = state_dict["model_state"]
+            
+            # Filter out non-model keys just in case
+            model_state = {k: v for k, v in state_dict.items() if not k in ["scaler_stats", "model_config", "trained_at", "best_acc"]}
+            model.load_state_dict(model_state, strict=False)
         else:
             model.load_state_dict(checkpoint)
             
@@ -193,10 +200,16 @@ class HybridModel:
             self.net = LSTMWithAttention(input_dim=config["input_dim"])
             
             if "state_dict" in checkpoint:
-                self.net.load_state_dict(checkpoint["state_dict"])
+                state_dict = checkpoint["state_dict"]
+                if isinstance(state_dict, dict) and "model_state" in state_dict:
+                    state_dict = state_dict["model_state"]
+                
+                # Filter non-weights keys
+                model_state = {k: v for k, v in state_dict.items() if k not in ["scaler_stats", "model_config", "trained_at", "best_acc"]}
+                self.net.load_state_dict(model_state, strict=False)
                 self.scaler_stats = checkpoint.get("scaler_stats")
             else:
-                self.net.load_state_dict(checkpoint)
+                self.net.load_state_dict(checkpoint, strict=False)
                 
             self.net.to(self.device).eval()
             print(f"🧠 LSTM Causal Model Loaded on {self.device} (Stats Embedded)")

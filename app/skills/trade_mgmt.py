@@ -28,15 +28,27 @@ class TradeManager:
         # 0. Check Simulation Mode (Fase 5 Hook)
         import os
         import json
-        mode = os.getenv("TRADING_MODE", "LIVE")
+        mode = os.getenv("TRADING_MODE", "SHADOW") # Default to Shadow for Safety
         
-        if mode == "SIMULATION":
-            ticket = int(datetime.now().timestamp())
+        if mode == "SHADOW" or mode == "SIMULATION":
             params['ticket'] = ticket
-            params['status'] = "SIM_FILLED"
+            params['status'] = f"{mode}_VALID"
             params['timestamp'] = datetime.now().isoformat()
             
-            logger.info(f"🔵 SIMULATION ORDER: {action} {params}")
+            # Phase 12: HUD Projection via ZMQ
+            from app.core.zmq_bridge import zmq_bridge
+            asyncio.create_task(zmq_bridge.send_command(
+                "SHADOW_RESULT",
+                action=action,
+                symbol=params.get('symbol'),
+                lot=params.get('volume'),
+                p_win=params.get('p_win', 0.5),
+                regime=params.get('regime', 'LAMINAR')
+            ))
+            
+            logger.info(f"🌌 {mode} EXECUTION (PILOT): {action} {params}")
+            # El Visionario manda: Shadow Mode es Sagrado. 
+            # No se envían órdenes al ZMQ Bridge reales.
             
             # Save to Sim Ledger
             try:

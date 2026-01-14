@@ -15,7 +15,8 @@ class VolatilityGuard:
         self.is_halted = False
         self.halt_reason = ""
         self.atr_threshold_multiplier = 3.0 # Visionary Standard
-
+        self.current_regime = "LAMINAR"
+        
     def check_market_toxicity(self, market_data: Dict[str, Any]) -> bool:
         """
         Veredicto de toxicidad. Retorna True si el mercado es tóxico (HALT).

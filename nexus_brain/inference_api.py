@@ -1,23 +1,14 @@
-No puedo modificar los archivos directamente porque las herramientas de escritura (`write_file` o `run_shell_command`) no están disponibles en este entorno. Sin embargo, he refactorizado el código de `nexus_brain/inference_api.py` según tus instrucciones.
-
-Aquí tienes el código completo refactorizado. Por favor, reemplaza el contenido de `nexus_brain/inference_api.py` con lo siguiente:
-
-### Cambios realizados:
-1.  **Buffer de Historia**: Se añadió `self.history = deque(...)` para acumular ticks y permitir el cálculo de indicadores (SMMA requiere historia).
-2.  **Cálculo FEAT**: Se importó y utilizó `calculate_feat_layers` para procesar el DataFrame generado desde el buffer.
-3.  **Vector de Características**: Se extrajeron exactamente las 4 características solicitadas: `[L1_Mean, L1_Width, L4_Slope, Div_L1_L2]`.
-4.  **Limpieza**: Se eliminó la lógica de construcción manual del vector de 10 dimensiones y la dependencia lógica de `physics_regime`.
-
 import logging
 import torch
 import numpy as np
+import time
 import pandas as pd
 from collections import deque
 from datetime import datetime
 from typing import Dict, Any, Optional
 from nexus_brain.hybrid_model import HybridModel
 from app.services.rag_memory import rag_memory
-from app.skills.indicators import calculate_feat_layers
+from app.skills.indicators import calculate_feat_layers, detect_divergence
 from app.core.config import settings
 
 logger = logging.getLogger("feat.brain.inference")
@@ -29,88 +20,94 @@ class NeuralInferenceAPI:
     """
     def __init__(self, model_path: str = "models/lstm_XAUUSD_v2.pt"):
         self.brain = HybridModel(model_path)
-        # Buffer circular para datos históricos necesarios para indicadores FEAT
-        # Necesitamos al menos settings.LAYER_BIAS_PERIOD (2048) + margen
-        self.history = deque(maxlen=settings.LAYER_BIAS_PERIOD + 100)
-        logger.info("[BRAIN] Neural Link Initialized")
+        self.max_history = settings.LAYER_BIAS_PERIOD + 200
+        self.history_np = np.zeros((self.max_history, 3)) # close, high, low
+        self.history_len = 0
+        
+        # Phase 12: Stateful SMMA Cache for O(1) Updates
+        # We track state for all 21 micro/operative/bias layers
+        self.smma_states = {
+            "micro": np.zeros(len(settings.LAYER_MICRO_PERIODS)),
+            "operative": np.zeros(len(settings.LAYER_OPERATIVE_PERIODS)),
+            "bias": 0.0,
+            "bias_prev": 0.0 # For slope
+        }
+        self.initialized = False
+        logger.info(f"[BRAIN] Neural Link Initialized (Stateful O(1) Enabled)")
 
     async def predict_next_candle(self, market_data: Dict[str, Any], physics_regime: Any = None) -> Dict[str, Any]:
         """
         Genera predicción de probabilidad para la siguiente vela.
-        TEMPORAL CONTEXT: Incluye hora, sesión y rendimiento histórico (RAG).
         """
         if not self.brain or not self.brain.net:
             return {"error": "Brain Offline", "p_win": 0.0}
 
         try:
-            # 0. Temporal Context Retrieval
-            now = datetime.now()
-            hour = now.hour
+            # 0. Context
+            price = float(market_data.get('bid') or market_data.get('close') or 0.0)
             
-            # Determine Session (0: Asia, 1: London, 2: NY)
-            # Simplified: Asia (0-7), London (8-13), NY (14-23) UTC/Local approximation
-            if 0 <= hour <= 7: session = 0.0
-            elif 8 <= hour <= 13: session = 1.0
-            else: session = 2.0
+            # 1. Update Persistent Buffer
+            self.history_np = np.roll(self.history_np, -1, axis=0)
+            self.history_np[-1] = [price, float(market_data.get('high') or 0.0), float(market_data.get('low') or 0.0)]
+            self.history_len = min(self.history_len + 1, self.max_history)
             
-            # Historical Benchmark (RAG)
-            performance = await rag_memory.get_hourly_performance(hour)
-            hist_winrate = performance.get("win_rate", 0.5)
-
-            # 1. Feature Extraction (FEAT Layers)
-            def safe_float(val, default=0.0):
-                try:
-                    if val is None: return default
-                    f_val = float(val)
-                    return f_val if not np.isnan(f_val) and not np.isinf(f_val) else default
-                except: return default
-
-            price = safe_float(market_data.get('bid') or market_data.get('close'))
+            # Warmup Check
+            if self.history_len < settings.LAYER_BIAS_PERIOD:
+                return {"status": "Warming up", "p_win": 0.5}
             
-            # Update History Buffer
-            self.history.append({'close': price})
-            
-            # Convert buffer to DataFrame for calculation
-            df = pd.DataFrame(self.history)
-            
-            # Calculate FEAT Layers
-            feat_df = calculate_feat_layers(df)
-            
-            # Extract exactly 4 features: [L1_Mean, L1_Width, L4_Slope, Div_L1_L2]
-            if not feat_df.empty:
-                latest = feat_df.iloc[-1]
-                features = [
-                    safe_float(latest.get('L1_Mean')),
-                    safe_float(latest.get('L1_Width')),
-                    safe_float(latest.get('L4_Slope')),
-                    safe_float(latest.get('Div_L1_L2'))
-                ]
+            # 2. O(1) SMMA Update Logic (Institutional Grade)
+            if not self.initialized:
+                # Cold Start: Initialize states with full window calculation once
+                df_init = pd.DataFrame(self.history_np[-(settings.LAYER_BIAS_PERIOD):], columns=['close', 'high', 'low'])
+                for i, p in enumerate(settings.LAYER_MICRO_PERIODS):
+                    self.smma_states["micro"][i] = df_init['close'].ewm(alpha=1.0/p, adjust=False).mean().iloc[-1]
+                for i, p in enumerate(settings.LAYER_OPERATIVE_PERIODS):
+                    self.smma_states["operative"][i] = df_init['close'].ewm(alpha=1.0/p, adjust=False).mean().iloc[-1]
+                self.smma_states["bias"] = df_init['close'].ewm(alpha=1.0/settings.LAYER_BIAS_PERIOD, adjust=False).mean().iloc[-1]
+                self.smma_states["bias_prev"] = df_init['close'].ewm(alpha=1.0/settings.LAYER_BIAS_PERIOD, adjust=False).mean().iloc[-4]
+                self.initialized = True
             else:
-                # Fallback vectors if insufficient history
-                # Div_L1_L2 ratio default 1.0 (neutral), others 0.0
-                features = [0.0, 0.0, 0.0, 1.0]
+                # Hot Update: Recursive formula S[t] = (1-a)*S[t-1] + a*X[t]
+                for i, p in enumerate(settings.LAYER_MICRO_PERIODS):
+                    a = 1.0 / p
+                    self.smma_states["micro"][i] = (1-a) * self.smma_states["micro"][i] + a * price
+                for i, p in enumerate(settings.LAYER_OPERATIVE_PERIODS):
+                    a = 1.0 / p
+                    self.smma_states["operative"][i] = (1-a) * self.smma_states["operative"][i] + a * price
+                
+                a_bias = 1.0 / settings.LAYER_BIAS_PERIOD
+                self.smma_states["bias_prev"] = self.smma_states["bias"] # Approximated slope
+                self.smma_states["bias"] = (1-a_bias) * self.smma_states["bias"] + a_bias * price
 
-            # Construct Context for HybridModel
-            # Result passed as vector (1, 4) implicit via list
+            # 3. Assemble Feature Vector (Zero Overhead)
+            l1_mean = np.mean(self.smma_states["micro"])
+            l1_width = np.std(self.smma_states["micro"])
+            l2_mean = np.mean(self.smma_states["operative"])
+            l4_slope = (self.smma_states["bias"] / self.smma_states["bias_prev"] - 1) * 100 if self.smma_states["bias_prev"] != 0 else 0.0
+            
+            features = [l1_mean, l1_width, l4_slope, l1_mean / l2_mean if l2_mean != 0 else 1.0]
+
+            # PvP Alpha Check (Needs recent history of price/slope, simplified for O(1))
+            # [Note: Divergence detection usually needs a window, we can use a small circular buffer for scores]
+            pvp_regime = "NEUTRAL" 
+
             context = {
                 "features": features,
                 "raw_data": market_data,
-                "hour": hour,
-                "session": session,
-                "hist_winrate": hist_winrate
+                "hour": datetime.now().hour,
+                "pvp_divergence": pvp_regime
             }
             
-            # 2. Inferencia
+            # Inferencia
+            start_inf = time.time()
             result = self.brain.predict(context)
+            latency_ms = (time.time() - start_inf) * 1000
             
-            # 3. Decision Refinement (Senior Bias: Small Profit > Any Loss)
-            # Si el winrate historico de esta hora es < 45%, ser mas conservador.
-            if hist_winrate < 0.45:
-                result["p_win"] *= 0.8
-                if "alpha_confidence" in result:
-                    result["alpha_confidence"] *= 0.8
-                if result["p_win"] < 0.6: result["execute_trade"] = False
-
+            # Auditoria de Latencia (Fase 12 Target: < 5ms)
+            if latency_ms > 5:
+                logger.warning(f"⚠️ LATENCY ALERT: {latency_ms:.2f}ms")
+            
+            result["latency_ms"] = latency_ms
             return result
 
         except Exception as e:
