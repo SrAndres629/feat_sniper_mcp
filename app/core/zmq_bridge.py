@@ -104,26 +104,38 @@ class ZMQBridge:
             except Exception:
                 if self.running:
                     await asyncio.sleep(1)
-
+    # Phase 13: HUD State
+    current_regime = "LAMINAR"
+    current_ai_confidence = 0.5
+    
     async def _heartbeat(self):
-        """Sends periodic health metrics to MT5 HUD."""
+        """Sends periodic health metrics to MT5 HUD (Phase 13 Institutional Upgrade)."""
         while self.running:
             try:
                 await self.send_command(
-                    "HEARTBEAT",
-                    lag_ms=self._last_lag_ms,
+                    "HUD_UPDATE",
+                    regime=self.current_regime,
+                    ai_confidence=round(self.current_ai_confidence * 100, 1),
+                    zmq_lag_ms=round(self._last_lag_ms, 2),
                     processed=self.messages_processed,
                     discarded=self.messages_discarded
                 )
-                await asyncio.sleep(1) # Sync every 1s
+                await asyncio.sleep(1)
             except Exception as e:
-                logger.error(f"Heartbeat failed: {e}")
+                logger.error(f"HUD Update failed: {e}")
                 await asyncio.sleep(5)
+
+    def update_hud_state(self, regime: str = None, ai_confidence: float = None):
+        """Updates HUD telemetry state for next broadcast."""
+        if regime:
+            self.current_regime = regime
+        if ai_confidence is not None:
+            self.current_ai_confidence = ai_confidence
 
     async def send_command(self, action: str, **params):
         if not self.running:
             return
-        payload = {"action": action, "params": params}
+        payload = {"action": action, "params": params, "ts": time.time() * 1000}
         await self.pub_socket.send_string(json.dumps(payload))
 
 zmq_bridge = ZMQBridge()
