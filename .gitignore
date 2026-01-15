@@ -1,26 +1,36 @@
-# === PERMISSIVE AUDIT MODE ===
-# Allowing everything strictly except Secrets & System Trash
+# === FEAT SNIPER STRICT LLM-MODE .gitignore ===
 
-# SECURITY (AUDIT MODE - WARNING: SECRETS LEAK)
-# .env
-# .env.local
+# Modelos pesados (Los LLM no pueden leerlos)
+*.pth
+*.pt
+*.joblib
+*.h5
+*.onnx
+*.pkl
 
-# SYSTEM TRASH
+# Bases de datos y Almacenamiento
+*.db
+*.sqlite3
+*.csv
+chroma_storage/
+data/
+
+# Logs y Temporales
+logs/
+*.log
 __pycache__/
-*.py[cod]
-*$py.class
 .venv/
-venv/
 env/
+.env
+
+# Node modules (Dashboard)
 node_modules/
-.git/
+package-lock.json
+.next/
+
+# IDE e Intermedios
 .vscode/
 .idea/
-
-# LARGE BINARIES (GitHub Limit > 100MB)
-# *.pth
-# *.pt
-# *.bin
-# Allowing .pkl and .joblib for audit if small
-# Allowing .log for audit
-# Allowing data/ for audit
+.DS_Store
+*.py[cod]
+*$py.class
