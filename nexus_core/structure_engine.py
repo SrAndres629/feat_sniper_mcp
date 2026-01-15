@@ -18,6 +18,7 @@ class MAE_Pattern_Recognizer:
     Detects structural shifts (BOS/CHOCH) and fractal pivots.
     """
     def __init__(self):
+        print("[Form] Pattern Engine Online (MAE analysis)")
         self.status = "RANGING"
 
     def detect_fractals(self, df: pd.DataFrame) -> pd.DataFrame:

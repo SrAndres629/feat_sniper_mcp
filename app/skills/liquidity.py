@@ -14,6 +14,7 @@ class LiquidityGrid:
     Identifies institutional levels (PDH/PDL) and structural imbalances (FVG).
     """
     def __init__(self):
+        print("[Liquidity] Grid Built (PDH/PDL calculation)")
         self.levels = {}
 
     def calculate_pdh_pdl(self, daily_candles: pd.DataFrame) -> Dict[str, float]:

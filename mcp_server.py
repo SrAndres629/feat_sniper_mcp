@@ -269,21 +269,29 @@ async def app_lifespan(server: FastMCP):
     """
     logger.info("HIGH COUNCIL: Iniciando red neuronal y sinapsis...")
     
+    # === MAIN SEQUENCE IGNITION: FEAT CORE ACTIVATION ===
+    try:
+        from app.skills.calendar import chronos_engine
+        from app.skills.liquidity import liquidity_grid
+        from nexus_core.acceleration import acceleration_engine
+        from nexus_core.structure_engine import mae_recognizer
+    except Exception as e:
+        logger.error(f"❌ FEAT CORE IGNITION FAILED: {e}")
+    
     # Global references for Master Tools
     global feat_engine, trade_manager, risk_engine
 
     # 0. STREAMER IGNITION (Supabase Realtime)
-    # 0. STREAMER IGNITION (Supabase Realtime) - DISABLED FOR STABILITY
-    # try:
-    #     from app.core.streamer import init_streamer
-    #     dashboard = init_streamer()
-    #     if dashboard:
-    #          logging.getLogger().addHandler(dashboard)
-    #          asyncio.create_task(dashboard.start_async_loop())
-    #          logger.info("📡 [STREAMER] Dashboard Uplink Established (Logs -> Supabase)")
-    # except Exception as e:
-    #     logger.error(f"❌ Streamer Init Failed: {e}")
-    dashboard = None # Explicitly set to None
+    # 0. STREAMER IGNITION (Supabase Realtime)
+    try:
+        from app.core.streamer import init_streamer
+        dashboard = init_streamer()
+        if dashboard:
+             logging.getLogger().addHandler(dashboard)
+             asyncio.create_task(dashboard.start_async_loop())
+             logger.info("📡 [STREAMER] Dashboard Uplink Established (Logs -> Supabase)")
+    except Exception as e:
+        logger.error(f"❌ Streamer Init Failed: {e}")
 
     
     # 1. MT5 Connection

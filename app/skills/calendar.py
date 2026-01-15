@@ -18,6 +18,10 @@ class ChronosEngine:
     Gate T: Chronos Engine.
     Handles institutional Killzones and session transitions synchronized with America/New_York.
     """
+    def __init__(self):
+        print("[Chronos] Engine Active (Session detection)")
+        self.status = "INITIALIZED"
+
     NY_TZ = pytz.timezone("America/New_York")
     
     # Institutional Killzones (EST/NY)

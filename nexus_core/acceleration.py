@@ -12,6 +12,7 @@ from typing import Dict, Any
 
 class AccelerationEngine:
     def __init__(self, config: Dict[str, Any] = None):
+        print("[Physics] Sigma Monitor ON (Velocity/Acceleration vectors)")
         self.config = config or {
             "atr_w": 14,
             "vol_w": 20,
