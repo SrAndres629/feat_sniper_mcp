@@ -16,12 +16,52 @@ class AccelerationEngine:
             "atr_w": 14,
             "vol_w": 20,
             "score_th": 0.70,
+            "sigma_th": 3.0, # Alert threshold for sigma
             "weights": {
                 "w1": 0.4, # Displacement
                 "w2": 0.3, # Volume Z-Score
                 "w3": 0.2, # FVG Presence
                 "w4": 0.1  # Velocity
             }
+        }
+
+    def calculate_momentum_vector(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Gate A: Velocity Vector.
+        Calculates Newtonian physics of price movement.
+        Logic: ImpactForce = Volume * (Close - Open).
+        """
+        if len(df) < 11:
+            return {"vector_strength": 0.0, "high_acceleration": False}
+
+        # 1. Impact Force calculation
+        last_candle = df.iloc[-1]
+        impact_force = last_candle['volume'] * (last_candle['close'] - last_candle['open'])
+        
+        # 2. Acceleration Flag: Body > AvgBody(10) * 1.5
+        bodies = (df['close'] - df['open']).abs()
+        last_body = bodies.iloc[-1]
+        avg_body_10 = bodies.iloc[-11:-1].mean()
+        high_acceleration = last_body > (avg_body_10 * 1.5)
+        
+        # 3. Vector Strength: Normalized body displacement (0.0 to 1.0)
+        # Using Z-score like logic for normalization
+        vector_strength = min(1.0, last_body / (avg_body_10 * 2.0 + 1e-9))
+        
+        # 4. Sigma Alert: If current acceleration (velocity delta) > 3 sigma
+        velocities = df['close'].diff().abs()
+        v_mu = velocities.rolling(window=20).mean()
+        v_std = velocities.rolling(window=20).std()
+        sigma_val = (velocities.iloc[-1] - v_mu.iloc[-1]) / (v_std.iloc[-1] + 1e-9)
+        
+        if sigma_val > self.config["sigma_th"]:
+            logger.warning(f"🚀 ACCELERATION ALERT: {sigma_val:.2f}σ deviation detected!")
+
+        return {
+            "vector_strength": float(vector_strength),
+            "high_acceleration": bool(high_acceleration),
+            "impact_force": float(impact_force),
+            "sigma": float(sigma_val)
         }
 
     def compute_acceleration_features(self, df: pd.DataFrame) -> pd.DataFrame:

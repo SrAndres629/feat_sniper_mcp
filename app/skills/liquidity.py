@@ -1,10 +1,70 @@
+import numpy as np
+import pandas as pd
 import logging
 import MetaTrader5 as mt5
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from app.core.mt5_conn import mt5_conn
 from app.core.config import settings
 
 logger = logging.getLogger("MT5_Bridge.Skills.Liquidity")
+
+class LiquidityGrid:
+    """
+    Gate E: Liquidity Grid mapping.
+    Identifies institutional levels (PDH/PDL) and structural imbalances (FVG).
+    """
+    def __init__(self):
+        self.levels = {}
+
+    def calculate_pdh_pdl(self, daily_candles: pd.DataFrame) -> Dict[str, float]:
+        """
+        Calculates Previous Day High (PDH) and Previous Day Low (PDL).
+        Input: daily_candles DataFrame with 'high', 'low' columns.
+        """
+        if daily_candles.empty or len(daily_candles) < 1:
+            return {"pdh": 0.0, "pdl": 0.0}
+        
+        # Last confirmed daily candle (i-1)
+        last_day = daily_candles.iloc[-1]
+        self.levels["pdh"] = float(last_day['high'])
+        self.levels["pdl"] = float(last_day['low'])
+        
+        logger.info(f"📊 PDH/PDL Mapped: {self.levels['pdh']} / {self.levels['pdl']}")
+        return self.levels
+
+    def detect_fvg(self, candle_series: pd.DataFrame) -> List[Dict[str, Any]]:
+        """
+        Detects Fair Value Gaps (FVG) in the provided series.
+        Candle(i) is FVG if:
+        Bullish: Low(i) > High(i-2)
+        Bearish: High(i) < Low(i-2)
+        """
+        fvgs = []
+        if len(candle_series) < 3:
+            return fvgs
+
+        for i in range(2, len(candle_series)):
+            # Bullish FVG
+            if candle_series.iloc[i]['low'] > candle_series.iloc[i-2]['high']:
+                fvgs.append({
+                    "type": "BULLISH_FVG",
+                    "top": candle_series.iloc[i]['low'],
+                    "bottom": candle_series.iloc[i-2]['high'],
+                    "index": i
+                })
+            # Bearish FVG
+            elif candle_series.iloc[i]['high'] < candle_series.iloc[i-2]['low']:
+                fvgs.append({
+                    "type": "BEARISH_FVG",
+                    "top": candle_series.iloc[i-2]['low'],
+                    "bottom": candle_series.iloc[i]['high'],
+                    "index": i
+                })
+        
+        self.levels["fvgs"] = fvgs
+        return fvgs
+
+liquidity_grid = LiquidityGrid()
 
 class LiquidityEngine:
     """

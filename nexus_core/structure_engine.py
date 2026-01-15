@@ -11,6 +11,62 @@ import pandas as pd
 from typing import Dict, Any, Tuple
 from numba import njit
 
+class MAE_Pattern_Recognizer:
+    """
+    Gate F: Pattern Recognition Cortex.
+    Implements the MAE Axiom: Momentum -> Accumulation -> Expansion.
+    Detects structural shifts (BOS/CHOCH) and fractal pivots.
+    """
+    def __init__(self):
+        self.status = "RANGING"
+
+    def detect_fractals(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Bill Williams Fractal Detection (3-candle swing).
+        """
+        # Bullish Fractal: Low(i) < Low(i-1) and Low(i) < Low(i+1)
+        # Shifted by 1 to detect on bar completion
+        df['fractal_high'] = (df['high'] > df['high'].shift(1)) & (df['high'] > df['high'].shift(-1))
+        df['fractal_low'] = (df['low'] < df['low'].shift(1)) & (df['low'] < df['low'].shift(-1))
+        return df
+
+    def detect_mae_pattern(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Detects Momentum -> Accumulation -> Expansion (MAE) phases.
+        Logic: 
+        1. Momentum: Body dominance > ATR * 1.5
+        2. Accumulation: Tight range (< 0.5 ATR)
+        3. Expansion: Breakout from accumulation range.
+        """
+        if len(df) < 5:
+            return {"phase": "UNKNOWN", "status": "RANGING"}
+
+        # Calculate ATR proxy for the last 14 candles
+        atr_proxy = (df['high'] - df['low']).rolling(14).mean().iloc[-1]
+        last_body = (df['close'] - df['open']).iloc[-1]
+        
+        # 1. Momentum Check
+        if abs(last_body) > (atr_proxy * 1.5):
+            phase = "MOMENTUM"
+            self.status = "BULLISH_BOS" if last_body > 0 else "BEARISH_BOS"
+        
+        # 2. Accumulation Check
+        elif (df['high'] - df['low']).iloc[-1] < (atr_proxy * 0.5):
+            phase = "ACCUMULATION"
+            self.status = "RANGING"
+        
+        # 3. Expansion Check
+        elif abs(last_body) > atr_proxy and (df['high'] - df['low']).iloc[-2] < (atr_proxy * 0.5):
+            phase = "EXPANSION"
+            self.status = "CHOCH"
+        else:
+            phase = "NORMAL"
+            self.status = "RANGING"
+
+        return {"phase": phase, "status": self.status}
+
+mae_recognizer = MAE_Pattern_Recognizer()
+
 class StructureEngine:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {
