@@ -1,6 +1,7 @@
 import os
 import logging
 import sys
+import anyio
 from fastmcp import FastMCP
 import chromadb
 from chromadb.utils import embedding_functions
@@ -44,26 +45,35 @@ async def ingest_memories(days: int = 30):
     if not os.path.exists(DB_PATH):
         return f"Error: No se encontr la base de datos en {DB_PATH}"
 
-    db = UnifiedModelDB(DB_PATH)
+    # Helper para ejecutar en hilo separado: Conexión y consulta SQLite
+    def _ingest_worker(db_path, days_arg):
+        db = UnifiedModelDB(db_path)
+        try:
+            return db.get_narrative_history(days=days_arg)
+        finally:
+            db.close()
+
+    # Helper para ejecutar en hilo separado: Inserción en ChromaDB
+    def _add_worker(col, docs, ids):
+        col.add(documents=docs, ids=ids)
+
     try:
-        narratives = db.get_narrative_history(days=days)
+        # 1. Obtener narrativas (Blocking I/O - SQLite)
+        narratives = await anyio.to_thread.run_sync(_ingest_worker, DB_PATH, days)
+
         if not narratives:
             return "No se encontraron nuevas memorias narrativas en el periodo especificado."
         
         # Generar IDs nicos basados en timestamp para evitar duplicados en la sesin
         batch_ids = [f"mem_{datetime.now().timestamp()}_{i}" for i in range(len(narratives))]
         
-        collection.add(
-            documents=narratives,
-            ids=batch_ids
-        )
+        # 2. Indexar en Chroma (Blocking I/O - Vector Store)
+        await anyio.to_thread.run_sync(_add_worker, collection, narratives, batch_ids)
         
         return f"xito: Se han procesado e indexado {len(narratives)} fragmentos de memoria narrativa en el almacn vectorial."
     except Exception as e:
         logger.error(f"Fallo en la ingesta: {str(e)}")
         return f"Error durante la ingesta: {str(e)}"
-    finally:
-        db.close()
 
 @mcp.tool()
 async def query_memory(question: str):
@@ -73,11 +83,12 @@ async def query_memory(question: str):
     """
     logger.info(f"Consultando memoria vectorial para: '{question}'")
     
+    # Helper para ejecutar en hilo separado: Consulta ChromaDB
+    def _query_worker(col, q):
+        return col.query(query_texts=[q], n_results=5)
+
     try:
-        results = collection.query(
-            query_texts=[question],
-            n_results=5
-        )
+        results = await anyio.to_thread.run_sync(_query_worker, collection, question)
         
         if not results['documents'] or len(results['documents'][0]) == 0:
             return "No se han encontrado recuerdos relevantes. Has ejecutado 'ingest_memories' primero?"
