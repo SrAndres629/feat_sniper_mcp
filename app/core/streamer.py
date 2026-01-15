@@ -32,18 +32,20 @@ class SupabaseStreamer(logging.Handler):
         """Intercepts a log record."""
         if not self.enabled: return
         
-        # Filter: Only INFO or higher for "audit_logs" (Clean logs)
+        # Filter: Only INFO or higher for "bot_activity_log" (Clean logs)
         if record.levelno < logging.INFO: return
 
         try:
             msg = self.format(record)
             
             # Structuring the log payload
+            # Schema Adaptation: 'level' column missing in DB (PGRST204).
+            # We embed level in message and remove specific column.
             log_entry = {
                 "timestamp": datetime.now().isoformat(),
-                "level": record.levelname,
+                # "level": record.levelname,  <-- REMOVED due to missing column
                 "module": record.name,
-                "message": msg,
+                "message": f"[{record.levelname}] {msg}", # Embed level in message
                 "session_id": settings.MT5_LOGIN or "UNKNOWN"
             }
             
@@ -63,7 +65,7 @@ class SupabaseStreamer(logging.Handler):
             self.buffer.clear()
             self.client.table("bot_activity_log").insert(data).execute()
         except Exception as e:
-            print(f"!! STREAMER ERROR: {e}")
+            pass # Silent fail in sync mode to prevent loops
 
     async def start_async_loop(self):
         self.loop = asyncio.get_event_loop()
@@ -72,12 +74,12 @@ class SupabaseStreamer(logging.Handler):
             await self.flush_async()
 
     async def _safe_execute(self, table: str, operation):
-        """Executes operation with error suppression for missing tables."""
+        """Executes operation with error suppression for missing tables/columns."""
         try:
              await self.loop.run_in_executor(None, operation)
         except Exception as e:
-            if "PGRST205" in str(e): # PostgREST code for table not found
-                 # Suppress repeated errors for missing tables to avoid spam
+            # PGRST205: Table not found | PGRST204: Column not found
+            if "PGRST205" in str(e) or "PGRST204" in str(e): 
                  pass 
             else:
                  print(f"!! STREAMER ERROR ({table}): {e}")

@@ -854,3 +854,477 @@ asyncio.exceptions.CancelledError
 2026-01-15 09:26:55,777 | INFO | MT5_Bridge.Core | Cerrando conexión con MT5...
 2026-01-15 09:26:55,777 | WARNING | MT5_Bridge.Core | MT5 terminal not active during shutdown. Watchdog will attempt reconnection.
 2026-01-15 09:26:55,777 | INFO | MT5_Bridge.Core | [OK] MT5 desconectado.
+2026-01-15 09:28:39,709 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:28:39,736 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:28:40,226 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:28:41,132 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:28:41,138 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:28:43,445 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: LiteFinance-MT5-Demo)...
+2026-01-15 09:28:47,542 | INFO | MT5_Bridge.Core | 
+2026-01-15 09:28:47,543 | INFO | MT5_Bridge.Core | [STATUS] CONEXION MT5: OK
+2026-01-15 09:28:47,543 | INFO | MT5_Bridge.Core | [ACCOUNT] TYPE: DEMO (Login: 90944186)
+2026-01-15 09:28:47,543 | INFO | MT5_Bridge.Core | [BALANCE] CURRENT: $21.96
+2026-01-15 09:28:47,543 | INFO | MT5_Bridge.Core | [LEVERAGE] 1:1000
+2026-01-15 09:28:47,543 | INFO | MT5_Bridge.Core | [HISTORY] TICKS LOADED: 500
+2026-01-15 09:28:47,543 | INFO | MT5_Bridge.Core | [OK] MetaTrader 5 Connection Established.
+2026-01-15 09:28:47,544 | INFO | MT5_Bridge.Core | Watchdog de conexión MT5 iniciado.
+2026-01-15 09:28:47,546 | INFO | feat.market_physics | [SATELLITE] Market Physics Engine Online (ATR-Normalized, NumPy Accelerated)
+2026-01-15 09:28:47,548 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-15 09:28:47,575 | WARNING | MT5_Bridge.ZMQ | ZMQ Bridge DISABLED: Address in use (addr='tcp://0.0.0.0:5555') - El servidor MCP funcionará sin streaming ZMQ.
+2026-01-15 09:28:47,576 | INFO | feat.trade_mgmt | [EXECUTION] Trade Manager Online (Warm-up: 60s, Exhaustion Exit: ON)
+2026-01-15 09:28:47,578 | INFO | feat.core.hardware_engine | [HARDWARE] HardwareEngine initialized - starting diagnostics...
+2026-01-15 09:28:47,580 | INFO | feat.core.health_sentinel | [SENTINEL] HealthSentinel initialized
+2026-01-15 09:28:47,582 | INFO | feat.core.integrity_check | [GUARDIAN] ModelGuardian initialized - Artifact Integrity Protection ACTIVE
+2026-01-15 09:28:47,583 | INFO | feat.core.lifecycle_manager | [LIFECYCLE] Manager initialized. PID directory: C:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.pid
+2026-01-15 09:28:47,648 | INFO | docket.worker | Starting worker 'Zhepy#29168' with the following tasks:
+2026-01-15 09:28:47,648 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-15 09:28:47,648 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-15 09:28:47,648 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-15 09:28:49,093 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:28:51,331 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:28:53,595 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:28:55,862 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:28:58,144 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:00,383 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:02,656 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:04,893 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:07,117 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:09,326 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:11,555 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:13,766 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:15,969 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:18,175 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:21,415 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:23,630 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:25,836 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:28,102 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:30,312 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:32,528 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:34,797 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:37,003 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:39,229 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:41,552 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:43,777 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:45,991 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:48,280 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:50,493 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:52,713 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:54,936 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:57,170 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:29:59,390 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:01,648 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:03,870 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:06,088 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:08,327 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:10,543 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:12,760 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:15,006 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:17,215 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:19,445 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:21,715 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:24,124 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:26,337 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:28,557 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:30,771 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:32,986 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:35,235 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:37,446 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:39,667 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:41,935 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:44,151 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:46,360 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22module%22%2C%22session_id%22%2C%22level%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:48,709 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:30:48,731 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:30:49,173 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:30:49,967 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:30:49,972 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:30:51,928 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: LiteFinance-MT5-Demo)...
+2026-01-15 09:30:54,747 | INFO | MT5_Bridge.Core | 
+2026-01-15 09:30:54,748 | INFO | MT5_Bridge.Core | [STATUS] CONEXION MT5: OK
+2026-01-15 09:30:54,748 | INFO | MT5_Bridge.Core | [ACCOUNT] TYPE: DEMO (Login: 90944186)
+2026-01-15 09:30:54,748 | INFO | MT5_Bridge.Core | [BALANCE] CURRENT: $21.96
+2026-01-15 09:30:54,748 | INFO | MT5_Bridge.Core | [LEVERAGE] 1:1000
+2026-01-15 09:30:54,748 | INFO | MT5_Bridge.Core | [HISTORY] TICKS LOADED: 500
+2026-01-15 09:30:54,748 | INFO | MT5_Bridge.Core | [OK] MetaTrader 5 Connection Established.
+2026-01-15 09:30:54,749 | INFO | MT5_Bridge.Core | Watchdog de conexión MT5 iniciado.
+2026-01-15 09:30:54,752 | INFO | feat.market_physics | [SATELLITE] Market Physics Engine Online (ATR-Normalized, NumPy Accelerated)
+2026-01-15 09:30:54,754 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-15 09:30:54,769 | WARNING | MT5_Bridge.ZMQ | ZMQ Bridge DISABLED: Address in use (addr='tcp://0.0.0.0:5555') - El servidor MCP funcionará sin streaming ZMQ.
+2026-01-15 09:30:54,770 | INFO | feat.trade_mgmt | [EXECUTION] Trade Manager Online (Warm-up: 60s, Exhaustion Exit: ON)
+2026-01-15 09:30:54,772 | INFO | feat.core.hardware_engine | [HARDWARE] HardwareEngine initialized - starting diagnostics...
+2026-01-15 09:30:54,774 | INFO | feat.core.health_sentinel | [SENTINEL] HealthSentinel initialized
+2026-01-15 09:30:54,775 | INFO | feat.core.integrity_check | [GUARDIAN] ModelGuardian initialized - Artifact Integrity Protection ACTIVE
+2026-01-15 09:30:54,777 | INFO | feat.core.lifecycle_manager | [LIFECYCLE] Manager initialized. PID directory: C:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.pid
+2026-01-15 09:30:54,837 | INFO | docket.worker | Starting worker 'Zhepy#14892' with the following tasks:
+2026-01-15 09:30:54,837 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-15 09:30:54,838 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-15 09:30:54,838 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-15 09:30:55,637 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:30:57,864 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:00,081 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:02,304 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:04,517 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:06,756 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:08,978 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:11,195 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:13,415 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:15,670 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:17,894 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:20,115 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:22,387 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:24,595 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:26,811 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:29,078 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:31:31,340 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22message%22%2C%22session_id%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:41:36,328 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:41:36,372 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:41:38,003 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:41:44,811 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 09:41:44,812 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 09:41:46,579 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:41:46,621 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:42:32,371 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:42:32,404 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:42:33,076 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:42:39,272 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 09:42:39,273 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 09:42:40,323 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:42:40,330 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:43:08,913 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:43:08,939 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:43:09,563 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:43:15,792 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 09:43:15,792 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 09:43:17,015 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:43:17,023 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:44:04,938 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:44:04,974 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:44:05,803 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:44:12,262 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 09:44:12,262 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 09:44:13,518 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:44:13,536 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:44:51,532 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:44:51,565 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:44:52,259 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:44:58,500 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 09:44:58,501 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 09:44:59,571 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:44:59,577 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:48:21,545 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:48:21,594 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:48:22,432 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:48:28,769 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 09:48:28,770 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 09:48:30,044 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:48:30,052 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:49:03,127 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:49:03,156 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:49:03,818 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:49:10,144 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 09:49:10,144 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 09:49:11,157 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:49:11,164 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:55:17,900 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:55:17,924 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:55:18,509 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:55:24,715 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 09:55:24,715 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 09:55:25,662 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:55:25,669 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:57:07,300 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:57:07,320 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:57:07,768 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:57:13,946 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 09:57:13,946 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 09:57:14,830 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:57:14,836 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:57:52,915 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:57:52,948 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:57:53,605 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:57:54,614 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:57:54,620 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:57:57,493 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: LiteFinance-MT5-Demo)...
+2026-01-15 09:58:02,002 | INFO | MT5_Bridge.Core | 
+2026-01-15 09:58:02,003 | INFO | MT5_Bridge.Core | [STATUS] CONEXION MT5: OK
+2026-01-15 09:58:02,003 | INFO | MT5_Bridge.Core | [ACCOUNT] TYPE: DEMO (Login: 90944186)
+2026-01-15 09:58:02,003 | INFO | MT5_Bridge.Core | [BALANCE] CURRENT: $21.96
+2026-01-15 09:58:02,003 | INFO | MT5_Bridge.Core | [LEVERAGE] 1:1000
+2026-01-15 09:58:02,003 | INFO | MT5_Bridge.Core | [HISTORY] TICKS LOADED: 500
+2026-01-15 09:58:02,003 | INFO | MT5_Bridge.Core | [OK] MetaTrader 5 Connection Established.
+2026-01-15 09:58:02,004 | INFO | MT5_Bridge.Core | Watchdog de conexión MT5 iniciado.
+2026-01-15 09:58:02,007 | INFO | feat.market_physics | [SATELLITE] Market Physics Engine Online (ATR-Normalized, NumPy Accelerated)
+2026-01-15 09:58:02,011 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-15 09:58:02,043 | WARNING | MT5_Bridge.ZMQ | ZMQ Bridge DISABLED: Address in use (addr='tcp://0.0.0.0:5555') - El servidor MCP funcionará sin streaming ZMQ.
+2026-01-15 09:58:02,044 | INFO | feat.trade_mgmt | [EXECUTION] Trade Manager Online (Warm-up: 60s, Exhaustion Exit: ON)
+2026-01-15 09:58:02,048 | INFO | feat.core.hardware_engine | [HARDWARE] HardwareEngine initialized - starting diagnostics...
+2026-01-15 09:58:02,050 | INFO | feat.core.health_sentinel | [SENTINEL] HealthSentinel initialized
+2026-01-15 09:58:02,052 | INFO | feat.core.integrity_check | [GUARDIAN] ModelGuardian initialized - Artifact Integrity Protection ACTIVE
+2026-01-15 09:58:02,055 | INFO | feat.core.lifecycle_manager | [LIFECYCLE] Manager initialized. PID directory: C:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.pid
+2026-01-15 09:58:02,170 | INFO | docket.worker | Starting worker 'Zhepy#27372' with the following tasks:
+2026-01-15 09:58:02,171 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-15 09:58:02,172 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-15 09:58:02,172 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-15 09:58:02,695 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22message%22%2C%22session_id%22%2C%22timestamp%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:04,953 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22message%22%2C%22session_id%22%2C%22timestamp%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:07,198 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22message%22%2C%22session_id%22%2C%22timestamp%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:10,780 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 09:58:10,802 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 09:58:11,281 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 09:58:12,153 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 09:58:12,158 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 09:58:14,382 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: LiteFinance-MT5-Demo)...
+2026-01-15 09:58:17,124 | INFO | MT5_Bridge.Core | 
+2026-01-15 09:58:17,124 | INFO | MT5_Bridge.Core | [STATUS] CONEXION MT5: OK
+2026-01-15 09:58:17,124 | INFO | MT5_Bridge.Core | [ACCOUNT] TYPE: DEMO (Login: 90944186)
+2026-01-15 09:58:17,124 | INFO | MT5_Bridge.Core | [BALANCE] CURRENT: $21.96
+2026-01-15 09:58:17,125 | INFO | MT5_Bridge.Core | [LEVERAGE] 1:1000
+2026-01-15 09:58:17,125 | INFO | MT5_Bridge.Core | [HISTORY] TICKS LOADED: 500
+2026-01-15 09:58:17,125 | INFO | MT5_Bridge.Core | [OK] MetaTrader 5 Connection Established.
+2026-01-15 09:58:17,125 | INFO | MT5_Bridge.Core | Watchdog de conexión MT5 iniciado.
+2026-01-15 09:58:17,128 | INFO | feat.market_physics | [SATELLITE] Market Physics Engine Online (ATR-Normalized, NumPy Accelerated)
+2026-01-15 09:58:17,130 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-15 09:58:17,149 | WARNING | MT5_Bridge.ZMQ | ZMQ Bridge DISABLED: Address in use (addr='tcp://0.0.0.0:5555') - El servidor MCP funcionará sin streaming ZMQ.
+2026-01-15 09:58:17,149 | INFO | feat.trade_mgmt | [EXECUTION] Trade Manager Online (Warm-up: 60s, Exhaustion Exit: ON)
+2026-01-15 09:58:17,152 | INFO | feat.core.hardware_engine | [HARDWARE] HardwareEngine initialized - starting diagnostics...
+2026-01-15 09:58:17,154 | INFO | feat.core.health_sentinel | [SENTINEL] HealthSentinel initialized
+2026-01-15 09:58:17,156 | INFO | feat.core.integrity_check | [GUARDIAN] ModelGuardian initialized - Artifact Integrity Protection ACTIVE
+2026-01-15 09:58:17,157 | INFO | feat.core.lifecycle_manager | [LIFECYCLE] Manager initialized. PID directory: C:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.pid
+2026-01-15 09:58:17,226 | INFO | docket.worker | Starting worker 'Zhepy#5520' with the following tasks:
+2026-01-15 09:58:17,227 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-15 09:58:17,227 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-15 09:58:17,227 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-15 09:58:18,038 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:20,292 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:22,546 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:24,881 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:27,157 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:29,402 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:31,682 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:33,917 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:36,151 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:38,378 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:40,583 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:42,843 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:45,142 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:47,387 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:49,652 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:51,912 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:54,169 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:56,402 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:58:58,650 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:59:00,905 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:59:03,142 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22session_id%22%2C%22timestamp%22%2C%22message%22%2C%22module%22 "HTTP/2 400 Bad Request"
+2026-01-15 09:59:03,826 | INFO | MT5_Bridge.ZMQ | ZMQ Bridge detenido.
+2026-01-15 09:59:03,826 | INFO | MT5_Bridge.Core | Watchdog de conexión MT5 detenido.
+2026-01-15 09:59:03,826 | INFO | MT5_Bridge.Core | Cerrando conexión con MT5...
+2026-01-15 09:59:03,827 | INFO | MT5_Bridge.Core | [OK] MT5 desconectado.
+2026-01-15 10:01:30,769 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 10:01:30,801 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 10:01:31,398 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 10:01:37,613 | INFO | MT5_Bridge.Services.N8N | [N8N] Using default n8n location (localhost:5678)
+2026-01-15 10:01:37,613 | INFO | MT5_Bridge.Services.N8N | [N8N] Bridge enabled: http://localhost:5678/webhook/feat-audit...
+2026-01-15 10:01:38,561 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 10:01:38,567 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 10:04:37,798 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 10:04:37,833 | INFO | MT5_Bridge.ZMQ | ZMQBridge initialized (pub:5556, sub:5555)
+2026-01-15 10:04:38,674 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 10:04:39,533 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 10:04:39,539 | INFO | QuantumLeap.DataCollector |  Institutional schema applied.
+2026-01-15 10:04:41,515 | INFO | MT5_Bridge.Core | Connecting to MT5 (Server: LiteFinance-MT5-Demo)...
+2026-01-15 10:04:44,233 | INFO | MT5_Bridge.Core | 
+2026-01-15 10:04:44,233 | INFO | MT5_Bridge.Core | [STATUS] CONEXION MT5: OK
+2026-01-15 10:04:44,233 | INFO | MT5_Bridge.Core | [ACCOUNT] TYPE: DEMO (Login: 90944186)
+2026-01-15 10:04:44,233 | INFO | MT5_Bridge.Core | [BALANCE] CURRENT: $21.96
+2026-01-15 10:04:44,233 | INFO | MT5_Bridge.Core | [LEVERAGE] 1:1000
+2026-01-15 10:04:44,233 | INFO | MT5_Bridge.Core | [HISTORY] TICKS LOADED: 500
+2026-01-15 10:04:44,234 | INFO | MT5_Bridge.Core | [OK] MetaTrader 5 Connection Established.
+2026-01-15 10:04:44,234 | INFO | MT5_Bridge.Core | Watchdog de conexión MT5 iniciado.
+2026-01-15 10:04:44,236 | INFO | feat.market_physics | [SATELLITE] Market Physics Engine Online (ATR-Normalized, NumPy Accelerated)
+2026-01-15 10:04:44,238 | INFO | MT5_Bridge.Services.Risk | [VAULT] State loaded: Vault=$500.00, Trading=$1500.00
+2026-01-15 10:04:44,254 | WARNING | MT5_Bridge.ZMQ | ZMQ Bridge DISABLED: Address in use (addr='tcp://0.0.0.0:5555') - El servidor MCP funcionará sin streaming ZMQ.
+2026-01-15 10:04:44,255 | INFO | feat.trade_mgmt | [EXECUTION] Trade Manager Online (Warm-up: 60s, Exhaustion Exit: ON)
+2026-01-15 10:04:44,257 | INFO | feat.core.hardware_engine | [HARDWARE] HardwareEngine initialized - starting diagnostics...
+2026-01-15 10:04:44,259 | INFO | feat.core.health_sentinel | [SENTINEL] HealthSentinel initialized
+2026-01-15 10:04:44,261 | INFO | feat.core.integrity_check | [GUARDIAN] ModelGuardian initialized - Artifact Integrity Protection ACTIVE
+2026-01-15 10:04:44,263 | INFO | feat.core.lifecycle_manager | [LIFECYCLE] Manager initialized. PID directory: C:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\.pid
+2026-01-15 10:04:44,328 | INFO | docket.worker | Starting worker 'Zhepy#4324' with the following tasks:
+2026-01-15 10:04:44,328 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-15 10:04:44,328 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-15 10:04:44,328 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-15 10:04:44,883 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:04:47,121 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:04:49,402 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:04:51,635 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:04:53,847 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:04:56,117 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:04:58,335 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:00,560 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:02,837 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:05,076 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:07,286 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:09,545 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:11,758 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:13,979 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:16,215 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:18,441 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:20,655 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:22,954 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:25,181 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:27,423 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:29,736 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:31,974 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:34,194 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:36,474 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:38,698 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:40,950 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:43,220 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:45,458 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:47,685 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:49,976 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:52,203 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:54,432 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:56,696 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:05:58,933 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:06:01,151 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:06:03,432 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:06:05,663 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:06:07,901 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 10:06:10,204 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22timestamp%22%2C%22session_id%22%2C%22module%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:32:45,093 | INFO | MT5_Bridge.Observability | Prometheus server started on port 9090
+2026-01-15 14:32:45,402 | INFO | feat.chain | [BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)
+2026-01-15 14:32:46,879 | INFO | MT5_Bridge.SupabaseSync |  Cliente Supabase NEXUS inicializado.
+2026-01-15 14:32:47,249 | INFO | MT5_Bridge.Core | Linux/Docker environment detected. Skipping local MT5 init. Entering Passive Mode.
+2026-01-15 14:32:47,376 | WARNING | feat.core.hardware_engine | [HARDWARE] PyTorch not available - running in degraded mode
+2026-01-15 14:32:47,378 | INFO | feat.core.hardware_engine | [HARDWARE] HardwareEngine initialized - starting diagnostics...
+2026-01-15 14:32:47,398 | INFO | feat.core.health_sentinel | [SENTINEL] HealthSentinel initialized
+2026-01-15 14:32:47,422 | INFO | feat.core.integrity_check | [GUARDIAN] ModelGuardian initialized - Artifact Integrity Protection ACTIVE
+2026-01-15 14:32:47,452 | INFO | feat.core.lifecycle_manager | [LIFECYCLE] Manager initialized. PID directory: /app/.pid
+2026-01-15 14:32:47,620 | INFO | docket.worker | Starting worker '652c6abab7b3#1' with the following tasks:
+2026-01-15 14:32:47,628 | INFO | docket.worker | * trace(message: str, ...)
+2026-01-15 14:32:47,630 | INFO | docket.worker | * fail(message: str, ...)
+2026-01-15 14:32:47,631 | INFO | docket.worker | * sleep(seconds: float, ...)
+2026-01-15 14:32:50,414 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:32:52,674 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:32:55,393 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:32:57,686 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:32:59,933 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:02,204 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:04,443 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:06,693 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:08,951 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:11,233 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:13,481 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:15,731 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:18,024 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:20,278 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:22,534 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:24,939 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:27,183 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:29,449 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:31,721 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:33,966 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:36,193 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:38,485 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:40,694 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:42,888 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:45,139 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:47,388 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:49,653 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:51,925 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:54,170 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:56,414 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:33:58,818 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:01,549 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:03,854 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:06,125 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:08,395 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:10,644 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:12,902 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:15,127 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:17,378 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:19,632 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:21,884 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:24,165 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:26,486 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:28,907 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:31,703 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:33,938 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:36,143 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:38,524 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:40,764 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:42,992 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:45,233 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:47,449 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:49,686 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:51,910 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:54,128 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:56,894 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:34:59,142 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:02,122 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:04,546 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:06,847 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:09,083 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:11,314 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:13,575 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:15,809 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:18,036 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:20,262 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:22,493 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:24,744 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:26,952 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:29,193 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:32,182 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:34,420 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:36,668 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:38,913 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:41,143 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:43,378 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:45,615 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:47,843 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:50,077 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:52,358 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:54,611 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:56,833 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:35:59,132 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:01,574 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:04,274 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:06,531 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:08,781 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:11,021 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:13,257 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:15,474 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:17,890 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:20,139 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:22,342 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:24,562 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:26,843 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:29,079 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:31,316 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:34,280 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:36,517 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:38,740 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:41,006 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:43,249 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:45,491 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:47,722 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:49,992 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:52,238 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:54,549 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:56,813 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:36:59,073 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:01,387 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:04,295 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:06,552 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:08,810 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:11,069 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:13,299 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:15,532 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:17,790 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:20,014 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:22,242 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:24,486 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:26,721 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:28,955 | INFO | httpx | HTTP Request: POST https://hkbnbwcjbitadkdkgzco.supabase.co/rest/v1/bot_activity_log?columns=%22module%22%2C%22session_id%22%2C%22timestamp%22%2C%22message%22 "HTTP/2 400 Bad Request"
+2026-01-15 14:37:29,480 | INFO | MT5_Bridge.Core | Cerrando conexiÃ³n con MT5...
+2026-01-15 14:37:29,481 | INFO | MT5_Bridge.Core | [OK] MT5 desconectado.

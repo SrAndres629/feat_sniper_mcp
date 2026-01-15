@@ -11,6 +11,19 @@ import sys
 import io
 
 # === PROTOCOLO BLACKHOLE (INICIO) ===
+# Silenciar Warnings de Inmediato
+import warnings
+import sys
+import os
+import io
+
+# Filter specific Pydantic/PyIceberg deprecation noise GLOBALLY and EARLY
+warnings.filterwarnings("ignore", module="pyiceberg")
+warnings.filterwarnings("ignore", module="pydantic")
+# Catch-all
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.simplefilter("ignore")
+
 _original_stdout = sys.stdout
 _original_stderr = sys.stderr
 _devnull = io.StringIO()
@@ -24,19 +37,7 @@ os.environ["OTEL_METRICS_EXPORTER"] = "none"
 os.environ["OTEL_LOGS_EXPORTER"] = "none"
 os.environ["OTEL_CONSOLE_EXPORT"] = "0"
 
-# 2. Silenciar Warnings
-import warnings
-# Filter specific Pydantic/PyIceberg deprecation noise
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="pyiceberg")
-warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
-try:
-    from pydantic.warnings import PydanticDeprecatedSince212
-    warnings.filterwarnings("ignore", category=PydanticDeprecatedSince212)
-except ImportError:
-    pass
-warnings.filterwarnings("ignore") # Catch-all for clean console during trading
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.simplefilter("ignore", DeprecationWarning)
+
 
 # 3. CRITICAL: Override ALL logger formats BEFORE any third-party imports
 # This prevents 'correlation_id' KeyError from docket/fastmcp default formatters
@@ -88,6 +89,15 @@ from app.core.logger import logger
 sys.stdout = _original_stdout
 sys.stderr = _original_stderr
 
+# Force UTF-8 encoding for console output (Windows fix)
+if sys.platform == 'win32':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except AttributeError:
+        # Python < 3.7 or hijacked stdout
+        pass
+
 # === IMPORTS DE NEGOCIO (OPERACIÓN REUNIÓN - 0 ORPHANS) ===
 # Core modules
 try:
@@ -111,15 +121,20 @@ except ImportError:
 # Skills modules (orphans → connected)
 try:
     from app.skills import market, execution, indicators
-    from app.skills.trade_mgmt import trade_mgmt
+    # TradeManager class import for Lifespan (not instance)
+    from app.skills.trade_mgmt import TradeManager
 except ImportError as e:
-    market = execution = indicators = trade_mgmt = None
-    logger.warning(f"Skills import error: {e}")
+    market = execution = indicators = TradeManager = None
+    logger.error(f"SKILLS IMPORT CRASH: {e}")
+    import traceback
+    traceback.print_exc()
+
 
 try:
-    from app.skills.history import history_manager
+    import app.skills.history as history_skill
+    from app.models.schemas import HistoryRequest
 except ImportError:
-    history_manager = None
+    history_skill = None
 
 try:
     from app.skills.unified_model import unified_model
@@ -236,6 +251,14 @@ try:
 except ImportError:
     hybrid_model = None
 
+# Global Initialization (Prevent NameError)
+feat_engine = None
+trade_manager = None
+risk_engine = None
+market_physics = None
+circuit_breaker = None
+
+
 # === LIFESPAN ===
 # === LIFESPAN (Module 1: The Synapse) ===
 @asynccontextmanager
@@ -250,15 +273,18 @@ async def app_lifespan(server: FastMCP):
     global feat_engine, trade_manager, risk_engine
 
     # 0. STREAMER IGNITION (Supabase Realtime)
-    try:
-        from app.core.streamer import init_streamer
-        dashboard = init_streamer()
-        if dashboard:
-             logging.getLogger().addHandler(dashboard)
-             asyncio.create_task(dashboard.start_async_loop())
-             logger.info("📡 [STREAMER] Dashboard Uplink Established (Logs -> Supabase)")
-    except Exception as e:
-        logger.error(f"❌ Streamer Init Failed: {e}")
+    # 0. STREAMER IGNITION (Supabase Realtime) - DISABLED FOR STABILITY
+    # try:
+    #     from app.core.streamer import init_streamer
+    #     dashboard = init_streamer()
+    #     if dashboard:
+    #          logging.getLogger().addHandler(dashboard)
+    #          asyncio.create_task(dashboard.start_async_loop())
+    #          logger.info("📡 [STREAMER] Dashboard Uplink Established (Logs -> Supabase)")
+    # except Exception as e:
+    #     logger.error(f"❌ Streamer Init Failed: {e}")
+    dashboard = None # Explicitly set to None
+
     
     # 1. MT5 Connection
     if mt5_conn:
@@ -643,20 +669,24 @@ async def trade_get_history(filter_type: str = "TODAY") -> Dict[str, Any]:
     
     Filters: TODAY, WEEK, MONTH, ALL
     """
-    positions = await trade_mgmt.get_positions() if mt5_conn.connected else []
-    history = await trade_mgmt.get_history(filter_type) if mt5_conn.connected else []
-    
-    total_profit = sum(p.get("profit", 0) for p in positions)
-    
-    return {
-        "tool": "trade_get_history",
-        "filter": filter_type,
-        "open_positions": len(positions),
-        "positions": positions[:10],  # Limitar para no saturar
-        "history_count": len(history),
-        "total_open_profit": round(total_profit, 2),
-        "timestamp": datetime.now(timezone.utc).isoformat()
+    days_map = {
+        "TODAY": 1,
+        "WEEK": 7,
+        "MONTH": 30,
+        "ALL": 365
     }
+    days = days_map.get(filter_type.upper(), 1)
+    
+    if not history_skill:
+        return {"error": "History Skill Offline", "status": "FAILED"}
+
+    try:
+        req = HistoryRequest(days=days)
+        result = await history_skill.get_trade_history(req)
+        return result
+    except Exception as e:
+        logger.error(f"History Error: {e}")
+        return {"error": str(e)}
 
 @mcp.tool()
 async def visual_update_hud(data: Dict[str, Any] = None) -> Dict[str, Any]:
@@ -781,10 +811,10 @@ if __name__ == "__main__":
         if is_docker:
             mcp.run(transport="sse", host="0.0.0.0", port=8000)
         else:
-            # Mode: SSE (Daemon Persistence)
-            # STDIO cierra al no detectar input. SSE mantiene el server vivo.
-            print("🔊 Iniciando Modo Daemon (SSE Port 8080)...", file=sys.stderr)
-            mcp.run(transport="sse", host="127.0.0.1", port=8080)
+            # Default to STDIO for local MCP Clients (Cursor, Claude Desktop, etc.)
+            # This fixes "Context Deadline Exceeded" caused by protocol mismatch (SSE vs STDIO).
+            # print("🔊 Starting STDIO Mode...", file=sys.stderr) 
+            mcp.run() # Defaults to stdio transport
     except Exception:
         traceback.print_exc()
         # Non-blocking pause for log visibility if running interactively

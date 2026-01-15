@@ -21,7 +21,7 @@ echo      [ SILENT DAEMON NODE ]
 echo      [ STATUS: ACTIVE ^| MODE: BACKGROUND EXECUTION ]
 echo.
 echo ==============================================================
-echo [PHASE 0] ZOMBIE KILLER & CLEANUP
+echo [PHASE 0] ZOMBIE KILLER AND CLEANUP
 echo ==============================================================
 powershell -Command "Get-NetTCPConnection -LocalPort 5555 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
 powershell -Command "Get-NetTCPConnection -LocalPort 5556 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"

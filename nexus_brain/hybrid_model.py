@@ -209,18 +209,18 @@ class HybridModel:
                 self.net.load_state_dict(model_state, strict=False)
                 self.scaler_stats = checkpoint.get("scaler_stats")
                 if self.scaler_stats:
-                    print(f"✅ Scaler Stats Extracted: {list(self.scaler_stats.keys())}")
+                    print(f"[SUCCESS] Scaler Stats Extracted: {list(self.scaler_stats.keys())}")
                 else:
-                    print("⚠️ No Scaler Stats found in checkpoint.")
+                    print("[WARNING] No Scaler Stats found in checkpoint.")
             else:
                 self.net.load_state_dict(checkpoint, strict=False)
-                print("⚠️ Checkpoint is a raw state_dict, no stats available.")
+                print("[WARNING] Checkpoint is a raw state_dict, no stats available.")
                 
             self.net.to(self.device).eval()
-            print(f"🧠 LSTM Causal Model Loaded on {self.device} (Stats Embedded)")
+            print(f"[INFO] LSTM Causal Model Loaded on {self.device} (Stats Embedded)")
         else:
             self.net = None
-            print(f"⚠️ Brain Offline: Model Not Found at {model_path}")
+            print(f"[WARNING] Brain Offline: Model Not Found at {model_path}")
 
 
     def _load_checkpoint(self, path):
