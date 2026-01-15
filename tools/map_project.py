@@ -2,6 +2,17 @@ import ast
 import os
 import json
 import logging
+import logging
+import warnings
+
+# Filter noise
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+try:
+    from pydantic.warnings import PydanticDeprecatedSince212
+    warnings.filterwarnings("ignore", category=PydanticDeprecatedSince212)
+except ImportError:
+    pass
+
 from typing import Set, Dict, List, Any
 
 # Configure logging

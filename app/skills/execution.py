@@ -505,3 +505,57 @@ async def execute_twin_trade(signal: Dict[str, Any]) -> Dict[str, Any]:
     
     results["status"] = "success" if results["scalp_ticket"] else "failed"
     return results
+
+# =============================================================================
+# INSTITUTIONAL PENDING ORDER WRAPPERS (Jules' Request)
+# =============================================================================
+
+async def place_limit_order(symbol: str, action: str, volume: float, price: float, 
+                           sl: float = 0.0, tp: float = 0.0, comment: str = "") -> ResponseModel:
+    """
+    Coloca una orden LIMIT (Buy Limit / Sell Limit).
+    Usage: Para entrar a mejor precio (Pullbacks, FVG retest).
+    Validation: Precio debe ser MEJOR que el actual.
+    """
+    tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
+    if not tick: return ResponseModel(status="error", error=ErrorDetail(code="NO_TICK", message="No market data"))
+    
+    current_price = tick.ask if action == "BUY" else tick.bid
+    
+    # Validate Limit Logic
+    if action == "BUY" and price >= current_price:
+        return ResponseModel(status="error", error=ErrorDetail(code="INVALID_LIMIT", message=f"Buy Limit {price} must be BELOW current {current_price}"))
+    if action == "SELL" and price <= current_price:
+        return ResponseModel(status="error", error=ErrorDetail(code="INVALID_LIMIT", message=f"Sell Limit {price} must be ABOVE current {current_price}"))
+
+    req = TradeOrderRequest(
+        symbol=symbol, action=f"{action}_LIMIT", volume=volume, 
+        price=price, sl=sl, tp=tp, comment=comment
+    )
+    # Urgency < 0.5 for Limits (Patient)
+    return await send_order(req, urgency_score=0.3)
+
+async def place_stop_order(symbol: str, action: str, volume: float, price: float, 
+                          sl: float = 0.0, tp: float = 0.0, comment: str = "") -> ResponseModel:
+    """
+    Coloca una orden STOP (Buy Stop / Sell Stop).
+    Usage: Breakout entries (BOS confirmation).
+    Validation: Precio debe ser PEOR que el actual.
+    """
+    tick = await mt5_conn.execute(mt5.symbol_info_tick, symbol)
+    if not tick: return ResponseModel(status="error", error=ErrorDetail(code="NO_TICK", message="No market data"))
+    
+    current_price = tick.ask if action == "BUY" else tick.bid
+    
+    # Validate Stop Logic
+    if action == "BUY" and price <= current_price:
+        return ResponseModel(status="error", error=ErrorDetail(code="INVALID_STOP", message=f"Buy Stop {price} must be ABOVE current {current_price}"))
+    if action == "SELL" and price >= current_price:
+        return ResponseModel(status="error", error=ErrorDetail(code="INVALID_STOP", message=f"Sell Stop {price} must be BELOW current {current_price}"))
+
+    req = TradeOrderRequest(
+        symbol=symbol, action=f"{action}_STOP", volume=volume, 
+        price=price, sl=sl, tp=tp, comment=comment
+    )
+    # Urgency > 0.6 for Stops (Momentum)
+    return await send_order(req, urgency_score=0.7)

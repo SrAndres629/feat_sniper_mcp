@@ -7,6 +7,10 @@
         "app.__init__",
         "app.core.config",
         "app.core.exceptions",
+        "app.core.hardware_engine",
+        "app.core.health_sentinel",
+        "app.core.integrity_check",
+        "app.core.lifecycle_manager",
         "app.core.logger",
         "app.core.mt5_conn",
         "app.core.observability",
@@ -15,6 +19,7 @@
         "app.core.zmq_projector",
         "app.core.__init__",
         "app.ml.data_collector",
+        "app.ml.drift_monitor",
         "app.ml.feat_processor",
         "app.ml.fractal_analysis",
         "app.ml.ml_engine",
@@ -27,13 +32,28 @@
         "app.models.schemas",
         "app.models.__init__",
         "app.services.analytics",
+        "app.services.auto_tuner",
         "app.services.circuit_breaker",
+        "app.services.compounding",
+        "app.services.deployment_gate",
+        "app.services.drift_monitor",
+        "app.services.feature_config",
+        "app.services.feature_importance",
+        "app.services.live_gate",
         "app.services.n8n_bridge",
         "app.services.rag_memory",
+        "app.services.recalibration",
         "app.services.risk_engine",
+        "app.services.risk_parity",
+        "app.services.session_filter",
+        "app.services.spread_filter",
+        "app.services.stat_validator",
         "app.services.supabase_sync",
         "app.services.telemetry",
+        "app.services.trade_journal",
+        "app.services.volatility_guard",
         "app.skills.advanced_analytics",
+        "app.skills.black_swan_guard",
         "app.skills.calendar",
         "app.skills.custom_loader",
         "app.skills.execution",
@@ -50,6 +70,7 @@
         "app.skills.system_ops",
         "app.skills.tester",
         "app.skills.trade_mgmt",
+        "app.skills.trade_sentinel",
         "app.skills.vision",
         "app.skills.__init__"
     ],
@@ -69,6 +90,7 @@
                 "typing",
                 "contextlib",
                 "app.core.logger",
+                "pydantic.warnings",
                 "fastmcp",
                 "app.core.mt5_conn",
                 "app.core.zmq_bridge",
@@ -108,8 +130,16 @@
                 "app.skills.feat_chain",
                 "app.services.risk_engine",
                 "app.skills.trade_mgmt",
+                "app.core.hardware_engine",
+                "app.core.health_sentinel",
+                "app.core.integrity_check",
+                "app.core.lifecycle_manager",
+                "app.ml.drift_monitor",
+                "app.skills.trade_sentinel",
                 "psutil",
                 "app.skills.rag_memory",
+                "MetaTrader5",
+                "time",
                 "time"
             ],
             "imported_by": []
@@ -149,6 +179,8 @@
                 "json",
                 "subprocess",
                 "time",
+                "warnings",
+                "pydantic.warnings",
                 "datetime"
             ],
             "imported_by": []
@@ -172,6 +204,12 @@
                 "app.skills.ml_sniper",
                 "app.skills.liquidity",
                 "app.services.circuit_breaker",
+                "app.services.deployment_gate",
+                "app.services.deployment_gate",
+                "app.services.trade_journal",
+                "app.services.stat_validator",
+                "app.services.drift_monitor",
+                "app.services.feature_config",
                 "unittest.mock"
             ],
             "imported_by": []
@@ -184,21 +222,30 @@
         "app.core.config": {
             "file_path": "app\\core\\config.py",
             "imports": [
+                "sys",
+                "json",
                 "pydantic_settings",
+                "pydantic",
                 "typing",
-                "pathlib"
+                "pathlib",
+                "logging"
             ],
             "imported_by": [
                 "nexus_control",
                 "app.main",
                 "app.core.mt5_conn",
                 "app.core.validation",
+                "app.core.zmq_bridge",
                 "app.ml.ml_engine",
-                "app.ml.train_models",
                 "app.ml.train_mtf_models",
+                "app.services.circuit_breaker",
+                "app.services.circuit_breaker",
                 "app.services.risk_engine",
+                "app.services.spread_filter",
                 "app.services.supabase_sync",
                 "app.services.telemetry",
+                "app.services.volatility_guard",
+                "app.skills.execution",
                 "app.skills.execution",
                 "app.skills.indicators",
                 "app.skills.liquidity",
@@ -212,6 +259,90 @@
             "file_path": "app\\core\\exceptions.py",
             "imports": [],
             "imported_by": []
+        },
+        "app.core.hardware_engine": {
+            "file_path": "app\\core\\hardware_engine.py",
+            "imports": [
+                "os",
+                "sys",
+                "logging",
+                "typing",
+                "dataclasses",
+                "enum",
+                "torch",
+                "torch",
+                "multiprocessing",
+                "torch",
+                "torch",
+                "psutil"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.core.health_sentinel": {
+            "file_path": "app\\core\\health_sentinel.py",
+            "imports": [
+                "os",
+                "sys",
+                "time",
+                "asyncio",
+                "logging",
+                "typing",
+                "dataclasses",
+                "enum",
+                "datetime",
+                "httpx",
+                "httpx",
+                "urllib.request",
+                "json",
+                "app.ml.ml_engine",
+                "app.skills.market_physics",
+                "app.services.spread_filter",
+                "app.services.volatility_guard"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.core.integrity_check": {
+            "file_path": "app\\core\\integrity_check.py",
+            "imports": [
+                "os",
+                "logging",
+                "pathlib",
+                "typing",
+                "dataclasses",
+                "enum",
+                "torch",
+                "joblib"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
+        "app.core.lifecycle_manager": {
+            "file_path": "app\\core\\lifecycle_manager.py",
+            "imports": [
+                "os",
+                "sys",
+                "signal",
+                "logging",
+                "time",
+                "atexit",
+                "pathlib",
+                "typing",
+                "dataclasses",
+                "enum",
+                "contextlib",
+                "psutil",
+                "subprocess",
+                "psutil",
+                "ctypes"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
         },
         "app.core.logger": {
             "file_path": "app\\core\\logger.py",
@@ -235,9 +366,9 @@
                 "typing",
                 "anyio",
                 "app.core.config",
-                "app.core.observability",
                 "MetaTrader5",
                 "app.core.observability",
+                "time",
                 "time"
             ],
             "imported_by": [
@@ -245,6 +376,7 @@
                 "app.main",
                 "app.core.validation",
                 "app.services.analytics",
+                "app.services.circuit_breaker",
                 "app.services.risk_engine",
                 "app.skills.calendar",
                 "app.skills.execution",
@@ -273,7 +405,6 @@
             ],
             "imported_by": [
                 "app.core.mt5_conn",
-                "app.core.mt5_conn",
                 "app.services.supabase_sync",
                 "app.skills.advanced_analytics",
                 "app.skills.execution",
@@ -299,14 +430,18 @@
             "imports": [
                 "sys",
                 "asyncio",
+                "time",
                 "zmq",
                 "zmq.asyncio",
                 "logging",
-                "json"
+                "json",
+                "typing",
+                "app.core.config"
             ],
             "imported_by": [
                 "mcp_server",
-                "app.core.zmq_projector"
+                "app.core.zmq_projector",
+                "app.skills.trade_mgmt"
             ]
         },
         "app.core.zmq_projector": {
@@ -347,6 +482,18 @@
                 "app.ml.train_mtf_models"
             ]
         },
+        "app.ml.drift_monitor": {
+            "file_path": "app\\ml\\drift_monitor.py",
+            "imports": [
+                "numpy",
+                "logging",
+                "collections",
+                "typing"
+            ],
+            "imported_by": [
+                "mcp_server"
+            ]
+        },
         "app.ml.feat_processor": {
             "file_path": "app\\ml\\feat_processor.py",
             "imports": [
@@ -367,7 +514,6 @@
             "file_path": "app\\ml\\fractal_analysis.py",
             "imports": [
                 "numpy",
-                "pandas",
                 "logging",
                 "typing"
             ],
@@ -381,21 +527,28 @@
                 "os",
                 "json",
                 "logging",
+                "asyncio",
                 "numpy",
+                "collections",
                 "typing",
                 "datetime",
                 "torch.nn",
                 "app.core.config",
                 "app.ml.fractal_analysis",
+                "app.skills.market_physics",
                 "app.skills.liquidity_detector",
+                "app.services.spread_filter",
+                "app.services.volatility_guard",
                 "sklearn.ensemble",
                 "torch",
                 "joblib",
                 "torch",
-                "app.ml.train_models"
+                "app.ml.train_models",
+                "concurrent.futures"
             ],
             "imported_by": [
-                "nexus_control"
+                "nexus_control",
+                "app.core.health_sentinel"
             ]
         },
         "app.ml.ml_normalization": {
@@ -434,32 +587,7 @@
         },
         "app.ml.train_models": {
             "file_path": "app\\ml\\train_models.py",
-            "imports": [
-                "os",
-                "sys",
-                "csv",
-                "logging",
-                "joblib",
-                "numpy",
-                "pandas",
-                "typing",
-                "datetime",
-                "app.core.config",
-                "argparse",
-                "app.skills.indicators",
-                "torch",
-                "torch.nn",
-                "sqlite3",
-                "sklearn.model_selection",
-                "sklearn.preprocessing",
-                "sklearn.ensemble",
-                "sklearn.metrics",
-                "sklearn.impute",
-                "torch",
-                "torch.nn",
-                "torch.utils.data",
-                "numpy"
-            ],
+            "imports": [],
             "imported_by": [
                 "app.ml.ml_engine"
             ]
@@ -529,19 +657,112 @@
                 "app.main"
             ]
         },
+        "app.services.auto_tuner": {
+            "file_path": "app\\services\\auto_tuner.py",
+            "imports": [
+                "logging",
+                "json",
+                "os",
+                "datetime",
+                "typing",
+                "pathlib",
+                "optuna",
+                "optuna.samplers",
+                "random"
+            ],
+            "imported_by": []
+        },
         "app.services.circuit_breaker": {
             "file_path": "app\\services\\circuit_breaker.py",
             "imports": [
                 "asyncio",
                 "logging",
                 "time",
-                "typing"
+                "typing",
+                "app.core.config",
+                "app.core.mt5_conn",
+                "MetaTrader5",
+                "app.core.config"
             ],
             "imported_by": [
                 "mcp_server",
                 "app.main",
+                "app.services.risk_engine",
                 "app.skills.execution"
             ]
+        },
+        "app.services.compounding": {
+            "file_path": "app\\services\\compounding.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "random"
+            ],
+            "imported_by": []
+        },
+        "app.services.deployment_gate": {
+            "file_path": "app\\services\\deployment_gate.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing",
+                "enum"
+            ],
+            "imported_by": [
+                "app.main",
+                "app.main"
+            ]
+        },
+        "app.services.drift_monitor": {
+            "file_path": "app\\services\\drift_monitor.py",
+            "imports": [
+                "logging",
+                "json",
+                "numpy",
+                "scipy",
+                "datetime",
+                "collections",
+                "typing",
+                "pathlib",
+                "random"
+            ],
+            "imported_by": [
+                "app.main"
+            ]
+        },
+        "app.services.feature_config": {
+            "file_path": "app\\services\\feature_config.py",
+            "imports": [
+                "os",
+                "typing",
+                "logging"
+            ],
+            "imported_by": [
+                "app.main"
+            ]
+        },
+        "app.services.feature_importance": {
+            "file_path": "app\\services\\feature_importance.py",
+            "imports": [
+                "logging",
+                "numpy",
+                "typing",
+                "collections",
+                "datetime",
+                "random"
+            ],
+            "imported_by": []
+        },
+        "app.services.live_gate": {
+            "file_path": "app\\services\\live_gate.py",
+            "imports": [
+                "logging",
+                "os",
+                "datetime",
+                "typing"
+            ],
+            "imported_by": []
         },
         "app.services.n8n_bridge": {
             "file_path": "app\\services\\n8n_bridge.py",
@@ -572,8 +793,19 @@
             ],
             "imported_by": [
                 "mcp_server",
-                "mcp_server"
+                "mcp_server",
+                "app.services.recalibration"
             ]
+        },
+        "app.services.recalibration": {
+            "file_path": "app\\services\\recalibration.py",
+            "imports": [
+                "logging",
+                "typing",
+                "app.services.rag_memory",
+                "datetime"
+            ],
+            "imported_by": []
         },
         "app.services.risk_engine": {
             "file_path": "app\\services\\risk_engine.py",
@@ -586,6 +818,9 @@
                 "typing",
                 "app.core.config",
                 "app.core.mt5_conn",
+                "app.services.volatility_guard",
+                "app.services.spread_filter",
+                "app.services.circuit_breaker",
                 "app.skills.market"
             ],
             "imported_by": [
@@ -595,6 +830,50 @@
                 "app.main",
                 "app.skills.execution",
                 "app.skills.execution"
+            ]
+        },
+        "app.services.risk_parity": {
+            "file_path": "app\\services\\risk_parity.py",
+            "imports": [
+                "logging",
+                "typing"
+            ],
+            "imported_by": []
+        },
+        "app.services.session_filter": {
+            "file_path": "app\\services\\session_filter.py",
+            "imports": [
+                "logging",
+                "datetime",
+                "typing"
+            ],
+            "imported_by": []
+        },
+        "app.services.spread_filter": {
+            "file_path": "app\\services\\spread_filter.py",
+            "imports": [
+                "logging",
+                "typing",
+                "app.core.config"
+            ],
+            "imported_by": [
+                "app.core.health_sentinel",
+                "app.ml.ml_engine",
+                "app.services.risk_engine"
+            ]
+        },
+        "app.services.stat_validator": {
+            "file_path": "app\\services\\stat_validator.py",
+            "imports": [
+                "logging",
+                "numpy",
+                "scipy",
+                "typing",
+                "datetime",
+                "random"
+            ],
+            "imported_by": [
+                "app.main"
             ]
         },
         "app.services.supabase_sync": {
@@ -627,6 +906,33 @@
                 "mcp_server"
             ]
         },
+        "app.services.trade_journal": {
+            "file_path": "app\\services\\trade_journal.py",
+            "imports": [
+                "json",
+                "logging",
+                "datetime",
+                "pathlib",
+                "typing"
+            ],
+            "imported_by": [
+                "app.main"
+            ]
+        },
+        "app.services.volatility_guard": {
+            "file_path": "app\\services\\volatility_guard.py",
+            "imports": [
+                "logging",
+                "time",
+                "typing",
+                "app.core.config"
+            ],
+            "imported_by": [
+                "app.core.health_sentinel",
+                "app.ml.ml_engine",
+                "app.services.risk_engine"
+            ]
+        },
         "app.skills.advanced_analytics": {
             "file_path": "app\\skills\\advanced_analytics.py",
             "imports": [
@@ -639,6 +945,22 @@
             ],
             "imported_by": [
                 "mcp_server"
+            ]
+        },
+        "app.skills.black_swan_guard": {
+            "file_path": "app\\skills\\black_swan_guard.py",
+            "imports": [
+                "logging",
+                "numpy",
+                "typing",
+                "collections",
+                "dataclasses",
+                "datetime",
+                "enum",
+                "abc"
+            ],
+            "imported_by": [
+                "app.skills.feat_chain"
             ]
         },
         "app.skills.calendar": {
@@ -676,7 +998,9 @@
         "app.skills.execution": {
             "file_path": "app\\skills\\execution.py",
             "imports": [
+                "asyncio",
                 "logging",
+                "pandas",
                 "typing",
                 "app.core.mt5_conn",
                 "app.models.schemas",
@@ -688,8 +1012,10 @@
                 "app.services.risk_engine",
                 "unittest.mock",
                 "app.services.circuit_breaker",
+                "app.core.config",
+                "app.services.risk_engine",
                 "app.skills.liquidity",
-                "app.services.risk_engine"
+                "app.skills.indicators"
             ],
             "imported_by": [
                 "nexus_control"
@@ -704,7 +1030,7 @@
                 "logging",
                 "collections",
                 "datetime",
-                "datetime",
+                "app.skills.black_swan_guard",
                 "app.skills.market_physics"
             ],
             "imported_by": [
@@ -743,7 +1069,7 @@
                 "app.core.config"
             ],
             "imported_by": [
-                "app.ml.train_models"
+                "app.skills.execution"
             ]
         },
         "app.skills.liquidity": {
@@ -803,6 +1129,8 @@
             ],
             "imported_by": [
                 "mcp_server",
+                "app.core.health_sentinel",
+                "app.ml.ml_engine",
                 "app.skills.feat_chain"
             ]
         },
@@ -877,13 +1205,27 @@
             "imports": [
                 "logging",
                 "asyncio",
+                "time",
                 "typing",
                 "datetime",
                 "os",
-                "json"
+                "json",
+                "app.core.zmq_bridge"
             ],
             "imported_by": [
                 "mcp_server",
+                "mcp_server"
+            ]
+        },
+        "app.skills.trade_sentinel": {
+            "file_path": "app\\skills\\trade_sentinel.py",
+            "imports": [
+                "logging",
+                "time",
+                "datetime",
+                "typing"
+            ],
+            "imported_by": [
                 "mcp_server"
             ]
         },
@@ -914,7 +1256,14 @@
         "nexus_control",
         "nexus_auditor",
         "app.core.exceptions",
-        "app.ml.multi_time_learning"
+        "app.ml.multi_time_learning",
+        "app.services.auto_tuner",
+        "app.services.compounding",
+        "app.services.feature_importance",
+        "app.services.live_gate",
+        "app.services.recalibration",
+        "app.services.risk_parity",
+        "app.services.session_filter"
     ],
     "scan_timestamp": "NOW"
 }

@@ -26,8 +26,15 @@ os.environ["OTEL_CONSOLE_EXPORT"] = "0"
 
 # 2. Silenciar Warnings
 import warnings
-os.environ["PYTHONWARNINGS"] = "ignore::DeprecationWarning:pyiceberg,ignore::DeprecationWarning:pydantic"
-warnings.filterwarnings("ignore")
+# Filter specific Pydantic/PyIceberg deprecation noise
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pyiceberg")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
+try:
+    from pydantic.warnings import PydanticDeprecatedSince212
+    warnings.filterwarnings("ignore", category=PydanticDeprecatedSince212)
+except ImportError:
+    pass
+warnings.filterwarnings("ignore") # Catch-all for clean console during trading
 warnings.filterwarnings("ignore", category=DeprecationWarning)
 warnings.simplefilter("ignore", DeprecationWarning)
 
@@ -241,6 +248,17 @@ async def app_lifespan(server: FastMCP):
     
     # Global references for Master Tools
     global feat_engine, trade_manager, risk_engine
+
+    # 0. STREAMER IGNITION (Supabase Realtime)
+    try:
+        from app.core.streamer import init_streamer
+        dashboard = init_streamer()
+        if dashboard:
+             logging.getLogger().addHandler(dashboard)
+             asyncio.create_task(dashboard.start_async_loop())
+             logger.info("📡 [STREAMER] Dashboard Uplink Established (Logs -> Supabase)")
+    except Exception as e:
+        logger.error(f"❌ Streamer Init Failed: {e}")
     
     # 1. MT5 Connection
     if mt5_conn:
@@ -287,6 +305,26 @@ async def app_lifespan(server: FastMCP):
                     
                     # 2. Neural Link (M4 - Probabilistic)
                     brain_score = await neural_api.predict_next_candle(data, regime)
+                    
+                    # [VISIBILITY LAYER] Push Signals to Dashboard
+                    if dashboard:
+                        asyncio.create_task(dashboard.push_signals({
+                            "alpha_confidence": brain_score.get('alpha_confidence', 0),
+                            "acceleration": regime.acceleration_score if regime else 0,
+                            "hurst": regime.hurst_exponent if regime else 0.5,
+                            "price": price
+                        }))
+                        
+                        # [VISIBILITY LAYER] Push Metrics (Balance/Equity)
+                        # In a real ticking loop, we limit this rate, but here we do it per nerve pulse for max freshness
+                        if trade_manager:
+                            acc = mt5.account_info()
+                            if acc:
+                                asyncio.create_task(dashboard.push_metrics({
+                                    "balance": acc.balance,
+                                    "equity": acc.equity,
+                                    "margin_free": acc.margin_free
+                                }))
                     
                     # 3. Decision Fusion
                     execute = is_valid and brain_score.get('execute_trade', False)
@@ -359,10 +397,53 @@ async def app_lifespan(server: FastMCP):
     try:
         from app.skills.trade_mgmt import TradeManager
         trade_manager = TradeManager(zmq_bridge) if zmq_bridge else None
-        logger.info("✅ Trade Manager Linked")
+        logger.info("[OK] Trade Manager Linked")
     except ImportError:
         trade_manager = None
         logger.warning("⚠️ Trade Manager Missing")
+    
+    # 6. ORPHAN SERVICE REGISTRATION (Connect the organs)
+    logger.info("🔗 Activating Dormant Services...")
+    try:
+        import app.core.hardware_engine as he; logger.info(f"   + Hardware Engine: {he.__name__}")
+        import app.core.health_sentinel as hs; logger.info(f"   + Health Sentinel: {hs.__name__}")
+        import app.core.integrity_check as ic; logger.info(f"   + Integrity Check: {ic.__name__}")
+        import app.core.lifecycle_manager as lm; logger.info(f"   + Lifecycle Mgr:   {lm.__name__}")
+        import app.ml.drift_monitor as dm; logger.info(f"   + Drift Monitor:   {dm.__name__}")
+        import app.skills.trade_sentinel as ts; logger.info(f"   + Trade Sentinel:  {ts.__name__}")
+        # Note: Other services loaded on demand by FeatEngine
+    except ImportError as e:
+        logger.warning(f"⚠️ Service Activation Partial: {e}")
+
+    # 7. DEEP ACCOUNT DIAGNOSTIC (Step 0)
+    if mt5_conn and mt5_conn._connected:
+        try:
+            logger.info("🩺 Performing Deep Account Diagnostic...")
+            import MetaTrader5 as mt5
+            import time
+            
+            # A. Account Valid
+            acc = mt5.account_info()
+            if not acc:
+                logger.error(f"❌ ACCOUNT CRITICAL: Login Failed (Code: {mt5.last_error()})")
+            else:
+                logger.info(f"   > Account: {acc.login} ({'REAL' if acc.trade_mode==0 else 'DEMO'})")
+                logger.info(f"   > Balance: ${acc.balance:.2f} (Eq: ${acc.equity:.2f})")
+                
+                # B. Market Watch
+                sym = "XAUUSD"
+                if not mt5.symbol_select(sym, True):
+                    logger.error(f"❌ MARKET CRITICAL: {sym} not found or disabled!")
+                else:
+                    tick = mt5.symbol_info_tick(sym)
+                    if tick:
+                        latency = (time.time() - tick.time) * 1000
+                        logger.info(f"   > Market: {sym} Active (Tick Latency: {latency:.1f}ms)")
+                    else:
+                        logger.warning(f"⚠️ Market: {sym} selected but NO TICKS.")
+                        
+        except Exception as e:
+            logger.error(f"❌ Diagnostic Failed: {e}")
     
     try:
         yield

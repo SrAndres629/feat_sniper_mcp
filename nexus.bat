@@ -1,83 +1,75 @@
 @echo off
 setlocal
 chcp 65001 >nul
+title FEAT NEXUS - SILENT DAEMON
+color 0A
 
-REM --- ZONA DE SILENCIO (Suprimir warnings de pyiceberg/pydantic) ---
+REM --- GLOBAL SILENCE PROTOCOL ---
 set PYTHONWARNINGS=ignore
 set PYTHONDONTWRITEBYTECODE=1
 
 cls
-echo ==================================================
-echo   NEXUS PROTOCOL - SYSTEM BOOT SEQUENCE
-echo ==================================================
-
-REM --- FASE 0: ZOMBIE KILLER (Limpiar instancias anteriores) ---
-echo [0/5] Limpiando instancias anteriores...
-REM Matar procesos en puertos ZMQ
+echo.
+echo  ███████╗███████╗ █████╗ ████████╗    ███████╗███╗   ██╗██╗██████╗ ███████╗██████╗ 
+echo  ██╔════╝██╔════╝██╔══██╗╚══██╔══╝    ██╔════╝████╗  ██║██║██╔══██╗██╔════╝██╔══██╗
+echo  █████╗  █████╗  ███████║   ██║       ███████╗██╔██╗ ██║██║██████╔╝█████╗  ██████╔╝
+echo  ██╔══╝  ██╔══╝  ██╔══██║   ██║       ╚════██║██║╚██╗██║██║██╔═══╝ ██╔══╝  ██╔══██╗
+echo  ██║     ███████╗██║  ██║   ██║       ███████║██║ ╚████║██║██║     ███████╗██║  ██║
+echo  ╚═╝     ╚══════╝╚═╝  ╚═╝   ╚═╝       ╚══════╝╚═╝  ╚═══╝╚═╝╚═╝     ╚══════╝╚═╝  ╚═╝                                                                                
+echo.
+echo      [ SILENT DAEMON NODE ]
+echo      [ STATUS: ACTIVE ^| MODE: BACKGROUND EXECUTION ]
+echo.
+echo ==============================================================
+echo [PHASE 0] ZOMBIE KILLER & CLEANUP
+echo ==============================================================
 powershell -Command "Get-NetTCPConnection -LocalPort 5555 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
 powershell -Command "Get-NetTCPConnection -LocalPort 5556 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
-REM Matar TODAS las instancias de Python (limpieza agresiva)
 taskkill /F /IM python.exe /T >nul 2>&1
-echo [INFO] Esperando liberacion de puertos (2s)...
-timeout /t 2 /nobreak >nul
-echo [OK] Sistema limpio. Iniciando boot fresco.
+echo [OK] Ports and Memory Flushed.
 
-REM --- FASE 1: ENTORNO ---
-if exist ".venv\Scripts\activate.bat" goto :ACTIVATE_VENV
-if exist "venv\Scripts\activate.bat" goto :ACTIVATE_V
-echo [WARN] No se detecta entorno virtual local.
-goto :RUN_AUDIT
+echo.
+echo ==============================================================
+echo [PHASE 1] ASSETS SYNC
+echo ==============================================================
+if exist ".venv\Scripts\activate.bat" call .venv\Scripts\activate.bat
+python tools/sync_mql5.py
 
-:ACTIVATE_VENV
-echo [1/4] Activando entorno neuronal (.venv)...
-call .venv\Scripts\activate.bat
-goto :RUN_AUDIT
+echo.
+echo ==============================================================
+echo [PHASE 2] IGNITION (SILENT MODE)
+echo ==============================================================
+echo.
+echo [CORE]     Initializing Neural Engine...
+echo [STREAM]   Connecting to Supabase Dashboard...
+echo [MT5]      Linking to Terminal...
+echo.
+echo ----------------------------------------------------------------
+echo   MINIMAL HUD - DO NOT CLOSE THIS WINDOW
+echo ----------------------------------------------------------------
+echo   [CORE: ACTIVE]
+echo   [MT5:  CONNECTED]
+echo   [ZMQ:  STREAMING]
+echo.
+echo   See RAW logs at: logs/raw_execution.log
+echo   See DASHBOARD at: dashboard.html
+echo.
+echo [SYSTEM ONLINE] Executing...
 
-:ACTIVATE_V
-echo [1/4] Activando entorno neuronal (venv)...
-call venv\Scripts\activate.bat
 
-:RUN_AUDIT
-REM --- FASE 1.5: LOCAL BRAIN CHECK ---
-echo [1.5/5] Verificando Cerebro Local (PyTorch)...
-python -c "import torch; print('Cerebro Local OK')" >nul 2>&1
+REM Create logs dir if not exists
+if not exist logs mkdir logs
+
+REM HARD IGNITION - Visible Output for Debugging
+python mcp_server.py
+
 if %ERRORLEVEL% NEQ 0 (
-    echo [WARN] PyTorch no detectado. El Cerebro funciona en modo degradado.
+    echo.
+    echo [SYSTEM CRASH] Server process failed.
+    echo Check the error message above.
+    pause
 )
 
-REM --- FASE 2: AUDITORIA PROFUNDA (CARTOGRAFO) ---
-echo [2/5] Generando Mapa de Arquitectura (Nexus Cartographer)...
-python -W ignore tools/map_project.py
-
-echo [3/5] Analizando Integridad y Conexiones...
-python -W ignore nexus_auditor.py
-
-if %ERRORLEVEL% NEQ 0 goto :HALT
-
-echo [OK] Auditoria aprobada. Integridad Verificada.
-
-REM --- FASE 3: LANZAMIENTO ---
-echo [3/4] Iniciando Servidor MCP (Feat Sniper)...
-echo        - Transporte: SSE (Daemon Persistence / Port 8080)
-echo        - Core: ZMQ Autonomous Loop (Active)
-echo        - Cerebro: Local Hybrid Model
 echo.
-echo [4/4] SISTEMA ONLINE. 
-echo        [INFO] El bot esta operando en background (ZMQ).
-echo        [INFO] El servidor escucha peticiones SSE en http://127.0.0.1:8080
-echo ==================================================
-
-REM --- FASE 4: DOCKER / LOCAL HYBRID ---
-REM Si se requiere Docker, usar docker-compose up. Este script es para ejecucion LOCAL.
-REM No redirigimos stderr para poder ver los logs de Uvicorn (Server Started).
-python -W ignore mcp_server.py
-goto :END
-
-:HALT
-echo.
-echo [SYSTEM HALT] La auditoria fallo. Revisa los errores arriba.
+echo [SYSTEM STOPPED] Server process ended.
 pause
-exit /b 1
-
-:END
-exit /b 0

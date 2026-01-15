@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>FEAT NEXUS | INSTITUTIONAL WAR ROOM</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'nexus-black': '#050505',
+                        'nexus-green': '#00ff41',
+                        'nexus-dim': '#008f11',
+                        'nexus-gray': '#1a1a1a',
+                        'nexus-alert': '#ff0000',
+                    },
+                    fontFamily: {
+                        mono: ['Consolas', 'Monaco', 'Courier New', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #050505;
+            color: #e5e5e5;
+        }
+
+        .matrix-text {
+            text-shadow: 0 0 5px #008f11;
+        }
+
+        .blink {
+            animation: blinker 1.5s linear infinite;
+        }
+
+        @keyframes blinker {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #050505;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #008f11;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body class="h-screen flex flex-col font-mono overflow-hidden">
+
+    <!-- HEADER -->
+    <header class="border-b border-nexus-dim p-4 flex justify-between items-center bg-nexus-gray bg-opacity-50">
+        <div class="flex items-center gap-4">
+            <h1 class="text-2xl font-bold text-nexus-green matrix-text">FEAT NEXUS <span
+                    class="text-xs text-gray-500">// SENTINEL WAR ROOM</span></h1>
+            <div id="status-badge" class="bg-red-900 text-red-100 text-xs px-2 py-0.5 rounded uppercase tracking-wider">
+                OFFLINE</div>
+        </div>
+        <div class="text-xs text-nexus-dim" id="clock">00:00:00 UTC</div>
+    </header>
+
+    <!-- MAIN GRID -->
+    <div class="flex-1 grid grid-cols-12 gap-4 p-4">
+
+        <!-- LEFT COLUMN: THE PULSE (Metrics) -->
+        <div class="col-span-3 flex flex-col gap-4">
+            <!-- Account Card -->
+            <div class="border border-nexus-dim bg-nexus-gray p-4 rounded shadow-lg">
+                <div class="text-xs text-gray-500 uppercase mb-1">Total Equity</div>
+                <div class="text-4xl font-bold text-white tracking-widest" id="equity">---</div>
+                <div class="flex justify-between mt-2 text-sm">
+                    <span class="text-gray-400">Balance:</span>
+                    <span class="text-nexus-green" id="balance">---</span>
+                </div>
+                <div class="flex justify-between mt-1 text-sm">
+                    <span class="text-gray-400">Unrealized P/L:</span>
+                    <span class="" id="pl">---</span>
+                </div>
+            </div>
+
+            <!-- Neural Signal Card -->
+            <div class="border border-nexus-dim bg-nexus-gray p-4 rounded shadow-lg flex-1">
+                <h3 class="text-nexus-green border-b border-nexus-dim pb-2 mb-4 uppercase text-sm font-bold">The Pulse
+                    (Neural)</h3>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-black p-3 rounded border border-gray-800">
+                        <div class="text-xs text-gray-500">Alpha Conf</div>
+                        <div class="text-2xl font-bold text-purple-400" id="alpha">0.00</div>
+                    </div>
+                    <div class="bg-black p-3 rounded border border-gray-800">
+                        <div class="text-xs text-gray-500">Physics Accel</div>
+                        <div class="text-2xl font-bold text-yellow-400" id="accel">0.00</div>
+                    </div>
+                    <div class="bg-black p-3 rounded border border-gray-800 col-span-2">
+                        <div class="text-xs text-gray-500">Hurst Exponent</div>
+                        <div class="text-xl font-bold text-blue-400" id="hurst">0.50 <span
+                                class="text-xs text-gray-600 font-normal">(Random Walk)</span></div>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-gray-600">
+                    <span class="blink">●</span> Listening for Neural Signals...
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER: THE ORACLE (Logs) -->
+        <div class="col-span-6 border border-nexus-dim bg-black rounded shadow-lg flex flex-col relative">
+            <div
+                class="bg-nexus-dim bg-opacity-20 p-2 text-xs uppercase font-bold text-nexus-green border-b border-nexus-dim flex justify-between">
+                <span>System Logs (Filtered)</span>
+                <span class="cursor-pointer hover:text-white"
+                    onclick="document.getElementById('logs').innerHTML=''">[CLEAR]</span>
+            </div>
+            <div id="logs" class="flex-1 overflow-y-auto p-4 font-mono text-sm space-y-1">
+                <!-- Logs injected here -->
+                <div class="text-gray-600 italic">Waiting for broadcast...</div>
+            </div>
+            <!-- Scanline effect -->
+            <div
+                class="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent to-nexus-green opacity-5">
+            </div>
+        </div>
+
+        <!-- RIGHT: THE LEDGER (Active Trades) -->
+        <div class="col-span-3 border border-nexus-dim bg-nexus-gray p-4 rounded shadow-lg flex flex-col">
+            <h3 class="text-nexus-green border-b border-nexus-dim pb-2 mb-4 uppercase text-sm font-bold">Active Orders
+            </h3>
+            <div class="flex-1 overflow-y-auto">
+                <table class="w-full text-xs text-left">
+                    <thead>
+                        <tr class="text-gray-500 border-b border-gray-700">
+                            <th class="pb-2">ID</th>
+                            <th class="pb-2">Type</th>
+                            <th class="pb-2 text-right">P/L</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ledger-body">
+                        <tr>
+                            <td colspan="3" class="text-center text-gray-600 py-4">No Active Trades</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-700">
+                <div class="text-xs text-gray-500 uppercase">Daily P/L</div>
+                <div class="text-2xl font-bold text-gray-300" id="daily-pl">$0.00</div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- SCRIPT -->
+    <script>
+        // CONFIGURATION - AUTO-INJECTED BY ANTIGRAVITY (DO NOT EDIT MANUALLY)
+        const SUPABASE_URL = "https://hkbnbwcjbitadkdkgzco.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhrYm5id2NqYml0YWRrZGtnemNvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNTY3MzEsImV4cCI6MjA4MzYzMjczMX0.-PRr0FohaLxmRVq1JeR20TLq54DoUjhC5wVZA-kVumE";
+
+        // State
+        let client;
+
+        function updateClock() {
+            const now = new Date();
+            document.getElementById('clock').innerText = now.toISOString().split('T')[1].split('.')[0] + " UTC";
+        }
+        setInterval(updateClock, 1000);
+
+        async function init() {
+            const { createClient } = supabase;
+            client = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+            // UI Online
+            const badge = document.getElementById('status-badge');
+            badge.innerText = "ONLINE";
+            badge.className = "bg-nexus-green text-black text-xs px-2 py-0.5 rounded uppercase tracking-wider font-bold blink";
+
+            // 1. Logs Channel
+            client.channel('audit_logs')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_logs' }, payload => {
+                    addLog(payload.new);
+                })
+                .subscribe();
+
+            // 2. Metrics Channel
+            client.channel('live_metrics')
+                .on('postgres_changes', { event: '*', schema: 'public', table: 'live_metrics' }, payload => {
+                    updateMetrics(payload.new);
+                })
+                .subscribe();
+
+            // 3. Signals Channel
+            client.channel('neural_signals')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'neural_signals' }, payload => {
+                    updateSignals(payload.new);
+                })
+                .subscribe();
+
+            console.log("✅ Nexus Uplink Established.");
+        }
+
+        function addLog(entry) {
+            const container = document.getElementById('logs');
+            const div = document.createElement('div');
+
+            let colorClass = "text-nexus-green";
+            if (entry.level === "WARNING") colorClass = "text-yellow-500";
+            if (entry.level === "ERROR") colorClass = "text-red-500 font-bold";
+
+            div.className = `flex gap-2 text-xs font-mono border-b border-gray-900 pb-1 ${colorClass}`;
+            div.innerHTML = `
+               <span class="text-gray-600">[${entry.timestamp.split('T')[1].split('.')[0]}]</span>
+               <span class="flex-1 break-words opacity-90 hover:opacity-100 transition-opacity">${entry.message}</span>
+           `;
+
+            container.prepend(div);
+            if (container.children.length > 50) container.lastElementChild.remove();
+        }
+
+        function updateMetrics(data) {
+            if (data.balance) document.getElementById('balance').innerText = `$${data.balance.toFixed(2)}`;
+            if (data.equity) document.getElementById('equity').innerText = `$${data.equity.toFixed(2)}`;
+            // Calculate rough P/L
+            if (data.equity && data.balance) {
+                const pl = data.equity - data.balance;
+                const plEl = document.getElementById('pl');
+                plEl.innerText = (pl >= 0 ? "+" : "") + `$${pl.toFixed(2)}`;
+                plEl.className = pl >= 0 ? "text-nexus-green" : "text-red-500";
+            }
+        }
+
+        function updateSignals(data) {
+            if (data.alpha_confidence) {
+                const el = document.getElementById('alpha');
+                el.innerText = data.alpha_confidence.toFixed(2);
+                el.className = `text-2xl font-bold ${data.alpha_confidence > 0.7 ? 'text-nexus-green blink' : 'text-purple-400'}`;
+            }
+            if (data.acceleration) document.getElementById('accel').innerText = data.acceleration.toFixed(2);
+            if (data.hurst) {
+                const h = data.hurst;
+                let status = "(Random)";
+                if (h > 0.6) status = "(Trending)";
+                if (h < 0.4) status = "(Mean Rev)";
+                document.getElementById('hurst').innerHTML = `${h.toFixed(2)} <span class="text-xs text-gray-600 font-normal">${status}</span>`;
+            }
+        }
+
+        init();
+    </script>
+</body>
+
+</html>

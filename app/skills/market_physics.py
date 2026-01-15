@@ -1,6 +1,17 @@
+"""
+Market Physics Engine - ATR-Normalized Acceleration (P0 REPAIR)
+================================================================
+The Sensory Cortex: Institutional-grade market physics calculator.
+
+[P0 REPAIR] Fixes:
+- ATR Normalization: Velocity divided by ATR for asset-agnostic metrics
+- Acceleration is now dimensionless (works identically for Gold and Bitcoin)
+- Added ATR calculation from price window
+- Improved documentation of physical formulas
+"""
 import logging
 import numpy as np
-from typing import Dict, List, Optional, Deque
+from typing import Dict, Optional, Deque
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
@@ -8,119 +19,247 @@ from datetime import datetime
 # Setup Logger
 logger = logging.getLogger("feat.market_physics")
 
+
 @dataclass
 class MarketRegime:
+    """
+    Output of physics engine - describes current market state.
+    
+    Attributes:
+        is_accelerating: True if momentum exceeds μ + 2σ threshold
+        acceleration_score: Dimensionless acceleration coefficient [0, ∞)
+        vol_z_score: Volume Z-score (standard deviations from mean)
+        trend: BULLISH, BEARISH, or NEUTRAL
+        atr: Current ATR value (for downstream use)
+        timestamp: ISO timestamp of calculation
+    """
     is_accelerating: bool
     acceleration_score: float
     vol_z_score: float
     trend: str
+    atr: float  # [P0 FIX] Added for downstream guards
     timestamp: str
+
 
 class MarketPhysics:
     """
     The Sensory Cortex: Motor de Física de Mercado Institucional.
-    Calcula Velocidad, Aceleración y Anomalías de Volumen en tiempo real.
+    
+    [P0 REPAIR] ATR-Normalized Acceleration Formula:
+    
+        Raw Velocity = ΔP / Δt                    [USD/second]
+        Normalized Velocity = Raw Velocity / ATR  [dimensionless]
+        Acceleration = Vol_Intensity × |Norm_Velocity|  [dimensionless]
+    
+    This makes acceleration ASSET-AGNOSTIC:
+    - A 0.5% move in Gold (from $2000) = acceleration X
+    - A 0.5% move in BTC (from $60000) = acceleration X (same!)
+    
+    [P0-1 FIX] Invariantes de Física Garantizados:
+    - MIN_DELTA_T: Floor de 1ms para evitar división por cero
+    - Monotonía Temporal: Timestamps siempre crecientes (causalidad)
+    - Aceleración Finita: Matemáticamente acotada en todos los escenarios
     """
+    
+    # Physical Invariants
+    MIN_DELTA_T: float = 0.001  # 1ms floor - prevents infinite acceleration
+    MAX_VELOCITY: float = 1e6   # Velocity cap to prevent overflow
+    MIN_ATR: float = 1e-8       # [P0 FIX] ATR floor to prevent division by zero
 
     def __init__(self, window_size: int = 100):
         self.window_size = window_size
-        # Buffers circulares para datos crudos
+        
+        # Circular buffers for raw data
         self.timestamps: Deque[float] = deque(maxlen=window_size)
         self.volume_window: Deque[float] = deque(maxlen=window_size)
         self.price_window: Deque[float] = deque(maxlen=window_size)
         
-        # Buffer de aceleracion histórica para cálculo de sigma
+        # Buffer for acceleration history (for σ calculation)
         self.acceleration_history: Deque[float] = deque(maxlen=window_size)
         
-        logger.info("[SATELLITE] Market Physics Engine Online (Numpy Accelerated)")
+        # [P0 FIX] Cache ATR for efficiency
+        self._cached_atr: float = 0.0
+        
+        logger.info("[SATELLITE] Market Physics Engine Online (ATR-Normalized, NumPy Accelerated)")
+
+    def _calculate_atr(self, prices: np.ndarray) -> float:
+        """
+        Calculate Average True Range from price series.
+        
+        For tick data without full OHLC, we approximate ATR as the 
+        average of absolute price changes (simplified True Range).
+        
+        [P0 FIX] This enables asset-agnostic velocity normalization.
+        
+        Args:
+            prices: Array of closing prices
+            
+        Returns:
+            float: ATR value (same units as price)
+        """
+        if len(prices) < 2:
+            return self.MIN_ATR
+        
+        # Simplified ATR: mean of absolute price changes
+        price_changes = np.abs(np.diff(prices))
+        atr = np.mean(price_changes)
+        
+        # Floor to prevent division by zero
+        return max(atr, self.MIN_ATR)
 
     def ingest_tick(self, data: Dict, force_timestamp: float = None) -> Optional[MarketRegime]:
         """
         Ingesta de Ticks con cálculo de física JIT.
+        
+        Args:
+            data: Dict with 'bid'/'close' and 'tick_volume'/'real_volume'
+            force_timestamp: Optional forced timestamp for backtesting
+            
+        Returns:
+            MarketRegime if enough data, None during warmup
         """
         try:
-            # 1. Extracción y Normalización
+            # 1. Extraction and Normalization
             vol = float(data.get('tick_volume', 0.0) or data.get('real_volume', 0.0))
             price = float(data.get('bid', 0.0) or data.get('close', 0.0))
             ts = force_timestamp if force_timestamp else datetime.now().timestamp()
+
+            # [P0-1 FIX] Temporal Monotonicity Guard
+            if self.timestamps and ts <= self.timestamps[-1]:
+                ts = self.timestamps[-1] + self.MIN_DELTA_T
+                logger.warning(f"[PHYSICS] Temporal monotonicity violation - forcing ts={ts:.6f}")
 
             # 2. Update Buffers
             self.volume_window.append(vol)
             self.price_window.append(price)
             self.timestamps.append(ts)
 
-            # Warmup Check
-            if len(self.price_window) < 50: # Minimo 50 periodos para StdDev confiable
+            # Warmup Check - need 50 periods for reliable statistics
+            if len(self.price_window) < 50:
                 return None
 
-            # 3. Cálculo Vectorizado
-            return self.calculate_acceleration_vectorized(vol, price, ts)
+            # 3. Vectorized Calculation
+            return self._calculate_acceleration_vectorized(vol, price, ts)
 
         except Exception as e:
             logger.error(f"Sensory Cortex Failure: {e}")
             return None
 
-    def calculate_acceleration_vectorized(self, current_vol: float, current_price: float, current_ts: float) -> MarketRegime:
+    def _calculate_acceleration_vectorized(self, current_vol: float, current_price: float, current_ts: float) -> MarketRegime:
         """
-        Fórmula FEAT: 
-        A = (Vol / AvgVol) * (DeltaPrecio / DeltaTiempo)
-        Trigger: A > 2.0 * Sigma(A)
+        [P0 REPAIR] ATR-Normalized FEAT Acceleration Formula:
+        
+        Step 1: Vol_Intensity = Current_Vol / Mean_Vol  [dimensionless ratio]
+        Step 2: Raw_Velocity = ΔP / Δt                  [price/second]
+        Step 3: ATR = mean(|ΔP|)                        [price units]
+        Step 4: Norm_Velocity = Raw_Velocity / ATR      [dimensionless]
+        Step 5: Acceleration = Vol_Intensity × |Norm_Velocity|  [dimensionless]
+        
+        Trigger: Acceleration > μ(Acceleration) + 2σ(Acceleration)
+        
+        This formula is ASSET-AGNOSTIC:
+        - Gold at $2000 with $10 move = same acceleration as
+        - BTC at $60000 with $300 move (both 0.5% moves)
         """
-        # Convertir a numpy arrays para velocidad
+        # Convert to numpy for vectorized operations
         vols = np.array(self.volume_window)
         prices = np.array(self.price_window)
         times = np.array(self.timestamps)
 
-        # Estadísticas de Volumen
+        # =====================================================
+        # STEP 1: Volume Intensity (dimensionless)
+        # =====================================================
         mean_vol = np.mean(vols)
         std_vol = np.std(vols)
         
-        # Vol Ratio (Intensidad)
-        if mean_vol == 0: mean_vol = 1
+        if mean_vol == 0:
+            mean_vol = 1
         vol_intensity = current_vol / mean_vol
         
-        # Z-Score de Volumen (Para diagnósticos)
-        vol_z = (current_vol - mean_vol) / (std_vol if std_vol > 0 else 1)
+        # Volume Z-Score (for diagnostics)
+        vol_z = (current_vol - mean_vol) / max(std_vol, 0.0001)
 
-        # Velocidad del Precio (Delta P / Delta T)
-        # Usamos los últimos 2 puntos para velocidad instantánea
-        if len(prices) >= 2 and (times[-1] - times[-2]) > 0:
+        # =====================================================
+        # STEP 2: Raw Velocity (price/second)
+        # =====================================================
+        if len(prices) >= 2:
             delta_p = prices[-1] - prices[-2]
-            delta_t = times[-1] - times[-2]
-            velocity = delta_p / delta_t
+            raw_delta_t = times[-1] - times[-2]
+            
+            # INVARIANT: δt never less than MIN_DELTA_T
+            delta_t = max(raw_delta_t, self.MIN_DELTA_T)
+            
+            # Raw velocity with safety cap
+            raw_velocity = delta_p / delta_t
+            raw_velocity = np.clip(raw_velocity, -self.MAX_VELOCITY, self.MAX_VELOCITY)
         else:
-            velocity = 0.0
+            raw_velocity = 0.0
 
-        # Aceleración FEAT (Magnitud Absoluta)
-        raw_acceleration = vol_intensity * abs(velocity)
+        # =====================================================
+        # STEP 3: ATR Calculation (price units)
+        # =====================================================
+        atr = self._calculate_atr(prices)
+        self._cached_atr = atr
+
+        # =====================================================
+        # STEP 4: Normalized Velocity (dimensionless)
+        # =====================================================
+        # [P0 FIX] This is the key normalization step
+        normalized_velocity = raw_velocity / atr
+
+        # =====================================================
+        # STEP 5: FEAT Acceleration (dimensionless)
+        # =====================================================
+        # Combines volume conviction with price momentum
+        raw_acceleration = vol_intensity * abs(normalized_velocity)
         
-        # Guardar en histórico de aceleración
+        # Store in history for σ calculation
         self.acceleration_history.append(raw_acceleration)
 
-        # Regla de Activación: 2 Sigma
+        # =====================================================
+        # TRIGGER: μ + 2σ Dynamic Threshold
+        # =====================================================
         if len(self.acceleration_history) > 10:
             acc_array = np.array(self.acceleration_history)
             acc_mean = np.mean(acc_array)
             acc_std = np.std(acc_array)
             
-            # Threshold Dinámico
+            # Dynamic threshold based on recent acceleration distribution
             threshold = acc_mean + (2.0 * acc_std)
             is_accelerating = raw_acceleration > threshold and raw_acceleration > 0
         else:
             is_accelerating = False
+            threshold = 0
 
-        trend = "BULLISH" if velocity > 0 else "BEARISH" if velocity < 0 else "NEUTRAL"
+        # Trend direction (from raw velocity, not normalized)
+        trend = "BULLISH" if raw_velocity > 0 else "BEARISH" if raw_velocity < 0 else "NEUTRAL"
         
         if is_accelerating:
-            logger.info(f"🚀 FEAT PHYSICS TRIGGER: Accel={raw_acceleration:.4f} > Threshold (Trend: {trend})")
+            logger.info(
+                f"🚀 FEAT PHYSICS TRIGGER: Accel={raw_acceleration:.4f} > {threshold:.4f} "
+                f"(Vol:{vol_intensity:.2f}x, NormVel:{normalized_velocity:.4f}, ATR:{atr:.2f}) "
+                f"Trend: {trend}"
+            )
 
         return MarketRegime(
             is_accelerating=is_accelerating,
             acceleration_score=raw_acceleration,
             vol_z_score=vol_z,
             trend=trend,
+            atr=atr,  # [P0 FIX] Include ATR for downstream use
             timestamp=datetime.fromtimestamp(current_ts).isoformat()
         )
 
-# Instancia Global
+    def get_status(self) -> Dict:
+        """Get current engine status for monitoring."""
+        return {
+            "buffer_size": len(self.price_window),
+            "window_size": self.window_size,
+            "cached_atr": round(self._cached_atr, 4),
+            "acceleration_history_size": len(self.acceleration_history),
+            "is_warmed_up": len(self.price_window) >= 50
+        }
+
+
+# Global Singleton
 market_physics = MarketPhysics()

@@ -3,6 +3,15 @@ import os
 import json
 import subprocess
 import time
+import warnings
+
+# Filter noise
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+try:
+    from pydantic.warnings import PydanticDeprecatedSince212
+    warnings.filterwarnings("ignore", category=PydanticDeprecatedSince212)
+except ImportError:
+    pass
 
 # Colors
 GREEN = "\033[38;5;82m"

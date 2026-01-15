@@ -1,3 +1,14 @@
+"""
+ZMQ Bridge - High-Performance Non-Blocking Architecture
+=========================================================
+Zero-latency message bridge between MQL5 and Python brain.
+
+[P1 REFACTOR] Changes:
+- asyncio.to_thread for ALL sync callbacks (no blocking)
+- Fixed class-level variables moved to __init__
+- Rate limiting via semaphore (max concurrent processing)
+- Enhanced TTL validation with metrics
+"""
 import sys
 import asyncio
 import time
@@ -5,6 +16,7 @@ import zmq
 import zmq.asyncio
 import logging
 import json
+from typing import Callable, List, Dict, Any, Optional
 
 from app.core.config import settings
 
@@ -15,24 +27,64 @@ if sys.platform == 'win32':
 
 logger = logging.getLogger("MT5_Bridge.ZMQ")
 
-class ZMQBridge:
-    def __init__(self, pub_port=5556, sub_port=5555):
-        self.pub_port = pub_port
-        self.sub_port = sub_port
-        self.context = zmq.asyncio.Context()
-        self.pub_socket = None
-        self.sub_socket = None
-        self.running = False
-        self.callbacks = []
-        # Metrics for observability
-        self.messages_processed = 0
-        self.messages_discarded = 0
-        self._last_lag_ms = 0.0
 
-    async def start(self, callback=None):
-        """Inicia los sockets ZMQ y el loop de escucha."""
+class ZMQBridge:
+    """
+    High-frequency ZMQ message bridge with non-blocking callback execution.
+    
+    [P1 FIX] Architecture improvements:
+    - All callbacks run via asyncio.to_thread (never blocks event loop)
+    - State variables are instance-level, not class-level
+    - Semaphore limits concurrent callback processing
+    - Enhanced metrics for observability
+    """
+    
+    # Processing limits
+    MAX_CONCURRENT_CALLBACKS: int = 10  # Semaphore limit
+    
+    def __init__(self, pub_port: int = None, sub_port: int = None):
+        """
+        Initialize ZMQ Bridge with configurable ports.
+        
+        Args:
+            pub_port: Port for publishing commands to MT5 (default: from settings)
+            sub_port: Port for subscribing to MT5 ticks (default: from settings)
+        """
+        self.pub_port = pub_port or settings.ZMQ_PUB_PORT
+        self.sub_port = sub_port or settings.ZMQ_PORT
+        self.context = zmq.asyncio.Context()
+        self.pub_socket: Optional[zmq.asyncio.Socket] = None
+        self.sub_socket: Optional[zmq.asyncio.Socket] = None
+        self.running = False
+        self.callbacks: List[Callable] = []
+        
+        # [P1 FIX] Instance-level state (was class-level - bug)
+        self.current_regime: str = "LAMINAR"
+        self.current_ai_confidence: float = 0.5
+        
+        # Metrics for observability
+        self.messages_processed: int = 0
+        self.messages_discarded: int = 0
+        self.messages_failed: int = 0
+        self._last_lag_ms: float = 0.0
+        self._peak_lag_ms: float = 0.0
+        
+        # [P1 FIX] Semaphore for rate limiting
+        self._callback_semaphore: Optional[asyncio.Semaphore] = None
+        
+        logger.info(f"ZMQBridge initialized (pub:{self.pub_port}, sub:{self.sub_port})")
+
+    async def start(self, callback: Callable = None):
+        """
+        Inicia los sockets ZMQ y el loop de escucha.
+        
+        [P1 FIX] Now creates semaphore for callback throttling.
+        """
         if callback:
             self.add_callback(callback)
+        
+        # Create semaphore for this event loop
+        self._callback_semaphore = asyncio.Semaphore(self.MAX_CONCURRENT_CALLBACKS)
             
         try:
             self.pub_socket = self.context.socket(zmq.PUB)
@@ -59,25 +111,35 @@ class ZMQBridge:
     async def stop(self):
         """Cierra conexiones limpiamente."""
         self.running = False
-        if self.pub_socket: self.pub_socket.close()
-        if self.sub_socket: self.sub_socket.close()
+        if self.pub_socket: 
+            self.pub_socket.close()
+        if self.sub_socket: 
+            self.sub_socket.close()
         self.context.term()
         logger.info("ZMQ Bridge detenido.")
 
-    def add_callback(self, callback):
+    def add_callback(self, callback: Callable):
+        """Add a callback to be invoked on each message."""
         self.callbacks.append(callback)
+        logger.debug(f"Callback added: {callback.__name__ if hasattr(callback, '__name__') else 'anonymous'}")
 
     async def _listen(self):
+        """
+        [P1 FIX] Non-blocking message processing loop.
+        
+        Key improvements:
+        - TTL validation with enhanced metrics
+        - All callbacks wrapped in asyncio.to_thread for sync functions
+        - Semaphore limits concurrent processing to prevent OOM
+        - Graceful error handling
+        """
         while self.running:
             try:
                 msg_string = await self.sub_socket.recv_string()
+                
                 # [AUDIT] Structured Traceability - INPUT FLOW
-                logger.info("INPUT_FLOW", extra={
-                     "module": "ZMQ_BRIDGE", 
-                     "action": "RECEIVE", 
-                     "size": len(msg_string), 
-                     "target": "internal_callback"
-                })
+                logger.debug(f"INPUT_FLOW: size={len(msg_string)}")
+                
                 try:
                     data = json.loads(msg_string)
                     
@@ -86,30 +148,58 @@ class ZMQBridge:
                     if msg_ts:
                         age_ms = (time.time() * 1000) - msg_ts
                         self._last_lag_ms = age_ms
+                        self._peak_lag_ms = max(self._peak_lag_ms, age_ms)
+                        
                         if age_ms > settings.DECISION_TTL_MS:
                             self.messages_discarded += 1
-                            logger.warning(f"⏰ ZMQ message discarded: age={age_ms:.0f}ms > TTL {settings.DECISION_TTL_MS}ms")
+                            logger.warning(
+                                f"⏰ ZMQ message discarded: age={age_ms:.0f}ms > TTL {settings.DECISION_TTL_MS}ms"
+                            )
                             continue
                     
+                    # [P1 FIX] Process callbacks with semaphore limiting
                     self.messages_processed += 1
-                    for cb in self.callbacks:
-                        if asyncio.iscoroutinefunction(cb):
-                            await cb(data)
-                        else:
-                            cb(data)
-                except json.JSONDecodeError:
-                    pass
+                    asyncio.create_task(self._invoke_callbacks(data))
+                    
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Invalid JSON received: {e}")
+                    self.messages_failed += 1
+                    
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except Exception as e:
+                logger.error(f"ZMQ listen error: {e}")
+                self.messages_failed += 1
                 if self.running:
                     await asyncio.sleep(1)
-    # Phase 13: HUD State
-    current_regime = "LAMINAR"
-    current_ai_confidence = 0.5
-    
+
+    async def _invoke_callbacks(self, data: Dict[str, Any]):
+        """
+        [P1 FIX] Invoke all callbacks with proper async handling.
+        
+        - Async callbacks: awaited directly
+        - Sync callbacks: wrapped in asyncio.to_thread (NON-BLOCKING)
+        - Protected by semaphore to limit concurrency
+        """
+        async with self._callback_semaphore:
+            for cb in self.callbacks:
+                try:
+                    if asyncio.iscoroutinefunction(cb):
+                        # Async callback - await directly
+                        await cb(data)
+                    else:
+                        # [P1 FIX] Sync callback - run in thread to avoid blocking
+                        # This is the CRITICAL fix - prevents loop blocking
+                        await asyncio.to_thread(cb, data)
+                except Exception as e:
+                    logger.error(f"Callback error ({cb.__name__ if hasattr(cb, '__name__') else 'anon'}): {e}")
+
     async def _heartbeat(self):
-        """Sends periodic health metrics to MT5 HUD (Phase 13 Institutional Upgrade)."""
+        """
+        Sends periodic health metrics to MT5 HUD (Phase 13 Institutional Upgrade).
+        
+        [P1 FIX] Enhanced with peak lag tracking and failure count.
+        """
         while self.running:
             try:
                 await self.send_command(
@@ -117,8 +207,10 @@ class ZMQBridge:
                     regime=self.current_regime,
                     ai_confidence=round(self.current_ai_confidence * 100, 1),
                     zmq_lag_ms=round(self._last_lag_ms, 2),
+                    zmq_peak_lag_ms=round(self._peak_lag_ms, 2),
                     processed=self.messages_processed,
-                    discarded=self.messages_discarded
+                    discarded=self.messages_discarded,
+                    failed=self.messages_failed
                 )
                 await asyncio.sleep(1)
             except Exception as e:
@@ -133,9 +225,39 @@ class ZMQBridge:
             self.current_ai_confidence = ai_confidence
 
     async def send_command(self, action: str, **params):
-        if not self.running:
+        """Send a command to MT5 via PUB socket."""
+        if not self.running or not self.pub_socket:
             return
-        payload = {"action": action, "params": params, "ts": time.time() * 1000}
-        await self.pub_socket.send_string(json.dumps(payload))
+        payload = {
+            "action": action, 
+            "params": params, 
+            "ts": time.time() * 1000
+        }
+        try:
+            await self.pub_socket.send_string(json.dumps(payload))
+        except Exception as e:
+            logger.error(f"Failed to send command {action}: {e}")
 
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get current bridge metrics for monitoring."""
+        return {
+            "running": self.running,
+            "pub_port": self.pub_port,
+            "sub_port": self.sub_port,
+            "messages_processed": self.messages_processed,
+            "messages_discarded": self.messages_discarded,
+            "messages_failed": self.messages_failed,
+            "last_lag_ms": round(self._last_lag_ms, 2),
+            "peak_lag_ms": round(self._peak_lag_ms, 2),
+            "current_regime": self.current_regime,
+            "current_ai_confidence": self.current_ai_confidence,
+            "callback_count": len(self.callbacks)
+        }
+
+    def reset_peak_metrics(self):
+        """Reset peak metrics (called periodically for monitoring)."""
+        self._peak_lag_ms = 0.0
+
+
+# Global singleton instance
 zmq_bridge = ZMQBridge()
