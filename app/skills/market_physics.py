@@ -27,6 +27,7 @@ class MarketRegime:
     
     Attributes:
         is_accelerating: True if momentum exceeds μ + 2σ threshold
+        is_initiative_candle: True if Volume > 2.5x and Displacement > 1.5x ATR (FEAT CORE)
         acceleration_score: Dimensionless acceleration coefficient [0, ∞)
         vol_z_score: Volume Z-score (standard deviations from mean)
         trend: BULLISH, BEARISH, or NEUTRAL
@@ -34,6 +35,7 @@ class MarketRegime:
         timestamp: ISO timestamp of calculation
     """
     is_accelerating: bool
+    is_initiative_candle: bool
     acceleration_score: float
     vol_z_score: float
     trend: str
@@ -241,8 +243,18 @@ class MarketPhysics:
                 f"Trend: {trend}"
             )
 
+        # =====================================================
+        # STEP 6: Initiative Candle (FEAT CORE)
+        # =====================================================
+        # Rule: Volume Intensity > 2.5 AND Normalized Velocity > 1.5
+        is_initiative = vol_intensity > 2.5 and abs(normalized_velocity) > 1.5
+
+        if is_initiative:
+            logger.info(f"🧬 [FEAT] INITIATIVE CANDLE DETECTED: Vol:{vol_intensity:.2f}x | Vel:{normalized_velocity:.2f}x")
+
         return MarketRegime(
             is_accelerating=is_accelerating,
+            is_initiative_candle=is_initiative,
             acceleration_score=raw_acceleration,
             vol_z_score=vol_z,
             trend=trend,

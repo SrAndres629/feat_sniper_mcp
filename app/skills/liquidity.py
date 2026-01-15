@@ -1,71 +1,85 @@
+import logging
 import numpy as np
 import pandas as pd
-import logging
-import MetaTrader5 as mt5
 from typing import Dict, Any, List, Optional
-from app.core.mt5_conn import mt5_conn
-from app.core.config import settings
 
-logger = logging.getLogger("MT5_Bridge.Skills.Liquidity")
+logger = logging.getLogger("feat.liquidity")
 
-class LiquidityGrid:
+class LiquidityMap:
     """
-    Gate E: Liquidity Grid mapping.
-    Identifies institutional levels (PDH/PDL) and structural imbalances (FVG).
+    [E] COMPONENT - SPACE (The Liquidity Grid)
+    Maps institutional liquidity pools (PDH, PDL) and Imbalances (FVG).
     """
     def __init__(self):
-        print("[Liquidity] Grid Built (PDH/PDL calculation)")
-        self.levels = {}
+        logger.info("[Liquidity] Map Engine Online (Mapping Pools & Imbalances)")
+        self.pools = {"pdh": 0.0, "pdl": 0.0, "pwh": 0.0, "pwl": 0.0}
+        self.imbalances: List[Dict[str, Any]] = []
 
-    def calculate_pdh_pdl(self, daily_candles: pd.DataFrame) -> Dict[str, float]:
+    def refresh_grid(self, h1_df: pd.DataFrame, d1_df: Optional[pd.DataFrame] = None):
         """
-        Calculates Previous Day High (PDH) and Previous Day Low (PDL).
-        Input: daily_candles DataFrame with 'high', 'low' columns.
+        Refreshes levels based on high-timeframe data.
         """
-        if daily_candles.empty or len(daily_candles) < 1:
-            return {"pdh": 0.0, "pdl": 0.0}
-        
-        # Last confirmed daily candle (i-1)
-        last_day = daily_candles.iloc[-1]
-        self.levels["pdh"] = float(last_day['high'])
-        self.levels["pdl"] = float(last_day['low'])
-        
-        logger.info(f"📊 PDH/PDL Mapped: {self.levels['pdh']} / {self.levels['pdl']}")
-        return self.levels
+        if d1_df is not None and len(d1_df) >= 2:
+            last_day = d1_df.iloc[-2] # Previous day completed
+            self.pools["pdh"] = float(last_day['high'])
+            self.pools["pdl"] = float(last_day['low'])
+        elif len(h1_df) >= 24:
+            # Proxy PDH/PDL from last 24 H1 candles
+            self.pools["pdh"] = float(h1_df['high'].iloc[-24:].max())
+            self.pools["pdl"] = float(h1_df['low'].iloc[-24:].min())
 
-    def detect_fvg(self, candle_series: pd.DataFrame) -> List[Dict[str, Any]]:
+        self.imbalances = self._detect_unmitigated_fvgs(h1_df)
+        
+        logger.debug(f"[SPACE] PDH: {self.pools['pdh']} | PDL: {self.pools['pdl']} | FVGs: {len(self.imbalances)}")
+
+    def _detect_unmitigated_fvgs(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
         """
-        Detects Fair Value Gaps (FVG) in the provided series.
-        Candle(i) is FVG if:
-        Bullish: Low(i) > High(i-2)
-        Bearish: High(i) < Low(i-2)
+        Detects Fair Value Gaps that have not been filled/mitigated.
         """
         fvgs = []
-        if len(candle_series) < 3:
-            return fvgs
+        if len(df) < 5: return fvgs
 
-        for i in range(2, len(candle_series)):
+        for i in range(2, len(df)):
             # Bullish FVG
-            if candle_series.iloc[i]['low'] > candle_series.iloc[i-2]['high']:
-                fvgs.append({
-                    "type": "BULLISH_FVG",
-                    "top": candle_series.iloc[i]['low'],
-                    "bottom": candle_series.iloc[i-2]['high'],
-                    "index": i
-                })
+            is_bull_fvg = df['low'].iloc[i] > df['high'].iloc[i-2]
+            if is_bull_fvg:
+                top = df['low'].iloc[i]
+                bottom = df['high'].iloc[i-2]
+                # Mitigation check: have any subsequent candles touched this zone?
+                # For simplicity, we check candles from i+1 to end
+                mitigated = (df['low'].iloc[i+1:] < top).any() if i+1 < len(df) else False
+                if not mitigated:
+                    fvgs.append({"type": "BULL_FVG", "top": top, "bottom": bottom, "price": (top+bottom)/2})
+            
             # Bearish FVG
-            elif candle_series.iloc[i]['high'] < candle_series.iloc[i-2]['low']:
-                fvgs.append({
-                    "type": "BEARISH_FVG",
-                    "top": candle_series.iloc[i-2]['low'],
-                    "bottom": candle_series.iloc[i]['high'],
-                    "index": i
-                })
+            is_bear_fvg = df['high'].iloc[i] < df['low'].iloc[i-2]
+            if is_bear_fvg:
+                top = df['low'].iloc[i-2]
+                bottom = df['high'].iloc[i]
+                mitigated = (df['high'].iloc[i+1:] > bottom).any() if i+1 < len(df) else False
+                if not mitigated:
+                    fvgs.append({"type": "BEAR_FVG", "top": top, "bottom": bottom, "price": (top+bottom)/2})
         
-        self.levels["fvgs"] = fvgs
         return fvgs
 
-liquidity_grid = LiquidityGrid()
+    def get_nearest_poi(self, current_price: float) -> Optional[Dict[str, Any]]:
+        """
+        Returns the closest institutional level / imbalance.
+        """
+        all_levels = []
+        for name, val in self.pools.items():
+            if val > 0: all_levels.append({"name": name, "price": val})
+        for fvg in self.imbalances:
+            all_levels.append({"name": fvg["type"], "price": fvg["price"]})
+            
+        if not all_levels: return None
+        
+        # Sort by distance to current price
+        all_levels.sort(key=lambda x: abs(x["price"] - current_price))
+        return all_levels[0]
+
+# Global singleton
+liquidity_map = LiquidityMap()
 
 class LiquidityEngine:
     """

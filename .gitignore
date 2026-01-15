@@ -33,4 +33,5 @@ package-lock.json
 .idea/
 .DS_Store
 *.py[cod]
-*$py.class
+# Legacy & Waste
+_archive_legacy/

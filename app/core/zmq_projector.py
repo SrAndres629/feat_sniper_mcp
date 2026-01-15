@@ -15,6 +15,22 @@ class ZMQProjector:
     def set_bridge(self, bridge):
         self.bridge = bridge
 
+    async def project_telemetry(self, symbol: str, feat_index: float, regime: str, ai_confidence: float, projections: dict = None, vault_active: bool = False):
+        """
+        Broadcasting de telemetría completa a MT5.
+        Keys sincronizadas con FEAT_Visualizer.mq5 estándar.
+        """
+        payload = {
+            "regime": str(regime),
+            "ai_confidence": int(ai_confidence),
+            "feat_index": float(feat_index),
+            "vault_active": "true" if vault_active else "false",
+            "proj_high": float(projections.get("high", 0)) if projections else 0.0,
+            "proj_low": float(projections.get("low", 0)) if projections else 0.0
+        }
+            
+        await self._send(payload)
+
     async def draw_zone(self, symbol: str, high: float, low: float, color: str = "clrGreen", name: str = "zone"):
         """Dibuja rectángulo (FVG/Block)."""
         await self._send({

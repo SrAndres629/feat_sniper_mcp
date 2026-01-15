@@ -1,14 +1,50 @@
-"""
-FEAT NEXUS: ACCELERATION ENGINE (A)
-====================================
-Validation of institutional intent through Velocity, Volume, and Displacement.
-Author: Antigravity Prime
-Version: 1.0.0
-"""
+import logging
 
-import numpy as np
-import pandas as pd
-from typing import Dict, Any
+logger = logging.getLogger("feat.acceleration")
+
+class MomentumVector:
+    """
+    [A] COMPONENT - ACCELERATION (The Physics Engine)
+    Calculates Newtonian physics of price: Velocity and Acceleration.
+    """
+    def __init__(self, threshold: float = 1.5):
+        self.threshold = threshold
+
+    def analyze(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Logic: 
+        Velocity (V) = Delta Price
+        Acceleration (Acc) = Delta Velocity
+        """
+        if len(df) < 5:
+            return {"velocity": 0.0, "acceleration": 0.0, "is_valid": False, "is_trap": False}
+            
+        prices = df['close'].values
+        
+        # 1st Derivative: Velocity
+        velocity = np.diff(prices)
+        # 2nd Derivative: Acceleration
+        acceleration = np.diff(velocity)
+        
+        v_current = velocity[-1]
+        a_current = acceleration[-1]
+        
+        # Rule: Valid breakout requires Acceleration > Threshold
+        # We normalize by ATR for asset-agnostic thresholding if possible, 
+        # but here we use the specific config threshold.
+        is_breakout = abs(a_current) > self.threshold
+        
+        # DIVERGENCE_TRAP: Price moves (V is high) but Acceleration is low or negative
+        # Signifies absorption or lack of institutional follow-through
+        is_trap = abs(v_current) > (self.threshold * 0.8) and abs(a_current) < (self.threshold * 0.2)
+        
+        return {
+            "velocity": float(v_current),
+            "acceleration": float(a_current),
+            "is_valid": is_breakout and not is_trap,
+            "is_trap": is_trap,
+            "status": "ACCELERATING" if is_breakout else ("DIVERGENCE_TRAP" if is_trap else "INERTIA")
+        }
 
 class AccelerationEngine:
     def __init__(self, config: Dict[str, Any] = None):
@@ -18,6 +54,7 @@ class AccelerationEngine:
             "vol_w": 20,
             "score_th": 0.70,
             "sigma_th": 3.0, # Alert threshold for sigma
+            "accel_th": 1.5, # Newtonian threshold
             "weights": {
                 "w1": 0.4, # Displacement
                 "w2": 0.3, # Volume Z-Score
@@ -25,45 +62,14 @@ class AccelerationEngine:
                 "w4": 0.1  # Velocity
             }
         }
+        self.momentum_v = MomentumVector(threshold=self.config["accel_th"])
 
     def calculate_momentum_vector(self, df: pd.DataFrame) -> Dict[str, Any]:
         """
-        Gate A: Velocity Vector.
+        Gate A: Velocity/Acceleration Vector.
         Calculates Newtonian physics of price movement.
-        Logic: ImpactForce = Volume * (Close - Open).
         """
-        if len(df) < 11:
-            return {"vector_strength": 0.0, "high_acceleration": False}
-
-        # 1. Impact Force calculation
-        last_candle = df.iloc[-1]
-        impact_force = last_candle['volume'] * (last_candle['close'] - last_candle['open'])
-        
-        # 2. Acceleration Flag: Body > AvgBody(10) * 1.5
-        bodies = (df['close'] - df['open']).abs()
-        last_body = bodies.iloc[-1]
-        avg_body_10 = bodies.iloc[-11:-1].mean()
-        high_acceleration = last_body > (avg_body_10 * 1.5)
-        
-        # 3. Vector Strength: Normalized body displacement (0.0 to 1.0)
-        # Using Z-score like logic for normalization
-        vector_strength = min(1.0, last_body / (avg_body_10 * 2.0 + 1e-9))
-        
-        # 4. Sigma Alert: If current acceleration (velocity delta) > 3 sigma
-        velocities = df['close'].diff().abs()
-        v_mu = velocities.rolling(window=20).mean()
-        v_std = velocities.rolling(window=20).std()
-        sigma_val = (velocities.iloc[-1] - v_mu.iloc[-1]) / (v_std.iloc[-1] + 1e-9)
-        
-        if sigma_val > self.config["sigma_th"]:
-            logger.warning(f"🚀 ACCELERATION ALERT: {sigma_val:.2f}σ deviation detected!")
-
-        return {
-            "vector_strength": float(vector_strength),
-            "high_acceleration": bool(high_acceleration),
-            "impact_force": float(impact_force),
-            "sigma": float(sigma_val)
-        }
+        return self.momentum_v.analyze(df)
 
     def compute_acceleration_features(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -72,6 +78,9 @@ class AccelerationEngine:
         """
         res = pd.DataFrame(index=df.index)
         
+        if len(df) < self.config['atr_w'] + 1:
+            return res
+
         # 1. Displacement (Normalized by ATR)
         highs = df['high']
         lows = df['low']
@@ -105,19 +114,15 @@ class AccelerationEngine:
         # ------------------------------------
         
         # 3. FVG Recognition (Structural gap)
-        # Bullish Gap: Low(i) > High(i-2)
         bull_fvg = (lows > highs.shift(2)).astype(float)
-        # Bearish Gap: High(i) < Low(i-2)
         bear_fvg = (highs < lows.shift(2)).astype(float)
         res['fvg_created'] = (bull_fvg + bear_fvg).clip(0, 1)
         
         # 4. Velocity (Delta P / Delta T)
         res['velocity'] = closes.diff(1).abs() / (atr + 1e-9)
         
-        # 5. Composite Score (Logit-like)
+        # 5. Composite Score
         w = self.config['weights']
-        # Incorporate new metrics optionally or stick to config weights. 
-        # For now, map disp_norm ~ candle_momentum roughly.
         linear_comb = (w['w1'] * res['disp_norm'] + 
                        w['w2'] * res['vol_z'] + 
                        w['w3'] * res['fvg_created'] + 
@@ -128,9 +133,27 @@ class AccelerationEngine:
         # 6. Classification
         res['accel_type'] = self._classify_accel(res)
         
-        # 7. Entry Trigger (Flag)
-        res['accel_flag'] = ((res['accel_score'] > self.config['score_th']) & 
-                             (res['accel_type'].isin(['breakout', 'rejection']))).astype(int)
+        # 7. Initiative Candle (Vela de Iniciativa - FEAT CORE)
+        # Rule: Volume > 2.5 * AvgVol AND Body > 1.5 * ATR
+        is_initiative = (res['rvol'] > 2.5) & (res['candle_momentum'] > 1.5)
+        res['is_initiative'] = is_initiative.astype(float)
+        
+        # 8. Newtonian Delta (1st & 2nd Derivatives)
+        # This aligns the component [A] with strict derivative logic
+        velocity = closes.diff(1)
+        acceleration = velocity.diff(1)
+        res['newton_accel'] = acceleration / (atr + 1e-9) # Normalized acceleration
+        
+        # 9. Entry Trigger (Flag)
+        # Optimized for Operación Navaja: Initiative Candles OR High Newtonian Acceleration
+        res['accel_flag'] = (is_initiative | 
+                            (abs(res['newton_accel']) > self.config['accel_th']) |
+                            ((res['accel_score'] > self.config['score_th']) & 
+                             (res['accel_type'].isin(['breakout', 'rejection'])))).astype(int)
+        
+        # 10. Trap Detection
+        # If absolute velocity is high but acceleration is low -> Trap
+        res['is_trap'] = ((res['velocity'] > 1.0) & (abs(res['newton_accel']) < 0.2)).astype(int)
         
         return res
 

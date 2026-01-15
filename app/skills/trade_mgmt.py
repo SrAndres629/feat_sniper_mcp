@@ -39,6 +39,7 @@ class TradeManager:
         mode = os.getenv("TRADING_MODE", "SHADOW") # Default to Shadow for Safety
         
         if mode == "SHADOW" or mode == "SIMULATION":
+            ticket = int(time.time() % 100000) # Dummy ticket for shadow
             params['ticket'] = ticket
             params['status'] = f"{mode}_VALID"
             params['timestamp'] = datetime.now().isoformat()

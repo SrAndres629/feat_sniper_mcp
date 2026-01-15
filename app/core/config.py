@@ -98,6 +98,12 @@ class Settings(BaseSettings):
     RISK_PER_TRADE_PERCENT: float = 1.0
     MAX_OPEN_POSITIONS: int = 20  # Increased for multi-asset strategies
     MAX_CORRELATION_LIMIT: float = 0.65 
+    
+    # =========================================================================
+    # PERFORMANCE & LOGGING (Operación Navaja)
+    # =========================================================================
+    PERFORMANCE_MODE: bool = True  # Disables non-essential live cloud sync
+    TRADING_MODE: str = "SHADOW"   # Options: LIVE, SHADOW, SIMULATION
     VOLATILITY_ADAPTIVE_LOTS: bool = True
     ATR_TRAILING_MULTIPLIER: float = 1.5
     PHANTOM_MODE_ENABLED: bool = True

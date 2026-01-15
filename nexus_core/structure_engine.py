@@ -1,15 +1,6 @@
-"""
-FEAT NEXUS: STRUCTURE ENGINE (FourJarvis Protocol)
-==================================================
-Vectorized Price Action & Institutional Structure Quantification.
-Author: Antigravity Prime
-Version: 1.0.0
-"""
+import logging
 
-import numpy as np
-import pandas as pd
-from typing import Dict, Any, Tuple
-from numba import njit
+logger = logging.getLogger("feat.structure")
 
 class MAE_Pattern_Recognizer:
     """
@@ -18,214 +9,143 @@ class MAE_Pattern_Recognizer:
     Detects structural shifts (BOS/CHOCH) and fractal pivots.
     """
     def __init__(self):
-        print("[Form] Pattern Engine Online (MAE analysis)")
-        self.status = "RANGING"
-
-    def detect_fractals(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Bill Williams Fractal Detection (3-candle swing).
-        """
-        # Bullish Fractal: Low(i) < Low(i-1) and Low(i) < Low(i+1)
-        # Shifted by 1 to detect on bar completion
-        df['fractal_high'] = (df['high'] > df['high'].shift(1)) & (df['high'] > df['high'].shift(-1))
-        df['fractal_low'] = (df['low'] < df['low'].shift(1)) & (df['low'] < df['low'].shift(-1))
-        return df
+        logger.info("[Form] Pattern Engine Online (MAE Analysis Active)")
 
     def detect_mae_pattern(self, df: pd.DataFrame) -> Dict[str, Any]:
         """
         Detects Momentum -> Accumulation -> Expansion (MAE) phases.
-        Logic: 
-        1. Momentum: Body dominance > ATR * 1.5
-        2. Accumulation: Tight range (< 0.5 ATR)
-        3. Expansion: Breakout from accumulation range.
         """
-        if len(df) < 5:
-            return {"phase": "UNKNOWN", "status": "RANGING"}
+        if len(df) < 15:
+            return {"phase": "WARMUP", "status": "RANGING"}
 
-        # Calculate ATR proxy for the last 14 candles
-        atr_proxy = (df['high'] - df['low']).rolling(14).mean().iloc[-1]
-        last_body = (df['close'] - df['open']).iloc[-1]
+        # ATR Proxy for normalization
+        atr = (df['high'] - df['low']).rolling(14).mean().iloc[-1]
         
-        # 1. Momentum Check
-        if abs(last_body) > (atr_proxy * 1.5):
+        # 1. Momentum: Large body displacement
+        body = df['close'].iloc[-1] - df['open'].iloc[-1]
+        is_momentum = abs(body) > (atr * 1.5)
+        
+        # 2. Accumulation: Compressed range (last 3-5 candles)
+        recent_range = (df['high'].iloc[-5:-1].max() - df['low'].iloc[-5:-1].min())
+        is_accumulation = recent_range < (atr * 1.2)
+        
+        # 3. Expansion: Breaking the accumulation zone
+        upper_bound = df['high'].iloc[-5:-1].max()
+        lower_bound = df['low'].iloc[-5:-1].min()
+        
+        is_expansion_up = df['close'].iloc[-1] > upper_bound and body > 0
+        is_expansion_down = df['close'].iloc[-1] < lower_bound and body < 0
+        
+        status = "RANGING"
+        phase = "NORMAL"
+        
+        if is_momentum:
             phase = "MOMENTUM"
-            self.status = "BULLISH_BOS" if last_body > 0 else "BEARISH_BOS"
-        
-        # 2. Accumulation Check
-        elif (df['high'] - df['low']).iloc[-1] < (atr_proxy * 0.5):
+            status = "IMPULSE"
+        elif is_accumulation:
             phase = "ACCUMULATION"
-            self.status = "RANGING"
-        
-        # 3. Expansion Check
-        elif abs(last_body) > atr_proxy and (df['high'] - df['low']).iloc[-2] < (atr_proxy * 0.5):
+            status = "COMPRESSION"
+        elif is_expansion_up or is_expansion_down:
             phase = "EXPANSION"
-            self.status = "CHOCH"
-        else:
-            phase = "NORMAL"
-            self.status = "RANGING"
+            status = "BREAKOUT"
 
-        return {"phase": phase, "status": self.status}
-
-mae_recognizer = MAE_Pattern_Recognizer()
-
-class StructureEngine:
-    def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {
-            "va_pct": 0.70,
-            "atr_window": 14,
-            "weights": {
-                "F": 0.30, "E": 0.30, "A": 0.20, "T": 0.20
-            }
+        return {
+            "phase": phase,
+            "status": status,
+            "is_expansion": is_expansion_up or is_expansion_down,
+            "direction": 1 if is_expansion_up else (-1 if is_expansion_down else 0)
         }
 
-    def detect_structure(self, df: pd.DataFrame) -> pd.DataFrame:
+class StructureEngine:
+    """
+    Institutional Structure quantification: Fractals, BOS, CHOCH.
+    """
+    def __init__(self, config: Dict[str, Any] = None):
+        self.config = config or {
+            "atr_window": 14,
+            "weights": {"F": 0.35, "E": 0.25, "A": 0.20, "T": 0.20}
+        }
+        self.mae_recognizer = MAE_Pattern_Recognizer()
+
+    def identify_fractals(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Identifies Bill Williams Fractals and Break of Structure (BOS).
+        Bill Williams Fractals (5-candle pattern).
+        A fractal is confirmed when the middle candle is the highest/lowest of 5.
         """
-        # Fractal simple (High/Low of 5 candles, centered)
-        # Shifted back by 2 to align with completion
-        df['fractal_high'] = (df['high'].rolling(window=5, center=True).max() == df['high']).fillna(False)
-        df['fractal_low'] = (df['low'].rolling(window=5, center=True).min() == df['low']).fillna(False)
+        # High Fractals
+        df['fractal_high'] = (df['high'].shift(2) > df['high'].shift(4)) & \
+                             (df['high'].shift(2) > df['high'].shift(3)) & \
+                             (df['high'].shift(2) > df['high'].shift(1)) & \
+                             (df['high'].shift(2) > df['high'])
         
-        # BOS (Break of Structure)
-        # Bullish BOS: Close > Previous Fractal High
-        # Note: In real-time, we look at confirmed fractals (shifted)
-        # Using shift(1) to avoid lookahead bias if using centered rolling on historical data
-        # For live, we strictly check past fractals.
-        
-        # Vectorized check roughly: Close > Last confirmed Fractal High
-        # For simplicity in this vectorization, we compare simply to potential fractal points
-        # (This assumes df is historical. For live, careful indexing is needed)
-        
-        # Simplified vector logic from prompt:
-        df['bos_bullish'] = np.where((df['close'] > df['high'].shift(1)) & (df['fractal_high'].shift(1)), 1, 0)
-        df['bos_bearish'] = np.where((df['close'] < df['low'].shift(1)) & (df['fractal_low'].shift(1)), 1, 0)
-        
+        # Low Fractals
+        df['fractal_low'] = (df['low'].shift(2) < df['low'].shift(4)) & \
+                            (df['low'].shift(2) < df['low'].shift(3)) & \
+                            (df['low'].shift(2) < df['low'].shift(1)) & \
+                            (df['low'].shift(2) < df['low'])
         return df
 
-    def detect_zones(self, df: pd.DataFrame) -> pd.DataFrame:
+    def detect_structural_shifts(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Detects FVG and Order Blocks using vectorized logic.
+        BOS (Break of Structure): Trend continuation.
+        CHOCH (Change of Character): Trend reversal (First break against trend).
         """
-        # FVG Detection
-        df['fvg_bull_gap'] = df['low'] - df['high'].shift(2)
-        df['fvg_bull'] = np.where((df['fvg_bull_gap'] > 0) & (df['close'] > df['open']), 1, 0)
+        df = self.identify_fractals(df)
         
-        df['fvg_bear_gap'] = df['low'].shift(2) - df['high']
-        df['fvg_bear'] = np.where((df['fvg_bear_gap'] > 0) & (df['close'] < df['open']), 1, 0)
+        # Track last confirmed fractal levels
+        df['last_h_fractal'] = df['high'].where(df['fractal_high']).ffill()
+        df['last_l_fractal'] = df['low'].where(df['fractal_low']).ffill()
         
-        # OB Detection (Approximation from prompt)
-        # Bullish OB: Red candle before strong up move (2 green candles)
-        is_red = df['close'] < df['open']
-        strong_move_up = (df['close'].shift(-1) > df['open'].shift(-1)) & (df['close'].shift(-2) > df['open'].shift(-2))
+        # BOS: Close exceeds last fractal in trend direction
+        df['bos_bull'] = (df['close'] > df['last_h_fractal'].shift(1)) & (df['close'].shift(1) <= df['last_h_fractal'].shift(1))
+        df['bos_bear'] = (df['close'] < df['last_l_fractal'].shift(1)) & (df['close'].shift(1) >= df['last_l_fractal'].shift(1))
         
-        # Note: shift(-1) is future looking. For labeling/training this is fine.
-        # For LIVE FEAT, we must look at PAST patterns.
-        # Adjusted for LIVE detection (looking back):
-        # Bullish OB formed 2 bars ago if: Candle(i-2) red, Candle(i-1) green, Candle(i) green
-        is_red_prev = df['close'].shift(2) < df['open'].shift(2)
-        strong_move_up_confirmed = (df['close'].shift(1) > df['open'].shift(1)) & (df['close'] > df['open'])
-        
-        df['ob_bull'] = np.where(is_red_prev & strong_move_up_confirmed, 1, 0)
-        
-        # Bearish OB: Green candle before strong down move
-        is_green_prev = df['close'].shift(2) > df['open'].shift(2)
-        strong_move_down_confirmed = (df['close'].shift(1) < df['open'].shift(1)) & (df['close'] < df['open'])
-        
-        df['ob_bear'] = np.where(is_green_prev & strong_move_down_confirmed, 1, 0)
+        # CHOCH (Simplified): Cross of EMA 9/21 aligned with a break
+        ema9 = df['close'].ewm(span=9).mean()
+        ema21 = df['close'].ewm(span=21).mean()
+        df['choch_bull'] = (ema9 > ema21) & (ema9.shift(1) <= ema21.shift(1)) & df['bos_bull']
+        df['choch_bear'] = (ema9 < ema21) & (ema9.shift(1) >= ema21.shift(1)) & df['bos_bear']
         
         return df
-
-    def score_phase_form(self, df: pd.DataFrame) -> pd.Series:
-        """
-        FASE 1: Forma (F) - Score based on BOS and Fractals
-        """
-        # Simplified vector proxies for structural scores
-        ob_presence = (df.get('ob_bull', 0) + df.get('ob_bear', 0))
-        
-        # BOS Proxy: Cierre por fuera de la banda Bollinger superior/inferior o similar
-        # Usaremos breakout de máximo/mínimo de 20 periodos
-        bos_score = (df.get('bos_bullish', 0) + df.get('bos_bearish', 0))
-        
-        # CHOCH Proxy: Cambio de signo en la diferencia de EMAs
-        ema_f = df['close'].ewm(span=9).mean()
-        ema_s = df['close'].ewm(span=21).mean()
-        choch_score = (np.sign(ema_f - ema_s) != np.sign(ema_f.shift(1) - ema_s.shift(1))).astype(float)
-        
-        fractal_score = (df.get('fractal_high', False) | df.get('fractal_low', False)).astype(float)
-
-        score_f = (0.35 * bos_score + 0.25 * choch_score + 0.25 * fractal_score + 0.15 * ob_presence)
-        return score_f.clip(0, 1)
-
-    def score_phase_space(self, df: pd.DataFrame) -> pd.Series:
-        """
-        FASE 2: Espacio (E) - Based on FVG and Liquidity Pools
-        """
-        fvg_score = (df.get('fvg_bull', 0) + df.get('fvg_bear', 0))
-        
-        # Pool Proxy: EQH / EQL (Double tops/bottoms)
-        eq_highs = (np.abs(df['high'] - df['high'].shift(1)) < (df['high'] * 0.0001)).astype(float)
-        eq_lows = (np.abs(df['low'] - df['low'].shift(1)) < (df['low'] * 0.0001)).astype(float)
-        pool_score = (eq_highs | eq_lows).rolling(5).max().fillna(0)
-        
-        score_e = (0.35 * pool_score + 0.40 * fvg_score + 0.25 * 0.5)
-        return score_e.clip(0, 1)
-
-    def score_phase_acceleration(self, df: pd.DataFrame) -> pd.Series:
-        """
-        FASE 3: Aceleración (A) - Now delegated to AccelerationEngine mostly, but for FEAT Index we keep simple check
-        """
-        vol_mean = df['volume'].rolling(20).mean()
-        vol_score = (df['volume'] > 1.5 * vol_mean).astype(float)
-        
-        # Speed: Range expansion
-        atr = (df['high'] - df['low']).rolling(14).mean()
-        speed_score = ((df['high'] - df['low']) > 1.2 * atr).astype(float)
-        
-        score_a = (0.5 * vol_score + 0.3 * speed_score + 0.2 * 0.5)
-        return score_a.clip(0, 1)
 
     def compute_feat_index(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Final FEAT Index calculation (0-100).
         """
-        # 1. Detect Structure & Zones
-        df = self.detect_structure(df)
-        df = self.detect_zones(df)
+        df = self.detect_structural_shifts(df)
         
-        # 2. Score Components
-        p_f = self.score_phase_form(df)
-        p_e = self.score_phase_space(df)
-        p_a = self.score_phase_acceleration(df)
+        # Scoring logic
+        mae = self.mae_recognizer.detect_mae_pattern(df)
         
-        # Phase T (Time): Simulated for now (Killzones should be added based on timestamp)
-        if hasattr(df.index, 'hour'):
-            df_time = df.index
-        elif 'tick_time' in df.columns:
-            df_time = pd.to_datetime(df['tick_time'])
-        else:
-            # Fallback
-            df_time = pd.to_datetime(df.index) if not isinstance(df.index, pd.RangeIndex) else pd.Series(pd.Timestamp.now(), index=df.index)
+        # F-Score (Form)
+        f_score = 0.0
+        if mae['phase'] == "EXPANSION": f_score += 0.4
+        if df['bos_bull'].iloc[-1] or df['bos_bear'].iloc[-1]: f_score += 0.3
+        if df['choch_bull'].iloc[-1] or df['choch_bear'].iloc[-1]: f_score += 0.3
+        
+        # E-Score (Space) - Proxy using FVG from OHLC
+        fvg_bull = (df['low'] > df['high'].shift(2)).iloc[-1]
+        fvg_bear = (df['high'] < df['low'].shift(2)).iloc[-1]
+        e_score = 0.5 if (fvg_bull or fvg_bear) else 0.2
+        
+        # A-Score (Acceleration) - Simple volatility proxy
+        atr = (df['high'] - df['low']).rolling(14).mean().iloc[-1]
+        curr_range = df['high'].iloc[-1] - df['low'].iloc[-1]
+        a_score = min(1.0, curr_range / (atr * 2 + 1e-9))
+        
+        # T-Score (Time) - Handled externally, but adding dummy for index
+        t_score = 0.5 
 
-        try:
-             # 1.0 if between 07:00-11:00 (London) or 13:00-17:00 (NY) UTC
-            is_london = df_time.hour.map(lambda h: 1.0 if 7 <= h <= 11 else 0.0)
-            is_ny = df_time.hour.map(lambda h: 1.0 if 13 <= h <= 17 else 0.0)
-            p_t = (is_london | is_ny).astype(float)
-        except:
-             p_t = pd.Series(0.5, index=df.index)
-
-        
         w = self.config["weights"]
-        p_feat = (w["F"] * p_f + w["E"] * p_e + w["A"] * p_a + w["T"] * p_t)
+        feat_val = (w['F'] * f_score + w['E'] * e_score + w['A'] * a_score + w['T'] * t_score)
         
-        results = pd.DataFrame(index=df.index)
-        results['feat_form'] = p_f
-        results['feat_space'] = p_e
-        results['feat_acceleration'] = p_a
-        results['feat_time'] = p_t
-        results['feat_index'] = (p_feat * 100).round(2)
+        res = pd.DataFrame(index=df.index)
+        res['feat_index'] = round(feat_val * 100, 2)
+        res['structure_status'] = mae['status']
+        res['is_mae_expansion'] = mae['is_expansion']
         
-        return results
+        return res
+
+structure_engine = StructureEngine()
 
 structure_engine = StructureEngine()

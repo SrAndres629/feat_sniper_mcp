@@ -1,20 +1,10 @@
-"""
-FEAT Chain - Institutional Trading Logic (P0 REPAIR)
-=====================================================
-Chain of Responsibility pattern for FEAT validation.
-
-[P0 REPAIR] Fixes:
-- Symbol Isolation: Each asset has its own MicroStructure memory
-- Threshold Unification: Uses is_accelerating (σ dynamic) instead of 2.0 fixed
-- UTC Enforcement: Killzones use UTC time, not local server time
-- Warmup Safety: Returns False during warmup, not forced True
-"""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional, Dict, Any
 import logging
 import collections
 from datetime import datetime, timezone, time as dt_time
+import pandas as pd
 
 # Logger
 logger = logging.getLogger("feat.chain")
@@ -73,8 +63,6 @@ class MicroStructure:
     def check_bos(self, current_price: float, trend: str) -> tuple:
         """
         Check for Break of Structure.
-        
-        [P0 FIX] Returns (False, "WARMING_UP") during warmup instead of forced True.
         """
         if not self._warmup_complete:
             return False, f"WARMING_UP ({len(self.prices)}/10 ticks)"
@@ -127,201 +115,140 @@ class FEATRule(ABC):
 
 class FormRule(FEATRule):
     """
-    Regla F: Valida Estructura (BOS/CHOCH Real).
-    
-    [P0 FIX] Now receives MicroStructure from FEATChain, not global singleton.
+    Regla F: Valida Estructura (BOS/CHOCH/MAE).
     """
-    def __init__(self, get_structure_fn):
-        super().__init__()
-        self._get_structure = get_structure_fn
-    
     async def validate(self, market_data: Dict, physics_output: Optional[Any]) -> ValidationResult:
-        symbol = market_data.get('symbol', 'UNKNOWN')
-        price = float(market_data.get('bid', 0) or market_data.get('close', 0))
-        trend = physics_output.trend if physics_output else "NEUTRAL"
-        
-        # [P0 FIX] Get symbol-specific structure memory
-        structure = self._get_structure(symbol)
-        
-        # Update Memory
-        structure.update(price)
-        
-        # Check Break of Structure
-        is_bos, reason = structure.check_bos(price, trend)
+        try:
+            from nexus_core.structure_engine import structure_engine
+            from app.skills.market_physics import market_physics
+            
+            if not hasattr(market_physics, 'price_window') or len(market_physics.price_window) < 10:
+                return ValidationResult(False, "Forma", "Warmup (Prices < 10)", {})
 
-        result = ValidationResult(
-            is_valid=is_bos,
-            rule_name="Forma",
-            message=reason,
-            data={"trend": trend, "last_high": structure.fractal_high, "symbol": symbol}
-        )
-        
-        if result.is_valid:
-            return await self.pass_next(market_data, physics_output, result)
-        return result
+            df = pd.DataFrame({'close': list(market_physics.price_window)})
+            if hasattr(market_physics, 'volume_window'):
+                df['volume'] = list(market_physics.volume_window)
+            
+            # Simple OHLC reconstruction for structure engine
+            df['high'] = df['close']
+            df['low'] = df['close']
+            df['open'] = df['close']
+            
+            res = structure_engine.compute_feat_index(df)
+            last = res.iloc[-1]
+            
+            is_valid = last['feat_index'] > 60.0
+            
+            result = ValidationResult(
+                is_valid=is_valid,
+                rule_name="Forma",
+                message=f"Estructura: {last['structure_status']} (FEAT:{last['feat_index']})",
+                data={"feat_index": last['feat_index']}
+            )
+            
+            if result.is_valid:
+                return await self.pass_next(market_data, physics_output, result)
+            return result
+        except Exception as e:
+            return ValidationResult(False, "Forma", f"Error: {e}", {})
 
 
 class AccelerationRule(FEATRule):
     """
-    Regla A: Valida Física de Mercado (Módulo 2).
-    
-    [P0 FIX] Uses is_accelerating (σ-based) instead of fixed 2.0 threshold.
+    Regla A: Valida Física de Mercado (Newtonian Acceleration).
     """
     async def validate(self, market_data: Dict, physics_output: Optional[Any]) -> ValidationResult:
-        if not physics_output:
-            return ValidationResult(False, "Aceleración", "No Physics Data", {})
+        try:
+            from nexus_core.acceleration import acceleration_engine
+            from app.skills.market_physics import market_physics
+            
+            if not hasattr(market_physics, 'price_window') or len(market_physics.price_window) < 10:
+                 return ValidationResult(False, "Aceleración", "Warmup", {})
 
-        # [P0 FIX] Use the σ-dynamic is_accelerating, not fixed threshold
-        is_valid = getattr(physics_output, 'is_accelerating', False)
-        accel_val = getattr(physics_output, 'acceleration_score', 0.0)
-
-        result = ValidationResult(
-            is_valid=is_valid,
-            rule_name="Aceleración",
-            message=f"Aceleración Confirmada: {accel_val:.2f} (σ-dynamic)" if is_valid else f"Inercia: {accel_val:.2f} (below σ threshold)",
-            data={
-                "acceleration": accel_val, 
-                "z_score": getattr(physics_output, 'vol_z_score', 0.0),
-                "is_accelerating": is_valid
-            }
-        )
-        
-        if result.is_valid:
-            return await self.pass_next(market_data, physics_output, result)
-        return result
+            df = pd.DataFrame({'close': list(market_physics.price_window)})
+            vec = acceleration_engine.calculate_momentum_vector(df)
+            
+            is_valid = vec['is_valid']
+            
+            result = ValidationResult(
+                is_valid=is_valid,
+                rule_name="Aceleración",
+                message=f"Newtonian: {vec['status']} (Acc:{vec['acceleration']:.2f})",
+                data=vec
+            )
+            
+            if result.is_valid:
+                return await self.pass_next(market_data, physics_output, result)
+            return result
+        except Exception as e:
+            return ValidationResult(False, "Aceleración", f"Error: {e}", {})
 
 
 class SpaceRule(FEATRule):
     """
-    Regla E: Valida Espacio (Liquidez y FVG).
-    
-    [LAST MILE] Real FVG Calculation:
-    - FVG = distance between fractals from MicroStructure
-    - If no clear gap, use distance to nearest fractal
+    Regla E: Valida Espacio (Liquidez y POI).
     """
-    def __init__(self, get_structure_fn):
-        super().__init__()
-        self._get_structure = get_structure_fn
-    
     async def validate(self, market_data: Dict, physics_output: Optional[Any]) -> ValidationResult:
-        symbol = market_data.get('symbol', 'UNKNOWN')
-        current_price = float(market_data.get('bid', 0) or market_data.get('close', 0))
-        
-        # Get symbol-specific structure for fractal data
-        structure = self._get_structure(symbol)
-        
-        is_displacement = False
-        fv_gap = 0.0
-        gap_type = "NONE"
-        
-        if physics_output:
-            accel = getattr(physics_output, 'acceleration_score', 0.0)
-            vol_z = getattr(physics_output, 'vol_z_score', 0.0)
+        try:
+            from app.skills.liquidity import liquidity_map
+            price = float(market_data.get('bid', 0) or market_data.get('close', 0))
             
-            # Displacement detection: high acceleration + high volume
-            if accel > 1.5 and vol_z > 1.0:
-                is_displacement = True
+            poi = liquidity_map.get_nearest_poi(price)
+            if not poi:
+                return ValidationResult(False, "Espacio", "No POI Mapped", {})
                 
-                # [LAST MILE] Real FVG Calculation
-                # Use fractals from MicroStructure instead of placeholder
-                fractal_high = structure.fractal_high if structure.fractal_high > 0 else current_price
-                fractal_low = structure.fractal_low if structure.fractal_low < float('inf') else current_price
-                
-                if fractal_high > 0 and fractal_low < float('inf'):
-                    # FVG = range between recent fractals
-                    fv_gap = abs(fractal_high - fractal_low)
-                    
-                    # Determine gap type based on current price position
-                    if current_price > fractal_high:
-                        gap_type = "BULLISH_BREAKOUT"
-                    elif current_price < fractal_low:
-                        gap_type = "BEARISH_BREAKOUT"
-                    else:
-                        gap_type = "INSIDE_RANGE"
-                else:
-                    # Fallback: distance from current price to ATR (if available)
-                    atr = getattr(physics_output, 'atr', 0)
-                    fv_gap = atr if atr > 0 else 0
-                    gap_type = "ATR_FALLBACK"
-        
-        result = ValidationResult(
-            is_valid=is_displacement,
-            rule_name="Espacio",
-            message=f"FVG Detectado: {fv_gap:.2f} ({gap_type})" if is_displacement else "Low Volatility/Congestion",
-            data={
-                "fvg_size": round(fv_gap, 4), 
-                "is_displacement": is_displacement,
-                "gap_type": gap_type
-            }
-        )
-
-        if result.is_valid:
-            return await self.pass_next(market_data, physics_output, result)
-        return result
+            dist = abs(poi["price"] - price)
+            atr = getattr(physics_output, 'atr', 0.001)
+            is_near = dist < (atr * 2.0)
+            
+            result = ValidationResult(
+                is_valid=is_near,
+                rule_name="Espacio",
+                message=f"POI: {poi['name']} at {dist:.4f} dist",
+                data={"poi": poi, "dist": dist}
+            )
+            
+            if result.is_valid:
+                return await self.pass_next(market_data, physics_output, result)
+            return result
+        except Exception as e:
+            return ValidationResult(False, "Espacio", f"Error: {e}", {})
 
 
 class TimeRule(FEATRule):
     """
-    Regla T: Valida Tiempo (Killzones).
-    
-    [P0 FIX] Uses UTC time, not local server time.
+    Regla T: Valida Tiempo (Killzones NY).
     """
-    
-    # Killzones in UTC
-    KILLZONES = {
-        "LONDON_OPEN": (dt_time(7, 0), dt_time(10, 0)),   # 07:00-10:00 UTC
-        "NY_OPEN": (dt_time(12, 0), dt_time(15, 0)),      # 12:00-15:00 UTC
-        "LONDON_CLOSE": (dt_time(15, 0), dt_time(17, 0)), # 15:00-17:00 UTC (overlap)
-        "ASIA": (dt_time(0, 0), dt_time(3, 0)),           # 00:00-03:00 UTC (optional)
-    }
-    
     async def validate(self, market_data: Dict, physics_output: Optional[Any]) -> ValidationResult:
-        # [P0 FIX] Use UTC time, not local time
-        if 'simulated_time' in market_data:
-            now = market_data['simulated_time']
-            if now.tzinfo is None:
-                now = now.replace(tzinfo=timezone.utc)
-        else:
-            now = datetime.now(timezone.utc)
+        try:
+            from app.skills.calendar import chronos_engine
+            t_val = chronos_engine.validate_window()
             
-        t = now.time()
-        
-        # Check which killzone we're in
-        active_kz = None
-        for kz_name, (start, end) in self.KILLZONES.items():
-            if start <= t <= end:
-                active_kz = kz_name
-                break
-        
-        is_valid = active_kz is not None
-
-        result = ValidationResult(
-            is_valid=is_valid,
-            rule_name="Tiempo",
-            message=f"Killzone Activa: {active_kz} ({t.strftime('%H:%M')} UTC)" if is_valid else f"Fuera de Horario ({t.strftime('%H:%M')} UTC)",
-            data={"session": active_kz or "NONE", "time_utc": t.isoformat()}
-        )
-
-        if result.is_valid:
-            return await self.pass_next(market_data, physics_output, result)
-        return result
+            result = ValidationResult(
+                is_valid=t_val["is_valid"],
+                rule_name="Tiempo",
+                message=f"Session: {t_val['session']} ({t_val['ny_time']} NY)",
+                data=t_val
+            )
+            
+            if result.is_valid:
+                return await self.pass_next(market_data, physics_output, result)
+            return result
+        except Exception as e:
+            return ValidationResult(False, "Tiempo", f"Error: {e}", {})
 
 
 class FEATChain:
     """
     Coordinador de la cadena de decisión con protección Black Swan.
-    
-    [P0 FIX] Symbol-isolated MicroStructure memories.
     """
     def __init__(self):
         # [P0 FIX] Per-symbol structure memories
         self._structure_memories: Dict[str, MicroStructure] = {}
         
         # Chain Assembly: F -> E -> A -> T
-        # Note: Order could be optimized to T -> A -> E -> F for efficiency
-        # but keeping F first for compatibility with existing logic flow
-        self.form = FormRule(self._get_structure)
-        self.space = SpaceRule(self._get_structure)  # [LAST MILE] Now uses real fractals
+        self.form = FormRule()
+        self.space = SpaceRule()
         self.accel = AccelerationRule()
         self.time = TimeRule()
 
@@ -335,147 +262,69 @@ class FEATChain:
         # Black Swan state cache
         self._last_black_swan_decision = None
         
-        logger.info("[BRAIN] FEAT Logic Chain Assembled (Symbol-Isolated, UTC-Enforced)")
+        logger.info("[BRAIN] FEAT Logic Chain Assembled (Institutional Mode)")
 
     def _get_structure(self, symbol: str) -> MicroStructure:
-        """
-        [P0 FIX] Get or create symbol-specific structure memory.
-        
-        Each asset now has its own isolated geometric brain.
-        """
         if symbol not in self._structure_memories:
             self._structure_memories[symbol] = MicroStructure(symbol)
-            logger.info(f"[FEAT] Created isolated MicroStructure for {symbol}")
         return self._structure_memories[symbol]
 
     async def check_black_swan(self, market_data: Dict, physics_output: Optional[Any] = None) -> tuple:
-        """
-        Pre-validate market conditions for Black Swan events.
-        
-        Returns:
-            Tuple of (can_trade: bool, lot_multiplier: float, rejection_reason: str)
-        """
         guard = _get_black_swan_guard()
         if not guard:
-            return (True, 1.0, None)  # Guard not available, proceed
+            return (True, 1.0, None)
         
-        # Extract ATR from physics or market_data
         atr = 0.0
         if physics_output:
-            atr = getattr(physics_output, 'atr', 0) or getattr(physics_output, 'atr_14', 0)
-        if atr == 0:
-            atr = market_data.get('atr', 0) or market_data.get('atr_14', 0)
+            atr = getattr(physics_output, 'atr', 0)
         
-        # Extract spread if available
         spread = None
         if 'ask' in market_data and 'bid' in market_data:
             spread = float(market_data.get('ask', 0)) - float(market_data.get('bid', 0))
         
-        # Extract equity
-        equity = market_data.get('equity', 0) or market_data.get('account_equity', 20.0)
+        equity = market_data.get('equity', 20.0)
         
-        # Skip if no ATR data available
         if atr <= 0:
-            logger.debug("[BLACK_SWAN] No ATR data, skipping guard check")
             return (True, 1.0, None)
         
         try:
-            decision = guard.evaluate(
-                current_atr=atr,
-                current_equity=equity,
-                current_spread=spread
-            )
-            
+            decision = guard.evaluate(current_atr=atr, current_equity=equity, current_spread=spread)
             self._last_black_swan_decision = decision
-            
             if not decision.can_trade:
-                reasons = "; ".join(decision.rejection_reasons)
-                logger.warning(f"🛡️ [BLACK_SWAN] Trading BLOCKED: {reasons}")
-                return (False, 0.0, reasons)
-            
-            if decision.lot_multiplier < 1.0:
-                logger.info(f"⚠️ [BLACK_SWAN] Lot reduced to {decision.lot_multiplier*100:.0f}%")
-            
+                return (False, 0.0, "; ".join(decision.rejection_reasons))
             return (True, decision.lot_multiplier, None)
-            
-        except Exception as e:
-            logger.error(f"[BLACK_SWAN] Guard evaluation failed: {e}")
+        except:
             return (True, 0.5, None)
 
     async def analyze(self, market_data: Dict, current_price: float, precomputed_physics: Optional[Any] = None) -> bool:
-        """Interfaz pública compatible con mcp_server.py"""
-        
-        # Ensure symbol is in market_data
         if 'symbol' not in market_data:
             market_data['symbol'] = 'UNKNOWN'
         
-        # =====================================================
-        # PHASE 0: BLACK SWAN GUARD (First line of defense)
-        # =====================================================
         can_trade, lot_mult, rejection = await self.check_black_swan(market_data, precomputed_physics)
-        
         if not can_trade:
-            logger.warning(f"🚨 [BLACK_SWAN] TRADING HALTED: {rejection}")
             return False
         
-        # Store lot multiplier for downstream use
         market_data['_black_swan_lot_multiplier'] = lot_mult
         
-        # =====================================================
-        # PHASE 1: PHYSICS ENGINE
-        # =====================================================
-        try:
-            from app.skills.market_physics import market_physics
-            
-            if precomputed_physics:
-                physics_output = precomputed_physics
-            else:
-                if 'simulated_time' in market_data:
-                    ts = market_data['simulated_time'].timestamp()
-                else:
-                    ts = datetime.now(timezone.utc).timestamp()
-                    
-                physics_output = market_physics.ingest_tick(market_data, force_timestamp=ts)
-            
-        except ImportError:
-            physics_output = None
-            logger.warning("Physics Engine Missing during analysis")
+        physics_output = precomputed_physics
+        if not physics_output:
+            try:
+                from app.skills.market_physics import market_physics
+                physics_output = market_physics.ingest_tick(market_data)
+            except:
+                pass
 
-        # =====================================================
-        # PHASE 2: FEAT CHAIN VALIDATION (F->E->A->T)
-        # =====================================================
         result = await self.head.validate(market_data, physics_output)
         
         if result.is_valid:
-            symbol = market_data.get('symbol', 'UNKNOWN')
-            if lot_mult < 1.0:
-                logger.info(f"✅ [{symbol}] FEAT SETUP CONFIRMED (Lot: {lot_mult*100:.0f}%): {result.message}")
-            else:
-                logger.info(f"✅ [{symbol}] FEAT SETUP CONFIRMED: {result.message}")
+            logger.info(f"✅ FEAT SETUP CONFIRMED: {result.message}")
             return True
-        else:
-            logger.debug(f"❌ FEAT REJECT: [{result.rule_name}] {result.message}")
-            return False
-    
-    def get_structure_status(self, symbol: str = None) -> Dict[str, Any]:
-        """Get structure memory status for monitoring."""
-        if symbol:
-            if symbol in self._structure_memories:
-                return self._structure_memories[symbol].get_status()
-            return {"error": f"No structure for {symbol}"}
-        return {s: m.get_status() for s, m in self._structure_memories.items()}
-    
-    def get_black_swan_status(self) -> Dict[str, Any]:
-        """Get current Black Swan guard status for monitoring."""
-        guard = _get_black_swan_guard()
-        if guard:
-            return guard.get_status()
-        return {"status": "guard_not_available"}
-    
-    def get_last_decision(self) -> Optional[Any]:
-        """Get the last Black Swan decision for inspection."""
-        return self._last_black_swan_decision
+        return False
 
+    def get_structure_status(self, symbol: str = None) -> Dict[str, Any]:
+        if symbol and symbol in self._structure_memories:
+            return self._structure_memories[symbol].get_status()
+        return {s: m.get_status() for s, m in self._structure_memories.items()}
 
 # Global singleton
 feat_full_chain_institucional = FEATChain()

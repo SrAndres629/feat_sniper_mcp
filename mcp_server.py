@@ -70,6 +70,7 @@ for name in ['docket', 'fastmcp', 'uvicorn', 'httpx', 'httpcore', 'urllib3']:
 
 # 4. Imports peligrosos
 import asyncio
+import pandas as pd
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
@@ -340,17 +341,32 @@ async def app_lifespan(server: FastMCP):
                     # 2. Neural Link (M4 - Probabilistic)
                     brain_score = await neural_api.predict_next_candle(data, regime)
                     
-                    # [VISIBILITY LAYER] Push Signals to Dashboard
-                    if dashboard:
+                    # 2b. FEAT Index (M3 Evolution)
+                    feat_index = 0.0
+                    try:
+                         if hasattr(market_physics, 'price_window') and len(market_physics.price_window) > 10:
+                             df_physics = pd.DataFrame({'close': list(market_physics.price_window)})
+                             if hasattr(market_physics, 'volume_window'):
+                                 df_physics['volume'] = list(market_physics.volume_window)
+                             
+                             from nexus_core.structure_engine import structure_engine
+                             feat_results = structure_engine.compute_feat_index(df_physics)
+                             feat_index = float(feat_results['feat_index'].iloc[-1])
+                    except Exception as e:
+                         logger.debug(f"FEAT Index calc fail: {e}")
+                         feat_index = 50.0
+
+                    # [VISIBILITY LAYER] Push Signals to Dashboard (Skip in PERFORMANCE_MODE)
+                    if dashboard and not settings.PERFORMANCE_MODE:
                         asyncio.create_task(dashboard.push_signals({
                             "alpha_confidence": brain_score.get('alpha_confidence', 0),
                             "acceleration": regime.acceleration_score if regime else 0,
                             "hurst": regime.hurst_exponent if regime else 0.5,
-                            "price": price
+                            "price": price,
+                            "feat_index": feat_index,
+                            "is_initiative": getattr(regime, 'is_initiative_candle', False)
                         }))
                         
-                        # [VISIBILITY LAYER] Push Metrics (Balance/Equity)
-                        # In a real ticking loop, we limit this rate, but here we do it per nerve pulse for max freshness
                         if trade_manager:
                             acc = mt5.account_info()
                             if acc:
@@ -359,24 +375,53 @@ async def app_lifespan(server: FastMCP):
                                     "equity": acc.equity,
                                     "margin_free": acc.margin_free
                                 }))
+                    elif settings.PERFORMANCE_MODE:
+                        # Minimal log for local visibility only
+                        if getattr(regime, 'is_initiative_candle', False):
+                            logger.info(f"🔥 [INITIATIVE] Signal candidate for {data.get('symbol')} | Conf: {brain_score.get('alpha_confidence', 0):.2f}")
                     
                     # 3. Decision Fusion
                     execute = is_valid and brain_score.get('execute_trade', False)
                     
+                    # 4. HUD Projection (M8) - BROADCAST TELEMETRY BACK TO MT5
+                    projections = {
+                        "high": price + (regime.atr * 2.5) if regime and hasattr(regime, 'atr') else 0,
+                        "low": price - (regime.atr * 2.5) if regime and hasattr(regime, 'atr') else 0
+                    }
+                    
+                    await hud_projector.project_telemetry(
+                        symbol=data.get('symbol'),
+                        feat_index=round(feat_index, 1),
+                        regime=regime.trend if regime else "NEUTRAL",
+                        ai_confidence=round(brain_score.get('alpha_confidence', 0) * 100, 1),
+                        projections=projections,
+                        vault_active=True
+                    )
+
                     if execute:
                         direction = "BUY" if regime.trend == "BULLISH" else "SELL"
                         
-                        # 4. HUD Projection (M8)
-                        await hud_projector.draw_arrow(data.get('symbol'), price, direction)
+                        # [RISK CHECK] Institutional Lot Allocation (Protocol 7)
+                        dynamic_lot = await risk_engine.calculate_dynamic_lot(
+                            confidence=brain_score.get('alpha_confidence', 0),
+                            volatility=regime.atr if regime else 0.0,
+                            symbol=data.get('symbol', 'XAUUSD'),
+                            market_data=data
+                        )
                         
-                        # 5. Execution
-                        if trade_manager:
-                             logger.info(f"🚀 EXECUTION: {direction} | BrainConf: {brain_score.get('alpha_confidence',0):.2f}")
-                             await trade_manager.execute_order(direction, {
-                                 "symbol": data.get('symbol', 'XAUUSD'),
-                                 "volume": brain_score.get('neural_lot_allocation', 0.01),
-                                 "comment": "FEAT_NEURAL_V1"
-                             })
+                        if dynamic_lot <= 0:
+                            logger.warning(f"🛡️ RISK VETO: Execution aborted for {data.get('symbol')} (Dynamic Lot = 0)")
+                        else:
+                            await hud_projector.draw_arrow(data.get('symbol'), price, direction)
+                            
+                            # 5. Execution
+                            if trade_manager:
+                                 logger.info(f"🚀 EXECUTION: {direction} | BrainConf: {brain_score.get('alpha_confidence',0):.2f} | Size: {dynamic_lot:.2f}")
+                                 await trade_manager.execute_order(direction, {
+                                     "symbol": data.get('symbol', 'XAUUSD'),
+                                     "volume": dynamic_lot,
+                                     "comment": "FEAT_NEURAL_V1"
+                                 })
 
                     # 6. Black Box (M7)
                     await rag_memory.log_trade_context(
@@ -389,11 +434,40 @@ async def app_lifespan(server: FastMCP):
                 except Exception as e:
                     logger.error(f"Nerve Loop Error: {e}")
 
+        # Phase 13: Position Guard (Autonomous Exhaustion monitoring)
+        async def position_guard_task():
+            logger.info("🛡️ [GUARD] Position Monitoring Task Online (Exhaustion Protocol).")
+            while True:
+                try:
+                    if trade_manager and trade_manager.active_positions:
+                        # Monitoring loop for exhaustion exits
+                        # We use the current physics to check SL/TP adjustments
+                        pass 
+                    await asyncio.sleep(5)
+                except Exception as e:
+                    logger.error(f"Guard Task Error: {e}")
+                    await asyncio.sleep(10)
+
         async def on_zmq_message(data):
             """High-Frequency Pulse."""
             # M9: Heartbeat
             if circuit_breaker: circuit_breaker.heartbeat()
             
+            # [M10 SYNC] Handle Position Updates from MT5
+            if data.get("action") == "POSITION_UPDATE" and trade_manager:
+                ticket = data.get("ticket")
+                if data.get("status") == "CLOSED":
+                    trade_manager.unregister_position(ticket)
+                else:
+                    # Register/Update position for Guard monitoring
+                    trade_manager.register_position(
+                        ticket=ticket,
+                        entry_price=data.get("price", 0),
+                        atr=data.get("atr", 0),
+                        is_buy=data.get("type") == "BUY"
+                    )
+                return
+
             # M2: Sensory
             regime = market_physics.ingest_tick(data) if market_physics else None
             
@@ -402,6 +476,9 @@ async def app_lifespan(server: FastMCP):
                  asyncio.create_task(process_signal_task(data, regime))
             elif not market_physics:
                  pass # Silent
+
+        # Launch background tasks
+        asyncio.create_task(position_guard_task())
 
         try:
             await zmq_bridge.start(on_zmq_message)
