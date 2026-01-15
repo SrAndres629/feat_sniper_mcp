@@ -15,7 +15,8 @@ MT5_BASE_PATH = os.path.join(os.getenv("APPDATA"), "MetaQuotes", "Terminal", MT5
 
 MANIFEST = {
     "FEAT_Sniper_Master_Core/FEAT_Visualizer.mq5": "Indicators/FEAT",
-    "FEAT_Sniper_Master_Core/UnifiedModel_Main.ex5": "Experts/FEAT"
+    "FEAT_Sniper_Master_Core/UnifiedModel_Main.ex5": "Experts/FEAT",
+    "FEAT_Sniper_Master_Core/Include/UnifiedModel/CInterop.mqh": "Include/UnifiedModel"
 }
 
 def sync():
