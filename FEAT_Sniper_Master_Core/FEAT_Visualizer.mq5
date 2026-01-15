@@ -1,253 +1,199 @@
 //+------------------------------------------------------------------+
-//|                                              FEAT_Visualizer.mq5 |
-//|                                  Copyright 2024, FEAT Systems AI |
-//|                                             https://featsystems.ai |
+//|                        FEAT_Visualizer_Master_v4.mq5             |
+//|               Cerebro Analítico FEAT - Institutional GUI         |
+//|           Sincronización: ZMQ BRIDGE | IA Nexus Integration      |
 //+------------------------------------------------------------------+
-#property copyright "FEAT Systems AI"
-#property link      "https://featsystems.ai"
-#property version   "5.00"
+#property copyright "FEAT System - Nexus Architecture"
+#property description "Visualizador Institucional: Forma, Espacio, Aceleración, Tiempo"
+#property version   "4.00"
 #property indicator_chart_window
 #property indicator_buffers 6
 #property indicator_plots   4
 
-//--- Plot 1: Clouds (Fills)
-#property indicator_label1  "CloudUpper"
-#property indicator_type1   DRAW_FILLING
-#property indicator_color1  clrMediumSeaGreen, clrCrimson
-//--- Plot 2: FEAT Score Line (Purple)
-#property indicator_label2  "FEAT Score"
+//--- PLOTS VISUALES EN EL GRÁFICO
+#property indicator_label1  "PvP_Zone_High"
+#property indicator_type1   DRAW_LINE
+#property indicator_color1  clrMediumPurple
+#property indicator_style1  STYLE_SOLID
+#property indicator_width1  2
+
+#property indicator_label2  "PvP_Zone_Low"
 #property indicator_type2   DRAW_LINE
 #property indicator_color2  clrMediumPurple
-#property indicator_style2  STYLE_SOLID
-#property indicator_width2  2
-//--- Plot 3: Projection High
-#property indicator_label3  "ProjHigh"
-#property indicator_type3   DRAW_LINE
-#property indicator_color3  clrDeepSkyBlue
-#property indicator_style3  STYLE_DOT
-//--- Plot 4: Projection Low
-#property indicator_label4  "ProjLow"
-#property indicator_type4   DRAW_LINE
-#property indicator_color4  clrOrangeRed
-#property indicator_style4  STYLE_DOT
+#property indicator_style2  STYLE_DOT
+#property indicator_width2  1
 
-// Includes
-#include <UnifiedModel/CInterop.mqh> // ZMQ Logic
-#include <Canvas/Canvas.mqh>
+#property indicator_label3  "Structure_BOS"
+#property indicator_type3   DRAW_ARROW
+#property indicator_color3  clrDodgerBlue
 
-//--- Buffers
-double CloudUpperBuffer[];
-double CloudLowerBuffer[];
-double FeatScoreBuffer[];
-double ProjHighBuffer[];
-double ProjLowBuffer[];
-double PlaceholderBuffer[]; 
+#property indicator_label4  "Structure_CHOCH"
+#property indicator_type4   DRAW_ARROW
+#property indicator_color4  clrCrimson
 
-//--- Global Objects
-CInterop g_interop; // Receiver (SUB)
-CInterop g_sender;  // Sender (PUSH)
-string   g_objPrefix = "FEAT_HUD_";
+//--- INCLUDES
+#include <UnifiedModel/CInterop.mqh> 
+#include <Canvas/Canvas.mqh>         
 
-//--- HUD State
-string g_systemState = "WAITING";
-double g_confidence = 0.0;
-double g_lastFeatScore = 0.0;
-bool   g_vaultActive = false;
+//--- GLOBALES
+CInterop g_interop;        
+CCanvas  Dashboard;         
+string   g_objPrefix = "FEAT_KZ_";
+
+//--- BUFFERS
+double BufferPvP_H[];
+double BufferPvP_L[];
+double BufferStruct_BOS[];
+double BufferStruct_CHOCH[];
+double BufferVol[];
+double BufferCalc[];
+
+//--- ESTADO DEL SISTEMA (Recibido desde Python)
+struct FeatState {
+   double score;           // -100 a +100
+   string ai_prediction;   // BUY FLOW / SELL FLOW / WAIT
+   double ai_confidence;   // %
+   string active_zone;     // Killzone status
+   string regime;          // Market Regime
+   double pvp_level;       // Central PVP
+   bool   acceleration;    // Momentum flag
+};
+FeatState CurrentState;
 
 //+------------------------------------------------------------------+
-//| Custom indicator initialization function                         |
+//| INIT                                                             |
 //+------------------------------------------------------------------+
-int OnInit()
-  {
-   //--- Indicator Buffers
-   SetIndexBuffer(0, CloudUpperBuffer, INDICATOR_DATA);
-   SetIndexBuffer(1, CloudLowerBuffer, INDICATOR_DATA);
-   SetIndexBuffer(2, FeatScoreBuffer,  INDICATOR_DATA);
-   SetIndexBuffer(3, ProjHighBuffer,   INDICATOR_DATA);
-   SetIndexBuffer(4, ProjLowBuffer,    INDICATOR_DATA);
-   SetIndexBuffer(5, PlaceholderBuffer, INDICATOR_CALCULATED);
+int OnInit() {
+   if(!SetIndexBuffer(0, BufferPvP_H)) return(INIT_FAILED);
+   if(!SetIndexBuffer(1, BufferPvP_L)) return(INIT_FAILED);
+   if(!SetIndexBuffer(2, BufferStruct_BOS)) return(INIT_FAILED);
+   if(!SetIndexBuffer(3, BufferStruct_CHOCH)) return(INIT_FAILED);
+   if(!SetIndexBuffer(4, BufferVol)) return(INIT_FAILED);
+   if(!SetIndexBuffer(5, BufferCalc)) return(INIT_FAILED);
+
+   PlotIndexSetInteger(2, PLOT_ARROW, 159); 
+   PlotIndexSetInteger(3, PLOT_ARROW, 158); 
    
-   PlotIndexSetInteger(0, PLOT_LINE_COLOR, 0, clrMediumSeaGreen); // Bullish
-   PlotIndexSetInteger(0, PLOT_LINE_COLOR, 1, clrCrimson);        // Bearish
-   
-   //--- ZMQ Init
-   if(!g_interop.Init(false)) // Subscribe Mode
-      Print("ZMQ Receiver Init Failed");
-      
-   if(!g_sender.Init(true))   // Push Mode (Sender)
-      Print("ZMQ Sender Init Failed");
-   
-   EventSetMillisecondTimer(50); // High frequency poll
-   
-   DrawHUD();
-   return(INIT_SUCCEEDED);
-  }
-
-//+------------------------------------------------------------------+
-//| Custom indicator deinitialization function                       |
-//+------------------------------------------------------------------+
-void OnDeinit(const int reason)
-  {
-   EventKillTimer();
-   ObjectsDeleteAll(0, g_objPrefix);
-   g_interop.Shutdown();
-   g_sender.Shutdown();
-  }
-
-//+------------------------------------------------------------------+
-//| Timer event handler                                              |
-//+------------------------------------------------------------------+
-void OnTimer()
-  {
-   string msg = g_interop.ReceiveHUD();
-   if(msg != "")
-     {
-      ParseState(msg);
-      UpdateHUD();
-      ChartRedraw();
-     }
-  }
-
-//+------------------------------------------------------------------+
-//| Parse JSON State from Python                                     |
-//+------------------------------------------------------------------+
-void ParseState(string json)
-  {
-   if (StringFind(json, "PING") >= 0)
-     {
-      g_sender.Send("PONG");
-      return; 
-     }
-  
-   // Extract values
-   g_systemState  = ExtractJsonString(json, "regime");
-   g_confidence   = StringToDouble(ExtractJsonValue(json, "ai_confidence")) / 100.0;
-   g_lastFeatScore = StringToDouble(ExtractJsonValue(json, "feat_index"));
-   string vaultStr = ExtractJsonValue(json, "vault_active");
-   g_vaultActive  = (vaultStr == "true");
-   
-   // Apply visuals per tick
-   double currentPrice = SymbolInfoDouble(_Symbol, SYMBOL_BID);
-   
-   if(g_lastFeatScore > 0)
-     {
-      // The user wants a purple line for PVP/POI. 
-      // We'll use the price level where the High probability was detected or actual POI if sent.
-      FeatScoreBuffer[0] = currentPrice; 
-     }
-     
-   // Impulse Projections extraction
-   double pHigh = StringToDouble(ExtractJsonValue(json, "proj_high"));
-   double pLow = StringToDouble(ExtractJsonValue(json, "proj_low"));
-   
-   if(pHigh > 0) {
-      ProjHighBuffer[0] = pHigh;
-      ProjLowBuffer[0]  = pLow;
+   if(!g_interop.Init(false)) {
+      Print("CRITICAL: ZMQ Bridge Failed.");
+      return(INIT_FAILED);
    }
-  }
 
-string ExtractJsonString(string json, string key)
-{
+   if(!Dashboard.CreateBitmapLabel("FEAT_HUD", 5, 25, 350, 180, COLOR_FORMAT_ARGB_NORMALIZE)) {
+      Print("Error creando Dashboard GUI");
+      return(INIT_FAILED);
+   }
+   
+   EventSetMillisecondTimer(100); 
+   DrawLoadingScreen();
+   return(INIT_SUCCEEDED);
+}
+
+void OnDeinit(const int reason) {
+   EventKillTimer();
+   g_interop.Shutdown();
+   Dashboard.Destroy();
+   ObjectsDeleteAll(0, g_objPrefix);
+}
+
+void OnTimer() {
+   string json = g_interop.ReceiveHUD();
+   if(json != "") {
+      ParseTelemetry(json); 
+      UpdateDashboard();
+      UpdateChartVisuals(); 
+   }
+}
+
+void ParseTelemetry(string json) {
+   CurrentState.regime     = ExtractJsonValue(json, "regime");
+   CurrentState.ai_confidence = StringToDouble(ExtractJsonValue(json, "ai_confidence"));
+   CurrentState.score      = StringToDouble(ExtractJsonValue(json, "feat_score_val"));
+   CurrentState.pvp_level  = StringToDouble(ExtractJsonValue(json, "feat_pvp_price"));
+   CurrentState.active_zone = ExtractJsonValue(json, "session");
+   
+   if(CurrentState.score > 50) CurrentState.ai_prediction = "BUY FLOW >>";
+   else if(CurrentState.score < -50) CurrentState.ai_prediction = "<< SELL FLOW";
+   else CurrentState.ai_prediction = "-- WAIT --";
+   
+   CurrentState.acceleration = (StringFind(CurrentState.regime, "TREND") >= 0);
+}
+
+void UpdateChartVisuals() {
+   int total = ArraySize(BufferPvP_H);
+   if(total > 0) {
+      BufferPvP_H[0] = CurrentState.pvp_level + (SymbolInfoDouble(_Symbol, SYMBOL_POINT) * 50);
+      BufferPvP_L[0] = CurrentState.pvp_level - (SymbolInfoDouble(_Symbol, SYMBOL_POINT) * 50);
+   }
+}
+
+void UpdateDashboard() {
+   Dashboard.Erase(0);
+   Dashboard.FillRectangle(0, 0, 350, 180, ColorToARGB(clrBlack, 230));
+   Dashboard.Rectangle(0, 0, 349, 179, ColorToARGB(clrGray, 255));
+   
+   Dashboard.TextOut(15, 10, "FEAT SYSTEM v4 | INSTITUTIONAL", ColorToARGB(clrLightGray, 255), TA_LEFT);
+   
+   int barX = 15, barY = 40, barW = 320, barH = 15;
+   Dashboard.FillRectangle(barX, barY, barX+barW, barY+barH, ColorToARGB(clrDarkSlateGray, 255));
+   
+   double pct = (CurrentState.score + 100.0) / 200.0; 
+   if(pct < 0) pct = 0; if(pct > 1) pct = 1;
+   int fillW = (int)(barW * pct);
+   
+   uint sColor = ColorToARGB(clrGray, 255);
+   if(CurrentState.score > 30) sColor = ColorToARGB(clrSpringGreen, 255);
+   if(CurrentState.score < -30) sColor = ColorToARGB(clrCrimson, 255);
+   
+   Dashboard.FillRectangle(barX, barY, barX+fillW, barY+barH, sColor);
+   Dashboard.TextOut(barX, barY+20, StringFormat("FEAT SCORE: %.2f", CurrentState.score), sColor, TA_LEFT);
+
+   Dashboard.TextOut(15, 80, "NEXUS AI PREDICTION:", ColorToARGB(clrWhite, 255), TA_LEFT);
+   
+   uint predColor = ColorToARGB(clrYellow, 255);
+   if(CurrentState.ai_prediction == "BUY FLOW >>") predColor = ColorToARGB(clrLime, 255);
+   else if(CurrentState.ai_prediction == "<< SELL FLOW") predColor = ColorToARGB(clrRed, 255);
+   
+   Dashboard.TextOut(15, 100, CurrentState.ai_prediction, predColor, TA_LEFT);
+   Dashboard.TextOut(200, 105, StringFormat("Conf: %.1f%%", CurrentState.ai_confidence), ColorToARGB(clrSilver, 255), TA_LEFT);
+
+   Dashboard.TextOut(15, 140, "MARKET: " + (CurrentState.acceleration ? "HIGH MOMENTUM" : "LOW VOL"), ColorToARGB(clrCyan, 255), TA_LEFT);
+   Dashboard.TextOut(200, 140, "SESSION: " + CurrentState.active_zone, ColorToARGB(clrGold, 255), TA_LEFT);
+
+   // --- INSTITUTIONAL ACCOUNT INFO ---
+   string accMode = (AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO) ? "DEMO" : "REAL";
+   uint accColor = (accMode == "REAL") ? ColorToARGB(clrRed, 255) : ColorToARGB(clrLimeGreen, 255);
+   
+   Dashboard.TextOut(15, 160, StringFormat("ACC: %s | BAL: $%.2f", accMode, AccountInfoDouble(ACCOUNT_BALANCE)), accColor, TA_LEFT);
+   Dashboard.TextOut(200, 160, StringFormat("EQ: $%.2f", AccountInfoDouble(ACCOUNT_EQUITY)), ColorToARGB(clrWhiteSmoke, 255), TA_LEFT);
+
+   Dashboard.Update();
+}
+
+void DrawLoadingScreen() {
+   if(Dashboard.ChartObjectName() != "") {
+      Dashboard.Erase(ColorToARGB(clrBlack, 255));
+      Dashboard.TextOut(175, 75, "BOOTING FEAT...", ColorToARGB(clrLime, 255), TA_CENTER);
+      Dashboard.Update();
+   }
+}
+
+string ExtractJsonValue(string json, string key) {
    int pos = StringFind(json, "\""+key+"\"");
-   if(pos < 0) return "";
-   int start = StringFind(json, ":", pos) + 1;
-   while(StringSubstr(json, start, 1) == " " || StringSubstr(json, start, 1) == "\"") start++;
-   int end = StringFind(json, "\"", start);
-   if (end < 0) end = StringFind(json, ",", start);
-   if (end < 0) end = StringFind(json, "}", start);
-   return StringSubstr(json, start, end-start);
+   if(pos < 0) return("");
+   int s = StringFind(json, ":", pos) + 1;
+   while(s < StringLen(json) && (StringSubstr(json, s, 1) == " " || StringSubstr(json, s, 1) == "\"")) s++;
+   int e = StringFind(json, ",", s);
+   if (e < 0) e = StringFind(json, "}", s);
+   int e2 = StringFind(json, "\"", s);
+   if (e2 > 0 && e2 < e) e = e2;
+   if (e < s) return("");
+   return(StringSubstr(json, s, e-s));
 }
 
-string ExtractJsonValue(string json, string key)
+int OnCalculate(const int rates_total, const int prev_calculated, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[], const long &tick_volume[], const long &volume[], const int &spread[])
 {
-   int pos = StringFind(json, "\""+key+"\"");
-   if(pos < 0) return "0";
-   int start = StringFind(json, ":", pos) + 1;
-   while(StringSubstr(json, start, 1) == " ") start++;
-   int end = StringFind(json, ",", start);
-   if (end < 0) end = StringFind(json, "}", start);
-   return StringSubstr(json, start, end-start);
-}
-
-//+------------------------------------------------------------------+
-//| Draw Head-Up Display                                             |
-//+------------------------------------------------------------------+
-void DrawHUD()
-  {
-   CreateRectLabel("BG", 10, 30, 240, 120, C'20,20,30', 200);
-   CreateLabel("TITLE", "FEAT NEXUS UPLINK V5", 20, 40, clrWhite, 10, true);
-   CreateLabel("PILOT", "REGIME: WAITING", 20, 60, clrGray, 9);
-   CreateLabel("CONF", "NEURAL CONF: 0%", 20, 80, clrGray, 9);
-   CreateLabel("FEAT", "FEAT SCORE: 0.0", 20, 100, clrMediumPurple, 9);
-   CreateLabel("VAULT", "VAULT: LOCKED", 20, 120, clrGray, 9);
-  }
-
-void UpdateHUD()
-  {
-   color stateColor = clrGray;
-   if(g_systemState == "TREND_GRAVITY") stateColor = clrLime;
-   else if(g_systemState == "EXPANSION") stateColor = clrGold;
-   else if(g_systemState == "COMPRESSION") stateColor = clrAqua;
-   
-   ObjectSetString(0, g_objPrefix+"PILOT", OBJPROP_TEXT, "REGIME: " + g_systemState);
-   ObjectSetInteger(0, g_objPrefix+"PILOT", OBJPROP_COLOR, stateColor);
-   
-   int confPct = (int)(g_confidence * 100);
-   ObjectSetString(0, g_objPrefix+"CONF", OBJPROP_TEXT, "NEURAL CONF: " + IntegerToString(confPct) + "%");
-   
-   ObjectSetString(0, g_objPrefix+"FEAT", OBJPROP_TEXT, "FEAT SCORE: " + DoubleToString(g_lastFeatScore, 1));
-   
-   color vaultColor = g_vaultActive ? clrAqua : clrSilver;
-   string vaultTxt = g_vaultActive ? "VAULT: ACTIVE" : "VAULT: SAFE";
-   ObjectSetString(0, g_objPrefix+"VAULT", OBJPROP_TEXT, vaultTxt);
-   ObjectSetInteger(0, g_objPrefix+"VAULT", OBJPROP_COLOR, vaultColor);
-  }
-
-void CreateLabel(string name, string text, int x, int y, color clr, int fontSize, bool isBold=false)
-{
-   string objName = g_objPrefix + name;
-   if(ObjectFind(0, objName) < 0)
-      ObjectCreate(0, objName, OBJ_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, objName, OBJPROP_XDISTANCE, x);
-   ObjectSetInteger(0, objName, OBJPROP_YDISTANCE, y);
-   ObjectSetInteger(0, objName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-   ObjectSetString(0, objName, OBJPROP_TEXT, text);
-   ObjectSetInteger(0, objName, OBJPROP_COLOR, clr);
-   ObjectSetInteger(0, objName, OBJPROP_FONTSIZE, fontSize);
-}
-
-void CreateRectLabel(string name, int x, int y, int w, int h, color bg, int alpha)
-{
-   string objName = g_objPrefix + name;
-   if(ObjectFind(0, objName) < 0)
-      ObjectCreate(0, objName, OBJ_RECTANGLE_LABEL, 0, 0, 0);
-   ObjectSetInteger(0, objName, OBJPROP_XDISTANCE, x);
-   ObjectSetInteger(0, objName, OBJPROP_YDISTANCE, y);
-   ObjectSetInteger(0, objName, OBJPROP_XSIZE, w);
-   ObjectSetInteger(0, objName, OBJPROP_YSIZE, h);
-   ObjectSetInteger(0, objName, OBJPROP_BGCOLOR, bg);
-   ObjectSetInteger(0, objName, OBJPROP_CORNER, CORNER_RIGHT_UPPER);
-}
-
-//+------------------------------------------------------------------+
-//| Custom indicator iteration function                              |
-//+------------------------------------------------------------------+
-int OnCalculate(const int rates_total,
-                const int prev_calculated,
-                const datetime &time[],
-                const double &open[],
-                const double &high[],
-                const double &low[],
-                const double &close[],
-                const long &tick_volume[],
-                const long &volume[],
-                const int &spread[])
-  {
-   ArraySetAsSeries(FeatScoreBuffer, true);
-   ArraySetAsSeries(ProjHighBuffer, true);
-   ArraySetAsSeries(ProjLowBuffer, true);
-   ArraySetAsSeries(CloudUpperBuffer, true);
-   ArraySetAsSeries(CloudLowerBuffer, true);
-   
+   ArraySetAsSeries(BufferPvP_H, true);
+   ArraySetAsSeries(BufferPvP_L, true);
    return(rates_total);
-  }
+}

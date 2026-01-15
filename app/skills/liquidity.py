@@ -78,6 +78,19 @@ class LiquidityMap:
         all_levels.sort(key=lambda x: abs(x["price"] - current_price))
         return all_levels[0]
 
+    def get_active_zones(self) -> List[Dict[str, Any]]:
+        """
+        Returns a list of all active (unmitigated) FVG zones.
+        """
+        zones = []
+        for fvg in self.imbalances:
+            zones.append({
+                "top": float(fvg["top"]),
+                "bottom": float(fvg["bottom"]),
+                "type": "SUPPLY" if fvg["type"] == "BEAR_FVG" else "DEMAND"
+            })
+        return zones
+
 # Global singleton
 liquidity_map = LiquidityMap()
 

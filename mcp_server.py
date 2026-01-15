@@ -383,15 +383,36 @@ async def app_lifespan(server: FastMCP):
                     # 3. Decision Fusion
                     execute = is_valid and brain_score.get('execute_trade', False)
                     
-                    # 4. HUD Projection (M8) - BROADCAST TELEMETRY BACK TO MT5
-                    await hud_projector.broadcast_system_state(
-                        regime=regime.trend if regime else "NEUTRAL",
-                        confidence=brain_score.get('alpha_confidence', 0),
-                        feat_score=feat_index,
-                        vault_active=True,
-                        p_high=price + (regime.atr * 2.5) if regime and hasattr(regime, 'atr') else 0,
-                        p_low=price - (regime.atr * 2.5) if regime and hasattr(regime, 'atr') else 0
-                    )
+                    # 4. HUD Projection (M8) - FULL INSTITUTIONAL NARRATIVE
+                    try:
+                        from app.skills.calendar import chronos_engine
+                        from app.skills.liquidity import liquidity_map
+                        from nexus_core.structure_engine import structure_engine
+                        
+                        # Gather Narrative Data
+                        struct_narrative = structure_engine.get_structural_narrative(df_physics) if 'df_physics' in locals() else {"last_bos": 0.0, "type": "NONE"}
+                        active_zones = liquidity_map.get_active_zones()
+                        session_info = chronos_engine.validate_window()
+                        
+                        await hud_projector.broadcast_full_narrative(
+                            regime=regime.trend if regime else "NEUTRAL",
+                            confidence=brain_score.get('alpha_confidence', 0),
+                            feat_score=feat_index,
+                            vault_active=True,
+                            pvp_level=price, # Current price acts as the PVP magnet baseline
+                            structure_map=struct_narrative,
+                            active_zones=active_zones,
+                            session_state=session_info.get("session", "OFF_HOURS")
+                        )
+                    except Exception as e:
+                        logger.error(f"HUD Narrative Broadcast failed: {e}")
+                        # Fallback to legacy state update if narrative fails
+                        await hud_projector.broadcast_system_state(
+                            regime=regime.trend if regime else "NEUTRAL",
+                            confidence=brain_score.get('alpha_confidence', 0),
+                            feat_score=feat_index,
+                            vault_active=True
+                        )
 
                     if execute:
                         direction = "BUY" if regime.trend == "BULLISH" else "SELL"

@@ -146,6 +146,35 @@ class StructureEngine:
         
         return res
 
+    def get_structural_narrative(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Returns the latest structural narrative: BOS/CHOCH levels and types.
+        """
+        df = self.detect_structural_shifts(df)
+        last_row = df.iloc[-1]
+        
+        bos_level = 0.0
+        bos_type = "NONE"
+        
+        if last_row['bos_bull']:
+            bos_level = last_row['last_h_fractal']
+            bos_type = "BULLISH_BOS"
+        elif last_row['bos_bear']:
+            bos_level = last_row['last_l_fractal']
+            bos_type = "BEARISH_BOS"
+        elif last_row['choch_bull']:
+            bos_level = last_row['last_h_fractal']
+            bos_type = "BULLISH_CHOCH"
+        elif last_row['choch_bear']:
+            bos_level = last_row['last_l_fractal']
+            bos_type = "BEARISH_CHOCH"
+            
+        return {
+            "last_bos": float(bos_level),
+            "type": bos_type,
+            "status": self.mae_recognizer.detect_mae_pattern(df)['status']
+        }
+
 structure_engine = StructureEngine()
 
 structure_engine = StructureEngine()

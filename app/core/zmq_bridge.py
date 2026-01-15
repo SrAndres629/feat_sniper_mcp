@@ -233,10 +233,16 @@ class ZMQBridge:
             "params": params, 
             "ts": time.time() * 1000
         }
+        await self.send_raw(payload)
+
+    async def send_raw(self, payload: Dict[str, Any]):
+        """Send a raw JSON payload directly."""
+        if not self.running or not self.pub_socket:
+            return
         try:
             await self.pub_socket.send_string(json.dumps(payload))
         except Exception as e:
-            logger.error(f"Failed to send command {action}: {e}")
+            logger.error(f"Failed to send raw payload: {e}")
 
     def get_metrics(self) -> Dict[str, Any]:
         """Get current bridge metrics for monitoring."""
