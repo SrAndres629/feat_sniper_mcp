@@ -103,5 +103,32 @@ class TradeMemory:
             logger.error(f"Memory Read Error (Hourly): {e}")
             return {"win_rate": 0.5, "sample_size": 0}
 
+    async def get_last_n_trades(self, n: int = 10) -> list:
+        """
+        Recupera los N últimos trades para análisis de racha.
+        """
+        try:
+            async with aiosqlite.connect(self.db_path) as db:
+                query = """
+                    SELECT outcome, physics_snapshot
+                    FROM trades
+                    ORDER BY timestamp DESC
+                    LIMIT ?
+                """
+                trades = []
+                async with db.execute(query, (n,)) as cursor:
+                    rows = await cursor.fetchall()
+                    for row in rows:
+                        outcome, physics_json = row
+                        try:
+                            physics = json.loads(physics_json) if physics_json else {}
+                            trades.append({"outcome": outcome, "regime": physics.get("regime", "UNKNOWN")})
+                        except json.JSONDecodeError:
+                            trades.append({"outcome": outcome, "regime": "UNKNOWN"})
+                return trades
+        except Exception as e:
+            logger.error(f"Memory Read Error (Last N): {e}")
+            return []
+
 # Instancia Global
 rag_memory = TradeMemory()
