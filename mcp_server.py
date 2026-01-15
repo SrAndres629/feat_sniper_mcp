@@ -384,18 +384,13 @@ async def app_lifespan(server: FastMCP):
                     execute = is_valid and brain_score.get('execute_trade', False)
                     
                     # 4. HUD Projection (M8) - BROADCAST TELEMETRY BACK TO MT5
-                    projections = {
-                        "high": price + (regime.atr * 2.5) if regime and hasattr(regime, 'atr') else 0,
-                        "low": price - (regime.atr * 2.5) if regime and hasattr(regime, 'atr') else 0
-                    }
-                    
-                    await hud_projector.project_telemetry(
-                        symbol=data.get('symbol'),
-                        feat_index=round(feat_index, 1),
+                    await hud_projector.broadcast_system_state(
                         regime=regime.trend if regime else "NEUTRAL",
-                        ai_confidence=round(brain_score.get('alpha_confidence', 0) * 100, 1),
-                        projections=projections,
-                        vault_active=True
+                        confidence=brain_score.get('alpha_confidence', 0),
+                        feat_score=feat_index,
+                        vault_active=True,
+                        p_high=price + (regime.atr * 2.5) if regime and hasattr(regime, 'atr') else 0,
+                        p_low=price - (regime.atr * 2.5) if regime and hasattr(regime, 'atr') else 0
                     )
 
                     if execute:
