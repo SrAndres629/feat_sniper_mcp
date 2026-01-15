@@ -56,12 +56,12 @@ class SupabaseStreamer(logging.Handler):
             self.handleError(record)
 
     def flush_sync(self):
-        """Synchronous flush to audit_logs."""
+        """Synchronous flush to bot_activity_log."""
         if not self.buffer or not self.client: return
         try:
             data = self.buffer.copy()
             self.buffer.clear()
-            self.client.table("audit_logs").insert(data).execute()
+            self.client.table("bot_activity_log").insert(data).execute()
         except Exception as e:
             print(f"!! STREAMER ERROR: {e}")
 
@@ -83,11 +83,11 @@ class SupabaseStreamer(logging.Handler):
                  print(f"!! STREAMER ERROR ({table}): {e}")
 
     async def flush_async(self):
-        """Async flush to audit_logs."""
+        """Async flush to bot_activity_log."""
         if not self.buffer or not self.client: return
         data = self.buffer.copy()
         self.buffer.clear()
-        await self._safe_execute("audit_logs", lambda: self.client.table("audit_logs").insert(data).execute())
+        await self._safe_execute("bot_activity_log", lambda: self.client.table("bot_activity_log").insert(data).execute())
 
     async def push_metrics(self, data: Dict[str, Any]):
         """Pushes to 'live_metrics'."""

@@ -132,8 +132,7 @@
                 <div class="text-gray-600 italic">Waiting for broadcast...</div>
             </div>
             <!-- Scanline effect -->
-            <div
-                class="pointer-events-none absolute inset-0 bg-gradient-to-b from-transparent to-nexus-green opacity-5">
+            <div class="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent to-nexus-green opacity-5">
             </div>
         </div>
 
@@ -190,8 +189,8 @@
             badge.className = "bg-nexus-green text-black text-xs px-2 py-0.5 rounded uppercase tracking-wider font-bold blink";
 
             // 1. Logs Channel
-            client.channel('audit_logs')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'audit_logs' }, payload => {
+            client.channel('bot_activity_log')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'bot_activity_log' }, payload => {
                     addLog(payload.new);
                 })
                 .subscribe();

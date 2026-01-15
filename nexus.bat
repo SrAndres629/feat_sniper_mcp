@@ -53,12 +53,12 @@ echo   [ZMQ:  STREAMING]
 echo.
 echo   See RAW logs at: logs/raw_execution.log
 echo   See DASHBOARD at: dashboard.html
-echo.
-echo [SYSTEM ONLINE] Executing...
-
 
 REM Create logs dir if not exists
 if not exist logs mkdir logs
+
+REM Auto-Open Dashboard
+start chrome "%~dp0dashboard.html"
 
 REM HARD IGNITION - Visible Output for Debugging
 python mcp_server.py
