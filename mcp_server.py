@@ -501,10 +501,11 @@ class NexusState:
                     "poc_price": poc_price
                 }
                 
-                brain_score = await self.ml_engine.ensemble_predict_async(symbol, neural_context) if self.ml_engine else {"p_win": 0.5, "alpha_confidence": 0}
+                brain_score = await self.ml_engine.predict_async(symbol, neural_context) if self.ml_engine else {"p_win": 0.5, "uncertainty": 0}
                 
                 # 4. Probabilistic Fusion (Total Convergence)
-                lstm_conf = brain_score.get('confidence', 0.0)
+                # Map p_win (0.0-1.0) to lstm_conf for fusion equation
+                lstm_conf = brain_score.get('p_win', 0.5)
                 norm_struct = struct_score / 100.0
                 norm_mtf = mtf_score  # Already 0-1
                 

@@ -148,33 +148,44 @@ class FeatProcessor:
             # [NORMALIZATION LOGIC]
             # Identify feature type by name substring
             
-            # 1. FEAT/Structure Scores (Range 0-100)
-            if "score" in feature or "rsi" in feature:
+        # [NORMALIZATION LOGIC]
+            # 1. Structure/Regime/Trend STRINGS -> FLOAT Mapping
+            if isinstance(val, str):
+                val_upper = val.upper()
+                if "BOS" in val_upper:
+                    if "BULL" in val_upper: val = 1.0
+                    elif "BEAR" in val_upper: val = -1.0
+                    else: val = 0.0
+                elif "TREND" in val_upper:
+                    if "UP" in val_upper or "BULL" in val_upper: val = 1.0
+                    elif "DOWN" in val_upper or "BEAR" in val_upper: val = -1.0
+                    else: val = 0.0
+                elif "RANGING" in val_upper or "NEUTRAL" in val_upper:
+                    val = 0.0
+                else:
+                    # Generic String fallback (hash or 0)
+                    val = 0.0
+            
+            # 2. FEAT/Structure Scores (Range 0-100)
+            elif "score" in feature or "rsi" in feature:
                 # heuristic: if value is > 1.0, assume it's raw 0-100. 
                 # If it's already 0-1, don't divide.
                 # But some scores might be 0.5 raw. Context needed.
                 # For Level 25, we assume inputs like 'feat_structure_score' are 0-100.
                 if "structure_score" in feature:
-                    val = val / 100.0
+                    val = val / 100.0 if val > 1.0 else val
                 elif "rsi" in feature:
-                    val = val / 100.0
+                    val = val / 100.0 if val > 1.0 else val
                 elif "fuzzy" in feature:
-                    # Fuzzy is -10 to +10 usually? 
-                    # If 'fuzzy_score' is passed, normalize -10..10 to 0..1?
-                    # Or keep as is? Neural Nets like -1 to 1.
-                    pass 
+                    # Fuzzy is -10 to +10 usually
+                    val = val / 10.0 # Map -1.0 to 1.0 roughly
                     
-            # 2. Acceleration (Range 0-10 or 0-1)
+            # 3. Acceleration (Range 0-10 or 0-1)
             elif "accel" in feature:
-                # If accel_score is 0-10
                 if "accel_score" in feature:
-                    val = val / 10.0
+                    val = val / 10.0 if val > 1.0 else val
             
-            # 3. Regime/Trend (Categorical encoded as int?)
-            # If feature is 'regime_code', it might be 0,1,2.
-            # Embedding handling would be better, but simpler is raw.
-            
-            vector.append(val)
+            vector.append(float(val))
             
         # [SAFETY NET] Remove NaNs/Infs that crash CUDA
         vec_np = np.array(vector, dtype=np.float32)

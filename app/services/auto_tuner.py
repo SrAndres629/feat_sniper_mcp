@@ -1,423 +1,201 @@
-"""
-AUTO-TUNING MODULE - Bayesian Hyperparameter Optimization
-==========================================================
-Uses Optuna to automatically find optimal thresholds for:
-- FEAT Chain: Acceleration threshold, Displacement multiplier
-- Risk Engine: Confidence minimums, Lot sizing
-- Drift Monitor: Z-Score thresholds
-
-Runs weekly on shadow mode data to prevent overfitting.
-"""
 
 import logging
 import json
 import os
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional, Callable
-from pathlib import Path
+import random
+import numpy as np
+from typing import Dict, Any, List
 
-logger = logging.getLogger("feat.auto_tuning")
-
-# Optional Optuna import (not required for production)
-try:
-    import optuna
-    from optuna.samplers import TPESampler
-    OPTUNA_AVAILABLE = True
-except ImportError:
-    OPTUNA_AVAILABLE = False
-    logger.warning("[AUTO-TUNE] Optuna not installed. Run: pip install optuna")
-
+logger = logging.getLogger("FEAT.AutoTuner")
 
 class AutoTuner:
     """
-    Bayesian hyperparameter optimizer for FEAT Sniper.
+    [LEVEL 31] GENETIC POPULATION OPTIMIZER
+    Implements a full Genetic Algorithm (Population, Crossover, Selecting)
+    using 'Virtual Replay' on Experience Memory to evaluate fitness.
     
-    Uses Tree-structured Parzen Estimator (TPE) for efficient
-    exploration of the hyperparameter space.
+    Replaces legacy Bayesian Optimizer.
     """
     
-    # Default hyperparameter ranges
-    PARAM_RANGES = {
-        # FEAT Chain thresholds
-        "acceleration_threshold": (1.5, 3.0),
-        "displacement_multiplier": (1.0, 2.5),
+    def __init__(self, memory_path: str = "data/experience_memory.jsonl"):
+        self.memory_path = memory_path
+        # [USER REQUEST] Ensure write permission to config used by system
+        self.output_path = "config/dynamic_params.json"
         
-        # ML Engine
-        "confidence_minimum": (0.55, 0.70),
-        "hurst_trending_threshold": (0.50, 0.60),
-        "hurst_reverting_threshold": (0.40, 0.50),
+        self.population_size = 20
+        self.generations = 5
+        self.mutation_rate = 0.2
         
-        # Risk Engine
-        "lot_confidence_floor": (0.01, 0.05),
-        "trailing_stop_atr": (1.0, 2.5),
-        
-        # Drift Monitor
-        "win_rate_min": (0.40, 0.55),
-        "profit_factor_min": (0.8, 1.2),
-        "ks_pvalue_threshold": (0.01, 0.10)
-    }
-    
-    CONFIG_FILE = "data/auto_tune_config.json"
-    STUDY_NAME = "feat_sniper_optimization"
-    
-    def __init__(self):
-        self.current_params = self._load_config()
-        self.study: Optional[Any] = None
-        
-    def _load_config(self) -> Dict[str, float]:
-        """Load current tuned parameters from disk."""
-        if os.path.exists(self.CONFIG_FILE):
-            try:
-                with open(self.CONFIG_FILE, 'r') as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning(f"Failed to load auto-tune config: {e}")
-        
-        # Return defaults (mid-range values)
-        return {k: (v[0] + v[1]) / 2 for k, v in self.PARAM_RANGES.items()}
-    
-    def _save_config(self, params: Dict[str, float]) -> None:
-        """Persist tuned parameters to disk."""
-        os.makedirs(os.path.dirname(self.CONFIG_FILE) or ".", exist_ok=True)
-        with open(self.CONFIG_FILE, 'w') as f:
-            json.dump({
-                "params": params,
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "version": "1.0"
-            }, f, indent=2)
-        logger.info(f"[AUTO-TUNE] Saved config: {self.CONFIG_FILE}")
-    
-    def create_objective(self, evaluate_fn: Callable[[Dict[str, float]], float]):
-        """
-        Creates an Optuna objective function.
-        
-        Args:
-            evaluate_fn: Function that takes params dict and returns a score
-                         (higher is better, e.g., Sharpe ratio or profit factor)
-        """
-        def objective(trial):
-            params = {}
-            for name, (low, high) in self.PARAM_RANGES.items():
-                params[name] = trial.suggest_float(name, low, high)
-            
-            # Evaluate the params on shadow mode data
-            score = evaluate_fn(params)
-            return score
-        
-        return objective
-    
-    def optimize(
-        self, 
-        evaluate_fn: Callable[[Dict[str, float]], float],
-        n_trials: int = 50,
-        timeout_minutes: int = 30
-    ) -> Dict[str, Any]:
-        """
-        Run Bayesian optimization to find optimal hyperparameters.
-        
-        Args:
-            evaluate_fn: Function that evaluates a param set (returns score)
-            n_trials: Maximum optimization iterations
-            timeout_minutes: Maximum time to spend optimizing
-            
-        Returns:
-            Dict with best params and optimization stats
-        """
-        if not OPTUNA_AVAILABLE:
-            return {
-                "status": "ERROR",
-                "message": "Optuna not installed. Run: pip install optuna"
-            }
-        
-        # Create study with TPE sampler (good for hyperparameter optimization)
-        self.study = optuna.create_study(
-            study_name=self.STUDY_NAME,
-            direction="maximize",
-            sampler=TPESampler(seed=42)
-        )
-        
-        objective = self.create_objective(evaluate_fn)
-        
-        logger.info(f"[AUTO-TUNE] Starting optimization: {n_trials} trials, {timeout_minutes}min timeout")
-        
-        self.study.optimize(
-            objective,
-            n_trials=n_trials,
-            timeout=timeout_minutes * 60,
-            show_progress_bar=True
-        )
-        
-        # Extract best params
-        best_params = self.study.best_params
-        best_score = self.study.best_value
-        
-        # Save to disk
-        self._save_config(best_params)
-        self.current_params = best_params
-        
-        result = {
-            "status": "SUCCESS",
-            "best_score": round(best_score, 4),
-            "best_params": {k: round(v, 4) for k, v in best_params.items()},
-            "trials_completed": len(self.study.trials),
-            "optimization_history": [
-                {"trial": t.number, "score": t.value}
-                for t in self.study.trials[:10]  # First 10 trials
-            ]
+        # Base Gene Pool (Ranges)
+        self.gene_bounds = {
+            "ALPHA_CONFIDENCE_THRESHOLD": (0.55, 0.85),
+            "ATR_TRAILING_MULTIPLIER": (1.0, 3.5),
+            "RISK_PER_TRADE_PERCENT": (0.5, 2.0)
         }
         
-        logger.info(f"[AUTO-TUNE] Optimization complete. Best score: {best_score:.4f}")
-        return result
-    
-    def get_param(self, name: str) -> float:
-        """Get a tuned parameter value."""
-        return self.current_params.get(name, self.PARAM_RANGES.get(name, (0.5, 0.5))[0])
-    
-    def get_all_params(self) -> Dict[str, float]:
-        """Get all tuned parameters."""
-        return self.current_params.copy()
-    
-    def get_status(self) -> Dict[str, Any]:
-        """Get auto-tuner status."""
+    def evolve_population(self):
+        """
+        Runs the Genetic Algorithm Cycle.
+        1. Load History (Replay Buffer)
+        2. Initialize Population
+        3. Iterate Generations (Select -> Crossover -> Mutate)
+        4. Save Alpha (Best Individual)
+        """
+        history = self._load_experience()
+        if len(history) < 20: # Need decent sample size
+            # Fallback to heuristic or do nothing
+            logger.info("🧬 GA: Not enough data for population sim (Need >20).")
+            return
+
+        logger.info(f"🧬 GA: Starting Evolution on {len(history)} experiences...")
+        
+        # 1. Initialize Population
+        population = [self._random_individual() for _ in range(self.population_size)]
+        
+        best_overall = None
+        best_fitness = -float('inf')
+        
+        # 2. Generations
+        for gen in range(self.generations):
+            # Evaluate Fitness
+            fitness_scores = [self._evaluate_fitness(ind, history) for ind in population]
+            
+            # Track Best
+            gen_best_idx = np.argmax(fitness_scores)
+            gen_best = population[gen_best_idx]
+            gen_fitness = fitness_scores[gen_best_idx]
+            
+            if gen_fitness > best_fitness:
+                best_fitness = gen_fitness
+                best_overall = gen_best
+                
+            logger.info(f"🧬 Gen {gen+1}: Best Fitness = {gen_fitness:.4f}")
+            
+            # Select Parents (Tournament)
+            parents = self._selection(population, fitness_scores)
+            
+            # Crossover & Mutation
+            next_generation = []
+            while len(next_generation) < self.population_size:
+                p1, p2 = random.sample(parents, 2)
+                child = self._crossover(p1, p2)
+                child = self._mutate(child)
+                next_generation.append(child)
+                
+            population = next_generation
+            
+        # 3. Save Winner
+        if best_overall:
+            logger.info(f"🏆 Evolution Complete. Winner: {best_overall}")
+            self._save_genes(best_overall)
+
+    def _evaluate_fitness(self, genes: Dict, history: List[Dict]) -> float:
+        """
+        Virtual Replay: Simulates PnL if these genes were active.
+        """
+        simulated_pnl = 0.0
+        trades_taken = 0
+        
+        threshold = genes["ALPHA_CONFIDENCE_THRESHOLD"]
+        risk = genes["RISK_PER_TRADE_PERCENT"]
+        stop_mult = genes["ATR_TRAILING_MULTIPLIER"]
+        
+        for record in history:
+            # Reconstruct State (Idealized)
+            snapshot = record.get("state_snapshot", {})
+            
+            # We use recorded 'confidence' or 'lstm_prob'
+            original_confidence = snapshot.get("confidence", 0.6)
+            
+            # Would we trade?
+            if original_confidence >= threshold:
+                # Yes, we trade.
+                # Outcome logic:
+                # If we have 'pnl' in record, that's the result of the ORIGINAL strategy.
+                # To simulate NEW strategy result, we need candle data (hard).
+                # SImplification: We assume the 'direction' is correct if PnL > 0.
+                
+                # If original PnL > 0 -> We win. Scale by risk.
+                # If original PnL < 0 -> We lose. Scale by risk.
+                
+                # BUT, tighter stops (ATR Mult) might mitigate loss or cut win short.
+                # This is a heuristic simulation.
+                
+                pnl = record.get("pnl", 0.0)
+                
+                # Apply Risk Scaling
+                scaled_pnl = pnl * risk 
+                
+                simulated_pnl += scaled_pnl
+                trades_taken += 1
+            else:
+                # We skipped this trade. PnL 0.
+                pass
+                
+        # Fitness Function
+        if trades_taken == 0: return -1.0
+        return simulated_pnl
+
+    def _random_individual(self) -> Dict:
         return {
-            "optuna_available": OPTUNA_AVAILABLE,
-            "config_file": self.CONFIG_FILE,
-            "config_exists": os.path.exists(self.CONFIG_FILE),
-            "current_params": self.current_params,
-            "param_ranges": self.PARAM_RANGES
+            k: round(random.uniform(v[0], v[1]), 2)
+            for k, v in self.gene_bounds.items()
         }
+        
+    def _selection(self, population, fitness_scores):
+        # Tournament Selection
+        selected = []
+        k = 3 # Tournament size
+        for _ in range(len(population) // 2): # Select half as parents
+            candidates_idx = random.sample(range(len(population)), k)
+            best_cand_idx = max(candidates_idx, key=lambda i: fitness_scores[i])
+            selected.append(population[best_cand_idx])
+        return selected
 
-    def optimize_genetic(self, n_gen: int = 5, pop_size: int = 20) -> Dict[str, Any]:
-        """
-        Runs Genetic Algorithm optimization using DEAP (Distributed Evolutionary Algorithms).
-        Evolves 'Survival of the Fittest' params.
-        """
+    def _crossover(self, p1: Dict, p2: Dict) -> Dict:
+        # Uniform Crossover
+        child = {}
+        for k in p1.keys():
+            child[k] = p1[k] if random.random() > 0.5 else p2[k]
+        return child
+
+    def _mutate(self, ind: Dict) -> Dict:
+        child = ind.copy()
+        for k, v in self.gene_bounds.items():
+            if random.random() < self.mutation_rate:
+                # Mutate by small delta (+- 10% of range)
+                delta = (v[1] - v[0]) * 0.1 * random.uniform(-1, 1)
+                new_val = child[k] + delta
+                # Clamp
+                child[k] = max(v[0], min(v[1], new_val))
+                child[k] = round(child[k], 2)
+        return child
+        
+    def _load_experience(self) -> List[Dict]:
+        if not os.path.exists(self.memory_path): return []
+        data = []
         try:
-            import random
-            import numpy as np
-            from deap import base, creator, tools, algorithms
-        except ImportError:
-            logger.error("DEAP not installed. Run: pip install deap")
-            return {"status": "ERROR", "message": "DEAP missing"}
+            with open(self.memory_path, "r") as f:
+                for line in f:
+                    try:
+                        data.append(json.loads(line))
+                    except: pass
+        except: pass
+        return data[-200:] # Use last 200
 
-        logger.info(f"[GENETIC] Starting Evolution: {n_gen} Gens, {pop_size} Pop")
-
-        # 1. Setup DEAP (Safe for re-runs)
-        if not hasattr(creator, "FitnessMax"):
-            creator.create("FitnessMax", base.Fitness, weights=(1.0,))
-        if not hasattr(creator, "Individual"):
-            creator.create("Individual", list, fitness=creator.FitnessMax)
-            
-        toolbox = base.Toolbox()
-        
-        # Genes mapping
-        param_names = list(self.PARAM_RANGES.keys())
-        
-        def random_gene(name):
-            low, high = self.PARAM_RANGES[name]
-            return random.uniform(low, high)
-            
-        def init_individual():
-            return creator.Individual([random_gene(n) for n in param_names])
-            
-        toolbox.register("individual", init_individual)
-        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
-        
-        # Evaluation Wrapper
-        def eval_genome(individual):
-            # Clamp values to ranges
-            params = {}
-            for i, name in enumerate(param_names):
-                val = individual[i]
-                low, high = self.PARAM_RANGES[name]
-                # Mutation might push out of bounds, so clamp
-                val = max(low, min(high, val)) 
-                params[name] = val
-            
-            score = evaluate_on_shadow_data(params)
-            return (score,) 
-            
-        toolbox.register("evaluate", eval_genome)
-        toolbox.register("mate", tools.cxBlend, alpha=0.5)
-        toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.2, indpb=0.2)
-        toolbox.register("select", tools.selTournament, tournsize=3)
-        
-        # 2. Run Evolution
-        pop = toolbox.population(n=pop_size)
-        hof = tools.HallOfFame(1)
-        
-        # Statistics
-        stats = tools.Statistics(lambda ind: ind.fitness.values)
-        stats.register("avg", np.mean)
-        stats.register("max", np.max)
-        
-        pop, log = algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.2, ngen=n_gen, 
-                                       stats=stats, halloffame=hof, verbose=True)
-                                       
-        # 3. Extract Best
-        best_ind = hof[0]
-        best_fitness = best_ind.fitness.values[0]
-        
-        best_params = {}
-        for i, name in enumerate(param_names):
-            val = best_ind[i]
-            low, high = self.PARAM_RANGES[name]
-            best_params[name] = max(low, min(high, val))
-
-        # Save to disk
-        self._save_config(best_params)
-        self.current_params = best_params
-        
-        logger.info(f"[GENETIC] Evolution Optimized. Fitness: {best_fitness:.4f}")
-        logger.info(f"[DNA] Best Genes: {best_params}")
-        
-        return {
-            "status": "SUCCESS",
-            "method": "GENETIC_DEAP",
-            "best_fitness": best_fitness,
-            "best_params": best_params,
-            "generations": n_gen
-        }
-
-
-    def select_best_features(self, df: Any, target_col: str = "profit") -> List[str]:
-        """
-        AutoML: Determine most predictive features using Random Forest importance.
-        """
+    def _save_genes(self, genes: Dict):
+        # Writes strictly to config/dynamic_params.json for System-wide Adoption
+        os.makedirs("config", exist_ok=True)
         try:
-            import pandas as pd
-            from sklearn.ensemble import RandomForestRegressor
-            
-            if not isinstance(df, pd.DataFrame) or df.empty:
-                logger.warning("[AUTO-ML] No data provided for feature selection.")
-                return []
-            
-            # Identify feature columns (exclude meta)
-            exclude = {"tick_time", "symbol", "label", "profit", "target", "uuid"}
-            feature_cols = [c for c in df.columns if c not in exclude and pd.api.types.is_numeric_dtype(df[c])]
-            
-            if not feature_cols:
-                return []
-
-            X = df[feature_cols].fillna(0)
-            y = df[target_col]
-            
-            # Train simple RF
-            model = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42, n_jobs=-1)
-            model.fit(X, y)
-            
-            importances = model.feature_importances_
-            
-            # Rank
-            feature_imp = list(zip(feature_cols, importances))
-            feature_imp.sort(key=lambda x: x[1], reverse=True)
-            
-            # Select features with > 1% importance (max 12)
-            top_features = [f[0] for f in feature_imp if f[1] > 0.01][:12]
-            
-            self._save_active_features(top_features)
-            logger.info(f"[AUTO-ML] Selected Active Features: {top_features}")
-            return top_features
-            
+            with open(self.output_path, "w") as f:
+                json.dump(genes, f, indent=4)
+            logger.info(f"[AUTO-TUNER] Successfully updated {self.output_path}")
         except Exception as e:
-            logger.error(f"[AUTO-ML] Feature selection failed: {e}")
-            return []
+            logger.error(f"[AUTO-TUNER] Failed to write config: {e}")
 
-    def _save_active_features(self, features: List[str]):
-        path = "data/active_features.json"
-        try:
-            os.makedirs("data", exist_ok=True)
-            with open(path, "w") as f:
-                json.dump(features, f)
-        except Exception as e:
-            logger.error(f"Failed to save features: {e}")
-
-
-# Singleton
+# Singleton Instance
 auto_tuner = AutoTuner()
 
-
-# =============================================================================
-# EXAMPLE EVALUATION FUNCTION (for shadow mode backtesting)
-# =============================================================================
-
-def evaluate_on_shadow_data(params: Dict[str, float]) -> float:
-    """
-    Evaluate tuned parameters against shadow mode trade history.
-    
-    Uses trade_journal to fetch recent shadow predictions and calculates
-    theoretical Sharpe ratio if those params had been applied.
-    
-    Returns:
-        float: Score (Sharpe-like metric, higher is better)
-    """
-    try:
-        from app.services.trade_journal import trade_journal
-        
-        # Fetch recent shadow mode entries
-        recent_trades = trade_journal.get_recent_entries(limit=100)
-        if not recent_trades or len(recent_trades) < 10:
-            # Insufficient data - return heuristic score
-            score = 0.0
-            accel = params.get("acceleration_threshold", 2.0)
-            score += 1.0 if 1.8 <= accel <= 2.2 else 0.5
-            conf = params.get("confidence_minimum", 0.6)
-            score += conf * 2
-            return score
-        
-        # Calculate theoretical returns with new params
-        returns = []
-        for trade in recent_trades:
-            # Would this trade pass with new params?
-            confidence = trade.get("confidence", 0.5)
-            accel_score = trade.get("acceleration_score", 0.0)
-            
-            would_pass = (
-                confidence >= params.get("confidence_minimum", 0.6) and
-                accel_score >= params.get("acceleration_threshold", 2.0)
-            )
-            
-            if would_pass:
-                # Theoretical P&L based on signal accuracy
-                actual_profit = trade.get("theoretical_profit", 0.0)
-                returns.append(actual_profit)
-        
-        if not returns:
-            return 0.0
-        
-        # Calculate Sharpe-like ratio
-        import numpy as np
-        returns_arr = np.array(returns)
-        mean_return = np.mean(returns_arr)
-        std_return = np.std(returns_arr) if len(returns_arr) > 1 else 1.0
-        
-        sharpe = mean_return / std_return if std_return > 0 else 0.0
-        return float(sharpe)
-        
-    except Exception as e:
-        logger.warning(f"[TUNER] Shadow data evaluation failed: {e}")
-        return 0.5  # Neutral score on error
-
-
-# =============================================================================
-# MCP-COMPATIBLE ASYNC WRAPPERS
-# =============================================================================
-
-async def get_tuner_status() -> Dict[str, Any]:
-    """MCP Tool: Get auto-tuner status."""
-    return auto_tuner.get_status()
-
-
-async def get_tuned_param(name: str) -> Dict[str, Any]:
-    """MCP Tool: Get a specific tuned parameter."""
-    value = auto_tuner.get_param(name)
-    return {"param": name, "value": value}
-
-
-async def run_optimization(n_trials: int = 50) -> Dict[str, Any]:
-    """
-    MCP Tool: Run hyperparameter optimization.
-    Uses Genetic Algorithms (DEAP) for Level 15 Evolution.
-    """
-    # Map 'n_trials' to 'pop_size * n_gen' roughly or just use as pop
-    return auto_tuner.optimize_genetic(n_gen=5, pop_size=max(10, n_trials))
+if __name__ == "__main__":
+    # Test Run
+    auto_tuner.evolve_population()
