@@ -122,4 +122,64 @@ class FeatProcessor:
             print(f"❌ Failed export JSONL: {e}")
 
 
+
+    def tensorize_snapshot(self, snapshot: Dict[str, Any], feature_names: List[str]) -> np.ndarray:
+        """
+        [LEVEL 25] THE ADAPTOR (Translator Universal).
+        Converts a raw JSON/Dict snapshot into a Normalized Feature Vector for the Neural Network.
+        
+        Rules:
+        - FEAT Scores (0-100) -> 0.0-1.0
+        - Acceleration (0-10) -> 0.0-1.0
+        - RSI (0-100) -> 0.0-1.0
+        - Missing Data -> 0.0 (Safe Fill)
+        """
+        vector = []
+        for feature in feature_names:
+            # Safe Get with 0.0 default
+            val = snapshot.get(feature, 0.0)
+            
+            # Ensure float
+            try:
+                val = float(val)
+            except:
+                val = 0.0
+            
+            # [NORMALIZATION LOGIC]
+            # Identify feature type by name substring
+            
+            # 1. FEAT/Structure Scores (Range 0-100)
+            if "score" in feature or "rsi" in feature:
+                # heuristic: if value is > 1.0, assume it's raw 0-100. 
+                # If it's already 0-1, don't divide.
+                # But some scores might be 0.5 raw. Context needed.
+                # For Level 25, we assume inputs like 'feat_structure_score' are 0-100.
+                if "structure_score" in feature:
+                    val = val / 100.0
+                elif "rsi" in feature:
+                    val = val / 100.0
+                elif "fuzzy" in feature:
+                    # Fuzzy is -10 to +10 usually? 
+                    # If 'fuzzy_score' is passed, normalize -10..10 to 0..1?
+                    # Or keep as is? Neural Nets like -1 to 1.
+                    pass 
+                    
+            # 2. Acceleration (Range 0-10 or 0-1)
+            elif "accel" in feature:
+                # If accel_score is 0-10
+                if "accel_score" in feature:
+                    val = val / 10.0
+            
+            # 3. Regime/Trend (Categorical encoded as int?)
+            # If feature is 'regime_code', it might be 0,1,2.
+            # Embedding handling would be better, but simpler is raw.
+            
+            vector.append(val)
+            
+        # [SAFETY NET] Remove NaNs/Infs that crash CUDA
+        vec_np = np.array(vector, dtype=np.float32)
+        vec_np = np.nan_to_num(vec_np, nan=0.0, posinf=1.0, neginf=-1.0)
+        
+        return vec_np
+
 feat_processor = FeatProcessor()

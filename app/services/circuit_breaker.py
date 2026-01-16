@@ -7,11 +7,14 @@ from datetime import datetime
 import json
 import os
 
+logger = logging.getLogger("feat.circuit_breaker")
+
 class PersistedTokenBucket:
     """
     [SENIOR ARCHITECTURE] Token Bucket with Persistent State.
     Ensures that rate limits and punishments survive process crashes/restarts.
     """
+
     def __init__(self, filename="data/rate_limit.json", capacity=10, fill_rate=0.5):
         self.filename = filename
         self.capacity = capacity
@@ -113,10 +116,19 @@ class CircuitBreaker:
         """
         from app.core.config import settings
         
-        # Check Operational Pause
         if time.time() < self.pause_until:
             logger.warning(f"⏳ OPERATIONAL PAUSE ACTIVE: Resuming in {int(self.pause_until - time.time())}s")
             return 0.0
+
+        # [NLP] Sentiment Check (Level 15 Upgrade)
+        try:
+            from app.skills.calendar import chronos_engine
+            news = chronos_engine.get_sentiment_impact()
+            if news.get("impact") == "HIGH" and news.get("sentiment") == "UNCERTAIN":
+                 logger.warning("📰 NEWS ALERT: High Impact + Uncertain Sentiment. Reducing lot size to 50%.")
+                 return 0.5
+        except ImportError:
+            pass
 
         dd = await self.get_drawdown()
         
@@ -194,31 +206,31 @@ class CircuitBreaker:
 
     async def monitor_heartbeat(self):
         """Tarea de fondo: Monitorea latencia y resets diarios."""
-        logger.info(f"🛡️ Multi-Level Circuit Breaker ARMED (Visionary Strategy Active)")
+        logger.info(f"[CB] Multi-Level Circuit Breaker ARMED (Visionary Strategy Active)")
         try:
             while True:
                 # 1. Monitoreo de Latencia (Heartbeat)
                 latency = time.time() - self.last_tick_time
                 if latency > self.max_latency and not self.is_tripped:
-                    logger.critical(f"🚨 CIRCUIT TRIP: Dead Silence ({latency:.1f}s > {self.max_latency}s)")
+                    logger.critical(f"[CRITICAL] CIRCUIT TRIP: Dead Silence ({latency:.1f}s > {self.max_latency}s)")
                     await self.emergency_shutdown()
                 
                 # 2. Monitoreo de Drawdown (Status Check)
                 multiplier = await self.get_lot_multiplier()
                 if self.current_level > 0:
-                     status_msg = f"⚠️ CB STATUS: Level {self.current_level}"
+                     status_msg = f"[WARN] CB STATUS: Level {self.current_level}"
                      if self.pause_until > time.time():
                          status_msg += f" (PAUSED for {int(self.pause_until - time.time())}s)"
                      logger.warning(status_msg)
 
                 await asyncio.sleep(5.0)  # Check every 5s
         except asyncio.CancelledError:
-            logger.info("🛡️ Circuit Breaker Disarmed")
+            logger.info("[CB] Circuit Breaker Disarmed")
 
     async def emergency_shutdown(self):
         self.is_tripped = True
         self.current_level = 3
-        logger.critical("⛔ SRE PROTOCOL: EXECUTE ORDER 66 (TOTAL HALT)")
+        logger.critical("[CRITICAL] SRE PROTOCOL: EXECUTE ORDER 66 (TOTAL HALT)")
         if self.trade_manager:
             try:
                 # Cerramos todo

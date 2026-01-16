@@ -10,6 +10,14 @@ import os
 import sys
 import io
 
+# [WINDOWS FIX] Force UTF-8 Encoding for Console
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 # === PROTOCOLO BLACKHOLE (INICIO) ===
 # Silenciar Warnings de Inmediato
 import warnings
@@ -140,6 +148,11 @@ except ImportError:
     economic_calendar = None
 
 try:
+    from app.skills.calendar_guard import calendar_guard
+except ImportError:
+    calendar_guard = None
+
+try:
     from app.skills.custom_loader import custom_loader
 except ImportError:
     custom_loader = None
@@ -256,8 +269,15 @@ class NexusState:
         self.dashboard = None
         self.ml_engine = None
         self.structure_engine = None
+        self.structure_engine = None
         self.market = None
+        self.calendar_guard = None
+        self.mtf_engine = None
+        self.mtf_engine = None
         self.brain_semaphore = asyncio.Semaphore(20)
+        self.last_scan_time = 0.0
+        self.context_cache = {"in_zone": False, "session": "OFF"}
+        self.chronos_engine = None
 
     async def initialize_services(self):
         """Sequential initialization of core services."""
@@ -271,10 +291,16 @@ class NexusState:
             from app.ml.ml_engine import MLEngine
             from nexus_core.structure_engine import structure_engine
             from app.skills import market
+            from app.skills.calendar import chronos_engine
+            from app.skills.calendar_guard import calendar_guard
+            from nexus_core.mtf_engine import mtf_engine
 
             self.market_physics = mp
             self.risk_engine = RiskEngine()
             self.structure_engine = structure_engine
+            self.mtf_engine = mtf_engine
+            self.calendar_guard = calendar_guard
+            self.chronos_engine = chronos_engine
             self.market = market
             self.circuit_breaker = cb
             self.feat_engine = feat_full_chain_institucional
@@ -304,54 +330,156 @@ class NexusState:
             return
 
         regime = self.market_physics.ingest_tick(data) if self.market_physics else None
-        if regime and regime.is_accelerating and regime.acceleration_score > 1.2:
-             asyncio.create_task(self.process_signal_task(data, regime))
+        
+        # --- THE ETERNAL SENTINEL LOGIC ---
+        # 1. Context Filter (Cheap)
+        in_killzone = False
+        if self.chronos_engine:
+             w_res = self.chronos_engine.validate_window()
+             in_killzone = w_res.get("is_valid", False)
+        
+        # 2. Structural Heartbeat (Update Map Always - periodic)
+        import time
+        now = time.time()
+        if (now - self.last_scan_time) >= 60.0:
+             self.last_scan_time = now
+             # Spawn SCAN task (Non-blocking map update)
+             asyncio.create_task(self.process_signal_task(data, regime, mode="SCAN"))
+        
+        # 3. Trigger Logic (The Sniper Trigger)
+        # Condition: (Killzone OR In_Zone) AND (Physics Breakout)
+        in_zone = self.context_cache.get("in_zone", False)
+        
+        # Physics Breakout: Acceleration > 1.2 OR Initiative Candle
+        is_breakout = False
+        if regime:
+             is_breakout = (regime.is_accelerating and regime.acceleration_score > 1.2) or \
+                           getattr(regime, 'is_initiative_candle', False)
+        
+        if (in_killzone or in_zone) and is_breakout:
+             # Full Neural Inference
+             asyncio.create_task(self.process_signal_task(data, regime, mode="FULL"))
 
     # --- BACKGROUND TASKS ---
-    async def process_signal_task(self, data, regime):
-        """Strategic Inference and Execution Pipeline."""
+    async def process_signal_task(self, data, regime, mode: str = "FULL"):
+        """
+        Strategic Inference and Execution Pipeline.
+        Modes:
+        - SCAN: Updates Structure Map & Zone Cache only (The Sentry).
+        - FULL: Executes ML Inference & Trade Logic (The Sniper).
+        """
         async with self.brain_semaphore:
             try:
                 price = float(data.get('bid', 0) or data.get('close', 0))
                 is_valid = await self.feat_engine.analyze(data, price, precomputed_physics=regime) if self.feat_engine else False
                 
                 # --- NEURAL-STRUCTURAL BINDING [LEVEL 10] ---
-                # 1. Fetch Contextual Structure (OHLC)
+                # 1. Fetch Contextual Structure (MTF Convergence)
                 symbol = data.get('symbol', 'XAUUSD')
-                candles_res = await self.market.get_candles(symbol, "M1", 100) if self.market else {}
                 
-                struct_score = 50.0 # Neutral default
+                # Fetch M1, M5, H1, H4 for Fractal Analysis
+                target_tfs = ["M1", "M5", "H1", "H4"]
+                candles_by_tf = {}
+                import pandas as pd
+                
+                # Default values
+                struct_score = 50.0 
                 mae_phase = 0.0
                 is_in_zone = 0.0 
                 struct_bos = 0.0 
                 feat_index = 50.0
+                mtf_score = 0.5
+                mtf_alignment = 0.0
+                
+                # Fetch loop
+                if self.market:
+                    for tf in target_tfs:
+                        c_res = await self.market.get_candles(symbol, tf, 100)
+                        if c_res.get("status") == "success" and c_res.get("candles"):
+                             df = pd.DataFrame(c_res["candles"])
+                             cols = ['open', 'high', 'low', 'close', 'tick_volume']
+                             for c in cols:
+                                 if c in df.columns:
+                                     df[c] = pd.to_numeric(df[c])
+                             candles_by_tf[tf] = df
 
-                if candles_res.get("status") == "success":
-                     candles = candles_res.get("candles", [])
-                     if candles:
-                          import pandas as pd
-                          df_struct = pd.DataFrame(candles)
-                          cols = ['open', 'high', 'low', 'close', 'tick_volume']
-                          for c in cols:
-                              if c in df_struct.columns:
-                                  df_struct[c] = pd.to_numeric(df_struct[c])
-                                  
-                          # 2. Execute Structure Engine
-                          if self.structure_engine:
-                               feat_res = self.structure_engine.compute_feat_index(df_struct)
-                               struct_score = float(feat_res['feat_index'].iloc[-1])
-                               feat_index = struct_score 
-                               
-                               report = self.structure_engine.get_structural_report(df_struct)
-                               phase_map = {"RANGE": 0.0, "NORMAL": 0.0, "ACCUMULATION": 0.5, "EXPANSION": 1.0, "MOMENTUM": 0.8}
-                               mae_phase = phase_map.get(report['mae_pattern']['phase'], 0.0)
-                               
-                               # Use distance to zone for proximity (normalized by price)
-                               dist = report['zones']['distance_to_zone']
-                               price_threshold = df_struct['close'].iloc[-1] * 0.0005 
-                               is_in_zone = 1.0 if dist < price_threshold else 0.0
-                               
-                               struct_bos = report['health']['bos_strength']
+                # 2. Execute Structure Engine (on M1) & MTF Engine
+                if "M1" in candles_by_tf and self.structure_engine:
+                     df_struct = candles_by_tf["M1"]
+                     
+                     # Structure Analysis
+                     feat_res = self.structure_engine.compute_feat_index(df_struct)
+                     struct_score = float(feat_res['feat_index'].iloc[-1])
+                     feat_index = struct_score 
+                     
+                     report = self.structure_engine.get_structural_report(df_struct)
+                     phase_map = {"RANGE": 0.0, "NORMAL": 0.0, "ACCUMULATION": 0.5, "EXPANSION": 1.0, "MOMENTUM": 0.8}
+                     mae_phase = phase_map.get(report['mae_pattern']['phase'], 0.0)
+                     
+                     # Use distance to zone for proximity
+                     dist = report['zones']['distance_to_zone']
+                     price_threshold = df_struct['close'].iloc[-1] * 0.0005 
+                     is_in_zone = 1.0 if dist < price_threshold else 0.0
+                     
+                     struct_bos = report['health']['bos_strength']
+                     
+                     # UPDATE SENTINEL CACHE
+                     self.context_cache["in_zone"] = (is_in_zone > 0.8) # >0.8 means very close/inside
+                
+                # If SCAN mode, stop here (We just wanted to update the Map/Cache)
+                if mode == "SCAN":
+                     return
+
+                # MTF Execution
+                if self.mtf_engine and candles_by_tf:
+                     mtf_res = await self.mtf_engine.analyze_all_timeframes(candles_by_tf, price)
+                     mtf_score = mtf_res.composite_score
+                     mtf_alignment = mtf_res.alignment_percentage
+
+                # PVP / Energy Analysis (Volume Perception)
+                pvp_energy = 0.5
+                poc_price = price # Default
+                
+                try:
+                    from nexus_core.features import feat_features
+                    from app.ml.market_regime import market_regime
+                    from app.ml.fuzzy_logic import fuzzy_logic
+
+                    if "M1" in candles_by_tf:
+                        # Generate Energy Tensor (Density + Kinetic + Flow)
+                        energy_map = feat_features.generate_energy_map(candles_by_tf["M1"])
+                        pvp_energy = energy_map.get("poc_idx", 25) / 50.0
+                        
+                        # Calculate Actual PVP Price for Reversion Logic
+                        e_meta = energy_map.get("metadata", {})
+                        bin_sz = e_meta.get("bin_size", 0.0)
+                        r_min = e_meta.get("range_min", 0.0)
+                        poc_idx = energy_map.get("poc_idx", 25)
+                        if bin_sz > 0 and r_min > 0:
+                            poc_price = r_min + (poc_idx * bin_sz)
+                        
+                        # [LEVEL 18] CLUSTERING & FUZZY LOGIC
+                        # 1. Update & Predict Regime
+                        last_candle = candles_by_tf["M1"].iloc[-1]
+                        atr_val = regime.atr if regime else 0.001
+                        vol_val = last_candle.get('tick_volume', 100) 
+                        
+                        market_regime.update(atr_val, vol_val) # Online Learning
+                        regime_label = market_regime.predict(atr_val, vol_val)
+                        
+                        # 2. Fuzzy Logic Evaluation
+                        rsi_val = data.get("rsi", 50.0)
+                        accel_val = regime.acceleration_score if regime else 0.0
+                        fuzzy_score = fuzzy_logic.evaluate(rsi_val, accel_val) # -10 to +10
+                        
+                    else:
+                        regime_label = "UNKNOWN"
+                        fuzzy_score = 0.0
+                        
+                except Exception as e:
+                    logger.warning(f"Cognitive Engine Error: {e}")
+                    regime_label = "UNKNOWN"
+                    fuzzy_score = 0.0
                                
                 # 3. Inject into Neural Context
                 neural_context = {
@@ -362,22 +490,102 @@ class NexusState:
                     "feat_structure_score": struct_score,
                     "mae_status": mae_phase,
                     "zone_proximity": is_in_zone,
-                    "struct_bos": struct_bos
+                    "struct_bos": struct_bos,
+                    "mtf_composite_score": mtf_score,
+                    "fractal_alignment": mtf_alignment,
+                    "pvp_energy": pvp_energy,
+                    "vol_intensity": regime.vol_z_score if regime else 0.0,
+                    "news_event": 1.0 if news_risk.get("is_news_time") else 0.0,
+                    "market_regime": regime_label,
+                    "fuzzy_score": fuzzy_score,
+                    "poc_price": poc_price
                 }
                 
                 brain_score = await self.ml_engine.ensemble_predict_async(symbol, neural_context) if self.ml_engine else {"p_win": 0.5, "alpha_confidence": 0}
                 
-                # 4. Probabilistic Fusion
+                # 4. Probabilistic Fusion (Total Convergence)
                 lstm_conf = brain_score.get('confidence', 0.0)
                 norm_struct = struct_score / 100.0
+                norm_mtf = mtf_score  # Already 0-1
+                
+                # Fuzzy Confidence Normalization (-10..10 -> 0..1)
+                norm_fuzzy = (fuzzy_score + 10) / 20.0 
+                
                 norm_physics = regime.acceleration_score / 10.0 if regime else 0.5
                 norm_physics = max(0.0, min(1.0, norm_physics))
                 
-                final_probability = (lstm_conf * 0.4) + (norm_struct * 0.4) + (norm_physics * 0.2)
+                # Weights: LSTM (25%), Structure (25%), MTF (20%), Fuzzy (15%), Physics (15%)
+                final_probability = (lstm_conf * 0.25) + (norm_struct * 0.25) + (norm_mtf * 0.2) + (norm_fuzzy * 0.15) + (norm_physics * 0.15)
+                
+                # [LEVEL 25] ALIGNMENT CHECK (ML Direction vs Regime Trend)
+                if regime and regime.trend in ["BULLISH", "BEARISH"]:
+                    ml_p_win = brain_score.get('p_win', 0.5)
+                    ml_says_buy = ml_p_win > 0.5
+                    trend_says_buy = (regime.trend == "BULLISH")
+                    
+                    if ml_says_buy != trend_says_buy:
+                        # Conflict: ML and Trend disagree. 
+                        # We crush the probability to prevent trading against the AI's conviction.
+                        final_probability *= 0.2 
+                        logger.warning(f"[ALIGNMENT] CONFLICT: ML(p={ml_p_win:.2f}) disagrees with Trend({regime.trend}). Vetoing.")
+
+                # [STRATEGIC REGIME FILTER - STRICT]
+                is_long_bias = final_probability > 0.5
+                
+                if regime_label == "CHAOS":
+                    final_probability *= 0.5 # Penalize Chaos
+                    logger.warning(f"[REGIME] CHAOS DETECTED on {symbol}. Confidence Halved.")
+                    
+                # [LEVEL 32] UNSUPERVISED ANOMALY GUARDIAN
+                # Checks for Out-of-Distribution events using Isolation Forest
+                if regime and regime.is_anomaly(data.get("atr", 0.001), data.get("vol_z", 0.0)):
+                    final_probability = 0.0 # COMPLETE VETO
+                    logger.warning(f"[GUARDIAN] ANOMALY DETECTED (Black Swan). Trade Vetoed.")
+                    
+                elif regime_label == "CALM":
+                    # Reversion Logic: Only Buy Low (Below POC), Sell High (Above POC)
+                    dist_to_poc = price - poc_price
+                    # If Long bias but Price > POC (Buying High) -> Penalize
+                    if is_long_bias and dist_to_poc > 0:
+                         penalty = 0.3
+                         final_probability -= penalty
+                         logger.info(f"[REGIME] CALM Filter: Penalized BUY > PVP (-{penalty})")
+                    # If Short bias but Price < POC (Selling Low) -> Penalize
+                    elif not is_long_bias and dist_to_poc < 0:
+                         penalty = 0.3
+                         final_probability -= penalty
+                         logger.info(f"[REGIME] CALM Filter: Penalized SELL < PVP (-{penalty})")
+
+                elif regime_label == "TENDENCIA":
+                    # Trend Logic: Follow Macro Flow
+                    physics_trend = regime.trend if regime else "NEUTRAL"
+                    if is_long_bias and physics_trend == "BEARISH":
+                         final_probability -= 0.4 # Severe penalty for Counter-Trend
+                         logger.info("[REGIME] TREND Filter: Penalized Counter-Trend BUY")
+                    elif not is_long_bias and physics_trend == "BULLISH":
+                         final_probability -= 0.4
+                         logger.info("[REGIME] TREND Filter: Penalized Counter-Trend SELL")
+ 
+                
                 brain_score['alpha_confidence'] = round(final_probability, 3)
 
+                # 5. Active Trade Management (The Hands - Reactive)
+                # Close existing trades if probability decays significantly
+                if self.trade_manager:
+                     await self.trade_manager.update_positions_logic(final_probability)
+
                 from app.core.config import settings
-                brain_score['execute_trade'] = brain_score.get('p_win', 0.5) > settings.PROFIT_THRESHOLD 
+                
+                # [LEVEL 20] PROBABILISTIC TRIGGER
+                # Only pull the trigger if Consensus is High AND Uncertainty is Low
+                uncertainty = brain_score.get('uncertainty', 1.0)
+                is_mechanically_sound = (final_probability > settings.PROFIT_THRESHOLD)
+                is_certain = (uncertainty < 0.05)
+                
+                if is_mechanically_sound and not is_certain:
+                    logger.warning(f"✋ TRIGGER HELD: High Uncertainty ({uncertainty:.3f} > 0.05) despite Signal ({final_probability:.2f})")
+                
+                brain_score['execute_trade'] = is_mechanically_sound and is_certain
 
                 if self.dashboard and not settings.PERFORMANCE_MODE:
                     asyncio.create_task(self.dashboard.push_signals({
@@ -398,17 +606,36 @@ class NexusState:
 
                 if is_valid and brain_score.get('execute_trade', False):
                     direction = "BUY" if regime.trend == "BULLISH" else "SELL"
+                    
+                    # Smart Risk: Cap lot size if News, unless Acceleration is Extreme
+                    lot_cap = news_risk.get("max_lot_cap", 10.0)
+                    if regime.acceleration and regime.acceleration_score > 2.0:
+                         lot_cap = 10.0 # Override cap if Momentum is Extreme (Smart Aggression)
+                    
                     dynamic_lot = await self.risk_engine.calculate_dynamic_lot(
                         confidence=brain_score.get('alpha_confidence', 0),
                         volatility=regime.atr if regime else 0.0,
                         symbol=data.get('symbol', 'XAUUSD'), market_data=data
                     ) if self.risk_engine else 0
                     
+                    # Apply Cap
+                    dynamic_lot = min(dynamic_lot, lot_cap)
+                    
                     if dynamic_lot > 0 and self.trade_manager:
-                        await self.trade_manager.execute_order(direction, {
+                        res = await self.trade_manager.execute_order(direction, {
                             "symbol": data.get('symbol', 'XAUUSD'),
                             "volume": dynamic_lot, "comment": "FEAT_NEURAL_V1"
                         })
+                        
+                        # Register for Active Management if filled
+                        if res.get("status") == "EXECUTED" and res.get("ticket"):
+                             self.trade_manager.register_position(
+                                 ticket=res["ticket"],
+                                 entry_price=price,
+                                 atr=regime.atr if regime else 0.0,
+                                 is_buy=(direction == "BUY"),
+                                 context=neural_context
+                             )
             except Exception as e:
                 logger.error(f"process_signal_task Error: {e}")
 
@@ -459,9 +686,30 @@ class NexusState:
         """Populates brain buffers while ZMQ remains responsive."""
         from app.skills.market import get_candles
         from app.ml.data_collector import data_collector
+        import MetaTrader5 as mt5_ref
+
+        # [AUTO-SCAN] Detect active symbols from Terminal
+        symbols_to_hydrate = []
+        try:
+            curr_id = mt5_ref.chart_first()
+            while curr_id > 0:
+                sym_name = mt5_ref.chart_symbol(curr_id)
+                if sym_name and sym_name not in symbols_to_hydrate:
+                    symbols_to_hydrate.append(sym_name)
+                curr_id = mt5_ref.chart_next(curr_id)
+            
+            if not symbols_to_hydrate:
+                 logger.warning("[SCAN] No active charts found. Defaulting to XAUUSD.")
+                 symbols_to_hydrate = ["XAUUSD"]
+            else:
+                 logger.info(f"[SCAN] Detected Active Assets: {symbols_to_hydrate}")
+                 
+        except Exception as e:
+            logger.warning(f"[SCAN] Auto-detection failed ({e}). Defaulting to XAUUSD.")
+            symbols_to_hydrate = ["XAUUSD"]
         
-        for symbol in ["XAUUSD", "EURUSD"]: 
-            logger.info(f"🌊 [HYDRATION] Deep Sync for {symbol}...")
+        for symbol in symbols_to_hydrate: 
+            logger.info(f"[HYDRATION] Deep Sync for {symbol}...")
             await data_collector.hydrate_all_timeframes(symbol, mt5_fallback_func=get_candles)
             
             candles_res = await get_candles(symbol, "M1", n_candles=200)
@@ -471,7 +719,7 @@ class NexusState:
                 prices = [float(c['close']) for c in candles]
                 if self.ml_engine: self.ml_engine.hydrate_hurst(symbol, prices)
             
-        logger.info("🌊 [HYDRATION] Buffers ACTIVE.")
+        logger.info("[HYDRATION] Buffers ACTIVE.")
 
 # Initialize the NexusState Manager
 STATE = NexusState()
@@ -502,14 +750,24 @@ async def app_lifespan(server: FastMCP):
         from app.skills.trade_mgmt import TradeManager
         STATE.trade_manager = TradeManager(zmq_bridge)
         asyncio.create_task(STATE.background_bootstrap())
-        asyncio.create_task(STATE.zmq_processing_loop())
         asyncio.create_task(STATE.jitter_sentinel())
+        
+        # [FIX] Register Memory Feeder as secondary callback (Topology V2)
+        from nexus_core.memory import nexus_memory
+        async def feed_memory(msg):
+             if msg.get('type') == 'TICK':
+                 await nexus_memory.save_tick(msg)
+        zmq_bridge.add_callback(feed_memory)
+        
+        # Start Bridge with Main Signal Handler
         await zmq_bridge.start(STATE.on_zmq_message)
-        logger.info("✅ ZMQ Bridge Active")
+        logger.info("✅ ZMQ Bridge Active (Callbacks: Signal + Memory)")
 
     try:
         yield
     finally:
+        if STATE.dashboard:
+            await STATE.dashboard.push_metrics({"status": "OFFLINE", "equity": 0, "balance": 0})
         if zmq_bridge: await zmq_bridge.stop()
         if mt5_conn: await mt5_conn.shutdown()
 
@@ -953,6 +1211,18 @@ async def sys_warm_reboot() -> Dict[str, Any]:
             "error": str(e),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
+
+@mcp.tool()
+async def visual_perception_snapshot(resize_factor: float = 0.5) -> Dict[str, Any]:
+    """
+    📸 MASTER TOOL 12: Vision System
+    Captura una imagen de la terminal MT5 para análisis visual.
+    """
+    try:
+        from app.skills.vision import capture_panorama
+        return await capture_panorama(resize_factor)
+    except Exception as e:
+        return {"error": str(e), "status": "FAILED"}
 
 # =============================================================================
 # MAIN ENTRY POINT

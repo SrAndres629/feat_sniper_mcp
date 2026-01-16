@@ -95,7 +95,7 @@ class MarketPhysics:
         if not ticks:
             return
             
-        logger.info(f"🌊 [PHYSICS] Hydrating with {len(ticks)} samples...")
+        logger.info(f"[PHYSICS] Hydrating with {len(ticks)} samples...")
         
         for tick in ticks:
             price = float(tick.get('bid', 0.0) or tick.get('close', 0.0))
@@ -120,7 +120,7 @@ class MarketPhysics:
         if len(self.price_window) >= 2:
             self._cached_atr = self._calculate_atr(np.array(self.price_window))
             
-        logger.info(f"✅ [PHYSICS] Hydration complete. ATR={self._cached_atr:.4f}")
+        logger.info(f"[PHYSICS] Hydration complete. ATR={self._cached_atr:.4f}")
 
     def _calculate_atr(self, prices: np.ndarray) -> float:
         """
@@ -167,7 +167,7 @@ class MarketPhysics:
             # [P0-1 FIX] Temporal Monotonicity Guard
             if self.timestamps and ts <= self.timestamps[-1]:
                 ts = self.timestamps[-1] + self.MIN_DELTA_T
-                logger.warning(f"[PHYSICS] Temporal monotonicity violation - forcing ts={ts:.6f}")
+                # logger.debug(f"[PHYSICS] Sub-second tick adjusted: ts={ts:.6f}")
 
             # 2. Update Buffers
             self.volume_window.append(vol)

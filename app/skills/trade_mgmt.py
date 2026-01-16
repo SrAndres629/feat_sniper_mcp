@@ -173,20 +173,40 @@ class TradeManager:
         return await self.execute_order("MODIFY", {"ticket": ticket, "sl": sl, "tp": tp})
 
     async def close_position(self, ticket: int, profit_pips: float = 0.0) -> Dict:
-        """Closes a position and sends feedback to the ML engine."""
+        """Closes a position and sends feedback to the ML engine & RLAIF Critic."""
         res = await self.execute_order("CLOSE", {"ticket": ticket})
         
         # [SENIOR] Closed-loop Feedback Initialization
         if ticket in self.active_positions:
             pos = self.active_positions[ticket]
+            
+            # 1. RLAIF Integration (AI Critic)
+            try:
+                from app.ml.rlaif_critic import rlaif_critic
+                trade_result = {
+                     "ticket": ticket,
+                     "entry_price": pos["entry_price"],
+                     "profit": profit_pips,   # Align key with Critic ("profit")
+                     "duration": (datetime.now() - pos["open_time"]).total_seconds()
+                }
+                trade_context = pos.get("context", {})
+                
+                # The Critic saves to JSONL for offline RL training
+                rlaif_critic.critique_trade(trade_result, trade_context)
+                logger.info(f"👨‍⚖️ RLAIF Critic Judged Ticket {ticket}")
+            except Exception as e:
+                logger.error(f"RLAIF Link Error: {e}")
+
+            # 2. Online Learning (Weights)
             from app.ml.ml_engine import ml_engine
             if ml_engine:
                  # Feed back the results for model weight recalibration
                  ml_engine.record_trade_result(
-                     gbm_prob=pos.get("gbm_prob", 0.5),
-                     lstm_prob=pos.get("lstm_prob", 0.5),
+                     gbm_prob=pos.get("gbm_prob", 0.5), # Legacy
+                     lstm_prob=pos.get("lstm_prob", 0.5), # Legacy
                      result_pips=profit_pips
                  )
+                 
             self.unregister_position(ticket)
             
         return res
@@ -199,10 +219,6 @@ class TradeManager:
         """
         Phase 13: Exhaustion Exit Logic.
         Monitors open positions and triggers early exit or breakeven based on physics.
-        
-        Rules:
-        1. If price reaches 0.5 ATR profit AND L4_Slope < 0 (momentum dying), move SL to Breakeven+1pip.
-        2. If position open > 5 minutes AND physics becomes erratic, close at market.
         """
         if ticket not in self.active_positions:
             return {"status": "NO_POSITION", "ticket": ticket}
@@ -242,16 +258,41 @@ class TradeManager:
         
         return result
 
-    def register_position(self, ticket: int, entry_price: float, atr: float, is_buy: bool, tp: float = 0):
+    async def update_positions_logic(self, probability: float):
+        """
+        Active Management Loop (The Hands).
+        Checks if open positions should be closed based on probability decay (AI Feedback).
+        """
+        if not self.active_positions:
+            return
+
+        to_close = []
+        for ticket, pos in self.active_positions.items():
+            is_buy = pos.get("is_buy", True)
+            
+            # Probability Decay Rules
+            # If BUY and Prob drops below 0.40 -> CLOSE
+            if is_buy and probability < 0.40:
+                 to_close.append((ticket, "Prob Decay (Buy)"))
+            # If SELL and Prob rises above 0.60 -> CLOSE
+            elif not is_buy and probability > 0.60:
+                 to_close.append((ticket, "Prob Reversal (Sell)"))
+                 
+        for ticket, reason in to_close:
+             logger.info(f"⚡ ACTIVE MGMT: Closing Ticket {ticket} due to {reason}. Prob={probability:.2f}")
+             await self.close_position(ticket)
+
+    def register_position(self, ticket: int, entry_price: float, atr: float, is_buy: bool, tp: float = 0, context: Dict = None):
         """Registers a new position for Exhaustion Exit monitoring."""
         self.active_positions[ticket] = {
             "entry_price": entry_price,
             "atr": atr,
             "is_buy": is_buy,
             "tp": tp,
-            "open_time": datetime.now()
+            "open_time": datetime.now(),
+            "context": context or {}
         }
-        logger.info(f"📝 Position Registered: Ticket {ticket}, Entry: {entry_price}, ATR: {atr}")
+        logger.info(f"📝 Position Registered: Ticket {ticket}, Entry: {entry_price}, Context_Keys: {list(context.keys()) if context else 'None'}")
 
     def unregister_position(self, ticket: int):
         """Removes a closed position from monitoring."""

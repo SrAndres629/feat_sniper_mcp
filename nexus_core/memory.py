@@ -21,11 +21,11 @@ class NexusMemory:
             try:
                 self.client = create_client(self.url, self.key)
                 self.enabled = True
-                self.logger.info("✅ Evolutionary Memory Connected (Supabase)")
+                self.logger.info("[OK] Evolutionary Memory Connected (Supabase)")
             except Exception as e:
-                self.logger.error(f"❌ Memory Link Failed: {e}")
+                self.logger.error(f"[FAIL] Memory Link Failed: {e}")
         else:
-            self.logger.warning("⚠️ Supabase Credentials Missing - Memory Disabled")
+            self.logger.warning("[WARN] Supabase Credentials Missing - Memory Disabled")
 
     async def save_tick(self, tick_data: dict, table_name="market_ticks"):
         """Fire-and-forget save of market data"""

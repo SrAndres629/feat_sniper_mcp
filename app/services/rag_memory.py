@@ -34,7 +34,7 @@ class TradeMemory:
                     )
                 """)
                 await db.commit()
-            logger.info("💾 Black Box Memory Initialized")
+            logger.info("[OK] Black Box Memory Initialized")
         except Exception as e:
             logger.warning(f"Memory Init Failed (Sqlite?): {e}")
 

@@ -187,6 +187,151 @@ class AutoTuner:
             "param_ranges": self.PARAM_RANGES
         }
 
+    def optimize_genetic(self, n_gen: int = 5, pop_size: int = 20) -> Dict[str, Any]:
+        """
+        Runs Genetic Algorithm optimization using DEAP (Distributed Evolutionary Algorithms).
+        Evolves 'Survival of the Fittest' params.
+        """
+        try:
+            import random
+            import numpy as np
+            from deap import base, creator, tools, algorithms
+        except ImportError:
+            logger.error("DEAP not installed. Run: pip install deap")
+            return {"status": "ERROR", "message": "DEAP missing"}
+
+        logger.info(f"[GENETIC] Starting Evolution: {n_gen} Gens, {pop_size} Pop")
+
+        # 1. Setup DEAP (Safe for re-runs)
+        if not hasattr(creator, "FitnessMax"):
+            creator.create("FitnessMax", base.Fitness, weights=(1.0,))
+        if not hasattr(creator, "Individual"):
+            creator.create("Individual", list, fitness=creator.FitnessMax)
+            
+        toolbox = base.Toolbox()
+        
+        # Genes mapping
+        param_names = list(self.PARAM_RANGES.keys())
+        
+        def random_gene(name):
+            low, high = self.PARAM_RANGES[name]
+            return random.uniform(low, high)
+            
+        def init_individual():
+            return creator.Individual([random_gene(n) for n in param_names])
+            
+        toolbox.register("individual", init_individual)
+        toolbox.register("population", tools.initRepeat, list, toolbox.individual)
+        
+        # Evaluation Wrapper
+        def eval_genome(individual):
+            # Clamp values to ranges
+            params = {}
+            for i, name in enumerate(param_names):
+                val = individual[i]
+                low, high = self.PARAM_RANGES[name]
+                # Mutation might push out of bounds, so clamp
+                val = max(low, min(high, val)) 
+                params[name] = val
+            
+            score = evaluate_on_shadow_data(params)
+            return (score,) 
+            
+        toolbox.register("evaluate", eval_genome)
+        toolbox.register("mate", tools.cxBlend, alpha=0.5)
+        toolbox.register("mutate", tools.mutGaussian, mu=0, sigma=0.2, indpb=0.2)
+        toolbox.register("select", tools.selTournament, tournsize=3)
+        
+        # 2. Run Evolution
+        pop = toolbox.population(n=pop_size)
+        hof = tools.HallOfFame(1)
+        
+        # Statistics
+        stats = tools.Statistics(lambda ind: ind.fitness.values)
+        stats.register("avg", np.mean)
+        stats.register("max", np.max)
+        
+        pop, log = algorithms.eaSimple(pop, toolbox, cxpb=0.5, mutpb=0.2, ngen=n_gen, 
+                                       stats=stats, halloffame=hof, verbose=True)
+                                       
+        # 3. Extract Best
+        best_ind = hof[0]
+        best_fitness = best_ind.fitness.values[0]
+        
+        best_params = {}
+        for i, name in enumerate(param_names):
+            val = best_ind[i]
+            low, high = self.PARAM_RANGES[name]
+            best_params[name] = max(low, min(high, val))
+
+        # Save to disk
+        self._save_config(best_params)
+        self.current_params = best_params
+        
+        logger.info(f"[GENETIC] Evolution Optimized. Fitness: {best_fitness:.4f}")
+        logger.info(f"[DNA] Best Genes: {best_params}")
+        
+        return {
+            "status": "SUCCESS",
+            "method": "GENETIC_DEAP",
+            "best_fitness": best_fitness,
+            "best_params": best_params,
+            "generations": n_gen
+        }
+
+
+    def select_best_features(self, df: Any, target_col: str = "profit") -> List[str]:
+        """
+        AutoML: Determine most predictive features using Random Forest importance.
+        """
+        try:
+            import pandas as pd
+            from sklearn.ensemble import RandomForestRegressor
+            
+            if not isinstance(df, pd.DataFrame) or df.empty:
+                logger.warning("[AUTO-ML] No data provided for feature selection.")
+                return []
+            
+            # Identify feature columns (exclude meta)
+            exclude = {"tick_time", "symbol", "label", "profit", "target", "uuid"}
+            feature_cols = [c for c in df.columns if c not in exclude and pd.api.types.is_numeric_dtype(df[c])]
+            
+            if not feature_cols:
+                return []
+
+            X = df[feature_cols].fillna(0)
+            y = df[target_col]
+            
+            # Train simple RF
+            model = RandomForestRegressor(n_estimators=50, max_depth=5, random_state=42, n_jobs=-1)
+            model.fit(X, y)
+            
+            importances = model.feature_importances_
+            
+            # Rank
+            feature_imp = list(zip(feature_cols, importances))
+            feature_imp.sort(key=lambda x: x[1], reverse=True)
+            
+            # Select features with > 1% importance (max 12)
+            top_features = [f[0] for f in feature_imp if f[1] > 0.01][:12]
+            
+            self._save_active_features(top_features)
+            logger.info(f"[AUTO-ML] Selected Active Features: {top_features}")
+            return top_features
+            
+        except Exception as e:
+            logger.error(f"[AUTO-ML] Feature selection failed: {e}")
+            return []
+
+    def _save_active_features(self, features: List[str]):
+        path = "data/active_features.json"
+        try:
+            os.makedirs("data", exist_ok=True)
+            with open(path, "w") as f:
+                json.dump(features, f)
+        except Exception as e:
+            logger.error(f"Failed to save features: {e}")
+
 
 # Singleton
 auto_tuner = AutoTuner()
@@ -272,11 +417,7 @@ async def get_tuned_param(name: str) -> Dict[str, Any]:
 async def run_optimization(n_trials: int = 50) -> Dict[str, Any]:
     """
     MCP Tool: Run hyperparameter optimization.
-    
-    WARNING: This is CPU-intensive and should only run during off-hours.
+    Uses Genetic Algorithms (DEAP) for Level 15 Evolution.
     """
-    return auto_tuner.optimize(
-        evaluate_fn=evaluate_on_shadow_data,
-        n_trials=n_trials,
-        timeout_minutes=30
-    )
+    # Map 'n_trials' to 'pop_size * n_gen' roughly or just use as pop
+    return auto_tuner.optimize_genetic(n_gen=5, pop_size=max(10, n_trials))

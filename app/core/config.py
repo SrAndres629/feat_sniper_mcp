@@ -357,6 +357,33 @@ class Settings(BaseSettings):
             )
         return self
 
+    @model_validator(mode="after")
+    def load_evolutionary_overrides(self):
+        """
+        [LEVEL 30] AUTOML INJECTION.
+        Loads 'config/dynamic_params.json' if it exists and overrides defaults.
+        This allows the EvolutionaryOptimizer to tune the system live.
+        """
+        try:
+            dynamic_path = Path(__file__).parent.parent.parent / "config" / "dynamic_params.json"
+            if dynamic_path.exists():
+                text = dynamic_path.read_text(encoding="utf-8")
+                if not text.strip():
+                    return self
+                    
+                overrides = json.loads(text)
+                
+                # Apply overrides if they match existing fields
+                for key, value in overrides.items():
+                    if hasattr(self, key):
+                        # Use setattr safely? BaseSettings fields are not frozen by default
+                        setattr(self, key, value)
+                        # Log inside validator is messy, but effectively silent update
+        except Exception as e:
+            # Fallback to defaults
+            pass
+        return self
+
     model_config = SettingsConfigDict(
         env_file=str(Path(__file__).parent.parent.parent / ".env"),
         env_file_encoding="utf-8",

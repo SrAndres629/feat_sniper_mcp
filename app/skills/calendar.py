@@ -84,5 +84,24 @@ class ChronosEngine:
             "checks": checks
         }
 
+    def get_sentiment_impact(self) -> Dict[str, Any]:
+        """
+        [NLP] Reads latest sentiment from RAG/News feed.
+        Returns: { 'sentiment': 'BULLISH'|'BEARISH'|'UNCERTAIN', 'impact': 'HIGH'|'LOW' }
+        """
+        try:
+             import os
+             import json
+             # RAG Memory writes to this file
+             path = "data/sentiment_analysis.json"
+             if os.path.exists(path):
+                 with open(path, "r") as f:
+                     data = json.load(f)
+                     # In a real system, check timestamp freshness here
+                     return data
+        except Exception:
+             pass
+        return {"sentiment": "NEUTRAL", "impact": "LOW"}
+
 # Global singleton
 chronos_engine = ChronosEngine()

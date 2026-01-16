@@ -439,7 +439,7 @@ class DataCollector:
         """
         global _global_state, _hydration_progress
         _global_state = SystemState.HYDRATING
-        logger.info(f"🌊 [HYDRATION] Starting async hydration for {symbol}...")
+        logger.info(f"[HYDRATION] Starting async hydration for {symbol}...")
         
         try:
             if symbol not in self.resamplers:
@@ -457,15 +457,18 @@ class DataCollector:
                 
                 # 2. Try MT5 Fallback if DB is empty or shallow
                 if len(history) < 200 and mt5_fallback_func:
-                    logger.warning(f"⚠️ {tf} history shallow in DB ({len(history)}). Attempting MT5 sync...")
-                    mt5_history = await mt5_fallback_func(symbol, tf, count=500)
-                    if mt5_history:
-                        history = mt5_history
+                    logger.warning(f"[WARN] {tf} history shallow in DB ({len(history)}). Attempting MT5 sync...")
+                    mt5_res = await mt5_fallback_func(symbol, tf, n_candles=500)
+                    if mt5_res:
+                        if isinstance(mt5_res, dict) and "candles" in mt5_res:
+                             history = mt5_res["candles"]
+                        elif isinstance(mt5_res, list):
+                             history = mt5_res
                 
                 if history:
                     # Hydrate history buffer
                     self.resamplers[symbol].history[tf] = history[-200:] # Keep last 200
-                    logger.info(f"✅ {tf} hydrated with {len(history)} candles.")
+                    logger.info(f"[OK] {tf} hydrated with {len(history)} candles.")
                     
                     # [P0 FIX] Cross-module Hydration
                     from app.ml.ml_engine import ml_engine
@@ -505,15 +508,15 @@ class DataCollector:
                             bias = "BULLISH" if last_close > sma20 else "BEARISH"
                             ml_engine.update_macro_bias(symbol, bias)
                 else:
-                    logger.warning(f"❌ Could not hydrate {tf} for {symbol}.")
+                    logger.warning(f"[FAIL] Could not hydrate {tf} for {symbol}.")
             
             _hydration_progress = 1.0
             _global_state = SystemState.READY
-            logger.info(f"✨ [HYDRATION] System READY for {symbol}. Buffers operational.")
+            logger.info(f"[HYDRATION] System READY for {symbol}. Buffers operational.")
             
         except Exception as e:
             _global_state = SystemState.ERROR
-            logger.error(f"💥 Hydration Critical Failure: {e}")
+            logger.error(f"[CRITICAL] Hydration Critical Failure: {e}")
 
     def _get_history_from_db(self, symbol: str, timeframe: str, limit: int = 500) -> List[Dict]:
         """Queries SQLite for historical records."""

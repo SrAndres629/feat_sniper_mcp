@@ -315,7 +315,7 @@ class ModelLoader:
             
     @staticmethod
     def load_lstm(symbol: str) -> Optional[Dict[str, Any]]:
-        """Loads a Torch LSTM model for a specific symbol.
+        """Loads the HybridSniper (Level 25) model for a specific symbol.
         
         Args:
             symbol: Target asset symbol.
@@ -323,26 +323,32 @@ class ModelLoader:
         Returns:
             Optional[Dict[str, Any]]: Dict with 'model' and 'config' or None.
         """
-        path = os.path.join(MODELS_DIR, f"lstm_{symbol}_v2.pt")
-        if not os.path.exists(path):
-            path = os.path.join(MODELS_DIR, "lstm_v2.pt")
-            
+        # [LEVEL 25] Hybrid Architecture Path (hybrid_SYMBOL_v1.pt)
+        path = os.path.join(MODELS_DIR, f"hybrid_{symbol}_v1.pt")
+        
         try:
             import torch
-            data = torch.load(path, map_location="cpu")
-            from app.ml.train_models import LSTMWithAttention
-            config = data["model_config"]
-            model = LSTMWithAttention(
-                input_dim=config["input_dim"],
-                hidden_dim=config["hidden_dim"],
-                num_layers=config["num_layers"]
-            )
-            model.load_state_dict(data["model_state"])
-            model.eval()
-            logger.info(f" LSTM Model loaded for {symbol}: {path}")
-            return {"model": model, "config": config}
+            from app.ml.models.hybrid_v1 import HybridSniper
+            
+            # Instantiate New Architecture
+            # Hardcoded config for now based on Level 25 specs
+            input_dim = len(FEATURE_NAMES)
+            model = HybridSniper(input_dim=input_dim, hidden_dim=128, num_classes=3)
+            
+            if os.path.exists(path):
+                data = torch.load(path, map_location="cpu")
+                model.load_state_dict(data["state_dict"])
+                best_acc = data.get("best_acc", 0.0)
+                logger.info(f" [LEVEL 25] HybridSniper TCN-BiLSTM loaded for {symbol} (Acc: {best_acc:.2f})")
+                model.eval()
+                return {"model": model, "config": {"seq_len": 32}} # Default seq_len
+            else:
+                logger.warning(f" [LEVEL 25] No trained Hybrid model found at {path}. Initialized Untrained Agent.")
+                model.eval()
+                return {"model": model, "config": {"seq_len": 32}} 
+
         except Exception as e:
-            logger.warning(f" LSTM load failed for {symbol}: {e}")
+            logger.error(f" Hybrid load failed for {symbol}: {e}")
             return None
 
 
@@ -469,6 +475,7 @@ class MLEngine:
         self.sharpe_tracker = SharpeTracker()
         
         self.seq_len_map: Dict[str, int] = {}
+        self.sequence_buffers: Dict[str, deque] = {}
         
         # [SENIOR ARCHITECTURE] Dedicated Executor for Inference (Bypasses GIL for C-extensions)
         self.executor = ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
@@ -492,7 +499,7 @@ class MLEngine:
         if not prices:
             return
             
-        logger.info(f"🌊 [HURST] Hydrating {symbol} with {len(prices)} prices...")
+        logger.info(f"[HURST] Hydrating {symbol} with {len(prices)} prices...")
         for p in prices:
             self.hurst_buffer.push(symbol, p)
             
@@ -501,9 +508,9 @@ class MLEngine:
             prices_arr = self.hurst_buffer.get_prices(symbol)
             hurst_sc = self.fractal_analyzer.compute_hurst(prices_arr)
             self.hurst_buffer.set_cached_hurst(symbol, hurst_sc)
-            logger.info(f"✅ [HURST] {symbol} Hydrated. Initial Hurst: {hurst_sc:.3f}")
+            logger.info(f"[HURST] {symbol} Hydrated. Initial Hurst: {hurst_sc:.3f}")
         except Exception as e:
-            logger.warning(f"⚠️ [HURST] Initial calculation failed after hydration: {e}")
+            logger.warning(f"[WARN] [HURST] Initial calculation failed after hydration: {e}")
 
     def hydrate_sequences(self, symbol: str, features_list: List[Dict[str, float]]) -> None:
         """
@@ -520,11 +527,11 @@ class MLEngine:
             buffer = deque(maxlen=seq_len)
             self.sequence_buffers[symbol] = buffer
 
-        logger.info(f"🌊 [LSTM] Hydrating {symbol} sequence with {len(features_list)} samples...")
+        logger.info(f"[LSTM] Hydrating {symbol} sequence with {len(features_list)} samples...")
         for feat in features_list:
             buffer.append(feat)
             
-        logger.info(f"✅ [LSTM] {symbol} sequence buffer ready ({len(buffer)}/{buffer.maxlen})")
+        logger.info(f"[LSTM] {symbol} sequence buffer ready ({len(buffer)}/{buffer.maxlen})")
 
     def apply_feat_veto(self, symbol: str, m1_signal: str) -> Tuple[bool, str]:
         """
@@ -604,32 +611,60 @@ class MLEngine:
         
         return {"prob": float(prob), "class": pred_class}
         
-    def predict_lstm(self, sequence: List[Dict[str, float]], symbol: str) -> Optional[Dict[str, Any]]:
-        """Predicts using the sniper LSTM model."""
+    def predict_lstm_uncertainty(self, sequence: List[Dict[str, float]], symbol: str, n_iter: int = 30) -> Dict[str, float]:
+        """
+        [LEVEL 25] Hybrid TCN-LSTM Monte Carlo Inference.
+        Runs prediction N times with dropout active.
+        Calculates Consensus Score from 3-class output (SELL, HOLD, BUY).
+        """
         self._ensure_models(symbol)
         lstm_data = self.models[symbol].get("sniper_lstm")
         if not lstm_data:
-            return None
+            return {"p_win": 0.5, "uncertainty": 1.0}
             
         import torch
+        from app.ml.feat_processor import feat_processor
+        
         model = lstm_data["model"]
         
-        # Build sequence tensor
+        # Build sequence tensor via Adaptor [LEVEL 25]
+        # This ensures Normalization (0-1) is applied consistently
         seq_array = np.array([
-            [s.get(k, 0) for k in FEATURE_NAMES]
+            feat_processor.tensorize_snapshot(s, FEATURE_NAMES)
             for s in sequence
         ], dtype=np.float32)
         
         x = torch.tensor(seq_array).unsqueeze(0) # (1, T, D)
         
+        # Enable Dropout (Train mode) but disable gradients
+        model.train() 
+        
+        scores = []
         with torch.no_grad():
-            logits = model(x)
-            proba = torch.softmax(logits, dim=-1)[0].cpu().numpy()
+            for _ in range(n_iter):
+                logits = model(x) # (1, 3) 
+                probs = torch.softmax(logits, dim=-1)[0]
+                
+                # [LEVEL 25] 3-Class Logic: 0:SELL, 1:HOLD, 2:BUY
+                p_sell = probs[0].item()
+                p_buy = probs[2].item()
+                
+                # Consensus Score: 0.0 (Strong Sell) -> 0.5 (Neutral) -> 1.0 (Strong Buy)
+                # Formula: (p_buy - p_sell + 1) / 2
+                score = (p_buy - p_sell + 1.0) / 2.0
+                scores.append(score)
             
+        # Restore Eval mode
+        model.eval()
+        
+        scores_np = np.array(scores)
+        mean_score = float(np.mean(scores_np))
+        std_dev = float(np.std(scores_np))
+        
         return {
-            "p_loss": float(proba[0]),
-            "p_win": float(proba[1]),
-            "prediction": "WIN" if proba[1] > 0.5 else "LOSS"
+            "p_win": mean_score,     # Interpreted as Long Probability for compat
+            "uncertainty": std_dev,  # Epistemic Uncertainty
+            "prediction": "WIN" if mean_score > 0.6 else ("LOSS" if mean_score < 0.4 else "WAIT")
         }
 
     def _neutral_response(self, symbol: str, reason: str) -> Dict[str, Any]:
@@ -637,7 +672,8 @@ class MLEngine:
         return {
             "symbol": symbol,
             "probability": 0.5,
-            "is_anomaly": True, # Mark as anomaly if neutralized by guard
+            "uncertainty": 0.0,
+            "is_anomaly": True,
             "regime": "UNKNOWN",
             "hurst": 0.5,
             "gbm_prob": 0.5,
@@ -733,9 +769,10 @@ class MLEngine:
         if len(self.sequence_buffers[symbol]) == self.seq_len_map[symbol]:
             try:
                 # [SENIOR ABSTRACTION] Use dedicated executor
+                # [LEVEL 20] Use Probabilistic MC Dropout
                 loop = asyncio.get_event_loop()
                 lstm_res = await asyncio.wait_for(
-                    loop.run_in_executor(self.executor, self.predict_lstm, list(self.sequence_buffers[symbol]), symbol),
+                    loop.run_in_executor(self.executor, self.predict_lstm_uncertainty, list(self.sequence_buffers[symbol]), symbol, 30),
                     timeout=settings.DECISION_TTL_MS / 2000.0 # 50% of TTL max for inference
                 )
             except asyncio.TimeoutError:
@@ -812,6 +849,7 @@ class MLEngine:
             "p_loss": 1 - final_p,
             "prediction": "WIN" if final_p > 0.6 else ("LOSS" if final_p < 0.4 else "WAIT"),
             "confidence": abs(final_p - 0.5) * 2,
+            "uncertainty": lstm_res["uncertainty"] if lstm_res else 1.0,
             # [ALPHA FIX] New fields for monitoring
             "hurst": round(hurst_sc, 3),
             "regime": regime,
@@ -865,7 +903,7 @@ class MLEngine:
         self.last_loop_time = now
         
         if jitter > 0.050: # 50ms threshold
-            logger.critical(f"🚨 [JITTER] Event Loop Latency Spike: {jitter*1000:.2f}ms. GIL Contention Detected!")
+            logger.critical(f"[JITTER] Event Loop Latency Spike: {jitter*1000:.2f}ms. GIL Contention Detected!")
 
     def get_status(self) -> Dict[str, Any]:
         """Diagnostic snapshot of the MLEngine state - [ALPHA FIX v8.0]."""
