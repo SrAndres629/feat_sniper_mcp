@@ -1,8 +1,250 @@
+"""
+Structure Engine - Probabilistic Market Structure Analysis
+==========================================================
+Implements:
+- FourLayerEMA: 4-layer EMA system from CEMAs.mqh (Micro/Oper/Macro/Bias)
+- StructuralConfidence: Probabilistic confidence scoring
+- MAE Pattern Recognition: Momentum → Accumulation → Expansion
+- BOS/CHOCH Detection: Break of Structure / Change of Character
+"""
 import logging
+import numpy as np
 import pandas as pd
-from typing import Dict, Any
+from dataclasses import dataclass, field
+from typing import Dict, Any, List, Optional, Tuple
+from enum import Enum
 
 logger = logging.getLogger("feat.structure")
+
+
+# =============================================================================
+# PROBABILISTIC RESULT STRUCTURES
+# =============================================================================
+
+class EMALayer(Enum):
+    """EMA Layer classification from CEMAs.mqh"""
+    MICRO = "micro"           # Layer 1: Intent/Gas (fast EMAs)
+    OPERATIVE = "operative"   # Layer 2: Structure/Water (medium EMAs)
+    MACRO = "macro"           # Layer 3: Memory/Wall (slow EMAs)
+    BIAS = "bias"             # Layer 4: Regime/Bedrock (SMMA 2048)
+
+
+@dataclass
+class LayerMetrics:
+    """Metrics for a single EMA layer."""
+    avg_value: float          # Average of all EMAs in layer
+    spread: float             # Max - Min of layer
+    compression: float        # Spread/Price * 1000 (squeeze indicator)
+    slope: float              # Direction of layer movement
+    layer_type: EMALayer
+
+
+@dataclass
+class StructuralConfidence:
+    """Probabilistic result from structure analysis."""
+    bos_confidence: float = 0.0       # 0.0-1.0: Break of Structure probability
+    choch_confidence: float = 0.0     # 0.0-1.0: Change of Character probability
+    zone_confidence: float = 0.0      # 0.0-1.0: Price at valid zone probability
+    mae_confidence: float = 0.0       # 0.0-1.0: MAE pattern valid probability
+    layer_alignment: float = 0.0      # 0.0-1.0: EMA layers aligned probability
+    
+    overall_form_score: float = 0.0   # Weighted combination
+    reasoning: List[str] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "bos_confidence": round(self.bos_confidence, 3),
+            "choch_confidence": round(self.choch_confidence, 3),
+            "zone_confidence": round(self.zone_confidence, 3),
+            "mae_confidence": round(self.mae_confidence, 3),
+            "layer_alignment": round(self.layer_alignment, 3),
+            "overall_form_score": round(self.overall_form_score, 3),
+            "reasoning": self.reasoning
+        }
+
+
+# =============================================================================
+# FOUR-LAYER EMA SYSTEM (from CEMAs.mqh)
+# =============================================================================
+
+class FourLayerEMA:
+    """
+    4-Layer EMA System - Institutional Grade Market Physics.
+    
+    Ported from CEMAs.mqh:
+    - Layer 1 (Micro/Gas): EMAs [1,2,3,6,7,8,9,12,13,14] → Intent
+    - Layer 2 (Operative/Water): EMAs [16,24,32,48,64,96,128,160,192,224] → Structure
+    - Layer 3 (Macro/Wall): EMAs [256,320,384,448,512,640,768,896,1024,1280] → Memory
+    - Layer 4 (Bias/Bedrock): SMMA 2048 → Regime
+    
+    Returns probabilistic confidence based on layer alignment and position.
+    """
+    
+    # Layer periods from CEMAs.mqh
+    MICRO_PERIODS = [1, 2, 3, 6, 7, 8, 9, 12, 13, 14]
+    OPERATIVE_PERIODS = [16, 24, 32, 48, 64, 96, 128, 160, 192, 224]
+    MACRO_PERIODS = [256, 320, 384, 448, 512, 640, 768, 896, 1024, 1280]
+    BIAS_PERIOD = 2048
+    
+    def __init__(self):
+        logger.info("[FourLayerEMA] Multifractal Layer Physics initialized")
+    
+    def compute_layer_metrics(
+        self, 
+        df: pd.DataFrame, 
+        layer: EMALayer
+    ) -> Optional[LayerMetrics]:
+        """
+        Compute metrics for a specific EMA layer.
+        
+        Returns:
+            LayerMetrics with avg, spread, compression, slope
+        """
+        if "close" not in df.columns or len(df) < 20:
+            return None
+        
+        close = df["close"]
+        
+        # Select periods based on layer
+        if layer == EMALayer.MICRO:
+            periods = self.MICRO_PERIODS
+        elif layer == EMALayer.OPERATIVE:
+            periods = self.OPERATIVE_PERIODS
+        elif layer == EMALayer.MACRO:
+            periods = [p for p in self.MACRO_PERIODS if p <= len(df)]
+        elif layer == EMALayer.BIAS:
+            periods = [min(self.BIAS_PERIOD, len(df))]
+        else:
+            return None
+        
+        if not periods:
+            return None
+        
+        # Calculate EMAs for each period in layer
+        ema_values = []
+        for p in periods:
+            if p <= len(df):
+                ema = close.ewm(span=p, adjust=False).mean().iloc[-1]
+                ema_values.append(ema)
+        
+        if not ema_values:
+            return None
+        
+        # Calculate metrics
+        avg_value = np.mean(ema_values)
+        spread = max(ema_values) - min(ema_values) if len(ema_values) > 1 else 0
+        compression = (spread / avg_value * 1000) if avg_value > 0 else 0
+        
+        # Slope: compare current avg to 1-bar-ago avg
+        if len(df) > 1:
+            prev_emas = [close.ewm(span=p, adjust=False).mean().iloc[-2] 
+                         for p in periods if p <= len(df)]
+            prev_avg = np.mean(prev_emas) if prev_emas else avg_value
+            slope = avg_value - prev_avg
+        else:
+            slope = 0.0
+        
+        return LayerMetrics(
+            avg_value=avg_value,
+            spread=spread,
+            compression=compression,
+            slope=slope,
+            layer_type=layer
+        )
+    
+    def get_all_layer_metrics(self, df: pd.DataFrame) -> Dict[EMALayer, LayerMetrics]:
+        """Compute metrics for all 4 layers."""
+        result = {}
+        for layer in EMALayer:
+            metrics = self.compute_layer_metrics(df, layer)
+            if metrics:
+                result[layer] = metrics
+        return result
+    
+    def get_price_position(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Determine where price sits relative to all layers.
+        
+        Returns:
+            Dict with position info and confidence score
+        """
+        if len(df) < 20:
+            return {"position": "WARMUP", "confidence": 0.0}
+        
+        price = df["close"].iloc[-1]
+        metrics = self.get_all_layer_metrics(df)
+        
+        # Determine position relative to operative layer (key structure)
+        oper = metrics.get(EMALayer.OPERATIVE)
+        if not oper:
+            return {"position": "UNKNOWN", "confidence": 0.0}
+        
+        # Position relative to operative layer
+        if price > oper.avg_value + oper.spread:
+            position = "ABOVE_STRUCTURE"
+            base_conf = 0.7
+        elif price < oper.avg_value - oper.spread:
+            position = "BELOW_STRUCTURE"
+            base_conf = 0.7
+        else:
+            position = "INSIDE_STRUCTURE"
+            base_conf = 0.5
+        
+        # Confidence boost if layers are aligned
+        alignment_conf = self.compute_layer_alignment(df)
+        
+        return {
+            "position": position,
+            "price": price,
+            "operative_avg": oper.avg_value,
+            "confidence": min(1.0, base_conf + alignment_conf * 0.3)
+        }
+    
+    def compute_layer_alignment(self, df: pd.DataFrame) -> float:
+        """
+        Compute alignment score between layers (0.0-1.0).
+        
+        Perfect alignment (1.0): All layers sloping same direction, 
+        Micro > Oper > Macro (bullish) or Micro < Oper < Macro (bearish).
+        """
+        metrics = self.get_all_layer_metrics(df)
+        
+        if len(metrics) < 3:
+            return 0.0
+        
+        micro = metrics.get(EMALayer.MICRO)
+        oper = metrics.get(EMALayer.OPERATIVE)
+        macro = metrics.get(EMALayer.MACRO)
+        
+        if not all([micro, oper, macro]):
+            return 0.0
+        
+        # Check slope alignment
+        slopes = [micro.slope, oper.slope, macro.slope]
+        all_positive = all(s > 0 for s in slopes)
+        all_negative = all(s < 0 for s in slopes)
+        slope_aligned = 1.0 if (all_positive or all_negative) else 0.3
+        
+        # Check layer ordering (bullish: micro > oper > macro)
+        bullish_order = micro.avg_value > oper.avg_value > macro.avg_value
+        bearish_order = micro.avg_value < oper.avg_value < macro.avg_value
+        order_aligned = 1.0 if (bullish_order or bearish_order) else 0.4
+        
+        # Combine
+        return (slope_aligned * 0.5 + order_aligned * 0.5)
+    
+    def is_cloud_compressed(self, df: pd.DataFrame, threshold: float = 0.5) -> bool:
+        """
+        Check if operative layer is compressed (squeeze indicator).
+        
+        Compression < threshold indicates potential breakout.
+        """
+        oper = self.compute_layer_metrics(df, EMALayer.OPERATIVE)
+        return oper is not None and oper.compression < threshold
+
+
+# Global singleton
+four_layer_ema = FourLayerEMA()
 
 
 class MAE_Pattern_Recognizer:

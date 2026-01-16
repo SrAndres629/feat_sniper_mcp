@@ -93,6 +93,55 @@ class ValidationResult:
     data: Dict[str, Any]
 
 
+@dataclass
+class FEATDecision:
+    """
+    Unified probabilistic decision from FEAT analysis.
+    
+    Each component returns a confidence score (0.0-1.0):
+    - Form: Structure analysis (BOS/CHOCH/MAE/Layer alignment)
+    - Space: Liquidity analysis (FVG/OB/Confluence)
+    - Acceleration: Physics analysis (Velocity/Initiative)
+    - Time: Session analysis (Killzones)
+    """
+    form_confidence: float = 0.0       # From StructureEngine
+    space_confidence: float = 0.0      # From LiquidityDetector
+    accel_confidence: float = 0.0      # From AccelerationEngine
+    time_confidence: float = 0.0       # From ChronosEngine
+    
+    composite_score: float = 0.0       # Bayesian combination
+    action: str = "HOLD"               # BUY/SELL/HOLD
+    direction: int = 0                 # 1=Bullish, -1=Bearish, 0=Neutral
+    reasoning: list = None
+    
+    # Risk modifiers
+    black_swan_multiplier: float = 1.0
+    layer_alignment: float = 0.0
+    
+    def __post_init__(self):
+        if self.reasoning is None:
+            object.__setattr__(self, 'reasoning', [])
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "form_confidence": round(self.form_confidence, 3),
+            "space_confidence": round(self.space_confidence, 3),
+            "accel_confidence": round(self.accel_confidence, 3),
+            "time_confidence": round(self.time_confidence, 3),
+            "composite_score": round(self.composite_score, 3),
+            "action": self.action,
+            "direction": self.direction,
+            "reasoning": self.reasoning,
+            "black_swan_multiplier": self.black_swan_multiplier,
+            "layer_alignment": round(self.layer_alignment, 3)
+        }
+    
+    @property
+    def is_valid_setup(self) -> bool:
+        """True if composite score exceeds threshold for trading."""
+        return self.composite_score >= 0.60 and self.action != "HOLD"
+
+
 class FEATRule(ABC):
     """Clase base para todas las reglas de la estrategia FEAT."""
     def __init__(self):
@@ -327,6 +376,217 @@ class FEATChain:
         if symbol and symbol in self._structure_memories:
             return self._structure_memories[symbol].get_status()
         return {s: m.get_status() for s, m in self._structure_memories.items()}
+
+    async def analyze_probabilistic(
+        self, 
+        market_data: Dict, 
+        candles: pd.DataFrame = None,
+        current_price: float = None
+    ) -> FEATDecision:
+        """
+        Main probabilistic analysis entry point.
+        
+        Returns a FEATDecision with confidence scores from each component:
+        - Form: Structure analysis (BOS/CHOCH/MAE/Layer alignment)
+        - Space: Liquidity analysis (FVG/OB/Confluence)  
+        - Acceleration: Physics analysis (Velocity/Initiative)
+        - Time: Session analysis (Killzones)
+        
+        Args:
+            market_data: Dict with bid, ask, symbol, etc.
+            candles: Optional DataFrame with OHLCV data
+            current_price: Current market price
+            
+        Returns:
+            FEATDecision with all confidence scores and action
+        """
+        reasoning = []
+        
+        # Get current price
+        if current_price is None:
+            current_price = float(market_data.get('bid', 0) or market_data.get('close', 0))
+        
+        symbol = market_data.get('symbol', 'UNKNOWN')
+        
+        # 1. Black Swan check first
+        can_trade, lot_mult, rejection = await self.check_black_swan(market_data)
+        if not can_trade:
+            return FEATDecision(
+                action="HOLD",
+                reasoning=[f"BLACK_SWAN: {rejection}"],
+                black_swan_multiplier=lot_mult
+            )
+        
+        # Initialize confidences
+        form_conf = 0.0
+        space_conf = 0.0
+        accel_conf = 0.0
+        time_conf = 0.0
+        layer_alignment = 0.0
+        direction = 0
+        
+        # 2. FORM (Structure) Analysis
+        try:
+            from nexus_core.structure_engine import structure_engine, four_layer_ema
+            
+            if candles is not None and len(candles) >= 20:
+                # Get structural narrative
+                narrative = structure_engine.get_structural_narrative(candles)
+                
+                # BOS/CHOCH confidence
+                if "CHOCH" in narrative.get("type", ""):
+                    form_conf += 0.4
+                    reasoning.append(f"CHOCH detected: {narrative['type']}")
+                elif "BOS" in narrative.get("type", ""):
+                    form_conf += 0.3
+                    reasoning.append(f"BOS detected: {narrative['type']}")
+                
+                # MAE pattern
+                mae = structure_engine.mae_recognizer.detect_mae_pattern(candles)
+                if mae.get("is_expansion"):
+                    form_conf += 0.3
+                    direction = mae.get("direction", 0)
+                    reasoning.append(f"MAE Expansion: {mae['status']}")
+                elif mae.get("phase") == "ACCUMULATION":
+                    form_conf += 0.1
+                    reasoning.append("MAE Accumulation (waiting)")
+                
+                # Layer alignment
+                layer_alignment = four_layer_ema.compute_layer_alignment(candles)
+                if layer_alignment > 0.7:
+                    form_conf += 0.3
+                    reasoning.append(f"Strong layer alignment: {layer_alignment:.2f}")
+                    
+        except Exception as e:
+            logger.warning(f"[FORM] Analysis error: {e}")
+            reasoning.append(f"FORM_ERROR: {e}")
+        
+        # 3. SPACE (Liquidity) Analysis
+        try:
+            from app.skills.liquidity_detector import compute_space_confidence
+            
+            if candles is not None and len(candles) >= 20:
+                space_result = compute_space_confidence(candles, current_price)
+                space_conf = space_result.overall_space_score
+                reasoning.extend(space_result.reasoning)
+                
+        except Exception as e:
+            logger.warning(f"[SPACE] Analysis error: {e}")
+            reasoning.append(f"SPACE_ERROR: {e}")
+        
+        # 4. ACCELERATION Analysis
+        try:
+            from nexus_core.acceleration import acceleration_engine
+            
+            if candles is not None and len(candles) >= 20:
+                accel_features = acceleration_engine.compute_acceleration_features(candles)
+                
+                if not accel_features.empty:
+                    last = accel_features.iloc[-1]
+                    
+                    # Initiative candle confidence
+                    if last.get('is_initiative', 0) > 0:
+                        accel_conf += 0.4
+                        reasoning.append("Initiative candle detected")
+                    
+                    # Acceleration score
+                    accel_score = last.get('accel_score', 0)
+                    accel_conf += accel_score * 0.3
+                    
+                    # Trap detection (reduces confidence)
+                    if last.get('is_trap', 0) > 0:
+                        accel_conf *= 0.5
+                        reasoning.append("⚠️ TRAP detected - confidence reduced")
+                    
+                    # Breakout classification
+                    accel_type = last.get('accel_type', 'normal')
+                    if accel_type == 'breakout':
+                        accel_conf += 0.3
+                        reasoning.append("Breakout acceleration")
+                    elif accel_type == 'climax':
+                        accel_conf += 0.2
+                        reasoning.append("Climax volume detected")
+                        
+        except Exception as e:
+            logger.warning(f"[ACCEL] Analysis error: {e}")
+            reasoning.append(f"ACCEL_ERROR: {e}")
+        
+        # 5. TIME Analysis
+        try:
+            from app.skills.liquidity_detector import get_current_kill_zone
+            
+            kz = get_current_kill_zone()
+            if kz == "NY":
+                time_conf = 0.9
+                reasoning.append("✅ Inside NY Killzone")
+            elif kz == "LONDON":
+                time_conf = 0.8
+                reasoning.append("✅ Inside London Killzone")
+            elif kz == "ASIA":
+                time_conf = 0.4
+                reasoning.append("Asia session (lower weight)")
+            else:
+                time_conf = 0.2
+                reasoning.append("Outside killzones")
+                
+        except Exception as e:
+            logger.warning(f"[TIME] Analysis error: {e}")
+            time_conf = 0.3
+            reasoning.append(f"TIME_ERROR: {e}")
+        
+        # 6. Calculate Composite Score (Weighted Bayesian Combination)
+        weights = {"F": 0.30, "S": 0.25, "A": 0.25, "T": 0.20}
+        composite = (
+            weights["F"] * min(1.0, form_conf) +
+            weights["S"] * min(1.0, space_conf) +
+            weights["A"] * min(1.0, accel_conf) +
+            weights["T"] * min(1.0, time_conf)
+        )
+        
+        # Determine action based on direction and composite
+        action = "HOLD"
+        if composite >= 0.60:
+            if direction > 0:
+                action = "BUY"
+            elif direction < 0:
+                action = "SELL"
+            else:
+                # No clear direction - check layer ordering
+                try:
+                    from nexus_core.structure_engine import four_layer_ema, EMALayer
+                    if candles is not None:
+                        metrics = four_layer_ema.get_all_layer_metrics(candles)
+                        micro = metrics.get(EMALayer.MICRO)
+                        oper = metrics.get(EMALayer.OPERATIVE)
+                        if micro and oper:
+                            if micro.avg_value > oper.avg_value:
+                                action = "BUY"
+                                direction = 1
+                            else:
+                                action = "SELL"
+                                direction = -1
+                except:
+                    pass
+        
+        # Build final decision
+        decision = FEATDecision(
+            form_confidence=min(1.0, form_conf),
+            space_confidence=min(1.0, space_conf),
+            accel_confidence=min(1.0, accel_conf),
+            time_confidence=min(1.0, time_conf),
+            composite_score=composite,
+            action=action,
+            direction=direction,
+            reasoning=reasoning,
+            black_swan_multiplier=lot_mult,
+            layer_alignment=layer_alignment
+        )
+        
+        if decision.is_valid_setup:
+            logger.info(f"✅ FEAT SETUP: {action} @ {current_price:.5f} (Score: {composite:.2f})")
+        
+        return decision
+
 
 # Global singleton
 feat_full_chain_institucional = FEATChain()

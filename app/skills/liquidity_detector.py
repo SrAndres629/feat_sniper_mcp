@@ -15,6 +15,7 @@ Kill Zone Detection:
 import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
+from dataclasses import dataclass, field
 import pandas as pd
 import numpy as np
 
@@ -274,6 +275,355 @@ def is_intention_candle(candle: Dict[str, float], threshold: float = 70.0) -> bo
     Determina si una vela es de "intencin" (cuerpo > 70% del rango).
     """
     return calculate_body_wick_ratio(candle) >= threshold
+
+
+# =============================================================================
+# ORDER BLOCK DETECTION (from CLiquidity.mqh)
+# =============================================================================
+
+@dataclass
+class OrderBlock:
+    """Institutional Order Block zone."""
+    zone_type: str              # "BULLISH_OB" or "BEARISH_OB"
+    top: float                  # Zone top price
+    bottom: float               # Zone bottom price
+    midpoint: float             # Zone midpoint
+    time_index: int             # Bar index where OB formed
+    strength: float             # 0.0-1.0 strength score
+    mitigated: bool = False     # Has price returned to zone?
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "type": self.zone_type,
+            "top": self.top,
+            "bottom": self.bottom,
+            "midpoint": self.midpoint,
+            "strength": round(self.strength, 3),
+            "mitigated": self.mitigated
+        }
+
+
+@dataclass
+class SpaceConfidence:
+    """Probabilistic result for Space/Liquidity analysis."""
+    fvg_confidence: float = 0.0        # 0.0-1.0: Valid FVG present
+    ob_confidence: float = 0.0         # 0.0-1.0: Price at OrderBlock
+    liquidity_confidence: float = 0.0  # 0.0-1.0: Near liquidity pool
+    confluence_confidence: float = 0.0 # 0.0-1.0: Multiple zones overlap
+    
+    overall_space_score: float = 0.0   # Weighted combination
+    reasoning: List[str] = field(default_factory=list)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "fvg_confidence": round(self.fvg_confidence, 3),
+            "ob_confidence": round(self.ob_confidence, 3),
+            "liquidity_confidence": round(self.liquidity_confidence, 3),
+            "confluence_confidence": round(self.confluence_confidence, 3),
+            "overall_space_score": round(self.overall_space_score, 3),
+            "reasoning": self.reasoning
+        }
+
+
+def detect_order_blocks(
+    candles: pd.DataFrame,
+    lookback: int = 50,
+    impulse_multiplier: float = 2.5
+) -> List[OrderBlock]:
+    """
+    Detect Order Blocks - Last opposite candle before institutional move.
+    
+    From CLiquidity.mqh logic:
+    - Bullish OB: Bearish candle → Strong bullish impulse (>2.5x range)
+    - Bearish OB: Bullish candle → Strong bearish impulse (>2.5x range)
+    
+    Args:
+        candles: DataFrame with OHLC columns
+        lookback: Number of bars to scan
+        impulse_multiplier: Minimum impulse size as multiple of prior range
+        
+    Returns:
+        List of OrderBlock objects
+    """
+    if len(candles) < lookback:
+        return []
+    
+    recent = candles.tail(lookback).reset_index(drop=True)
+    order_blocks = []
+    
+    # Calculate ATR for normalization
+    atr = (recent["high"] - recent["low"]).rolling(14).mean()
+    
+    for i in range(1, len(recent) - 1):
+        curr = recent.iloc[i]
+        next_candle = recent.iloc[i + 1]
+        
+        curr_range = curr["high"] - curr["low"]
+        next_range = next_candle["high"] - next_candle["low"]
+        
+        # Skip if current candle range is too small
+        if curr_range < (atr.iloc[i] * 0.2 if not pd.isna(atr.iloc[i]) else 0.001):
+            continue
+        
+        # Current candle direction
+        curr_bullish = curr["close"] > curr["open"]
+        curr_bearish = curr["close"] < curr["open"]
+        
+        # Next candle direction and magnitude
+        next_bullish = next_candle["close"] > next_candle["open"]
+        next_bearish = next_candle["close"] < next_candle["open"]
+        
+        # Check for impulse (next candle much larger than current)
+        is_impulse = next_range > (curr_range * impulse_multiplier)
+        
+        # Bullish OB: Bearish candle followed by strong bullish impulse
+        if curr_bearish and next_bullish and is_impulse:
+            # Check if NOT mitigated (price hasn't returned below)
+            future = recent.iloc[i + 2:] if i + 2 < len(recent) else pd.DataFrame()
+            mitigated = len(future) > 0 and future["low"].min() < curr["low"]
+            
+            strength = min(1.0, (next_range / curr_range) / 5.0)  # Normalize strength
+            
+            order_blocks.append(OrderBlock(
+                zone_type="BULLISH_OB",
+                top=curr["high"],
+                bottom=curr["low"],
+                midpoint=(curr["high"] + curr["low"]) / 2,
+                time_index=i,
+                strength=strength,
+                mitigated=mitigated
+            ))
+        
+        # Bearish OB: Bullish candle followed by strong bearish impulse
+        if curr_bullish and next_bearish and is_impulse:
+            future = recent.iloc[i + 2:] if i + 2 < len(recent) else pd.DataFrame()
+            mitigated = len(future) > 0 and future["high"].max() > curr["high"]
+            
+            strength = min(1.0, (next_range / curr_range) / 5.0)
+            
+            order_blocks.append(OrderBlock(
+                zone_type="BEARISH_OB",
+                top=curr["high"],
+                bottom=curr["low"],
+                midpoint=(curr["high"] + curr["low"]) / 2,
+                time_index=i,
+                strength=strength,
+                mitigated=mitigated
+            ))
+    
+    # Return only unmitigated order blocks, sorted by recency
+    return [ob for ob in order_blocks if not ob.mitigated][-5:]  # Last 5 valid OBs
+
+
+# =============================================================================
+# CONFLUENCE ZONE DETECTION (from CLiquidity.mqh)
+# =============================================================================
+
+@dataclass
+class ConfluenceZone:
+    """Zone where multiple signals overlap."""
+    top: float
+    bottom: float
+    zone_types: List[str]       # What overlaps: ["FVG", "OB", "LIQUIDITY"]
+    direction: str              # "BULLISH" or "BEARISH"
+    strength: float             # 0.0-2.0 (confluence adds strength)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "top": self.top,
+            "bottom": self.bottom,
+            "overlapping": self.zone_types,
+            "direction": self.direction,
+            "strength": round(self.strength, 3)
+        }
+
+
+def detect_confluence_zones(
+    candles: pd.DataFrame,
+    atr_tolerance: float = 0.5
+) -> List[ConfluenceZone]:
+    """
+    Detect zones where multiple signals overlap (FVG + OB, OB + Liquidity, etc.).
+    
+    Confluence zones have 2x strength multiplier.
+    
+    Args:
+        candles: DataFrame with OHLC
+        atr_tolerance: ATR multiplier for considering zones "overlapping"
+        
+    Returns:
+        List of ConfluenceZone objects
+    """
+    if len(candles) < 20:
+        return []
+    
+    # Collect all zones
+    fvgs = detect_fvg(candles, lookback=30)
+    order_blocks = detect_order_blocks(candles, lookback=50)
+    liquidity = detect_liquidity_pools(candles, lookback=50)
+    
+    # Calculate ATR for tolerance
+    atr = (candles["high"] - candles["low"]).rolling(14).mean().iloc[-1]
+    tolerance = atr * atr_tolerance
+    
+    all_zones = []
+    
+    # Convert FVGs to standard zone format
+    for fvg in fvgs:
+        all_zones.append({
+            "type": "FVG",
+            "top": fvg["top"],
+            "bottom": fvg["bottom"],
+            "direction": fvg["type"]
+        })
+    
+    # Convert OBs to standard zone format
+    for ob in order_blocks:
+        all_zones.append({
+            "type": "OB",
+            "top": ob.top,
+            "bottom": ob.bottom,
+            "direction": "BULLISH" if "BULLISH" in ob.zone_type else "BEARISH"
+        })
+    
+    # Convert liquidity pools to zones
+    for pool in liquidity.get("pools", []):
+        pool_price = pool["price"]
+        all_zones.append({
+            "type": "LIQUIDITY",
+            "top": pool_price + tolerance * 0.5,
+            "bottom": pool_price - tolerance * 0.5,
+            "direction": "BULLISH" if pool["type"] == "BUY_SIDE" else "BEARISH"
+        })
+    
+    # Find overlapping zones
+    confluences = []
+    processed = set()
+    
+    for i, zone1 in enumerate(all_zones):
+        if i in processed:
+            continue
+            
+        overlapping_types = [zone1["type"]]
+        merged_top = zone1["top"]
+        merged_bottom = zone1["bottom"]
+        direction = zone1["direction"]
+        
+        for j, zone2 in enumerate(all_zones):
+            if i == j or j in processed:
+                continue
+            
+            # Check if zones overlap (with tolerance)
+            overlap_top = min(zone1["top"], zone2["top"])
+            overlap_bottom = max(zone1["bottom"], zone2["bottom"])
+            
+            if overlap_top >= overlap_bottom - tolerance:
+                # Zones overlap!
+                if zone1["direction"] == zone2["direction"]:
+                    overlapping_types.append(zone2["type"])
+                    merged_top = max(merged_top, zone2["top"])
+                    merged_bottom = min(merged_bottom, zone2["bottom"])
+                    processed.add(j)
+        
+        # Only create confluence if 2+ zones overlap
+        if len(overlapping_types) >= 2:
+            processed.add(i)
+            base_strength = len(overlapping_types) / 3.0  # More overlaps = stronger
+            confluences.append(ConfluenceZone(
+                top=merged_top,
+                bottom=merged_bottom,
+                zone_types=overlapping_types,
+                direction=direction,
+                strength=min(2.0, base_strength + 0.5)  # Confluence bonus
+            ))
+    
+    return confluences
+
+
+def compute_space_confidence(
+    candles: pd.DataFrame,
+    current_price: float
+) -> SpaceConfidence:
+    """
+    Compute probabilistic confidence for Space/Liquidity component.
+    
+    Returns SpaceConfidence with individual and overall scores.
+    """
+    result = SpaceConfidence()
+    
+    if len(candles) < 20:
+        result.reasoning.append("Insufficient data for analysis")
+        return result
+    
+    atr = (candles["high"] - candles["low"]).rolling(14).mean().iloc[-1]
+    
+    # 1. FVG Confidence
+    fvgs = detect_fvg(candles, lookback=20)
+    if fvgs:
+        # Check if price is near any FVG
+        for fvg in fvgs:
+            if fvg["bottom"] <= current_price <= fvg["top"]:
+                result.fvg_confidence = 0.9
+                result.reasoning.append(f"Price INSIDE {fvg['type']} FVG")
+                break
+            
+            dist = min(abs(current_price - fvg["top"]), abs(current_price - fvg["bottom"]))
+            if dist < atr * 1.5:
+                result.fvg_confidence = max(result.fvg_confidence, 0.6)
+                result.reasoning.append(f"Price NEAR {fvg['type']} FVG ({dist:.4f})")
+    
+    # 2. OrderBlock Confidence
+    obs = detect_order_blocks(candles, lookback=50)
+    if obs:
+        for ob in obs:
+            if ob.bottom <= current_price <= ob.top:
+                result.ob_confidence = 0.85 * ob.strength
+                result.reasoning.append(f"Price INSIDE {ob.zone_type}")
+                break
+            
+            dist = min(abs(current_price - ob.top), abs(current_price - ob.bottom))
+            if dist < atr * 2.0:
+                result.ob_confidence = max(result.ob_confidence, 0.5 * ob.strength)
+                result.reasoning.append(f"Price NEAR {ob.zone_type} ({dist:.4f})")
+    
+    # 3. Liquidity Confidence
+    liq = detect_liquidity_pools(candles, lookback=50)
+    liq_above = liq.get("liquidity_above", 0)
+    liq_below = liq.get("liquidity_below", 0)
+    
+    if liq_above > 0:
+        dist = liq_above - current_price
+        if dist < atr * 3.0:
+            result.liquidity_confidence = min(0.8, (atr * 3.0 - dist) / (atr * 3.0))
+            result.reasoning.append(f"Liquidity above at {liq_above:.5f}")
+    
+    if liq_below > 0:
+        dist = current_price - liq_below
+        if dist < atr * 3.0:
+            conf = min(0.8, (atr * 3.0 - dist) / (atr * 3.0))
+            if conf > result.liquidity_confidence:
+                result.liquidity_confidence = conf
+                result.reasoning.append(f"Liquidity below at {liq_below:.5f}")
+    
+    # 4. Confluence Confidence
+    confluences = detect_confluence_zones(candles)
+    if confluences:
+        for conf_zone in confluences:
+            if conf_zone.bottom <= current_price <= conf_zone.top:
+                result.confluence_confidence = min(1.0, conf_zone.strength / 2.0)
+                result.reasoning.append(f"CONFLUENCE: {'+'.join(conf_zone.zone_types)}")
+                break
+    
+    # Calculate overall score (weighted average)
+    weights = {"fvg": 0.25, "ob": 0.30, "liquidity": 0.20, "confluence": 0.25}
+    result.overall_space_score = (
+        weights["fvg"] * result.fvg_confidence +
+        weights["ob"] * result.ob_confidence +
+        weights["liquidity"] * result.liquidity_confidence +
+        weights["confluence"] * result.confluence_confidence
+    )
+    
+    return result
 
 
 # =============================================================================
