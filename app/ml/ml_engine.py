@@ -21,6 +21,8 @@ import numpy as np
 from collections import deque
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timezone
+import time
+from concurrent.futures import ThreadPoolExecutor
 import torch.nn as nn
 from app.core.config import settings
 from app.ml.fractal_analysis import fractal_analyzer
@@ -466,10 +468,11 @@ class MLEngine:
         # [FIX #2] Sharpe Tracker - replaces naive 50/50 fusion
         self.sharpe_tracker = SharpeTracker()
         
-        # [P0-3 FIX] Internal State - sequence_buffers now use deque for O(1) rotation
-        self.execution_enabled: bool = EXECUTION_ENABLED
-        self.sequence_buffers: Dict[str, deque] = {}  # Changed from List to deque
         self.seq_len_map: Dict[str, int] = {}
+        
+        # [SENIOR ARCHITECTURE] Dedicated Executor for Inference (Bypasses GIL for C-extensions)
+        self.executor = ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
+        self.last_loop_time = time.time()
         
         # FEAT-DEEP Multi-Temporal State
         self.macro_bias: Dict[str, str] = {}  # H4 Trend per symbol
@@ -522,24 +525,25 @@ class MLEngine:
     def _ensure_models(self, symbol: str) -> None:
         """Lazily loads models for the requested symbol with Role Separation."""
         if symbol not in self.models:
-            # Load Sniper (Default)
+            # Load Sniper (Main Execution Model)
             gbm = ModelLoader.load_gbm(symbol)
             lstm = ModelLoader.load_lstm(symbol)
             
-            # Load Strategist (Bias) if available
-            # In a real MIP, these would be separate files like 'gbm_BTCUSD_strategist.joblib'
-            
             self.models[symbol] = {
                 "sniper_gbm": gbm,
-                "sniper_lstm": lstm,
-                "strategist_gbm": None # Placeholder for future scaling
+                "sniper_lstm": lstm
             }
+            
+            # Initialize neural buffers
+            seq_len = 32
+            if lstm and "config" in lstm:
+                seq_len = lstm["config"].get("seq_len", 32)
+            
             if symbol not in self.sequence_buffers:
-                # [P0-3] Use deque with maxlen for O(1) rotation instead of list.pop(0)
-                self.sequence_buffers[symbol] = deque(maxlen=lstm["config"].get("seq_len", 32))
-            self.seq_len_map[symbol] = lstm["config"].get("seq_len", 32)
+                self.sequence_buffers[symbol] = deque(maxlen=seq_len)
+            self.seq_len_map[symbol] = seq_len
         else:
-            self.seq_len_map[symbol] = 32
+            # Guard for existing entry
             if symbol not in self.sequence_buffers:
                 self.sequence_buffers[symbol] = deque(maxlen=32)
         
@@ -682,16 +686,18 @@ class MLEngine:
         # GBM prediction (fast, keep sync)
         gbm_res = self.predict_gbm(features, symbol)
         
-        # [FIX #3] LSTM prediction - run in thread to avoid blocking
+        # [FIX #3] LSTM prediction - run in thread pool to release GIL
         lstm_res = None
         if len(self.sequence_buffers[symbol]) == self.seq_len_map[symbol]:
             try:
+                # [SENIOR ABSTRACTION] Use dedicated executor
+                loop = asyncio.get_event_loop()
                 lstm_res = await asyncio.wait_for(
-                    asyncio.to_thread(self.predict_lstm, self.sequence_buffers[symbol], symbol),
-                    timeout=0.010  # 10ms max - kill if too slow
+                    loop.run_in_executor(self.executor, self.predict_lstm, list(self.sequence_buffers[symbol]), symbol),
+                    timeout=settings.DECISION_TTL_MS / 2000.0 # 50% of TTL max for inference
                 )
             except asyncio.TimeoutError:
-                logger.warning(f"[LSTM] {symbol}: Inference timeout (>10ms)")
+                logger.warning(f"[LSTM] {symbol}: Inference timeout (>{settings.DECISION_TTL_MS/2}ms)")
                 lstm_res = None
 
         # 4. Behavioral Anomaly Guard
@@ -809,6 +815,16 @@ class MLEngine:
             # No running loop - safe to use asyncio.run
             return asyncio.run(self.ensemble_predict_async(symbol, features))
         
+    async def check_loop_jitter(self):
+        """Monitors event loop latency. Logs critical warnings if jitter > 50ms."""
+        now = time.time()
+        # Measure time drift from expected 0.1s check interval
+        jitter = abs((now - self.last_loop_time) - 0.1) 
+        self.last_loop_time = now
+        
+        if jitter > 0.050: # 50ms threshold
+            logger.critical(f"🚨 [JITTER] Event Loop Latency Spike: {jitter*1000:.2f}ms. GIL Contention Detected!")
+
     def get_status(self) -> Dict[str, Any]:
         """Diagnostic snapshot of the MLEngine state - [ALPHA FIX v8.0]."""
         return {
@@ -821,6 +837,15 @@ class MLEngine:
             "hurst_buffer": {s: self.hurst_buffer.get_status(s) for s in self.models.keys()},
             "sharpe_tracker": self.sharpe_tracker.get_status()
         }
+
+    def record_trade_result(self, gbm_prob: float, lstm_prob: float, result_pips: float):
+        """
+        [SENIOR ABSTRACTION] Closed-loop feedback with noise filter.
+        Updates model performance metrics (Sharpe) based on actual trade outcomes.
+        """
+        if self.sharpe_tracker:
+            self.sharpe_tracker.record_prediction(gbm_prob, lstm_prob, result_pips)
+            logger.info(f"📈 [FEEDBACK] Sharpe updated. New weights: {self.sharpe_tracker.get_weights()}")
 
 
 # Singleton instance

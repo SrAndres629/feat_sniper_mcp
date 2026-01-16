@@ -1,199 +1,418 @@
 //+------------------------------------------------------------------+
-//|                        FEAT_Visualizer_Master_v4.mq5             |
-//|               Cerebro Analítico FEAT - Institutional GUI         |
-//|           Sincronización: ZMQ BRIDGE | IA Nexus Integration      |
+//|                                     FEAT_Visualizer_Master_v5.mq5|
+//|                   Cerebro Analítico FEAT - Institutional Master  |
+//|               Engineering: OOP | ZMQ Hyperbridge | Canvas GPU    |
 //+------------------------------------------------------------------+
-#property copyright "FEAT System - Nexus Architecture"
-#property description "Visualizador Institucional: Forma, Espacio, Aceleración, Tiempo"
-#property version   "4.00"
+#property copyright "FEAT Systems AI | Quant Arch: Omega"
+#property description "Institutional Grade: Volatility Envelopes, Delta-Neutral GUI, HFT Bridge"
+#property version   "5.00"
 #property indicator_chart_window
-#property indicator_buffers 6
-#property indicator_plots   4
+#property indicator_buffers 7
+#property indicator_plots   5
 
-//--- PLOTS VISUALES EN EL GRÁFICO
-#property indicator_label1  "PvP_Zone_High"
-#property indicator_type1   DRAW_LINE
-#property indicator_color1  clrMediumPurple
+//--- PLOTS: DYNAMIC PVP ENVELOPES (Violin Cloud)
+#property indicator_label1  "PvP_Cloud_High"
+#property indicator_type1   DRAW_FILLING
+#property indicator_color1  clrMediumPurple, clrMediumPurple
 #property indicator_style1  STYLE_SOLID
-#property indicator_width1  2
+#property indicator_width1  1
 
-#property indicator_label2  "PvP_Zone_Low"
-#property indicator_type2   DRAW_LINE
-#property indicator_color2  clrMediumPurple
-#property indicator_style2  STYLE_DOT
-#property indicator_width2  1
+#property indicator_label2  "PvP_Cloud_Low"
+#property indicator_type2   DRAW_NONE 
 
+//--- PLOTS: STRUCTURE (BOS/CHOCH)
 #property indicator_label3  "Structure_BOS"
 #property indicator_type3   DRAW_ARROW
 #property indicator_color3  clrDodgerBlue
+#property indicator_width3  2
 
 #property indicator_label4  "Structure_CHOCH"
 #property indicator_type4   DRAW_ARROW
 #property indicator_color4  clrCrimson
+#property indicator_width4  2
+
+//--- PLOTS: HFT ACTIVITY (Volume/Tick Heat)
+#property indicator_label5  "HFT_Pulse"
+#property indicator_type5   DRAW_NONE
 
 //--- INCLUDES
 #include <UnifiedModel/CInterop.mqh> 
 #include <Canvas/Canvas.mqh>         
 
-//--- GLOBALES
-CInterop g_interop;        
-CCanvas  Dashboard;         
-string   g_objPrefix = "FEAT_KZ_";
+//--- INPUTS
+input int      InpZMQPort        = 5556;        // ZMQ Sub Port
+input color    InpColorBuy       = clrLimeGreen;// Buy Flow Color
+input color    InpColorSell      = clrCrimson;  // Sell Flow Color
+input int      InpSparklineHist  = 20;          // Sparkline Depth
 
 //--- BUFFERS
 double BufferPvP_H[];
 double BufferPvP_L[];
 double BufferStruct_BOS[];
 double BufferStruct_CHOCH[];
-double BufferVol[];
-double BufferCalc[];
-
-//--- ESTADO DEL SISTEMA (Recibido desde Python)
-struct FeatState {
-   double score;           // -100 a +100
-   string ai_prediction;   // BUY FLOW / SELL FLOW / WAIT
-   double ai_confidence;   // %
-   string active_zone;     // Killzone status
-   string regime;          // Market Regime
-   double pvp_level;       // Central PVP
-   bool   acceleration;    // Momentum flag
-};
-FeatState CurrentState;
+double BufferHFT[];
+// Shadow Buffers for calculation
+double BufferCalc_1[];
+double BufferCalc_2[];
 
 //+------------------------------------------------------------------+
-//| INIT                                                             |
+//| CLASS: CMarketLogic                                              |
+//| Kernel: Mathematical Modeling & State Management                 |
 //+------------------------------------------------------------------+
-int OnInit() {
-   if(!SetIndexBuffer(0, BufferPvP_H)) return(INIT_FAILED);
-   if(!SetIndexBuffer(1, BufferPvP_L)) return(INIT_FAILED);
-   if(!SetIndexBuffer(2, BufferStruct_BOS)) return(INIT_FAILED);
-   if(!SetIndexBuffer(3, BufferStruct_CHOCH)) return(INIT_FAILED);
-   if(!SetIndexBuffer(4, BufferVol)) return(INIT_FAILED);
-   if(!SetIndexBuffer(5, BufferCalc)) return(INIT_FAILED);
+class CMarketLogic
+{
+public:
+   struct State {
+      double score;
+      string prediction;
+      double confidence;
+      string session_state;
+      string regime;
+      double pvp_level;
+      bool   acceleration;
+      // New: Volatility Factors
+      double vol_factor;
+      string raw_json;
+      ulong  last_update_ms;
+   };
 
-   PlotIndexSetInteger(2, PLOT_ARROW, 159); 
-   PlotIndexSetInteger(3, PLOT_ARROW, 158); 
+   State m_state;
+   double m_sparkline[];
    
-   if(!g_interop.Init(false)) {
-      Print("CRITICAL: ZMQ Bridge Failed.");
-      return(INIT_FAILED);
+   CMarketLogic() {
+      ArrayResize(m_sparkline, InpSparklineHist);
+      ArrayInitialize(m_sparkline, 0.0);
+      m_state.score = 0;
+      m_state.vol_factor = 1.0;
+   }
+   
+   // --- PARSING & STATE UPDATE ---
+   bool UpdateState(string json) {
+      // 1. Hash Check (Simple String Compare for Low Latency)
+      if(json == m_state.raw_json) return false;
+      m_state.raw_json = json;
+      m_state.last_update_ms = GetTickCount64();
+      
+      // 2. Parse JSON
+      m_state.regime     = ExtractJsonValue(json, "regime");
+      m_state.confidence = StringToDouble(ExtractJsonValue(json, "ai_confidence"));
+      m_state.score      = StringToDouble(ExtractJsonValue(json, "feat_score_val"));
+      m_state.pvp_level  = StringToDouble(ExtractJsonValue(json, "feat_pvp_price"));
+      m_state.session_state = ExtractJsonValue(json, "session");
+      
+      string acc_str     = ExtractJsonValue(json, "acceleration"); // Assuming bool or number
+      m_state.acceleration = (StringFind(m_state.regime, "TREND") >= 0); // Logic override based on reg
+
+      // 3. Update Sparkline (FIFO)
+      for(int i=InpSparklineHist-1; i>0; i--) {
+         m_sparkline[i] = m_sparkline[i-1];
+      }
+      m_sparkline[0] = m_state.score;
+      
+      // 4. Volatility Dynamics (Breathing Function)
+      // If Accelerating -> Compress (Focus). If Laminar -> Expand (Discovery).
+      if(m_state.acceleration) m_state.vol_factor = 0.5; // Tight
+      else m_state.vol_factor = 1.5; // Wide for consolidation
+      
+      // Prediction String
+      if(m_state.score > 50) m_state.prediction = "BUY FLOW >>";
+      else if(m_state.score < -50) m_state.prediction = "<< SELL FLOW";
+      else m_state.prediction = "-- NEUTRAL --";
+      
+      return true; // State changed
    }
 
-   if(!Dashboard.CreateBitmapLabel("FEAT_HUD", 5, 25, 350, 180, COLOR_FORMAT_ARGB_NORMALIZE)) {
-      Print("Error creando Dashboard GUI");
+private:
+    string ExtractJsonValue(string json, string key) {
+       string search = "\"" + key + "\"";
+       int start = StringFind(json, search);
+       if(start < 0) return("");
+       
+       int valStart = StringFind(json, ":", start);
+       if(valStart < 0) return("");
+       
+       valStart++;
+       while(valStart < StringLen(json) && 
+             (StringGetCharacter(json, valStart) == ' ' || StringGetCharacter(json, valStart) == '"')) {
+          valStart++;
+       }
+       
+       int valEnd = valStart;
+       while(valEnd < StringLen(json)) {
+          ushort c = StringGetCharacter(json, valEnd);
+          if(c == ',' || c == '}') break;
+          valEnd++;
+       }
+       
+       string res = StringSubstr(json, valStart, valEnd - valStart);
+       StringReplace(res, "\"", "");
+       return(res);
+    }
+};
+
+//+------------------------------------------------------------------+
+//| CLASS: CVisualEngine                                             |
+//| Kernel: GPU Canvas Rendering & Glassmorphism                     |
+//+------------------------------------------------------------------+
+class CVisualEngine
+{
+private:
+   CCanvas m_canvas;
+   int     m_width;
+   int     m_height;
+   
+public:
+   CVisualEngine() : m_width(400), m_height(220) {}
+   ~CVisualEngine() { m_canvas.Destroy(); }
+   
+   bool Init() {
+      if(!m_canvas.CreateBitmapLabel("FEAT_HUD_V5", 5, 25, m_width, m_height, COLOR_FORMAT_ARGB_NORMALIZE))
+         return false;
+      return true;
+   }
+   
+   void Render(CMarketLogic &logic) {
+      // 1. Glassmorphism Background
+      // Dark Semi-transparent base
+      m_canvas.FillRectangle(0, 0, m_width, m_height, ColorToARGB(clrBlack, 235));
+      // Subtle Glow Border (Neon Cyan or Purple based on PVP)
+      uint borderColor = logic.m_state.acceleration ? ColorToARGB(clrCyan, 120) : ColorToARGB(clrMediumPurple, 100);
+      m_canvas.Rectangle(0, 0, m_width-1, m_height-1, borderColor);
+      
+      // 2. Header
+      m_canvas.TextOut(15, 10, "FEAT INSTITUTIONAL // V5", ColorToARGB(clrWhiteSmoke, 255), TA_LEFT);
+      
+      // 3. FEAT Gradient Bar
+      RenderGradientBar(logic.m_state.score);
+      
+      // 4. Telemetry Grid
+      RenderTelemetry(logic.m_state);
+      
+      // 5. Sparkline (AI Trend)
+      RenderSparkline(logic.m_sparkline);
+      
+      // 6. Account Status (Bottom)
+      RenderAccountStatus();
+      
+      m_canvas.Update();
+   }
+   
+private:
+   void RenderGradientBar(double score) {
+      int x=15, y=40, w=370, h=12;
+      
+      // Background track
+      m_canvas.FillRectangle(x, y, x+w, y+h, ColorToARGB(clrDarkSlateGray, 255));
+      
+      // Gradient Fill (Simulated)
+      // Center (0) is Gray, Left (-100) Red, Right (+100) Green
+      double norm = (score + 100.0) / 200.0; 
+      if(norm < 0) norm=0; if(norm>1) norm=1;
+      
+      int fillW = (int)(w * norm);
+      
+      uint c1 = ColorToARGB(clrCrimson, 255);
+      uint c2 = ColorToARGB(clrLime, 255);
+      // Simple coloring for reliability: Red if negative, Green if positive
+      uint barColor = score >= 0 ? c2 : c1;
+      
+      // Draw from center? Or left-to-right? Standard progress bar:
+      m_canvas.FillRectangle(x, y, x+fillW, y+h, barColor);
+      
+      // Center Marker
+      m_canvas.Line(x+(w/2), y-2, x+(w/2), y+h+2, ColorToARGB(clrWhite, 255));
+      
+      // Triangle Marker at current position
+      int triX = x + fillW;
+      int triY = y + h + 2;
+      m_canvas.FillTriangle(triX, triY, triX-5, triY+5, triX+5, triY+5, ColorToARGB(clrWhite, 255));
+      
+      m_canvas.TextOut(x, y+22, StringFormat("NEURAL SCORE: %.2f", score), barColor, TA_LEFT);
+   }
+   
+   void RenderTelemetry(CMarketLogic::State &state) {
+      int col1_x = 15;
+      int col2_x = 220;
+      int row_y  = 90;
+      int step   = 20;
+      
+      // AI Signal
+      uint sigColor = clrSilver;
+      if(StringFind(state.prediction, "BUY") >= 0) sigColor = clrLime;
+      if(StringFind(state.prediction, "SELL") >= 0) sigColor = clrRed;
+      
+      m_canvas.TextOut(col1_x, row_y, "SIGNAL:", ColorToARGB(clrGray, 200));
+      m_canvas.TextOut(col1_x+60, row_y, state.prediction, ColorToARGB(sigColor, 255));
+      
+      m_canvas.TextOut(col2_x, row_y, StringFormat("CONF: %.1f%%", state.confidence), ColorToARGB(clrWhite, 255));
+      
+      row_y += step;
+      m_canvas.TextOut(col1_x, row_y, "REGIME:", ColorToARGB(clrGray, 200));
+      m_canvas.TextOut(col1_x+60, row_y, state.regime, ColorToARGB(clrCyan, 255));
+      
+      m_canvas.TextOut(col2_x, row_y, state.session_state, ColorToARGB(clrGold, 255));
+   }
+   
+   void RenderSparkline(double &data[]) {
+      int x=15, y=140, w=370, h=40;
+      int count = ArraySize(data);
+      if(count < 2) return;
+      
+      double maxV = 100, minV = -100;
+      double dx = (double)w / (count - 1);
+      
+      // Draw Frame
+      m_canvas.Rectangle(x, y, x+w, y+h, ColorToARGB(clrGray, 50));
+      m_canvas.Line(x, y+(h/2), x+w, y+(h/2), ColorToARGB(clrGray, 50)); // Zero line
+      
+      for(int i=1; i<count; i++) {
+         int x1 = x + (int)((count - 1 - i) * dx); // Reverse visual order (0 is newest on right)
+         int x2 = x + (int)((count - 1 - (i-1)) * dx);
+         
+         // Normalize Y (-100..100 -> h..0)
+         int y1 = y + h - (int)((data[i] + 100) / 200.0 * h);
+         int y2 = y + h - (int)((data[i-1] + 100) / 200.0 * h);
+         
+         uint lc = (data[i-1] >= 0) ? ColorToARGB(clrLime, 200) : ColorToARGB(clrRed, 200);
+         m_canvas.Line(x1, y1, x2, y2, lc);
+      }
+   }
+   
+   void RenderAccountStatus() {
+      int y = 195;
+      string mode = (AccountInfoInteger(ACCOUNT_TRADE_MODE)==ACCOUNT_TRADE_MODE_DEMO) ? "DEMO" : "REAL";
+      uint c = (mode=="REAL") ? ColorToARGB(clrRed, 255) : ColorToARGB(clrLime, 255);
+      
+      string txt = StringFormat("[%s] BAL: $%.2f | EQ: $%.2f", 
+         mode, AccountInfoDouble(ACCOUNT_BALANCE), AccountInfoDouble(ACCOUNT_EQUITY));
+      
+      m_canvas.TextOut(m_width/2, y, txt, c, TA_CENTER);
+      m_canvas.TextOut(m_width-10, y+5, "5.0", ColorToARGB(clrGray, 100), TA_RIGHT); // Ver
+   }
+};
+
+//+------------------------------------------------------------------+
+//| CLASS: CNexusBridge (ZMQ)                                        |
+//+------------------------------------------------------------------+
+class CNexusBridge
+{
+private:
+   CInterop m_zmq;
+   bool     m_active;
+   
+public:
+   bool Init() {
+      m_active = m_zmq.Init(false);
+      return m_active;
+   }
+   
+   void Shutdown() {
+      m_zmq.Shutdown();
+   }
+   
+   string GetPacket() {
+      if(!m_active) return "";
+      return m_zmq.ReceiveHUD();
+   }
+};
+
+//--- GLOBALS (Instances)
+CNexusBridge   Bridge;
+CVisualEngine  Gui;
+CMarketLogic   Logic;
+
+//+------------------------------------------------------------------+
+//| Init                                                             |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   // Buffers mapping
+   SetIndexBuffer(0, BufferPvP_H, INDICATOR_DATA);
+   SetIndexBuffer(1, BufferPvP_L, INDICATOR_DATA);
+   SetIndexBuffer(2, BufferStruct_BOS, INDICATOR_DATA);
+   SetIndexBuffer(3, BufferStruct_CHOCH, INDICATOR_DATA);
+   SetIndexBuffer(4, BufferHFT, INDICATOR_CALCULATIONS);
+   SetIndexBuffer(5, BufferCalc_1, INDICATOR_CALCULATIONS);
+   SetIndexBuffer(6, BufferCalc_2, INDICATOR_CALCULATIONS);
+   
+   // ZMQ
+   if(!Bridge.Init()) {
+      Print("CRITICAL: Nexus Bridge Failed.");
+      return(INIT_FAILED);
+   }
+   
+   // GUI
+   if(!Gui.Init()) {
+      Print("GUI Init Failed");
       return(INIT_FAILED);
    }
    
    EventSetMillisecondTimer(100); 
-   DrawLoadingScreen();
    return(INIT_SUCCEEDED);
 }
 
-void OnDeinit(const int reason) {
+//+------------------------------------------------------------------+
+//| Deinit                                                           |
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
    EventKillTimer();
-   g_interop.Shutdown();
-   Dashboard.Destroy();
-   ObjectsDeleteAll(0, g_objPrefix);
+   Bridge.Shutdown();
+   // VisualEngine handles canvas destroy in destructor
 }
 
-void OnTimer() {
-   string json = g_interop.ReceiveHUD();
+//+------------------------------------------------------------------+
+//| Timer (The Nerve Loop)                                           |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   string json = Bridge.GetPacket();
+   
    if(json != "") {
-      ParseTelemetry(json); 
-      UpdateDashboard();
-      UpdateChartVisuals(); 
+      // Logic Core handles Hash Check internally
+      if(Logic.UpdateState(json)) {
+         // Only Render if state changed
+         Gui.Render(Logic);
+         UpdateChartObjects();
+      }
    }
 }
 
-void ParseTelemetry(string json) {
-   CurrentState.regime     = ExtractJsonValue(json, "regime");
-   CurrentState.ai_confidence = StringToDouble(ExtractJsonValue(json, "ai_confidence"));
-   CurrentState.score      = StringToDouble(ExtractJsonValue(json, "feat_score_val"));
-   CurrentState.pvp_level  = StringToDouble(ExtractJsonValue(json, "feat_pvp_price"));
-   CurrentState.active_zone = ExtractJsonValue(json, "session");
+//+------------------------------------------------------------------+
+//| Chart Updates (PvP Envelopes)                                    |
+//+------------------------------------------------------------------+
+void UpdateChartObjects()
+{
+   // Here we update the indicator buffers for the Cloud
    
-   if(CurrentState.score > 50) CurrentState.ai_prediction = "BUY FLOW >>";
-   else if(CurrentState.score < -50) CurrentState.ai_prediction = "<< SELL FLOW";
-   else CurrentState.ai_prediction = "-- WAIT --";
+   double pvp = Logic.m_state.pvp_level;
+   if(pvp <= 0) return;
    
-   CurrentState.acceleration = (StringFind(CurrentState.regime, "TREND") >= 0);
+   // Dynamic Envelopes: "Breathing"
+   // Base width: 50 points. 
+   // Volatility Multiplier: Logic.m_state.vol_factor
+   double points = SymbolInfoDouble(_Symbol, SYMBOL_POINT);
+   double baseWidth = 50 * points;
+   double dynamicWidth = baseWidth * Logic.m_state.vol_factor;
+   
+   // Update current bar
+   // (In a real scenario we might update a rolling window, but for HUD we focus on current state visualization)
+   BufferPvP_H[0] = pvp + dynamicWidth;
+   BufferPvP_L[0] = pvp - dynamicWidth;
+   
+   // For history, we just hold the level (simplification for HUD indicator)
+   // Or we could shift the buffer if we were tracking history in MQL5 arrays
 }
 
-void UpdateChartVisuals() {
-   int total = ArraySize(BufferPvP_H);
-   if(total > 0) {
-      BufferPvP_H[0] = CurrentState.pvp_level + (SymbolInfoDouble(_Symbol, SYMBOL_POINT) * 50);
-      BufferPvP_L[0] = CurrentState.pvp_level - (SymbolInfoDouble(_Symbol, SYMBOL_POINT) * 50);
-   }
-}
-
-void UpdateDashboard() {
-   Dashboard.Erase(0);
-   Dashboard.FillRectangle(0, 0, 350, 180, ColorToARGB(clrBlack, 230));
-   Dashboard.Rectangle(0, 0, 349, 179, ColorToARGB(clrGray, 255));
-   
-   Dashboard.TextOut(15, 10, "FEAT SYSTEM v4 | INSTITUTIONAL", ColorToARGB(clrLightGray, 255), TA_LEFT);
-   
-   int barX = 15, barY = 40, barW = 320, barH = 15;
-   Dashboard.FillRectangle(barX, barY, barX+barW, barY+barH, ColorToARGB(clrDarkSlateGray, 255));
-   
-   double pct = (CurrentState.score + 100.0) / 200.0; 
-   if(pct < 0) pct = 0; if(pct > 1) pct = 1;
-   int fillW = (int)(barW * pct);
-   
-   uint sColor = ColorToARGB(clrGray, 255);
-   if(CurrentState.score > 30) sColor = ColorToARGB(clrSpringGreen, 255);
-   if(CurrentState.score < -30) sColor = ColorToARGB(clrCrimson, 255);
-   
-   Dashboard.FillRectangle(barX, barY, barX+fillW, barY+barH, sColor);
-   Dashboard.TextOut(barX, barY+20, StringFormat("FEAT SCORE: %.2f", CurrentState.score), sColor, TA_LEFT);
-
-   Dashboard.TextOut(15, 80, "NEXUS AI PREDICTION:", ColorToARGB(clrWhite, 255), TA_LEFT);
-   
-   uint predColor = ColorToARGB(clrYellow, 255);
-   if(CurrentState.ai_prediction == "BUY FLOW >>") predColor = ColorToARGB(clrLime, 255);
-   else if(CurrentState.ai_prediction == "<< SELL FLOW") predColor = ColorToARGB(clrRed, 255);
-   
-   Dashboard.TextOut(15, 100, CurrentState.ai_prediction, predColor, TA_LEFT);
-   Dashboard.TextOut(200, 105, StringFormat("Conf: %.1f%%", CurrentState.ai_confidence), ColorToARGB(clrSilver, 255), TA_LEFT);
-
-   Dashboard.TextOut(15, 140, "MARKET: " + (CurrentState.acceleration ? "HIGH MOMENTUM" : "LOW VOL"), ColorToARGB(clrCyan, 255), TA_LEFT);
-   Dashboard.TextOut(200, 140, "SESSION: " + CurrentState.active_zone, ColorToARGB(clrGold, 255), TA_LEFT);
-
-   // --- INSTITUTIONAL ACCOUNT INFO ---
-   string accMode = (AccountInfoInteger(ACCOUNT_TRADE_MODE) == ACCOUNT_TRADE_MODE_DEMO) ? "DEMO" : "REAL";
-   uint accColor = (accMode == "REAL") ? ColorToARGB(clrRed, 255) : ColorToARGB(clrLimeGreen, 255);
-   
-   Dashboard.TextOut(15, 160, StringFormat("ACC: %s | BAL: $%.2f", accMode, AccountInfoDouble(ACCOUNT_BALANCE)), accColor, TA_LEFT);
-   Dashboard.TextOut(200, 160, StringFormat("EQ: $%.2f", AccountInfoDouble(ACCOUNT_EQUITY)), ColorToARGB(clrWhiteSmoke, 255), TA_LEFT);
-
-   Dashboard.Update();
-}
-
-void DrawLoadingScreen() {
-   if(Dashboard.ChartObjectName() != "") {
-      Dashboard.Erase(ColorToARGB(clrBlack, 255));
-      Dashboard.TextOut(175, 75, "BOOTING FEAT...", ColorToARGB(clrLime, 255), TA_CENTER);
-      Dashboard.Update();
-   }
-}
-
-string ExtractJsonValue(string json, string key) {
-   int pos = StringFind(json, "\""+key+"\"");
-   if(pos < 0) return("");
-   int s = StringFind(json, ":", pos) + 1;
-   while(s < StringLen(json) && (StringSubstr(json, s, 1) == " " || StringSubstr(json, s, 1) == "\"")) s++;
-   int e = StringFind(json, ",", s);
-   if (e < 0) e = StringFind(json, "}", s);
-   int e2 = StringFind(json, "\"", s);
-   if (e2 > 0 && e2 < e) e = e2;
-   if (e < s) return("");
-   return(StringSubstr(json, s, e-s));
-}
-
+//+------------------------------------------------------------------+
+//| OnCalculate                                                      |
+//+------------------------------------------------------------------+
 int OnCalculate(const int rates_total, const int prev_calculated, const datetime &time[], const double &open[], const double &high[], const double &low[], const double &close[], const long &tick_volume[], const long &volume[], const int &spread[])
 {
    ArraySetAsSeries(BufferPvP_H, true);
    ArraySetAsSeries(BufferPvP_L, true);
+   ArraySetAsSeries(BufferStruct_BOS, true);
+   ArraySetAsSeries(BufferStruct_CHOCH, true);
+   
    return(rates_total);
 }

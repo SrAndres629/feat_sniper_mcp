@@ -97,26 +97,73 @@ class TradeManager:
             if "tp" in params: payload["tp"] = float(params["tp"])
             if "ticket" in params: payload["ticket"] = int(params["ticket"])
 
+            # 0.5 Physical Rate Limiting & Safety Guard
+            from app.services.circuit_breaker import circuit_breaker
+            if not circuit_breaker.can_execute():
+                status = circuit_breaker.get_hierarchical_status()
+                logger.error(f"🚨 ORDER BLOCKED BY SRE: {status}")
+                return {"status": "BLOCKED_BY_GAURDIAN", "reason": status}
+
             logger.info(f"Sending Execution Command: {action} on {symbol}")
             
-            # Enviar comando async (fire and forget por ahora, o request/reply si bridge soporta)
+            # REAL ACK IMPLEMENTATION: Send command and wait for confirmation
             if self.zmq_bridge:
-                # Asumimos que zmq_bridge tiene un metodo para enviar comandos
-                # Si es PUB/SUB, publicamos. Si es REQ/REP, esperamos.
-                # En mcp_server.py original era PULL/PUSH o PUB/SUB.
-                # Usaremos un metodo generico 'send_command' si existe, o 'broadcast'.
-                # Revisar zmq_bridge implementation...
-                # Asumiremos send_string o similar.
-                # Para simplificar Módulo 6, mockeamos el envio real si no hay metodo claro.
-                 # TODO: Implementar ACK real.
-                # ACTIVATION: Sending command via ZMQ PUB socket
-                await self.zmq_bridge.send_command(action, **params) 
-            
-            return {
-                "status": "SENT",
-                "ticket": 0, # Pending confirmation
-                "timestamp": datetime.now().isoformat()
-            }
+                import asyncio
+                from app.core.config import settings
+                
+                max_retries = settings.MAX_ORDER_RETRIES
+                base_backoff_ms = settings.RETRY_BACKOFF_BASE_MS
+                timeout_seconds = 5.0
+                
+                last_error = None
+                for attempt in range(1, max_retries + 1):
+                    try:
+                        logger.info(f"[ACK] Attempt {attempt}/{max_retries} for {action}")
+                        
+                        # Send command and await response (with timeout)
+                        response = await asyncio.wait_for(
+                            self.zmq_bridge.send_command_with_ack(action, **params),
+                            timeout=timeout_seconds
+                        )
+                        
+                        # Parse ACK response
+                        if response and response.get("result") == "OK":
+                            ticket = response.get("ticket", 0)
+                            logger.info(f"[ACK] Order confirmed: Ticket #{ticket}")
+                            return {
+                                "status": "EXECUTED",
+                                "ticket": ticket,
+                                "timestamp": datetime.now().isoformat(),
+                                "attempts": attempt
+                            }
+                        else:
+                            error_msg = response.get("error", "Unknown error") if response else "No response"
+                            logger.warning(f"[ACK] Order rejected: {error_msg}")
+                            last_error = error_msg
+                            
+                    except asyncio.TimeoutError:
+                        logger.warning(f"[ACK] Timeout on attempt {attempt}")
+                        last_error = "Timeout waiting for MT5 response"
+                    except Exception as e:
+                        logger.warning(f"[ACK] Error on attempt {attempt}: {e}")
+                        last_error = str(e)
+                    
+                    # Exponential backoff before retry
+                    if attempt < max_retries:
+                        backoff_ms = base_backoff_ms * (3 ** (attempt - 1))  # 50 -> 150 -> 450ms
+                        await asyncio.sleep(backoff_ms / 1000.0)
+                
+                # All retries exhausted
+                logger.error(f"[ACK] All {max_retries} attempts failed: {last_error}")
+                return {
+                    "status": "FAILED",
+                    "ticket": 0,
+                    "error": last_error,
+                    "timestamp": datetime.now().isoformat()
+                }
+            else:
+                logger.warning("No ZMQ bridge - order not sent")
+                return {"status": "NO_BRIDGE", "ticket": 0}
 
         except Exception as e:
             logger.error(f"Execution Failed: {e}")
@@ -125,8 +172,24 @@ class TradeManager:
     async def modify_position(self, ticket: int, sl: float, tp: float) -> Dict:
         return await self.execute_order("MODIFY", {"ticket": ticket, "sl": sl, "tp": tp})
 
-    async def close_position(self, ticket: int) -> Dict:
-        return await self.execute_order("CLOSE", {"ticket": ticket})
+    async def close_position(self, ticket: int, profit_pips: float = 0.0) -> Dict:
+        """Closes a position and sends feedback to the ML engine."""
+        res = await self.execute_order("CLOSE", {"ticket": ticket})
+        
+        # [SENIOR] Closed-loop Feedback Initialization
+        if ticket in self.active_positions:
+            pos = self.active_positions[ticket]
+            from app.ml.ml_engine import ml_engine
+            if ml_engine:
+                 # Feed back the results for model weight recalibration
+                 ml_engine.record_trade_result(
+                     gbm_prob=pos.get("gbm_prob", 0.5),
+                     lstm_prob=pos.get("lstm_prob", 0.5),
+                     result_pips=profit_pips
+                 )
+            self.unregister_position(ticket)
+            
+        return res
 
     async def close_all_positions(self) -> Dict:
         return await self.execute_order("CLOSE_ALL", {})

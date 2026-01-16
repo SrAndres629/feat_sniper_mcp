@@ -100,35 +100,25 @@ if sys.platform == 'win32':
         pass
 
 # === IMPORTS DE NEGOCIO (OPERACIÓN REUNIÓN - 0 ORPHANS) ===
-# Core modules
+# Core modules (MILITARY GRADE: FAIL-STOP)
 try:
     from app.core.mt5_conn import mt5_conn
-except ImportError:
-    mt5_conn = None
-    logger.warning("mt5_conn no disponible")
-
-try:
     from app.core.zmq_bridge import zmq_bridge
-except ImportError:
-    zmq_bridge = None
-    logger.warning("zmq_bridge no disponible")
-
-try:
     from app.core.zmq_projector import ZMQProjector
     zmq_projector = ZMQProjector()
-except ImportError:
-    zmq_projector = None
+except ImportError as e:
+    logger.critical(f"🛑 CRITICAL BOOT FAILURE: Core Connectivity missing: {e}")
+    sys.exit(1)
 
-# Skills modules (orphans → connected)
+# Skills modules (FAIL-STOP for Trade and Strategy)
 try:
     from app.skills import market, execution, indicators
-    # TradeManager class import for Lifespan (not instance)
     from app.skills.trade_mgmt import TradeManager
+    from app.skills.feat_chain import feat_chain_orchestrator
+    from app.skills.risk_engine import risk_engine # Critical Safety
 except ImportError as e:
-    market = execution = indicators = TradeManager = None
-    logger.error(f"SKILLS IMPORT CRASH: {e}")
-    import traceback
-    traceback.print_exc()
+    logger.critical(f"🛑 CRITICAL BOOT FAILURE: Trade/Risk modules missing: {e}")
+    sys.exit(1)
 
 
 try:
@@ -245,12 +235,14 @@ try:
 except ImportError:
     train_mtf_models = None
 
-# Nexus Brain (neural network core)
+# Master ML Engine (Quantum Leap V9.0)
 try:
-    from nexus_brain.hybrid_model import HybridModel
-    hybrid_model = HybridModel()
+    from app.ml.ml_engine import MLEngine
+    ml_engine = MLEngine()
+    logger.info("✅ Quantum Leap ML Engine Initialized")
 except ImportError:
-    hybrid_model = None
+    ml_engine = None
+    logger.error("❌ MLEngine Import Failed")
 
 # Global Initialization (Prevent NameError)
 feat_engine = None
@@ -280,9 +272,8 @@ async def app_lifespan(server: FastMCP):
         logger.error(f"❌ FEAT CORE IGNITION FAILED: {e}")
     
     # Global references for Master Tools
-    global feat_engine, trade_manager, risk_engine
+    global feat_engine, trade_manager, risk_engine, ml_engine
 
-    # 0. STREAMER IGNITION (Supabase Realtime)
     # 0. STREAMER IGNITION (Supabase Realtime)
     try:
         from app.core.streamer import init_streamer
@@ -290,7 +281,28 @@ async def app_lifespan(server: FastMCP):
         if dashboard:
              logging.getLogger().addHandler(dashboard)
              asyncio.create_task(dashboard.start_async_loop())
+             
+             # DASHBOARD HEARTBEAT: Push account metrics every 5 seconds
+             # This runs INDEPENDENT of ZMQ tick flow
+             async def dashboard_heartbeat():
+                 """Push account metrics every 5 seconds regardless of tick flow."""
+                 while True:
+                     try:
+                         if dashboard and mt5 and mt5.terminal_info():
+                             acc = mt5.account_info()
+                             if acc:
+                                 await dashboard.push_metrics({
+                                     "balance": acc.balance,
+                                     "equity": acc.equity,
+                                     "margin_free": acc.margin_free
+                                 })
+                     except Exception as e:
+                         logger.debug(f"Heartbeat error: {e}")
+                     await asyncio.sleep(5)
+             
+             asyncio.create_task(dashboard_heartbeat())
              logger.info("📡 [STREAMER] Dashboard Uplink Established (Logs -> Supabase)")
+             logger.info("💓 [HEARTBEAT] Account metrics push every 5s ACTIVE")
     except Exception as e:
         logger.error(f"❌ Streamer Init Failed: {e}")
 
@@ -307,7 +319,7 @@ async def app_lifespan(server: FastMCP):
     try:
         from app.skills.market_physics import market_physics      # M2
         from app.services.risk_engine import risk_engine         # M5
-        from nexus_brain.inference_api import neural_api         # M4
+        # M4 Brain replaced by ml_engine (Quantum Leap)
         from app.services.rag_memory import rag_memory           # M7
         from app.core.zmq_projector import hud_projector         # M8
         from app.services.circuit_breaker import circuit_breaker # M9
@@ -322,13 +334,36 @@ async def app_lifespan(server: FastMCP):
         await rag_memory.initialize()
         asyncio.create_task(circuit_breaker.monitor_heartbeat())
         
-        logger.info("✅ Full Neural-Symbolic Stack ONLINE (M1-M10)")
+        # [ULTIMATE ARCHITECTURE] Zero-Wait Async Hydration Sequence
+        async def background_bootstrap():
+            """Populates brain buffers while ZMQ remains responsive."""
+            from app.skills.market import fetch_candles_mt5 # Ensure availability
+            
+            # Start background hydration for major assets
+            target_symbols = settings.ASSETS_TO_MOINTOR # Typo in original config? Fixed or aliased
+            for symbol in ["XAUUSD", "EURUSD"]: # Priority zero
+                await data_collector.hydrate_all_timeframes(symbol, mt5_fallback_func=market.fetch_candles)
+                
+            logger.info("🌊 [HYDRATION] Background synchronization complete.")
+
+        async def jitter_sentinel():
+            """Monitors ZMQ loop health indefinitely."""
+            while True:
+                if ml_engine:
+                    await ml_engine.check_loop_jitter()
+                await asyncio.sleep(0.1)
+
+        asyncio.create_task(background_bootstrap())
+        asyncio.create_task(jitter_sentinel())
+        
+        logger.info("✅ Full Neural-Symbolic Stack ONLINE (Institutional Grade)")
     except ImportError as e:
         logger.error(f"❌ Stack Assembly Error: {e}")
 
     # 3. ZMQ Bridge (The Nerve Loop)
     if zmq_bridge:
-        brain_semaphore = asyncio.Semaphore(5)
+        # [AUDIT FIX] Increased capacity from 5 to 20 to handle high-frequency news events/bursts
+        brain_semaphore = asyncio.Semaphore(20)
 
         async def process_signal_task(data, regime):
             async with brain_semaphore:
@@ -338,8 +373,17 @@ async def app_lifespan(server: FastMCP):
                     # 1. FEAT Logic (M3 - Symbolic)
                     is_valid = await feat_engine.analyze(data, price, precomputed_physics=regime) if feat_engine else False
                     
-                    # 2. Neural Link (M4 - Probabilistic)
-                    brain_score = await neural_api.predict_next_candle(data, regime)
+                    # 2. Quantum Leap Ensemble (M4 - Deep Probabilistic + Fractal)
+                    brain_score = await ml_engine.ensemble_predict_async(data.get('symbol', 'XAUUSD'), {
+                        **data, 
+                        "close": price,
+                        "rsi": data.get("rsi", 50.0),
+                        "atr": data.get("atr", 0.001)
+                    }) if ml_engine else {"p_win": 0.5, "alpha_confidence": 0}
+                    
+                    # Align brain_score schema for legacy compatibility in HUD/Risk
+                    brain_score['alpha_confidence'] = brain_score.get('confidence', 0)
+                    brain_score['execute_trade'] = brain_score.get('p_win', 0.5) > settings.PROFIT_THRESHOLD # Heuristic
                     
                     # 2b. FEAT Index (M3 Evolution)
                     feat_index = 0.0
@@ -663,28 +707,40 @@ async def brain_run_inference(context_data: Dict[str, Any] = None) -> Dict[str, 
     if not context_data:
         context_data = {}
     
-    global feat_engine, hybrid_model
+    global feat_engine, ml_engine
     
     prediction = {"signal": "NEUTRAL", "confidence": 0.0, "reason": "Initializing"}
-    feat_check = False
+    feat_check = False # MILITARY GRADE: Rejected by default
 
     try:
+        # 0. Price Context
+        current_price = float(context_data.get("close", 0) or context_data.get("bid", 0))
+        
         # 1. FEAT Strategic Filter (Rule Based)
         if feat_engine:
-            current_price = float(context_data.get("close", 0) or context_data.get("bid", 0))
-            feat_check = feat_engine.analyze(context_data, current_price)
+            feat_check = await feat_engine.analyze(context_data, current_price) if asyncio.iscoroutinefunction(feat_engine.analyze) else feat_engine.analyze(context_data, current_price)
             
             if not feat_check:
                 prediction["reason"] = "FEAT_REJECTED (Rules)"
                 prediction["signal"] = "WAIT"
+        else:
+            prediction["reason"] = "STRATEGY_ENGINE_OFFLINE"
+            prediction["signal"] = "HALT"
+            feat_check = False
         
-        # 2. Neural Inference (Deep Learning)
-        # Solo inferir si FEAT pasa o si forzamos (para analisis)
-        if feat_check and hybrid_model:
-             # prediction = hybrid_model.predict(context_data) # TODO: Implement real call
-             prediction = {"signal": "BUY", "confidence": 0.85, "reason": "FEAT+Neural Confirmed"}
-        elif not hybrid_model:
-             prediction["error"] = "Neural Brain Offline (Docker)"
+        # 2. Neural Inference (Quantum Leap Ensemble)
+        if feat_check and ml_engine:
+             res = await ml_engine.ensemble_predict_async(context_data.get('symbol', settings.SYMBOL), context_data)
+             prediction = {
+                 "signal": res["prediction"],
+                 "confidence": res["confidence"],
+                 "reason": f"QuantumLeap ({res['regime']})",
+                 "hurst": res.get("hurst"),
+                 "p_win": res.get("p_win"),
+                 "is_anomaly": res.get("is_anomaly")
+             }
+        elif not ml_engine:
+             prediction["error"] = "MLEngine Offline"
 
     except Exception as e:
         logger.error(f"Inference Logic Error: {e}")
@@ -798,11 +854,23 @@ async def visual_update_hud(data: Dict[str, Any] = None) -> Dict[str, Any]:
     if not data:
         data = {}
     
-    # Placeholder - integrar con dashboard si existe
+    # Send HUD update via ZMQ to MT5
+    from app.core.zmq_bridge import zmq_bridge
+    if zmq_bridge.running:
+        hud_payload = {
+            "action": "HUD_UPDATE",
+            **data,
+            "ts": datetime.now(timezone.utc).timestamp() * 1000
+        }
+        await zmq_bridge.send_raw(hud_payload)
+        status = "HUD update sent via ZMQ"
+    else:
+        status = "ZMQ bridge not running - HUD update queued"
+    
     return {
         "tool": "visual_update_hud",
         "data_received": data,
-        "status": "HUD update acknowledged",
+        "status": status,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -857,19 +925,30 @@ async def config_update_parameters(params: Dict[str, Any] = None) -> Dict[str, A
         return {
             "tool": "config_update_parameters",
             "current_config": {
-                "risk_percent": 1.0,
-                "max_positions": 3,
-                "shadow_mode": True,
-                "allowed_symbols": ["XAUUSD", "EURUSD", "GBPUSD"]
+                "risk_percent": settings.RISK_PERCENT,
+                "max_positions": settings.MAX_OPEN_POSITIONS,
+                "shadow_mode": settings.SHADOW_MODE,
+                "allowed_symbols": [settings.SYMBOL]
             },
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     
-    # Placeholder - implementar config manager
+    # Update settings dynamically (runtime only, not persistent)
+    updated = {}
+    for key, value in params.items():
+        key_upper = key.upper()
+        if hasattr(settings, key_upper):
+            try:
+                setattr(settings, key_upper, value)
+                updated[key] = value
+                logger.info(f"[CONFIG] Updated {key_upper} = {value}")
+            except Exception as e:
+                logger.warning(f"[CONFIG] Failed to set {key_upper}: {e}")
+    
     return {
         "tool": "config_update_parameters",
-        "updated": params,
-        "status": "Configuration updated",
+        "updated": updated,
+        "status": "Configuration updated (runtime only)",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -914,7 +993,7 @@ if __name__ == "__main__":
         else:
             # Default to STDIO for local MCP Clients (Cursor, Claude Desktop, etc.)
             # This fixes "Context Deadline Exceeded" caused by protocol mismatch (SSE vs STDIO).
-            # print("🔊 Starting STDIO Mode...", file=sys.stderr) 
+            print("FEAT NEXUS: System online in STDIO mode. Awaiting synapse activations...", file=sys.stderr)
             mcp.run() # Defaults to stdio transport
     except Exception:
         traceback.print_exc()

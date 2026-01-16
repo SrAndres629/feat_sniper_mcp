@@ -62,7 +62,9 @@ class FractalAnalyzer:
         n = len(series)
         
         if n < 100:
-            logger.warning(f"[HURST] Insufficient data ({n} < 100), returning 0.5")
+            if n > 16:
+                return FractalAnalyzer.compute_hurst_lite(series)
+            logger.warning(f"[HURST] Insufficient data ({n} < 16), returning 0.5")
             return 0.5  # Default to random walk
         
         if max_window is None:
@@ -148,6 +150,31 @@ class FractalAnalyzer:
             
         except Exception as e:
             logger.error(f"[HURST] Regression failed: {e}")
+            return 0.5
+
+    @staticmethod
+    def compute_hurst_lite(series: np.ndarray) -> float:
+        """
+        [SENIOR ARCHITECTURE] Hurst Lite: Variance-based estimator for HFT.
+        Calculates H based on the slope of variance scaling for small windows.
+        Works for 16 <= n < 100.
+        """
+        n = len(series)
+        if n < 16: return 0.5
+        
+        # Calculate variances for lags: 2, 4, 8, 16
+        lags = [2, 4, 8, 16]
+        variances = []
+        for lag in lags:
+            diffs = series[lag:] - series[:-lag]
+            variances.append(np.var(diffs))
+        
+        # Fit: log(Var) ~ 2H * log(lag)
+        try:
+            coeffs = np.polyfit(np.log2(lags), np.log2(variances), 1)
+            H = coeffs[0] / 2.0
+            return float(np.clip(H, 0.0, 1.0))
+        except:
             return 0.5
 
     @staticmethod

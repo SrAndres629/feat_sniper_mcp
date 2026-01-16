@@ -2,8 +2,65 @@ import asyncio
 import logging
 import time
 from typing import Optional, Any
+from datetime import datetime
 
-logger = logging.getLogger("feat.sre")
+import json
+import os
+
+class PersistedTokenBucket:
+    """
+    [SENIOR ARCHITECTURE] Token Bucket with Persistent State.
+    Ensures that rate limits and punishments survive process crashes/restarts.
+    """
+    def __init__(self, filename="data/rate_limit.json", capacity=10, fill_rate=0.5):
+        self.filename = filename
+        self.capacity = capacity
+        self.fill_rate = fill_rate # tokens per second (0.5 = 1 every 2s)
+        self.tokens = capacity
+        self.last_update = time.time()
+        self._load_state()
+
+    def _load_state(self):
+        """Loads bucket state from disk."""
+        if os.path.exists(self.filename):
+            try:
+                with open(self.filename, 'r') as f:
+                    state = json.load(f)
+                    self.tokens = state.get('tokens', self.capacity)
+                    self.last_update = state.get('last_update', time.time())
+                    # Ensure tokens are up to date with time elapsed since last save
+                    self.consume(0) 
+            except Exception as e:
+                logger.error(f"Failed to load RateLimit state: {e}")
+
+    def _save_state(self):
+        """Saves current state to disk (Async or fast sync)."""
+        try:
+            os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+            with open(self.filename, 'w') as f:
+                json.dump({
+                    'tokens': self.tokens,
+                    'last_update': self.last_update
+                }, f)
+        except Exception as e:
+            logger.error(f"Failed to save RateLimit state: {e}")
+
+    def consume(self, amount=1) -> bool:
+        """Attempts to consume tokens. Returns True if successful."""
+        now = time.time()
+        time_passed = now - self.last_update
+        self.tokens = min(self.capacity, self.tokens + time_passed * self.fill_rate)
+        self.last_update = now
+
+        if self.tokens >= amount:
+            self.tokens -= amount
+            self._save_state()
+            return True
+        return False
+
+    def is_locked(self) -> bool:
+        """Returns True if the bucket is empty (rate limited)."""
+        return self.tokens < 1
 
 class CircuitBreaker:
     """
@@ -15,6 +72,10 @@ class CircuitBreaker:
         self.is_tripped = False
         self.current_level = 0  # 0: Safe, 1: Defensive, 2: Survival, 3: Shutdown
         self.pause_until: float = 0.0 # Multi-level operational pause
+        
+        # [SENIOR FIX] Persisted Rate Limiter
+        self.rate_limiter = PersistedTokenBucket(capacity=20, fill_rate=0.5) # 1 order / 2s
+        
         # Tolerance: 15 seconds of silence = DEATH
         self.max_latency = 15.0 
         self.trade_manager: Optional[Any] = None 
@@ -78,16 +139,54 @@ class CircuitBreaker:
         return 1.0
 
     def can_execute(self) -> bool:
-        """Veredicto final para la ejecucin de órdenes."""
-        return not self.is_tripped and self.current_level < 3 and time.time() >= self.pause_until
+        """
+        Veredicto final para la ejecución de órdenes.
+        Refined with [SENIOR] Persisted Rate Limiting.
+        """
+        if self.is_tripped or self.current_level >= 3:
+            return False
+            
+        if time.time() < self.pause_until:
+             return False
+             
+        # Check Physical Rate Limiter
+        if self.rate_limiter.is_locked():
+            logger.error("🛑 PHYSICAL RATE LIMITER ACTIVE: Blocking Order Frequency.")
+            return False
+            
+        # Consume token on check (optimistic lock)
+        return self.rate_limiter.consume(1)
+
+    def get_hierarchical_status(self) -> Dict[str, Any]:
+        """Returns full status for HUD/Orchestrator."""
+        return {
+            "is_tripped": self.is_tripped,
+            "level": self.current_level,
+            "can_trade": self.can_execute(),
+            "pause_remaining": max(0, int(self.pause_until - time.time())),
+            "tokens_remaining": round(self.rate_limiter.tokens, 2),
+            "timestamp": datetime.now().isoformat()
+        }
 
     def record_failure(self):
         """Registra un fallo técnico (broker error, timeout)."""
-        pass
+        if not hasattr(self, '_consecutive_failures'):
+            self._consecutive_failures = 0
+        self._consecutive_failures += 1
+        logger.warning(f"[CB] Technical failure recorded ({self._consecutive_failures} consecutive)")
+        
+        # Trip circuit after 5 consecutive failures
+        if self._consecutive_failures >= 5:
+            logger.critical(f"[CB] Too many failures ({self._consecutive_failures}) - triggering protective shutdown")
+            asyncio.create_task(self.emergency_shutdown())
 
     def record_success(self):
         """Limpia contadores de fallos temporales."""
-        pass
+        if not hasattr(self, '_consecutive_failures'):
+            self._consecutive_failures = 0
+        if self._consecutive_failures > 0:
+            logger.info(f"[CB] Success recorded - resetting failure counter from {self._consecutive_failures}")
+            self._consecutive_failures = 0
 
     def heartbeat(self):
         """Llamado por cada tick ZMQ recibido."""

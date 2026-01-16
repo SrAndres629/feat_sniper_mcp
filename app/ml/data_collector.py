@@ -18,6 +18,9 @@ from typing import Any, Dict, List, Optional, Tuple
 import pandas as pd
 import numpy as np
 from datetime import datetime, timezone, timedelta
+from app.skills.indicators import (
+    calculate_rsi_numpy, calculate_atr_numpy, calculate_feat_layers
+)
 
 # Configuration
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -33,6 +36,16 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("QuantumLeap.DataCollector")
+
+class SystemState:
+    """Global state for zero-wait boot synchronization."""
+    BOOTING = "BOOTING"
+    HYDRATING = "HYDRATING"
+    READY = "READY"
+    ERROR = "ERROR"
+
+_global_state = SystemState.BOOTING
+_hydration_progress = 0.0 # 0.0 to 1.0
 
 FEATURE_NAMES: List[str] = [
     "close", "open", "high", "low", "volume",
@@ -176,7 +189,8 @@ class Resampler:
     
     def __init__(self, symbol: str):
         self.symbol = symbol
-        self.buffers: Dict[str, List[Dict]] = {tf: [] for tf in TIMEFRAMES if tf != "M1"}
+        # Historical buffers for indicator calculation (e.g., last 100 candles)
+        self.history: Dict[str, List[Dict]] = {tf: [] for tf in TIMEFRAMES if tf != "M1"}
         self.current_candles: Dict[str, Dict] = {}
 
     def _parse_time(self, tick_time) -> datetime:
@@ -238,6 +252,12 @@ class Resampler:
                 curr["low"] = min(curr["low"], m1_candle["low"])
                 curr["close"] = m1_candle["close"]
                 curr["volume"] += m1_candle["volume"]
+                
+        # Update history for completed candles to enable indicator calculation
+        for tf, candle in completed:
+            self.history[tf].append(candle)
+            if len(self.history[tf]) > 200: # Limit history size
+                self.history[tf].pop(0)
                 
         return completed
 
@@ -316,17 +336,40 @@ class DataCollector:
                 
                 completed_tf_candles = self.resamplers[symbol].push_tick(record)
                 for tf, tf_candle in completed_tf_candles:
-                    # For larger timeframes, indicators would ideally be re-calculated here
-                    # or passed from a higher-level logic. For now, we store basic OHLC.
-                    # In a full MIP, indicators would be calculated on 'tf_candle'.
+                    # [SENIOR FIX] Calculate REAL indicators for MTF candles
+                    history = self.resamplers[symbol].history[tf]
+                    
+                    if len(history) < 14:
+                        continue  # [AUDIT FIX] Skip saving cold-start records to prevent dataset corruption
+                        
+                    closes = np.array([c["close"] for c in history])
+                    highs = np.array([c["high"] for c in history])
+                    lows = np.array([c["low"] for c in history])
+                    
+                    rsi = calculate_rsi_numpy(closes, 14)
+                    atr = calculate_atr_numpy(highs, lows, closes, 14)
+                    feat_score = 0.0
+                    
+                    # Feat score calculation (simplified for MTF)
+                    if len(history) >= 20: 
+                         df_tf = pd.DataFrame(history)
+                         feat_df = calculate_feat_layers(df_tf)
+                         if not feat_df.empty:
+                             feat_score = float(feat_df['L1_Mean'].iloc[-1])
+                    
                     self.batch.append({
                         "symbol": symbol,
                         "timeframe": tf,
                         **tf_candle,
-                        # Placeholders for TF indicators
-                        "rsi": 50.0, "atr": 0.001, "ema_fast": tf_candle["close"], 
-                        "ema_slow": tf_candle["close"], "fsm_state": 0, "feat_score": 0.0,
-                        "liquidity_ratio": 1.0, "volatility_zscore": 0.0
+                        "tick_time": tf_candle["tick_time"],
+                        "rsi": rsi, 
+                        "atr": atr, 
+                        "ema_fast": tf_candle["close"],
+                        "ema_slow": tf_candle["close"],
+                        "fsm_state": 0, 
+                        "feat_score": feat_score,
+                        "liquidity_ratio": 1.0, 
+                        "volatility_zscore": 0.0
                     })
 
             if len(self.batch) >= BATCH_SIZE:
@@ -388,6 +431,74 @@ class DataCollector:
             ).fetchone()[0]
             
         return stats
+
+    async def hydrate_all_timeframes(self, symbol: str, mt5_fallback_func=None):
+        """
+        [SENIOR ARCHITECTURE] Async Hydration Protocol.
+        Populates Resampler buffers without blocking the main event loop.
+        """
+        global _global_state, _hydration_progress
+        _global_state = SystemState.HYDRATING
+        logger.info(f"🌊 [HYDRATION] Starting async hydration for {symbol}...")
+        
+        try:
+            if symbol not in self.resamplers:
+                self.resamplers[symbol] = Resampler(symbol)
+            
+            tfs_to_hydrate = TIMEFRAMES
+            total_tfs = len(tfs_to_hydrate)
+            
+            for i, tf in enumerate(tfs_to_hydrate):
+                _hydration_progress = i / total_tfs
+                logger.debug(f"Hydrating {tf}...")
+                
+                # 1. Try DB first
+                history = self._get_history_from_db(symbol, tf, limit=500)
+                
+                # 2. Try MT5 Fallback if DB is empty or shallow
+                if len(history) < 200 and mt5_fallback_func:
+                    logger.warning(f"⚠️ {tf} history shallow in DB ({len(history)}). Attempting MT5 sync...")
+                    mt5_history = await mt5_fallback_func(symbol, tf, count=500)
+                    if mt5_history:
+                        history = mt5_history
+                
+                if history:
+                    # Hydrate history buffer
+                    self.resamplers[symbol].history[tf] = history[-200:] # Keep last 200
+                    logger.info(f"✅ {tf} hydrated with {len(history)} candles.")
+                else:
+                    logger.warning(f"❌ Could not hydrate {tf} for {symbol}.")
+            
+            _hydration_progress = 1.0
+            _global_state = SystemState.READY
+            logger.info(f"✨ [HYDRATION] System READY for {symbol}. Buffers operational.")
+            
+        except Exception as e:
+            _global_state = SystemState.ERROR
+            logger.error(f"💥 Hydration Critical Failure: {e}")
+
+    def _get_history_from_db(self, symbol: str, timeframe: str, limit: int = 500) -> List[Dict]:
+        """Queries SQLite for historical records."""
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.cursor()
+                # Check for table existence first
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='market_data'")
+                if not cursor.fetchone():
+                    return []
+                    
+                query = "SELECT * FROM market_data WHERE symbol = ? AND timeframe = ? ORDER BY tick_time DESC LIMIT ?"
+                cursor.execute(query, (symbol, timeframe, limit))
+                rows = cursor.fetchall()
+                
+                # Convert to dict list and reverse for chronological order
+                history = []
+                for row in rows:
+                    history.append(dict(row))
+                return history[::-1]
+        except Exception as e:
+            logger.error(f"DB History Query Error: {e}")
+            return []
         
     def export_training_csv(self, path: str = None) -> str:
         """Exporta training_samples a CSV para compatibilidad."""

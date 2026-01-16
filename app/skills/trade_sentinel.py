@@ -2,6 +2,7 @@ import logging
 import time
 from datetime import datetime
 from typing import Dict, Any, Optional
+from app.core.config import settings
 
 logger = logging.getLogger("feat.trade_sentinel")
 
@@ -46,12 +47,18 @@ class TradeSentinel:
              logger.warning(f"🚨 SENTINEL: Ticket {ticket} CONFIDENCE CRASH ({current_p_win:.2f} < 0.45). Signal CLOSE.")
              return {"action": "CLOSE_NOW", "reason": "Confidence Crash"}
         
-        if (trade_data["max_p_win"] - current_p_win) > 0.20:
+        if (trade_data["max_p_win"] - current_p_win) > settings.SENTINEL_EXIT_THRESHOLD:
              logger.warning(f"📉 SENTINEL: Ticket {ticket} Momentum Lost (Max {trade_data['max_p_win']:.2f} -> Curr {current_p_win:.2f}). Signal CLOSE.")
-             return {"action": "CLOSE_NOW", "reason": "Momentum Decay > 20%"}
+             return {"action": "CLOSE_NOW", "reason": f"Momentum Decay > {settings.SENTINEL_EXIT_THRESHOLD*100}%"}
 
-        # RULE 2: PHYSICS REVERSAL (if physics object has directional cues)
-        # Placeholder for complex physics check
+        # RULE 2: PHYSICS REVERSAL (Acceleration/Velocity Direction Change)
+        if current_physics:
+            # Check if physics has directional attributes
+            entry_physics = trade_data.get("last_physics")
+            if entry_physics and hasattr(current_physics, 'direction') and hasattr(entry_physics, 'direction'):
+                if current_physics.direction != entry_physics.direction:
+                    logger.warning(f"🔄 SENTINEL: Ticket {ticket} Physics Reversal detected. Signal CLOSE.")
+                    return {"action": "CLOSE_NOW", "reason": "Physics Reversal"}
         
         return {"action": "HOLD", "reason": "Vital signs stable"}
 

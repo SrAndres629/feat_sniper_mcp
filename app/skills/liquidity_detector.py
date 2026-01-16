@@ -142,7 +142,7 @@ def detect_asian_sweep(
     utc_offset: int = -4
 ) -> Dict[str, Any]:
     """
-    Detecta si el precio ha barrido (sweep) el rango de la sesin asitica.
+    Detecta si el precio ha barrido (sweep) el rango de la sesión asiática.
     
     Un sweep ocurre cuando el precio rompe el High/Low de Asia y 
     luego vuelve a entrar en el rango con fuerza.
@@ -150,13 +150,63 @@ def detect_asian_sweep(
     if len(candles) < 50:
         return {"asian_sweep": False, "sweep_type": None}
     
-    # TODO: Implement proper Asian range detection
-    # For now, return placeholder
+    # Ensure 'time' column is datetime
+    df = candles.copy()
+    if 'time' in df.columns:
+        if df['time'].dtype == 'object' or df['time'].dtype == 'O':
+            df['time'] = pd.to_datetime(df['time'])
+        elif not pd.api.types.is_datetime64_any_dtype(df['time']):
+            df['time'] = pd.to_datetime(df['time'], unit='s')
+    else:
+        return {"asian_sweep": False, "sweep_type": None, "asian_high": 0, "asian_low": 0}
+    
+    # Extract hour from time
+    df['hour'] = df['time'].dt.hour
+    
+    # Filter Asian session candles (handles midnight wrap: 20:00 - 04:00)
+    if asian_start_hour > asian_end_hour:
+        asian_candles = df[(df['hour'] >= asian_start_hour) | (df['hour'] < asian_end_hour)]
+    else:
+        asian_candles = df[(df['hour'] >= asian_start_hour) & (df['hour'] < asian_end_hour)]
+    
+    if len(asian_candles) < 3:
+        return {"asian_sweep": False, "sweep_type": None, "asian_high": 0, "asian_low": 0}
+    
+    # Calculate Asian range
+    asian_high = float(asian_candles['high'].max())
+    asian_low = float(asian_candles['low'].min())
+    
+    # Get post-Asian candles (typically NY session)
+    last_asian_time = asian_candles['time'].max()
+    post_asian = df[df['time'] > last_asian_time].tail(20)
+    
+    if len(post_asian) < 3:
+        return {"asian_sweep": False, "sweep_type": None, "asian_high": asian_high, "asian_low": asian_low}
+    
+    # Check for sweeps
+    current_price = float(post_asian['close'].iloc[-1])
+    swept_high = float(post_asian['high'].max()) > asian_high
+    swept_low = float(post_asian['low'].min()) < asian_low
+    
+    # Price returned to range after sweep?
+    in_range = asian_low <= current_price <= asian_high
+    
+    sweep_type = None
+    asian_sweep = False
+    
+    if swept_high and in_range:
+        sweep_type = "BEARISH_SWEEP"  # Price took highs and rejected
+        asian_sweep = True
+    elif swept_low and in_range:
+        sweep_type = "BULLISH_SWEEP"  # Price took lows and rejected
+        asian_sweep = True
+    
     return {
-        "asian_sweep": False,
-        "sweep_type": None,
-        "asian_high": 0,
-        "asian_low": 0
+        "asian_sweep": asian_sweep,
+        "sweep_type": sweep_type,
+        "asian_high": asian_high,
+        "asian_low": asian_low,
+        "current_in_range": in_range
     }
 
 

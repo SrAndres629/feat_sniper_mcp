@@ -293,8 +293,9 @@ class FEATChain:
             if not decision.can_trade:
                 return (False, 0.0, "; ".join(decision.rejection_reasons))
             return (True, decision.lot_multiplier, None)
-        except:
-            return (True, 0.5, None)
+        except Exception as e:
+            logger.critical(f"🚨 [FAIL-SAFE] BlackSwanGuard Evaluation Failure: {e}")
+            return (False, 0.0, f"INTERNAL_ERROR: {e}")
 
     async def analyze(self, market_data: Dict, current_price: float, precomputed_physics: Optional[Any] = None) -> bool:
         if 'symbol' not in market_data:
@@ -311,8 +312,9 @@ class FEATChain:
             try:
                 from app.skills.market_physics import market_physics
                 physics_output = market_physics.ingest_tick(market_data)
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"🚨 [FAIL-SAFE] Physics Ingestion Failure: {e}")
+                physics_output = None
 
         result = await self.head.validate(market_data, physics_output)
         

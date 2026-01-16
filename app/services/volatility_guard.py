@@ -1,6 +1,7 @@
 import logging
 import time
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, Deque
+from collections import deque
 from app.core.config import settings
 
 logger = logging.getLogger("feat.services.volatility_guard")
@@ -14,22 +15,57 @@ class VolatilityGuard:
         self.last_check_time = 0
         self.is_halted = False
         self.halt_reason = ""
-        self.atr_threshold_multiplier = 3.0 # Visionary Standard
         self.current_regime = "LAMINAR"
+        
+        # [SENIOR ARCHITECTURE] Relative Thresholds
+        self.rel_threshold = 0.05 # 5% of price (Crisis Cap)
+        self.dead_market_threshold = 0.0005 # 0.05% of price (Low Liquidity)
+        self.multiplier = 3.0
+        self._atr_memories: Dict[str, deque] = {}
+
+    def _get_memory(self, symbol: str) -> deque:
+        if symbol not in self._atr_memories:
+            self._atr_memories[symbol] = deque(maxlen=50)
+        return self._atr_memories[symbol]
         
     def check_market_toxicity(self, market_data: Dict[str, Any]) -> bool:
         """
         Veredicto de toxicidad. Retorna True si el mercado es tóxico (HALT).
+        [SENIOR] Relative Volatility Guard (ATR/Price) + Memory.
         """
+        symbol = market_data.get("symbol", "UNKNOWN")
+        price = float(market_data.get("bid", 0) or market_data.get("close", 0))
         atr = market_data.get("atr")
         avg_atr = market_data.get("avg_atr")
         
-        if atr is not None and avg_atr is not None and avg_atr > 0:
-            vol_ratio = atr / avg_atr
-            if vol_ratio > self.atr_threshold_multiplier:
+        memory = self._get_memory(symbol)
+        
+        if atr is not None:
+            memory.append(atr)
+            
+            # Rule 1: Relative Volatility (Scale proof)
+            if price > 0:
+                rel_vol = atr / price
+                if rel_vol > self.rel_threshold:
+                    self.is_halted = True
+                    self.halt_reason = f"Toxic Volatility: Relative ATR ({rel_vol:.2%}) > {self.rel_threshold:.2%}"
+                    logger.critical(f"🛡️ VOLATILITY GUARD [RELATIVE_HIGH]: {self.halt_reason}")
+                    return True
+                
+                # Rule 1b: Dead Market Check
+                if rel_vol < self.dead_market_threshold:
+                    self.is_halted = True
+                    self.halt_reason = f"Dead Market: Relative ATR ({rel_vol:.4%}) < {self.dead_market_threshold:.4%}"
+                    logger.warning(f"🛡️ VOLATILITY GUARD [RELATIVE_LOW]: {self.halt_reason}")
+                    return True
+            
+            # Rule 2: Multiplier (Autonomous Memory Fallback)
+            effective_avg = avg_atr if (avg_atr and avg_atr > 0) else (sum(memory)/len(memory) if len(memory) > 10 else None)
+            
+            if effective_avg and atr / effective_avg > self.multiplier:
                 self.is_halted = True
-                self.halt_reason = f"Flash Crash Detected: Volatility Ratio {vol_ratio:.1f}x > {self.atr_threshold_multiplier}x"
-                logger.critical(f"🛡️ VOLATILITY GUARD TRIGGERED: {self.halt_reason}")
+                self.halt_reason = f"Flash Crash: ATR Ratio {atr/effective_avg:.1f}x > {self.multiplier}x"
+                logger.critical(f"🛡️ VOLATILITY GUARD [RATIO]: {self.halt_reason}")
                 return True
         
         self.is_halted = False

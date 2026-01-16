@@ -3,13 +3,16 @@ import os
 import subprocess
 import configparser
 from typing import Dict, Any, Optional
+
+# FAIL-FAST: Use centralized MT5 from mt5_conn (no silent mocks)
 from app.core.config import settings
-from app.core.mt5_conn import mt5_conn
-try:
-    import MetaTrader5 as mt5
-except ImportError:
-    from unittest.mock import MagicMock
-    mt5 = MagicMock()
+from app.core.mt5_conn import mt5_conn, mt5, MT5_AVAILABLE
+
+if not MT5_AVAILABLE:
+    raise ImportError(
+        "MetaTrader5 library not found. This module requires a real MT5 connection. "
+        "Install: pip install MetaTrader5 (Windows only)"
+    )
 
 logger = logging.getLogger("MT5_Bridge.Skills.Tester")
 

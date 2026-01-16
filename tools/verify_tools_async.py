@@ -51,14 +51,21 @@ async def check_tools():
         
     # Try calling a tool directly to verify access
     try:
-        print("Attempting to call 'sys_audit_status' direct...")
+        print("Attempting to call 'sys_audit_status' (Core Health Check)...")
         if hasattr(mcp_server, 'sys_audit_status'):
             func = mcp_server.sys_audit_status
-            if asyncio.iscoroutinefunction(func):
-                res = await func()
-            else:
-                res = func()
-            print(f"Tool Result: {res}")
+            res = await func() if asyncio.iscoroutinefunction(func) else func()
+            
+            # Real validation: Check if MT5 and ZMQ are alive
+            health = res.get("status", {})
+            mt5_alive = health.get("mt5_connected", False)
+            zmq_alive = health.get("zmq_active", False)
+            
+            print(f"[HEALTH] MT5: {'✅' if mt5_alive else '❌'} | ZMQ: {'✅' if zmq_alive else '❌'}")
+            
+            if not mt5_alive:
+                print("[CRITICAL] MT5 Connection not detected. System in HYDRATION or OFFLINE.")
+            
             return True
         else:
             print("sys_audit_status not found in mcp_server module.")

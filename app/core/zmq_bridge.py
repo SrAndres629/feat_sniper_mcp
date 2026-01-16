@@ -1,11 +1,13 @@
 """
-ZMQ Bridge - High-Performance Non-Blocking Architecture
-=========================================================
+ZMQ Bridge - High-Performance Non-Blocking Architecture (ZMQNucleus)
+=====================================================================
 Zero-latency message bridge between MQL5 and Python brain.
 
-[P1 REFACTOR] Changes:
+[PROJECT ATLAS] Vibranium Grade Upgrades:
+- asyncio.PriorityQueue for Execution > Telemetry ordering
+- BackpressureManager: LIFO frame dropping when lag > threshold
+- Separation of control: PUB (Stream) vs PUSH (Execution)
 - asyncio.to_thread for ALL sync callbacks (no blocking)
-- Fixed class-level variables moved to __init__
 - Rate limiting via semaphore (max concurrent processing)
 - Enhanced TTL validation with metrics
 """
@@ -16,16 +18,91 @@ import zmq
 import zmq.asyncio
 import logging
 import json
-from typing import Callable, List, Dict, Any, Optional
+from enum import IntEnum
+from typing import Callable, List, Dict, Any, Optional, Tuple
+from dataclasses import dataclass, field
+from collections import deque
 
 from app.core.config import settings
 
 # --- WINDOWS FIX CRÍTICO ---
-# Esto evita el error "Proactor event loop" en Windows
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 logger = logging.getLogger("MT5_Bridge.ZMQ")
+
+
+# =============================================================================
+# MESSAGE PRIORITY SYSTEM
+# =============================================================================
+
+class MessagePriority(IntEnum):
+    """Priority levels for message processing. Lower = higher priority."""
+    CRITICAL = 0      # Emergency stop, circuit breaker
+    EXECUTION = 1     # Trade orders (BUY, SELL, CLOSE)
+    RISK = 2          # Risk updates, margin alerts
+    TELEMETRY = 5     # HUD updates, metrics
+    DEBUG = 10        # Low-priority diagnostic
+
+
+@dataclass(order=True)
+class PrioritizedMessage:
+    """Message wrapper for priority queue ordering."""
+    priority: int
+    timestamp: float = field(compare=False)
+    data: Dict = field(compare=False)
+
+
+# =============================================================================
+# BACKPRESSURE MANAGER
+# =============================================================================
+
+class BackpressureManager:
+    """
+    Manages message backpressure to prevent queue overflow.
+    
+    When consumer is slower than producer:
+    1. Drop oldest TELEMETRY messages (LIFO for freshness)
+    2. Never drop EXECUTION or CRITICAL messages
+    3. Alert when backpressure threshold is exceeded
+    """
+    
+    def __init__(self, max_queue_size: int = 100, lag_threshold_ms: float = 200.0):
+        self.max_queue_size = max_queue_size
+        self.lag_threshold_ms = lag_threshold_ms
+        self.frames_dropped = 0
+        self.backpressure_events = 0
+        self._telemetry_buffer: deque = deque(maxlen=max_queue_size)
+    
+    def should_drop_telemetry(self, queue_size: int, lag_ms: float) -> bool:
+        """
+        Determine if telemetry message should be dropped.
+        
+        Returns:
+            True if message should be dropped to relieve backpressure
+        """
+        if lag_ms > self.lag_threshold_ms:
+            self.backpressure_events += 1
+            return True
+        
+        if queue_size >= self.max_queue_size:
+            self.backpressure_events += 1
+            return True
+        
+        return False
+    
+    def record_drop(self):
+        """Record that a frame was dropped."""
+        self.frames_dropped += 1
+    
+    def get_metrics(self) -> Dict:
+        """Return backpressure metrics."""
+        return {
+            "frames_dropped": self.frames_dropped,
+            "backpressure_events": self.backpressure_events,
+            "max_queue_size": self.max_queue_size,
+            "lag_threshold_ms": self.lag_threshold_ms
+        }
 
 
 class ZMQBridge:
@@ -243,6 +320,73 @@ class ZMQBridge:
             await self.pub_socket.send_string(json.dumps(payload))
         except Exception as e:
             logger.error(f"Failed to send raw payload: {e}")
+
+    async def send_command_with_ack(self, action: str, **params) -> Optional[Dict[str, Any]]:
+        """
+        Send a command to MT5 and wait for acknowledgment.
+        
+        Uses correlation ID to match request/response.
+        
+        Args:
+            action: Command action (BUY, SELL, CLOSE, etc.)
+            **params: Additional parameters
+            
+        Returns:
+            Response dict with 'result', 'ticket', 'error' keys or None on failure
+        """
+        import uuid
+        
+        if not self.running or not self.pub_socket:
+            return {"result": "ERROR", "error": "ZMQ bridge not running"}
+        
+        correlation_id = str(uuid.uuid4())[:8]
+        
+        payload = {
+            "action": action, 
+            "params": params, 
+            "ts": time.time() * 1000,
+            "correlation_id": correlation_id
+        }
+        
+        # Create temporary response holder
+        response_future = asyncio.get_event_loop().create_future()
+        
+        # Store pending request
+        if not hasattr(self, '_pending_acks'):
+            self._pending_acks: Dict[str, asyncio.Future] = {}
+        self._pending_acks[correlation_id] = response_future
+        
+        try:
+            # Send command
+            await self.pub_socket.send_string(json.dumps(payload))
+            logger.debug(f"[ACK] Sent command with correlation_id={correlation_id}")
+            
+            # Wait for response (caller handles timeout)
+            response = await response_future
+            return response
+            
+        except asyncio.CancelledError:
+            logger.warning(f"[ACK] Request cancelled: {correlation_id}")
+            return None
+        except Exception as e:
+            logger.error(f"[ACK] Send failed: {e}")
+            return {"result": "ERROR", "error": str(e)}
+        finally:
+            # Cleanup
+            self._pending_acks.pop(correlation_id, None)
+
+    def handle_ack_response(self, data: Dict[str, Any]):
+        """
+        Handle incoming ACK response from MT5.
+        
+        Called from _invoke_callbacks when message has correlation_id.
+        """
+        correlation_id = data.get("correlation_id")
+        if correlation_id and hasattr(self, '_pending_acks'):
+            future = self._pending_acks.get(correlation_id)
+            if future and not future.done():
+                future.set_result(data)
+                logger.debug(f"[ACK] Response matched: {correlation_id}")
 
     def get_metrics(self) -> Dict[str, Any]:
         """Get current bridge metrics for monitoring."""

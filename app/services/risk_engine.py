@@ -257,8 +257,49 @@ class RiskEngine:
     async def get_adaptive_lots(self, symbol: str, sl_points: int, neural_multiplier: float = 1.0) -> float:
         """
         Calculates lot size based on account equity, risk percent, SL distance AND Neural Multiplier.
+        
+        Formula: Lot = (Equity * Risk% * NeuralMult) / (SL_Points * PointValue)
         """
-        if neural_multiplier <= 0: return 0.0
+        if neural_multiplier <= 0:
+            return 0.0
+        
+        if sl_points <= 0:
+            logger.warning("[RISK] SL points is zero or negative, returning minimum lot")
+            return 0.01
+        
+        try:
+            account_info = await mt5_conn.execute(mt5.account_info)
+            symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
+            
+            if not account_info or not symbol_info:
+                logger.error("[RISK] Failed to get account/symbol info for lot calculation")
+                return 0.01
+            
+            equity = account_info.equity
+            risk_percent = settings.effective_risk_cap / 100  # Use context-aware risk cap
+            
+            # Point value calculation (value of 1 point movement for 1 lot)
+            point_value = symbol_info.trade_tick_value / symbol_info.trade_tick_size * symbol_info.point
+            if point_value <= 0:
+                point_value = 10  # Fallback for standard forex
+            
+            # Core calculation
+            risk_amount = equity * risk_percent * neural_multiplier
+            lot_size = risk_amount / (sl_points * point_value)
+            
+            # Clamp to symbol limits
+            lot_size = max(symbol_info.volume_min, min(lot_size, symbol_info.volume_max))
+            
+            # Round to step
+            lot_size = round(lot_size / symbol_info.volume_step) * symbol_info.volume_step
+            lot_size = round(lot_size, 2)
+            
+            logger.debug(f"[RISK] Adaptive Lot: {lot_size} (Eq:{equity:.0f}, Risk:{risk_percent*100:.1f}%, SL:{sl_points}pts)")
+            return lot_size
+            
+        except Exception as e:
+            logger.error(f"[RISK] Lot calculation error: {e}")
+            return 0.01
 
     async def check_drawdown_limit(self) -> bool:
         """

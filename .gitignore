@@ -22,6 +22,9 @@ __pycache__/
 .venv/
 env/
 .env
+.env.*
+.env.demo
+.env.real
 
 # Node modules (Dashboard)
 node_modules/

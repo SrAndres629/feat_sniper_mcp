@@ -2,12 +2,16 @@ import asyncio
 import logging
 import pandas as pd
 from typing import Dict, Any, Optional
-try:
-    import MetaTrader5 as mt5
-except ImportError:
-    from unittest.mock import MagicMock
-    mt5 = MagicMock()
-from app.core.mt5_conn import mt5_conn
+
+# FAIL-FAST: Use centralized MT5 from mt5_conn (no silent mocks)
+from app.core.mt5_conn import mt5_conn, mt5, MT5_AVAILABLE
+
+if not MT5_AVAILABLE:
+    raise ImportError(
+        "MetaTrader5 library not found. This module requires a real MT5 connection. "
+        "Install: pip install MetaTrader5 (Windows only)"
+    )
+
 from app.models.schemas import TradeOrderRequest, ResponseModel, TradeOrderResponse, ErrorDetail
 from app.core.validation import OrderValidator
 
@@ -183,10 +187,18 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
             sl_points = abs(exec_price - sl) / symbol_info.point
             
             # 1.0.3 POM: Use calculate_dynamic_lot to internalize CB Levels & Multipliers
-            # We pass black_swan_multiplier=1.0 because VolatilityGuard/SpreadFilter already vetted the entry above.
+            # Fetch volatility from symbol ATR if available
+            volatility = 0.0
+            try:
+                symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
+                if symbol_info:
+                    volatility = float(symbol_info.spread) / 100.0  # Spread as volatility proxy
+            except:
+                pass
+            
             volume = await risk_engine.calculate_dynamic_lot(
                 confidence=urgency_score, # Mapping urgency to confidence for sizing
-                volatility=0.0,           # Placeholders - risk_engine will fetch if needed
+                volatility=volatility,
                 symbol=symbol,
                 sl_points=int(sl_points),
                 black_swan_multiplier=1.0
@@ -233,7 +245,7 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
         
         # SMART DEVIATION: Ms urgencia = Ms slippage permitido
         base_deviation = max(20, int(spread * 1.5))
-        if urgency_score > 0.8:
+        if urgency_score > settings.URGENCY_THRESHOLD:
             dynamic_deviation = base_deviation * 3  # Aceptamos pagar spread por entrar YA
         else:
             dynamic_deviation = base_deviation 
@@ -248,8 +260,8 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
         if "LIMIT" not in action and "STOP" not in action:
             # Es una orden a mercado (potencialmente)
             
-            if urgency_score > 0.8:
-                 # HIGH URGENCY (> 0.8) -> FORCE MARKET EXECUTION
+            if urgency_score > settings.URGENCY_THRESHOLD:
+                 # HIGH URGENCY -> FORCE MARKET EXECUTION
                  exec_price = current_ask if action == "BUY" else current_bid
                  logger.info(f"🔥 HIGH URGENCY ({urgency_score:.2f}) -> FORCING MARKET EXECUTION")
             

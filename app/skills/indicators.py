@@ -204,11 +204,41 @@ def detect_divergence(df: pd.DataFrame, window: int = 10) -> str:
     slope_change = recent['L4_Slope'].iloc[-1] - recent['L4_Slope'].iloc[0]
     
     # 1. Bearish Divergence (Retail Trap / Top)
-    if price_change > 0 and slope_change < -0.01:
+    if price_change > 0 and slope_change < -settings.SLOPE_CHANGE_THRESHOLD:
         return "BULL_TRAP"
         
     # 2. Bullish Divergence (Retail Trap / Bottom)
-    if price_change < 0 and slope_change > 0.01:
+    if price_change < 0 and slope_change > settings.SLOPE_CHANGE_THRESHOLD:
         return "BEAR_TRAP"
         
     return "NEUTRAL"
+
+def calculate_rsi_numpy(close: np.ndarray, period: int = 14) -> float:
+    """
+    [HOT-PATH] Pure NumPy RSI (Wilder's Smoothed version).
+    Formula: RSI = 100 - [100 / (1 + (AvgGain/AvgLoss))]
+    """
+    n = len(close)
+    if n < period + 1:
+        return 50.0
+    
+    delta = np.diff(close)
+    ups = np.where(delta > 0, delta, 0.0)
+    downs = np.where(delta < 0, -delta, 0.0)
+    
+    alpha = 1.0 / period
+    
+    # Initial EMA (Simple Mean)
+    avg_up = np.mean(ups[:period])
+    avg_down = np.mean(downs[:period])
+    
+    # Recursive SMMA update
+    for i in range(period, len(ups)):
+        avg_up = (ups[i] * alpha) + (avg_up * (1 - alpha))
+        avg_down = (downs[i] * alpha) + (avg_down * (1 - alpha))
+        
+    if avg_down == 0:
+        return 100.0
+        
+    rs = avg_up / avg_down
+    return float(100.0 - (100.0 / (1.0 + rs)))

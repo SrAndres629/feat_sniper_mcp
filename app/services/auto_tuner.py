@@ -198,33 +198,60 @@ auto_tuner = AutoTuner()
 
 def evaluate_on_shadow_data(params: Dict[str, float]) -> float:
     """
-    Example evaluation function for auto-tuning.
+    Evaluate tuned parameters against shadow mode trade history.
     
-    In production, this would:
-    1. Apply the params to a copy of the strategy
-    2. Run backtest on last N shadow mode predictions
-    3. Return the Sharpe ratio or profit factor
+    Uses trade_journal to fetch recent shadow predictions and calculates
+    theoretical Sharpe ratio if those params had been applied.
     
     Returns:
-        float: Score (higher is better)
+        float: Score (Sharpe-like metric, higher is better)
     """
-    # Placeholder - in production, this runs actual backtesting
-    # For now, return a dummy score based on param reasonableness
-    score = 0.0
-    
-    # Prefer moderate acceleration thresholds
-    accel = params.get("acceleration_threshold", 2.0)
-    score += 1.0 if 1.8 <= accel <= 2.2 else 0.5
-    
-    # Prefer higher confidence minimums
-    conf = params.get("confidence_minimum", 0.6)
-    score += conf * 2
-    
-    # Add some noise to simulate real evaluation variance
-    import random
-    score += random.uniform(-0.1, 0.1)
-    
-    return score
+    try:
+        from app.services.trade_journal import trade_journal
+        
+        # Fetch recent shadow mode entries
+        recent_trades = trade_journal.get_recent_entries(limit=100)
+        if not recent_trades or len(recent_trades) < 10:
+            # Insufficient data - return heuristic score
+            score = 0.0
+            accel = params.get("acceleration_threshold", 2.0)
+            score += 1.0 if 1.8 <= accel <= 2.2 else 0.5
+            conf = params.get("confidence_minimum", 0.6)
+            score += conf * 2
+            return score
+        
+        # Calculate theoretical returns with new params
+        returns = []
+        for trade in recent_trades:
+            # Would this trade pass with new params?
+            confidence = trade.get("confidence", 0.5)
+            accel_score = trade.get("acceleration_score", 0.0)
+            
+            would_pass = (
+                confidence >= params.get("confidence_minimum", 0.6) and
+                accel_score >= params.get("acceleration_threshold", 2.0)
+            )
+            
+            if would_pass:
+                # Theoretical P&L based on signal accuracy
+                actual_profit = trade.get("theoretical_profit", 0.0)
+                returns.append(actual_profit)
+        
+        if not returns:
+            return 0.0
+        
+        # Calculate Sharpe-like ratio
+        import numpy as np
+        returns_arr = np.array(returns)
+        mean_return = np.mean(returns_arr)
+        std_return = np.std(returns_arr) if len(returns_arr) > 1 else 1.0
+        
+        sharpe = mean_return / std_return if std_return > 0 else 0.0
+        return float(sharpe)
+        
+    except Exception as e:
+        logger.warning(f"[TUNER] Shadow data evaluation failed: {e}")
+        return 0.5  # Neutral score on error
 
 
 # =============================================================================
