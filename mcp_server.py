@@ -114,7 +114,7 @@ except ImportError as e:
 try:
     from app.skills import market, execution, indicators
     from app.skills.trade_mgmt import TradeManager
-    from app.skills.feat_chain import feat_chain_orchestrator
+    from app.skills.feat_chain import feat_full_chain_institucional as feat_chain_orchestrator
     from app.services.risk_engine import risk_engine  # Critical Safety (FIX: was app.skills)
 except ImportError as e:
     logger.critical(f"🛑 CRITICAL BOOT FAILURE: Trade/Risk modules missing: {e}")
