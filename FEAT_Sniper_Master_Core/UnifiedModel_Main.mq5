@@ -49,7 +49,7 @@ public:
       // But user asked for % Risk check. 
       // Let's rely on standard margin check too.
       
-      double maxVolByMargin = AccountInfoDouble(ACCOUNT_FREEMARGIN) / SymbolInfoDouble(_Symbol, SYMBOL_MARGIN_INITIAL) * 0.9;
+      double maxVolByMargin = AccountInfoDouble(ACCOUNT_MARGIN_FREE) / SymbolInfoDouble(_Symbol, SYMBOL_MARGIN_INITIAL) * 0.9;
       
       if(requestedVol > maxVolByMargin) {
          Print("[RISK] Volume Clamped by Margin: ", requestedVol, " -> ", maxVolByMargin);
@@ -73,7 +73,7 @@ public:
    {
       if(signalTime <= 0) return true; // No timestamp provided
       
-      long now = GetTickCount64(); // Note: MT5 Time is Client Time. Python sends UTC or similar.
+      ulong now = GetTickCount64(); // Note: MT5 Time is Client Time. Python sends UTC or similar.
       // To strictly sync, Python should send "AgeMs".
       // Assuming command has 'ts' field in ms.
       
@@ -134,7 +134,7 @@ public:
             if(Verbose) Print("[EXECUTION] SUCCESS | Ticket: ", resultTicket);
             break; 
          } else {
-            int err = g_trade.ResultRetcode();
+            uint err = g_trade.ResultRetcode();
             Print("[EXECUTION] ERROR: ", err, " | Retrying...");
             Sleep(100); // 100ms Atomic wait
             retries--;
