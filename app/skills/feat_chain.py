@@ -587,6 +587,39 @@ class FEATChain:
         
         return decision
 
+    async def analyze_mtf(
+        self,
+        candles_by_tf: Dict[str, pd.DataFrame],
+        current_price: float
+    ):
+        """
+        Multi-Timeframe Fractal Analysis - SNIPER MODE.
+        
+        Analyzes all 8 timeframes (W1→D1→H4→H1→M30→M15→M5→M1) and returns
+        weighted composite score for precision entry.
+        
+        Args:
+            candles_by_tf: Dict mapping timeframe string to DataFrame
+                Example: {
+                    "W1": df_weekly,
+                    "D1": df_daily,
+                    "H4": df_4hour,
+                    "H1": df_1hour,
+                    "M30": df_30min,
+                    "M15": df_15min,
+                    "M5": df_5min,
+                    "M1": df_1min
+                }
+            current_price: Current market price
+            
+        Returns:
+            MTFCompositeScore with weighted composite and entry decision
+        """
+        from nexus_core.mtf_engine import mtf_engine
+        
+        # Delegate to the fractal MTF engine
+        return await mtf_engine.analyze_all_timeframes(candles_by_tf, current_price)
+
 
 # Global singleton
 feat_full_chain_institucional = FEATChain()
