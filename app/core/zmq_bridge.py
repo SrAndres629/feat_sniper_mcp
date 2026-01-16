@@ -276,19 +276,26 @@ class ZMQBridge:
         Sends periodic health metrics to MT5 HUD (Phase 13 Institutional Upgrade).
         
         [P1 FIX] Enhanced with peak lag tracking and failure count.
+        [MTF FIX] Now sends flat JSON format expected by FEAT_Visualizer.
         """
         while self.running:
             try:
-                await self.send_command(
-                    "HUD_UPDATE",
-                    regime=self.current_regime,
-                    ai_confidence=round(self.current_ai_confidence * 100, 1),
-                    zmq_lag_ms=round(self._last_lag_ms, 2),
-                    zmq_peak_lag_ms=round(self._peak_lag_ms, 2),
-                    processed=self.messages_processed,
-                    discarded=self.messages_discarded,
-                    failed=self.messages_failed
-                )
+                # Flat JSON format for FEAT_Visualizer compatibility
+                hud_data = {
+                    "regime": self.current_regime,
+                    "ai_confidence": round(self.current_ai_confidence, 2),
+                    "feat_score_val": round(self.current_ai_confidence * 100, 1),
+                    "feat_pvp_price": 0.0,  # Will be set by telemetry
+                    "acceleration": False,
+                    "vol_factor": 1.0,
+                    "zmq_lag_ms": round(self._last_lag_ms, 2),
+                    "zmq_peak_lag_ms": round(self._peak_lag_ms, 2),
+                    "processed": self.messages_processed,
+                    "discarded": self.messages_discarded,
+                    "failed": self.messages_failed,
+                    "ts": time.time() * 1000
+                }
+                await self.send_raw(hud_data)
                 await asyncio.sleep(1)
             except Exception as e:
                 logger.error(f"HUD Update failed: {e}")
