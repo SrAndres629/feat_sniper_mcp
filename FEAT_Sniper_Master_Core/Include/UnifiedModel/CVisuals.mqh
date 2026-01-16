@@ -72,11 +72,11 @@ void CVisuals::Init(string symbol, int x, int y) {
    m_bg.Selectable(false);
    m_bg.Z_Order(0);
 
-   int curY = m_y;
-   int step = 20;
+   int curY = m_y + 10;
+   int step = 25; // Increased spacing for better readability
 
    // 2. Header
-   CreateLabel(m_lblTitle, "FEAT_HUD_Title", m_x, curY, 12, HUD_ACCENT, ">> FEAT SNIPER COCKPIT V2");
+   CreateLabel(m_lblTitle, "FEAT_HUD_Title", m_x, curY, 11, HUD_ACCENT, ">> FEAT SNIPER COCKPIT V5");
    curY += step + 5;
 
    // 3. Pilot Status
@@ -90,14 +90,14 @@ void CVisuals::Init(string symbol, int x, int y) {
    CreateLabel(m_lblState, "FEAT_HUD_State", m_x, curY, 10, clrWhite, "STATE: SCANNING...");
    curY += step;
    
-   CreateLabel(m_lblScore, "FEAT_HUD_Score", m_x, curY, 14, clrGold, "SCORE: 0.0");
+   CreateLabel(m_lblScore, "FEAT_HUD_Score", m_x, curY, 12, clrGold, "SCORE: 0.0");
    curY += step + 5;
 
-   CreateLabel(m_lblRegime, "FEAT_HUD_Regime", m_x, curY, 9, clrSkyBlue, "REGIME: CALIBRATING");
-   curY += step;
+   CreateLabel(m_lblRegime, "FEAT_HUD_Regime", m_x, curY, 10, clrSkyBlue, "REGIME: CALIBRATING");
+   curY += step + 15; // Extra space before footer
 
    // 5. Vault Area
-   CreateLabel(m_lblVault, "FEAT_HUD_Vault", m_x, curY, 9, clrMediumSpringGreen, "VAULT: $0.00 (LOCKED)");
+   CreateLabel(m_lblVault, "FEAT_HUD_Vault", m_x, curY, 9, clrMediumSpringGreen, "VAULT: CACHED");
 }
 
 void CVisuals::CreateLabel(CChartObjectLabel &lbl, string name, int x, int y, int size, color col, string text) {

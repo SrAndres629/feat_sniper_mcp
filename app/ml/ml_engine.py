@@ -484,6 +484,48 @@ class MLEngine:
         
         logger.info(f"MLEngine V9.0 [P0-FIX] initialized. FEAT Gates + HurstBuffer + SharpeTracker ACTIVE.")
     
+    def hydrate_hurst(self, symbol: str, prices: List[float]) -> None:
+        """
+        [P0 FIX] Deep Hydration for Hurst Buffer.
+        Ensures fractal regime is known immediately.
+        """
+        if not prices:
+            return
+            
+        logger.info(f"🌊 [HURST] Hydrating {symbol} with {len(prices)} prices...")
+        for p in prices:
+            self.hurst_buffer.push(symbol, p)
+            
+        # Forces immediate calculation
+        try:
+            prices_arr = self.hurst_buffer.get_prices(symbol)
+            hurst_sc = self.fractal_analyzer.compute_hurst(prices_arr)
+            self.hurst_buffer.set_cached_hurst(symbol, hurst_sc)
+            logger.info(f"✅ [HURST] {symbol} Hydrated. Initial Hurst: {hurst_sc:.3f}")
+        except Exception as e:
+            logger.warning(f"⚠️ [HURST] Initial calculation failed after hydration: {e}")
+
+    def hydrate_sequences(self, symbol: str, features_list: List[Dict[str, float]]) -> None:
+        """
+        [P0 FIX] Deep Hydration for LSTM Sequence Buffers.
+        """
+        if not features_list:
+            return
+            
+        self._ensure_models(symbol)
+        buffer = self.sequence_buffers.get(symbol)
+        if buffer is None:
+            # Fallback if _ensure_models failed to create it
+            seq_len = self.seq_len_map.get(symbol, 32)
+            buffer = deque(maxlen=seq_len)
+            self.sequence_buffers[symbol] = buffer
+
+        logger.info(f"🌊 [LSTM] Hydrating {symbol} sequence with {len(features_list)} samples...")
+        for feat in features_list:
+            buffer.append(feat)
+            
+        logger.info(f"✅ [LSTM] {symbol} sequence buffer ready ({len(buffer)}/{buffer.maxlen})")
+
     def apply_feat_veto(self, symbol: str, m1_signal: str) -> Tuple[bool, str]:
         """
         FEAT-DEEP Veto Rule: Prevents counter-trend trading.

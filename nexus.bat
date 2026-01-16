@@ -21,12 +21,13 @@ echo      [ SILENT DAEMON NODE ]
 echo      [ STATUS: ACTIVE ^| MODE: BACKGROUND EXECUTION ]
 echo.
 echo ==============================================================
-echo [PHASE 0] ZOMBIE KILLER AND CLEANUP
+echo [PHASE 0] ZOMBIE KILLER (SYSTEM PURGE)
 echo ==============================================================
-REM powershell -Command "Get-NetTCPConnection -LocalPort 5555 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
-REM powershell -Command "Get-NetTCPConnection -LocalPort 5556 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
-REM taskkill /F /IM python.exe /T >nul 2>&1
-echo [OK] Ports and Memory Flushed.
+echo [SANITIZER] Scanning ports 5555-5558, 8000...
+powershell -NoProfile -Command "5555,5556,5557,5558,8000 | ForEach-Object { $p=$_; Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue | ForEach-Object { Write-Host 'Killing PID:' $_.OwningProcess 'on port' $p; Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue } }"
+echo [SANITIZER] Flushing Python Orphans...
+taskkill /F /IM python.exe /FI "WINDOWTITLE eq FEAT NEXUS*" >nul 2>&1
+echo [OK] System Clean.
 
 echo.
 echo ==============================================================
@@ -72,4 +73,9 @@ if %ERRORLEVEL% NEQ 0 (
 
 echo.
 echo [SYSTEM STOPPED] Server process ended.
+
+echo [CLEANUP] Closing Dashboard sessions...
+powershell -NoProfile -Command "$browser='chrome'; Get-Process $browser -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowTitle -match 'FEAT NEXUS' -or $_.MainWindowTitle -match 'dashboard.html' } | Stop-Process -Force"
+
+echo [CLEANUP] Done.
 pause

@@ -183,16 +183,17 @@ class FormRule(FEATRule):
             df['low'] = df['close']
             df['open'] = df['close']
             
-            res = structure_engine.compute_feat_index(df)
-            last = res.iloc[-1]
+            feat_index = structure_engine.get_structural_score(df)
+            health = structure_engine.get_structural_health(df)
             
-            is_valid = last['feat_index'] > 60.0
+            # Form Rule is valid if structural health is healthy/neutral AND score is high enough
+            is_valid = health["health_score"] > 0.4 and feat_index > 50.0
             
             result = ValidationResult(
                 is_valid=is_valid,
                 rule_name="Forma",
-                message=f"Estructura: {last['structure_status']} (FEAT:{last['feat_index']})",
-                data={"feat_index": last['feat_index']}
+                message=f"Estructura: {health['status']} (Score:{feat_index:.1f}, Health:{health['health_score']:.2f})",
+                data={"feat_index": feat_index, "health": health}
             )
             
             if result.is_valid:
@@ -430,32 +431,37 @@ class FEATChain:
             from nexus_core.structure_engine import structure_engine, four_layer_ema
             
             if candles is not None and len(candles) >= 20:
-                # Get structural narrative
+                # Get senior structural metrics
+                health = structure_engine.get_structural_health(candles)
+                zone_status = structure_engine.get_zone_status(candles)
+                structural_bias = structure_engine.get_structural_bias(candles)
+                
+                # Form confidence based on health score
+                form_conf = health["health_score"]
+                reasoning.append(f"Structure Health: {health['status']} ({health['health_score']:.2f})")
+                
+                # Direction from structural bias
+                if structural_bias == "BULLISH":
+                    direction = 1
+                elif structural_bias == "BEARISH":
+                    direction = -1
+                
+                # Zone quality boost
+                if zone_status["is_in_zone"]:
+                    form_conf += zone_status["zone_strength"] * 0.2
+                    reasoning.append(f"Inside {zone_status['nearest_zone']} zone (Strength: {zone_status['zone_strength']:.2f})")
+                
+                # BOS/CHOCH narrative integration
                 narrative = structure_engine.get_structural_narrative(candles)
-                
-                # BOS/CHOCH confidence
                 if "CHOCH" in narrative.get("type", ""):
-                    form_conf += 0.4
-                    reasoning.append(f"CHOCH detected: {narrative['type']}")
-                elif "BOS" in narrative.get("type", ""):
-                    form_conf += 0.3
-                    reasoning.append(f"BOS detected: {narrative['type']}")
-                
-                # MAE pattern
-                mae = structure_engine.mae_recognizer.detect_mae_pattern(candles)
-                if mae.get("is_expansion"):
-                    form_conf += 0.3
-                    direction = mae.get("direction", 0)
-                    reasoning.append(f"MAE Expansion: {mae['status']}")
-                elif mae.get("phase") == "ACCUMULATION":
                     form_conf += 0.1
-                    reasoning.append("MAE Accumulation (waiting)")
+                    reasoning.append(f"CHOCH Narrative: {narrative['type']}")
                 
-                # Layer alignment
+                # Layer alignment (from four_layer_ema)
                 layer_alignment = four_layer_ema.compute_layer_alignment(candles)
                 if layer_alignment > 0.7:
-                    form_conf += 0.3
-                    reasoning.append(f"Strong layer alignment: {layer_alignment:.2f}")
+                    form_conf += 0.1
+                    reasoning.append(f"Layers Aligned: {layer_alignment:.2f}")
                     
         except Exception as e:
             logger.warning(f"[FORM] Analysis error: {e}")

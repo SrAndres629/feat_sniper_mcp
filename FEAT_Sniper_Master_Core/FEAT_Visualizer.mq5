@@ -337,8 +337,8 @@ int OnInit()
    
    // ZMQ
    if(!Bridge.Init()) {
-      Print("CRITICAL: Nexus Bridge Failed.");
-      return(INIT_FAILED);
+      Print("WARNING: Nexus Bridge Failed - Running in OFFLINE mode.");
+      // Don't fail - allow indicator to show offline status
    }
    
    // GUI
@@ -346,6 +346,12 @@ int OnInit()
       Print("GUI Init Failed");
       return(INIT_FAILED);
    }
+   
+   // CRITICAL: Render initial frame immediately
+   Logic.m_state.regime = "OFFLINE";
+   Logic.m_state.confidence = 0.0;
+   Logic.m_state.score = 0.0;
+   Gui.Render(Logic);
    
    EventSetMillisecondTimer(100); 
    return(INIT_SUCCEEDED);
@@ -374,6 +380,14 @@ void OnTimer()
          // Only Render if state changed
          Gui.Render(Logic);
          UpdateChartObjects();
+      }
+   } else {
+      // No data - still render to show offline status periodically
+      static int tick_count = 0;
+      tick_count++;
+      if(tick_count % 50 == 0) { // Every 5 seconds
+         Logic.m_state.regime = "WAITING";
+         Gui.Render(Logic);
       }
    }
 }

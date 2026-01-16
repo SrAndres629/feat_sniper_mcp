@@ -466,6 +466,44 @@ class DataCollector:
                     # Hydrate history buffer
                     self.resamplers[symbol].history[tf] = history[-200:] # Keep last 200
                     logger.info(f"✅ {tf} hydrated with {len(history)} candles.")
+                    
+                    # [P0 FIX] Cross-module Hydration
+                    from app.ml.ml_engine import ml_engine
+                    from app.skills.market_physics import market_physics
+                    
+                    if tf == "M1":
+                        # Populate Hurst and Sequence buffers
+                        m1_prices = [float(c.get('close', 0)) for c in history]
+                        ml_engine.hydrate_hurst(symbol, m1_prices)
+                        
+                        # Use compute_features for LSTM sequences
+                        # m1 candles in history already have some features, but let's ensure consistency
+                        features_list = []
+                        for candle in history:
+                            # Reconstruct indicators dict for compute_features
+                            # This is a bit recursive, but safe for hydration
+                            inds = {
+                                "rsi": candle.get("rsi", 50.0),
+                                "atr": candle.get("atr", 0.001),
+                                "feat_score": candle.get("feat_score", 0.0),
+                                # Add others as needed for LSTM
+                            }
+                            features_list.append(self.compute_features(candle, inds))
+                        
+                        ml_engine.hydrate_sequences(symbol, features_list)
+                        
+                        # Populate Market Physics
+                        market_physics.hydrate(history)
+                    
+                    elif tf == "H4":
+                        # Update Macro Bias for Veto Rule
+                        # Simple logic: current close vs SMA 20
+                        if len(history) >= 20:
+                            h4_closes = [float(c['close']) for c in history]
+                            last_close = h4_closes[-1]
+                            sma20 = sum(h4_closes[-20:]) / 20
+                            bias = "BULLISH" if last_close > sma20 else "BEARISH"
+                            ml_engine.update_macro_bias(symbol, bias)
                 else:
                     logger.warning(f"❌ Could not hydrate {tf} for {symbol}.")
             

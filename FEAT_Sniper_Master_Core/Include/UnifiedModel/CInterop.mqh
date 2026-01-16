@@ -7,6 +7,7 @@
 #property strict
 
 // --- ZMQ CONSTANTS ---
+// --- ZMQ CONSTANTS ---
 #define ZMQ_REQ       3
 #define ZMQ_REP       4
 #define ZMQ_DEALER    5
@@ -14,8 +15,9 @@
 #define ZMQ_PULL      7
 #define ZMQ_PUSH      8
 #define ZMQ_XPUB      9
-#define ZMQ_SUB       10
-#define ZMQ_PUB       1
+#define ZMQ_SUB       2    // CORRECT: 2
+#define ZMQ_PUB       1    // CORRECT: 1
+#define ZMQ_SUBSCRIBE 6    // NEW: Option for filtering
 
 #define ZMQ_NOBLOCK   1
 #define ZMQ_DONTWAIT  1
@@ -87,6 +89,7 @@ bool CInterop::Init(bool is_publisher)
       return false;
    }
 
+   // [FIX] Ensure correct socket type (PUSH=8, SUB=2)
    int type = is_publisher ? ZMQ_PUSH : ZMQ_SUB;
    m_socket = zmq_socket(m_context, type);
    
@@ -99,22 +102,30 @@ bool CInterop::Init(bool is_publisher)
    int rc = 0;
 
    if(is_publisher) {
-      StringToCharArray("tcp://127.0.0.1:5555", endpoint);
+      StringToCharArray("tcp://127.0.0.1:5555", endpoint, 0, WHOLE_ARRAY, CP_UTF8);
       rc = zmq_connect(m_socket, endpoint);
+      if(rc != 0) {
+         Print("<<< [FORENSIC] PUSH CONNECT FAIL (5555). Error: ", zmq_errno());
+         return false;
+      }
    } else {
-      StringToCharArray("tcp://127.0.0.1:5556", endpoint);
+      StringToCharArray("tcp://127.0.0.1:5556", endpoint, 0, WHOLE_ARRAY, CP_UTF8);
       rc = zmq_connect(m_socket, endpoint);
       
-      if(rc == 0) {
-         // SUBSCRIBE ALL
-         uchar filter[]; // Empty array implies all
-         rc = zmq_setsockopt(m_socket, ZMQ_SUB, filter, (ulong)0); 
+      if(rc != 0) {
+         Print("<<< [FORENSIC] SUB CONNECT FAIL (5556). Error: ", zmq_errno());
+         return false;
       }
-   }
-
-   if(rc != 0) {
-      Print("[HYPERBRIDGE] Connection Error: ", zmq_errno());
-      return false;
+      
+      // SUBSCRIBE ALL (Option 6)
+      uchar filter[1]; 
+      filter[0] = 0;
+      rc = zmq_setsockopt(m_socket, ZMQ_SUBSCRIBE, filter, (ulong)0); 
+      
+      if(rc != 0) {
+         Print("<<< [FORENSIC] SUB SETSOCKOPT FAIL (Filter). Error: ", zmq_errno());
+         return false;
+      }
    }
 
    union IntUnion {

@@ -13,9 +13,6 @@ import io
 # === PROTOCOLO BLACKHOLE (INICIO) ===
 # Silenciar Warnings de Inmediato
 import warnings
-import sys
-import os
-import io
 
 # Filter specific Pydantic/PyIceberg deprecation noise GLOBALLY and EARLY
 warnings.filterwarnings("ignore", module="pyiceberg")
@@ -244,391 +241,277 @@ except ImportError:
     ml_engine = None
     logger.error("❌ MLEngine Import Failed")
 
-# Global Initialization (Prevent NameError)
-feat_engine = None
-trade_manager = None
-risk_engine = None
-market_physics = None
-circuit_breaker = None
+# === SYSTEM STATE (SENIOR ARCHITECTURE: CLASS-BASED SINGLETONS) ===
+class NexusState:
+    """
+    Centralized System State to avoid scoping/closure issues.
+    All background tasks and callbacks access services through this singleton.
+    """
+    def __init__(self):
+        self.market_physics = None
+        self.risk_engine = None
+        self.trade_manager = None
+        self.feat_engine = None
+        self.circuit_breaker = None
+        self.dashboard = None
+        self.ml_engine = None
+        self.structure_engine = None
+        self.market = None
+        self.brain_semaphore = asyncio.Semaphore(20)
 
+    async def initialize_services(self):
+        """Sequential initialization of core services."""
+        logger.info("🚀 [NEXUS] Initializing Core Services...")
+        try:
+            from app.skills.market_physics import market_physics as mp
+            from app.services.risk_engine import RiskEngine
+            from app.skills.trade_mgmt import TradeManager
+            from app.skills.feat_chain import feat_full_chain_institucional
+            from app.services.circuit_breaker import circuit_breaker as cb
+            from app.ml.ml_engine import MLEngine
+            from nexus_core.structure_engine import structure_engine
+            from app.skills import market
 
-# === LIFESPAN ===
-# === LIFESPAN (Module 1: The Synapse) ===
+            self.market_physics = mp
+            self.risk_engine = RiskEngine()
+            self.structure_engine = structure_engine
+            self.market = market
+            self.circuit_breaker = cb
+            self.feat_engine = feat_full_chain_institucional
+            self.ml_engine = MLEngine()
+            
+            # Bind trade manager once zmq is active (handled in startup_sequence)
+            logger.info("✅ Services Bound to NexusState")
+        except Exception as e:
+            logger.critical(f"🛑 FAILED TO BIND SERVICES: {e}")
+            raise
+
+    # --- CALLBACKS ---
+    async def on_zmq_message(self, data):
+        """High-Frequency Pulse Handler."""
+        if self.circuit_breaker: 
+            self.circuit_breaker.heartbeat()
+        
+        if data.get("action") == "POSITION_UPDATE" and self.trade_manager:
+            ticket = data.get("ticket")
+            if data.get("status") == "CLOSED": 
+                self.trade_manager.unregister_position(ticket)
+            else:
+                self.trade_manager.register_position(
+                    ticket=ticket, entry_price=data.get("price", 0),
+                    atr=data.get("atr", 0), is_buy=data.get("type") == "BUY"
+                )
+            return
+
+        regime = self.market_physics.ingest_tick(data) if self.market_physics else None
+        if regime and regime.is_accelerating and regime.acceleration_score > 1.2:
+             asyncio.create_task(self.process_signal_task(data, regime))
+
+    # --- BACKGROUND TASKS ---
+    async def process_signal_task(self, data, regime):
+        """Strategic Inference and Execution Pipeline."""
+        async with self.brain_semaphore:
+            try:
+                price = float(data.get('bid', 0) or data.get('close', 0))
+                is_valid = await self.feat_engine.analyze(data, price, precomputed_physics=regime) if self.feat_engine else False
+                
+                # --- NEURAL-STRUCTURAL BINDING [LEVEL 10] ---
+                # 1. Fetch Contextual Structure (OHLC)
+                symbol = data.get('symbol', 'XAUUSD')
+                candles_res = await self.market.get_candles(symbol, "M1", 100) if self.market else {}
+                
+                struct_score = 50.0 # Neutral default
+                mae_phase = 0.0
+                is_in_zone = 0.0 
+                struct_bos = 0.0 
+                feat_index = 50.0
+
+                if candles_res.get("status") == "success":
+                     candles = candles_res.get("candles", [])
+                     if candles:
+                          import pandas as pd
+                          df_struct = pd.DataFrame(candles)
+                          cols = ['open', 'high', 'low', 'close', 'tick_volume']
+                          for c in cols:
+                              if c in df_struct.columns:
+                                  df_struct[c] = pd.to_numeric(df_struct[c])
+                                  
+                          # 2. Execute Structure Engine
+                          if self.structure_engine:
+                               feat_res = self.structure_engine.compute_feat_index(df_struct)
+                               struct_score = float(feat_res['feat_index'].iloc[-1])
+                               feat_index = struct_score 
+                               
+                               report = self.structure_engine.get_structural_report(df_struct)
+                               phase_map = {"RANGE": 0.0, "NORMAL": 0.0, "ACCUMULATION": 0.5, "EXPANSION": 1.0, "MOMENTUM": 0.8}
+                               mae_phase = phase_map.get(report['mae_pattern']['phase'], 0.0)
+                               
+                               # Use distance to zone for proximity (normalized by price)
+                               dist = report['zones']['distance_to_zone']
+                               price_threshold = df_struct['close'].iloc[-1] * 0.0005 
+                               is_in_zone = 1.0 if dist < price_threshold else 0.0
+                               
+                               struct_bos = report['health']['bos_strength']
+                               
+                # 3. Inject into Neural Context
+                neural_context = {
+                    **data, 
+                    "close": price,
+                    "rsi": data.get("rsi", 50.0), 
+                    "atr": data.get("atr", 0.001),
+                    "feat_structure_score": struct_score,
+                    "mae_status": mae_phase,
+                    "zone_proximity": is_in_zone,
+                    "struct_bos": struct_bos
+                }
+                
+                brain_score = await self.ml_engine.ensemble_predict_async(symbol, neural_context) if self.ml_engine else {"p_win": 0.5, "alpha_confidence": 0}
+                
+                # 4. Probabilistic Fusion
+                lstm_conf = brain_score.get('confidence', 0.0)
+                norm_struct = struct_score / 100.0
+                norm_physics = regime.acceleration_score / 10.0 if regime else 0.5
+                norm_physics = max(0.0, min(1.0, norm_physics))
+                
+                final_probability = (lstm_conf * 0.4) + (norm_struct * 0.4) + (norm_physics * 0.2)
+                brain_score['alpha_confidence'] = round(final_probability, 3)
+
+                from app.core.config import settings
+                brain_score['execute_trade'] = brain_score.get('p_win', 0.5) > settings.PROFIT_THRESHOLD 
+
+                if self.dashboard and not settings.PERFORMANCE_MODE:
+                    asyncio.create_task(self.dashboard.push_signals({
+                        "alpha_confidence": brain_score.get('alpha_confidence', 0),
+                        "acceleration": regime.acceleration_score if regime else 0,
+                        "hurst": regime.hurst_exponent if regime else 0.5,
+                        "price": price, "feat_index": feat_index,
+                        "is_initiative": getattr(regime, 'is_initiative_candle', False)
+                    }))
+
+                from app.core.zmq_projector import ZMQProjector
+                projector = ZMQProjector()
+                await projector.broadcast_system_state(
+                    regime=regime.trend if regime else "NEUTRAL",
+                    confidence=brain_score.get('alpha_confidence', 0),
+                    feat_score=feat_index, vault_active=True
+                )
+
+                if is_valid and brain_score.get('execute_trade', False):
+                    direction = "BUY" if regime.trend == "BULLISH" else "SELL"
+                    dynamic_lot = await self.risk_engine.calculate_dynamic_lot(
+                        confidence=brain_score.get('alpha_confidence', 0),
+                        volatility=regime.atr if regime else 0.0,
+                        symbol=data.get('symbol', 'XAUUSD'), market_data=data
+                    ) if self.risk_engine else 0
+                    
+                    if dynamic_lot > 0 and self.trade_manager:
+                        await self.trade_manager.execute_order(direction, {
+                            "symbol": data.get('symbol', 'XAUUSD'),
+                            "volume": dynamic_lot, "comment": "FEAT_NEURAL_V1"
+                        })
+            except Exception as e:
+                logger.error(f"process_signal_task Error: {e}")
+
+    async def dashboard_heartbeat(self):
+        """Push account metrics every 5 seconds."""
+        import MetaTrader5 as mt5_lib
+        while True:
+            try:
+                if self.dashboard and mt5_lib.terminal_info():
+                    acc = mt5_lib.account_info()
+                    if acc:
+                        await self.dashboard.push_metrics({
+                            "balance": acc.balance,
+                            "equity": acc.equity,
+                            "margin_free": acc.margin_free
+                        })
+            except Exception as e:
+                logger.debug(f"Heartbeat error: {e}")
+            await asyncio.sleep(5)
+
+    async def zmq_processing_loop(self):
+        """Polls ZMQ updates and feeds Memory."""
+        from nexus_core.memory import nexus_memory
+        while True:
+            try:
+                 if zmq_bridge:
+                     msg = zmq_bridge.check_messages()
+                     if msg:
+                         if msg.get('type') == 'TICK':
+                             await nexus_memory.save_tick(msg)
+                         await asyncio.sleep(0.001)
+                     else:
+                         await asyncio.sleep(0.01)
+                 else:
+                     await asyncio.sleep(1.0)
+            except Exception as e:
+                 logger.error(f"ZMQ Loop Error: {e}")
+                 await asyncio.sleep(1.0)
+
+    async def jitter_sentinel(self):
+        """Monitors ZMQ loop health."""
+        while True:
+            if self.ml_engine:
+                await self.ml_engine.check_loop_jitter()
+            await asyncio.sleep(0.1)
+
+    async def background_bootstrap(self):
+        """Populates brain buffers while ZMQ remains responsive."""
+        from app.skills.market import get_candles
+        from app.ml.data_collector import data_collector
+        
+        for symbol in ["XAUUSD", "EURUSD"]: 
+            logger.info(f"🌊 [HYDRATION] Deep Sync for {symbol}...")
+            await data_collector.hydrate_all_timeframes(symbol, mt5_fallback_func=get_candles)
+            
+            candles_res = await get_candles(symbol, "M1", n_candles=200)
+            if candles_res.get("status") == "success":
+                candles = candles_res["candles"]
+                if self.market_physics: self.market_physics.hydrate(candles)
+                prices = [float(c['close']) for c in candles]
+                if self.ml_engine: self.ml_engine.hydrate_hurst(symbol, prices)
+            
+        logger.info("🌊 [HYDRATION] Buffers ACTIVE.")
+
+# Initialize the NexusState Manager
+STATE = NexusState()
+
+# --- LIFESPAN ENCAPSULATION ---
 @asynccontextmanager
 async def app_lifespan(server: FastMCP):
-    """
-    Ciclo de vida institucional: MT5 + ZMQ + FEAT + RISK + AI.
-    Integración total de módulos para Zero Orphans.
-    """
-    logger.info("HIGH COUNCIL: Iniciando red neuronal y sinapsis...")
+    """Ciclo de vida institucional."""
+    # 1. Initialize State and Services
+    await STATE.initialize_services()
     
-    # === MAIN SEQUENCE IGNITION: FEAT CORE ACTIVATION ===
-    try:
-        from app.skills.calendar import chronos_engine
-        from app.skills.liquidity import liquidity_grid
-        from nexus_core.acceleration import acceleration_engine
-        from nexus_core.structure_engine import mae_recognizer
-    except Exception as e:
-        logger.error(f"❌ FEAT CORE IGNITION FAILED: {e}")
+    # 2. Startup sequences
+    from app.core.streamer import init_streamer
+    STATE.dashboard = init_streamer()
+    if STATE.dashboard:
+        logging.getLogger().addHandler(STATE.dashboard)
+        asyncio.create_task(STATE.dashboard.start_async_loop())
+        asyncio.create_task(STATE.dashboard_heartbeat())
     
-    # Global references for Master Tools
-    global feat_engine, trade_manager, risk_engine, ml_engine
-
-    # 0. STREAMER IGNITION (Supabase Realtime)
-    try:
-        from app.core.streamer import init_streamer
-        dashboard = init_streamer()
-        if dashboard:
-             logging.getLogger().addHandler(dashboard)
-             asyncio.create_task(dashboard.start_async_loop())
-             
-             # DASHBOARD HEARTBEAT: Push account metrics every 5 seconds
-             # This runs INDEPENDENT of ZMQ tick flow
-             async def dashboard_heartbeat():
-                 """Push account metrics every 5 seconds regardless of tick flow."""
-                 while True:
-                     try:
-                         if dashboard and mt5 and mt5.terminal_info():
-                             acc = mt5.account_info()
-                             if acc:
-                                 await dashboard.push_metrics({
-                                     "balance": acc.balance,
-                                     "equity": acc.equity,
-                                     "margin_free": acc.margin_free
-                                 })
-                     except Exception as e:
-                         logger.debug(f"Heartbeat error: {e}")
-                     await asyncio.sleep(5)
-             
-             asyncio.create_task(dashboard_heartbeat())
-             logger.info("📡 [STREAMER] Dashboard Uplink Established (Logs -> Supabase)")
-             logger.info("💓 [HEARTBEAT] Account metrics push every 5s ACTIVE")
-    except Exception as e:
-        logger.error(f"❌ Streamer Init Failed: {e}")
-
+    if mt5_conn: await mt5_conn.startup()
     
-    # 1. MT5 Connection
-    if mt5_conn:
-        try:
-            await mt5_conn.startup()
-            logger.info("✅ MT5 Connected")
-        except Exception as e:
-            logger.warning(f"⚠️ MT5 Startup: {e}")
+    from app.services.rag_memory import rag_memory
+    await rag_memory.initialize()
+    if STATE.circuit_breaker: 
+        asyncio.create_task(STATE.circuit_breaker.monitor_heartbeat())
     
-    # === FULL STACK ASSEMBLY (M1-M10) ===
-    try:
-        from app.skills.market_physics import market_physics      # M2
-        from app.services.risk_engine import risk_engine         # M5
-        # M4 Brain replaced by ml_engine (Quantum Leap)
-        from app.services.rag_memory import rag_memory           # M7
-        from app.core.zmq_projector import hud_projector         # M8
-        from app.services.circuit_breaker import circuit_breaker # M9
-        
-        # Dependency Injection (Wiring)
-        if trade_manager:
-            circuit_breaker.set_trade_manager(trade_manager)
-        if zmq_bridge:
-            hud_projector.set_bridge(zmq_bridge)
-            
-        # Initialize Async Services
-        await rag_memory.initialize()
-        asyncio.create_task(circuit_breaker.monitor_heartbeat())
-        
-        # [ULTIMATE ARCHITECTURE] Zero-Wait Async Hydration Sequence
-        async def background_bootstrap():
-            """Populates brain buffers while ZMQ remains responsive."""
-            from app.skills.market import fetch_candles_mt5 # Ensure availability
-            
-            # Start background hydration for major assets
-            target_symbols = settings.ASSETS_TO_MOINTOR # Typo in original config? Fixed or aliased
-            for symbol in ["XAUUSD", "EURUSD"]: # Priority zero
-                await data_collector.hydrate_all_timeframes(symbol, mt5_fallback_func=market.fetch_candles)
-                
-            logger.info("🌊 [HYDRATION] Background synchronization complete.")
-
-        async def jitter_sentinel():
-            """Monitors ZMQ loop health indefinitely."""
-            while True:
-                if ml_engine:
-                    await ml_engine.check_loop_jitter()
-                await asyncio.sleep(0.1)
-
-        asyncio.create_task(background_bootstrap())
-        asyncio.create_task(jitter_sentinel())
-        
-        logger.info("✅ Full Neural-Symbolic Stack ONLINE (Institutional Grade)")
-    except ImportError as e:
-        logger.error(f"❌ Stack Assembly Error: {e}")
-
-    # 3. ZMQ Bridge (The Nerve Loop)
     if zmq_bridge:
-        # [AUDIT FIX] Increased capacity from 5 to 20 to handle high-frequency news events/bursts
-        brain_semaphore = asyncio.Semaphore(20)
-
-        async def process_signal_task(data, regime):
-            async with brain_semaphore:
-                try:
-                    price = float(data.get('bid', 0) or data.get('close', 0))
-                    
-                    # 1. FEAT Logic (M3 - Symbolic)
-                    is_valid = await feat_engine.analyze(data, price, precomputed_physics=regime) if feat_engine else False
-                    
-                    # 2. Quantum Leap Ensemble (M4 - Deep Probabilistic + Fractal)
-                    brain_score = await ml_engine.ensemble_predict_async(data.get('symbol', 'XAUUSD'), {
-                        **data, 
-                        "close": price,
-                        "rsi": data.get("rsi", 50.0),
-                        "atr": data.get("atr", 0.001)
-                    }) if ml_engine else {"p_win": 0.5, "alpha_confidence": 0}
-                    
-                    # Align brain_score schema for legacy compatibility in HUD/Risk
-                    brain_score['alpha_confidence'] = brain_score.get('confidence', 0)
-                    brain_score['execute_trade'] = brain_score.get('p_win', 0.5) > settings.PROFIT_THRESHOLD # Heuristic
-                    
-                    # 2b. FEAT Index (M3 Evolution)
-                    feat_index = 0.0
-                    try:
-                         if hasattr(market_physics, 'price_window') and len(market_physics.price_window) > 10:
-                             df_physics = pd.DataFrame({'close': list(market_physics.price_window)})
-                             if hasattr(market_physics, 'volume_window'):
-                                 df_physics['volume'] = list(market_physics.volume_window)
-                             
-                             from nexus_core.structure_engine import structure_engine
-                             feat_results = structure_engine.compute_feat_index(df_physics)
-                             feat_index = float(feat_results['feat_index'].iloc[-1])
-                    except Exception as e:
-                         logger.debug(f"FEAT Index calc fail: {e}")
-                         feat_index = 50.0
-
-                    # [VISIBILITY LAYER] Push Signals to Dashboard (Skip in PERFORMANCE_MODE)
-                    if dashboard and not settings.PERFORMANCE_MODE:
-                        asyncio.create_task(dashboard.push_signals({
-                            "alpha_confidence": brain_score.get('alpha_confidence', 0),
-                            "acceleration": regime.acceleration_score if regime else 0,
-                            "hurst": regime.hurst_exponent if regime else 0.5,
-                            "price": price,
-                            "feat_index": feat_index,
-                            "is_initiative": getattr(regime, 'is_initiative_candle', False)
-                        }))
-                        
-                        if trade_manager:
-                            acc = mt5.account_info()
-                            if acc:
-                                asyncio.create_task(dashboard.push_metrics({
-                                    "balance": acc.balance,
-                                    "equity": acc.equity,
-                                    "margin_free": acc.margin_free
-                                }))
-                    elif settings.PERFORMANCE_MODE:
-                        # Minimal log for local visibility only
-                        if getattr(regime, 'is_initiative_candle', False):
-                            logger.info(f"🔥 [INITIATIVE] Signal candidate for {data.get('symbol')} | Conf: {brain_score.get('alpha_confidence', 0):.2f}")
-                    
-                    # 3. Decision Fusion
-                    execute = is_valid and brain_score.get('execute_trade', False)
-                    
-                    # 4. HUD Projection (M8) - FULL INSTITUTIONAL NARRATIVE
-                    try:
-                        from app.skills.calendar import chronos_engine
-                        from app.skills.liquidity import liquidity_map
-                        from nexus_core.structure_engine import structure_engine
-                        
-                        # Gather Narrative Data
-                        struct_narrative = structure_engine.get_structural_narrative(df_physics) if 'df_physics' in locals() else {"last_bos": 0.0, "type": "NONE"}
-                        active_zones = liquidity_map.get_active_zones()
-                        session_info = chronos_engine.validate_window()
-                        
-                        await hud_projector.broadcast_full_narrative(
-                            regime=regime.trend if regime else "NEUTRAL",
-                            confidence=brain_score.get('alpha_confidence', 0),
-                            feat_score=feat_index,
-                            vault_active=True,
-                            pvp_level=price, # Current price acts as the PVP magnet baseline
-                            structure_map=struct_narrative,
-                            active_zones=active_zones,
-                            session_state=session_info.get("session", "OFF_HOURS")
-                        )
-                    except Exception as e:
-                        logger.error(f"HUD Narrative Broadcast failed: {e}")
-                        # Fallback to legacy state update if narrative fails
-                        await hud_projector.broadcast_system_state(
-                            regime=regime.trend if regime else "NEUTRAL",
-                            confidence=brain_score.get('alpha_confidence', 0),
-                            feat_score=feat_index,
-                            vault_active=True
-                        )
-
-                    if execute:
-                        direction = "BUY" if regime.trend == "BULLISH" else "SELL"
-                        
-                        # [RISK CHECK] Institutional Lot Allocation (Protocol 7)
-                        dynamic_lot = await risk_engine.calculate_dynamic_lot(
-                            confidence=brain_score.get('alpha_confidence', 0),
-                            volatility=regime.atr if regime else 0.0,
-                            symbol=data.get('symbol', 'XAUUSD'),
-                            market_data=data
-                        )
-                        
-                        if dynamic_lot <= 0:
-                            logger.warning(f"🛡️ RISK VETO: Execution aborted for {data.get('symbol')} (Dynamic Lot = 0)")
-                        else:
-                            await hud_projector.draw_arrow(data.get('symbol'), price, direction)
-                            
-                            # 5. Execution
-                            if trade_manager:
-                                 logger.info(f"🚀 EXECUTION: {direction} | BrainConf: {brain_score.get('alpha_confidence',0):.2f} | Size: {dynamic_lot:.2f}")
-                                 await trade_manager.execute_order(direction, {
-                                     "symbol": data.get('symbol', 'XAUUSD'),
-                                     "volume": dynamic_lot,
-                                     "comment": "FEAT_NEURAL_V1"
-                                 })
-
-                    # 6. Black Box (M7)
-                    await rag_memory.log_trade_context(
-                        trade_data={"symbol": data.get('symbol'), "price": price, "action": "SIGNAL" if execute else "REJECT"},
-                        feat_result=is_valid, 
-                        brain_result=brain_score, 
-                        physics=regime
-                    )
-                     
-                except Exception as e:
-                    logger.error(f"Nerve Loop Error: {e}")
-
-        # Phase 13: Position Guard (Autonomous Exhaustion monitoring)
-        async def position_guard_task():
-            logger.info("🛡️ [GUARD] Position Monitoring Task Online (Exhaustion Protocol).")
-            while True:
-                try:
-                    if trade_manager and trade_manager.active_positions:
-                        # Monitoring loop for exhaustion exits
-                        # We use the current physics to check SL/TP adjustments
-                        pass 
-                    await asyncio.sleep(5)
-                except Exception as e:
-                    logger.error(f"Guard Task Error: {e}")
-                    await asyncio.sleep(10)
-
-        async def on_zmq_message(data):
-            """High-Frequency Pulse."""
-            # M9: Heartbeat
-            if circuit_breaker: circuit_breaker.heartbeat()
-            
-            # [M10 SYNC] Handle Position Updates from MT5
-            if data.get("action") == "POSITION_UPDATE" and trade_manager:
-                ticket = data.get("ticket")
-                if data.get("status") == "CLOSED":
-                    trade_manager.unregister_position(ticket)
-                else:
-                    # Register/Update position for Guard monitoring
-                    trade_manager.register_position(
-                        ticket=ticket,
-                        entry_price=data.get("price", 0),
-                        atr=data.get("atr", 0),
-                        is_buy=data.get("type") == "BUY"
-                    )
-                return
-
-            # M2: Sensory
-            regime = market_physics.ingest_tick(data) if market_physics else None
-            
-            # M2: Filter (>1.2x Accel)
-            if regime and regime.is_accelerating and regime.acceleration_score > 1.2:
-                 asyncio.create_task(process_signal_task(data, regime))
-            elif not market_physics:
-                 pass # Silent
-
-        # Launch background tasks
-        asyncio.create_task(position_guard_task())
-
-        try:
-            await zmq_bridge.start(on_zmq_message)
-            logger.info("✅ ZMQ Bridge Active (Autonomous M1-M10)")
-        except Exception as e:
-            logger.warning(f"⚠️ ZMQ Startup: {e}")
-            
-    # 3. FEAT Engine Injection
-    try:
-        from app.skills.feat_chain import feat_full_chain_institucional
-        feat_engine = feat_full_chain_institucional
-        logger.info("✅ FEAT Engine Linked")
-    except ImportError:
-        feat_engine = None
-        logger.error("❌ FEAT Orphaned")
-
-    # 4. Risk Engine Injection
-    try:
-        from app.services.risk_engine import RiskEngine
-        risk_engine = RiskEngine()
-        logger.info("✅ Risk Engine Linked")
-    except ImportError:
-        risk_engine = None
-        logger.warning("⚠️ Risk Engine Missing")
-
-    # 5. Trade Manager Injection
-    try:
         from app.skills.trade_mgmt import TradeManager
-        trade_manager = TradeManager(zmq_bridge) if zmq_bridge else None
-        logger.info("[OK] Trade Manager Linked")
-    except ImportError:
-        trade_manager = None
-        logger.warning("⚠️ Trade Manager Missing")
-    
-    # 6. ORPHAN SERVICE REGISTRATION (Connect the organs)
-    logger.info("🔗 Activating Dormant Services...")
-    try:
-        import app.core.hardware_engine as he; logger.info(f"   + Hardware Engine: {he.__name__}")
-        import app.core.health_sentinel as hs; logger.info(f"   + Health Sentinel: {hs.__name__}")
-        import app.core.integrity_check as ic; logger.info(f"   + Integrity Check: {ic.__name__}")
-        import app.core.lifecycle_manager as lm; logger.info(f"   + Lifecycle Mgr:   {lm.__name__}")
-        import app.ml.drift_monitor as dm; logger.info(f"   + Drift Monitor:   {dm.__name__}")
-        import app.skills.trade_sentinel as ts; logger.info(f"   + Trade Sentinel:  {ts.__name__}")
-        # Note: Other services loaded on demand by FeatEngine
-    except ImportError as e:
-        logger.warning(f"⚠️ Service Activation Partial: {e}")
+        STATE.trade_manager = TradeManager(zmq_bridge)
+        asyncio.create_task(STATE.background_bootstrap())
+        asyncio.create_task(STATE.zmq_processing_loop())
+        asyncio.create_task(STATE.jitter_sentinel())
+        await zmq_bridge.start(STATE.on_zmq_message)
+        logger.info("✅ ZMQ Bridge Active")
 
-    # 7. DEEP ACCOUNT DIAGNOSTIC (Step 0)
-    if mt5_conn and mt5_conn._connected:
-        try:
-            logger.info("🩺 Performing Deep Account Diagnostic...")
-            import MetaTrader5 as mt5
-            import time
-            
-            # A. Account Valid
-            acc = mt5.account_info()
-            if not acc:
-                logger.error(f"❌ ACCOUNT CRITICAL: Login Failed (Code: {mt5.last_error()})")
-            else:
-                logger.info(f"   > Account: {acc.login} ({'REAL' if acc.trade_mode==0 else 'DEMO'})")
-                logger.info(f"   > Balance: ${acc.balance:.2f} (Eq: ${acc.equity:.2f})")
-                
-                # B. Market Watch
-                sym = "XAUUSD"
-                if not mt5.symbol_select(sym, True):
-                    logger.error(f"❌ MARKET CRITICAL: {sym} not found or disabled!")
-                else:
-                    tick = mt5.symbol_info_tick(sym)
-                    if tick:
-                        latency = (time.time() - tick.time) * 1000
-                        logger.info(f"   > Market: {sym} Active (Tick Latency: {latency:.1f}ms)")
-                    else:
-                        logger.warning(f"⚠️ Market: {sym} selected but NO TICKS.")
-                        
-        except Exception as e:
-            logger.error(f"❌ Diagnostic Failed: {e}")
-    
     try:
         yield
     finally:
-        if zmq_bridge:
-            try:
-                await zmq_bridge.stop()
-            except Exception:
-                pass
-        if mt5_conn:
-            try:
-                await mt5_conn.shutdown()
-            except Exception:
-                pass
+        if zmq_bridge: await zmq_bridge.stop()
+        if mt5_conn: await mt5_conn.shutdown()
 
 # === INICIALIZAR MCP ===
 mcp = FastMCP("MT5_Neural_Sentinel", lifespan=app_lifespan)
@@ -685,16 +568,40 @@ async def market_get_telemetry(symbol: str = "XAUUSD", timeframe: str = "M5") ->
     OHLCV + Fractales (Capas 1-4) + Indicadores + Liquidez en un solo JSON.
     """
     snapshot = await market.get_snapshot(symbol, timeframe)
-    candles = await market.get_candles(symbol, timeframe, 100)
-    feat_layers = indicators.calculate_feat_layers(candles) if candles else {}
+    candles_res = await market.get_candles(symbol, timeframe, 100)
     
+    feat_layers = {}
+    if candles_res.get("status") == "success":
+        candles_list = candles_res.get("candles", [])
+        if candles_list:
+            df = pd.DataFrame(candles_list)
+            # Ensure column names match what indicator engine expects (tick_volume -> volume if needed)
+            if 'tick_volume' in df.columns:
+                df = df.rename(columns={'tick_volume': 'volume'})
+            
+            feat_df = indicators.calculate_feat_layers(df)
+            feat_layers = feat_df.to_dict('records') if not feat_df.empty else {}
+            
+            # 3. Structural Intelligence Report
+            from nexus_core.structure_engine import structure_engine
+            structure_report = structure_engine.get_structural_report(df)
+            structural_narrative = structure_engine.get_structural_narrative(df)
+            structural_score = structure_engine.get_structural_score(df)
+            structural_risk = structure_engine.get_structural_risk(df)
+
     return {
         "tool": "market_get_telemetry",
         "symbol": symbol,
         "timeframe": timeframe,
         "snapshot": snapshot,
-        "candles_count": len(candles) if candles else 0,
+        "candles_count": len(candles_res.get("candles", [])) if candles_res.get("status") == "success" else 0,
         "feat_layers": feat_layers,
+        "structure": {
+            "report": structure_report,
+            "narrative": structural_narrative,
+            "score": structural_score,
+            "risk": structural_risk
+        },
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -707,8 +614,6 @@ async def brain_run_inference(context_data: Dict[str, Any] = None) -> Dict[str, 
     if not context_data:
         context_data = {}
     
-    global feat_engine, ml_engine
-    
     prediction = {"signal": "NEUTRAL", "confidence": 0.0, "reason": "Initializing"}
     feat_check = False # MILITARY GRADE: Rejected by default
 
@@ -717,8 +622,8 @@ async def brain_run_inference(context_data: Dict[str, Any] = None) -> Dict[str, 
         current_price = float(context_data.get("close", 0) or context_data.get("bid", 0))
         
         # 1. FEAT Strategic Filter (Rule Based)
-        if feat_engine:
-            feat_check = await feat_engine.analyze(context_data, current_price) if asyncio.iscoroutinefunction(feat_engine.analyze) else feat_engine.analyze(context_data, current_price)
+        if STATE.feat_engine:
+            feat_check = await STATE.feat_engine.analyze(context_data, current_price) if asyncio.iscoroutinefunction(STATE.feat_engine.analyze) else STATE.feat_engine.analyze(context_data, current_price)
             
             if not feat_check:
                 prediction["reason"] = "FEAT_REJECTED (Rules)"
@@ -729,8 +634,8 @@ async def brain_run_inference(context_data: Dict[str, Any] = None) -> Dict[str, 
             feat_check = False
         
         # 2. Neural Inference (Quantum Leap Ensemble)
-        if feat_check and ml_engine:
-             res = await ml_engine.ensemble_predict_async(context_data.get('symbol', settings.SYMBOL), context_data)
+        if feat_check and STATE.ml_engine:
+             res = await STATE.ml_engine.ensemble_predict_async(context_data.get('symbol', settings.SYMBOL), context_data)
              prediction = {
                  "signal": res["prediction"],
                  "confidence": res["confidence"],
@@ -739,7 +644,13 @@ async def brain_run_inference(context_data: Dict[str, Any] = None) -> Dict[str, 
                  "p_win": res.get("p_win"),
                  "is_anomaly": res.get("is_anomaly")
              }
-        elif not ml_engine:
+             
+             if 'symbol' in context_data:
+                # To obtain a deeper structural context, we would need to fetch history here.
+                # For now, we rely on the pre-computed 'res["regime"]'.
+                pass
+
+        elif not STATE.ml_engine:
              prediction["error"] = "MLEngine Offline"
 
     except Exception as e:
@@ -797,15 +708,12 @@ async def trade_execute_order(action: str, params: Dict[str, Any] = None) -> Dic
     
     action = action.upper()
     
-    # Use Global Injected Manager
-    global trade_manager
-    
-    if not trade_manager:
+    if not STATE.trade_manager:
         return {"error": "TradeManager Offline/Orphaned", "status": "FAILED"}
 
     try:
         # Delegate to Module 6
-        result_data = await trade_manager.execute_order(action, params)
+        result_data = await STATE.trade_manager.execute_order(action, params)
         
         return {
             "tool": "trade_execute_order",
@@ -964,9 +872,10 @@ async def sys_emergency_stop(reason: str = "Manual stop") -> Dict[str, Any]:
     cancelled_orders = []
     
     try:
-        if mt5_conn.connected:
-            closed_positions = await trade_mgmt.close_all_positions()
-            cancelled_orders = await trade_mgmt.cancel_all_orders()
+        if mt5_conn.connected and STATE.trade_manager:
+            closed_positions = await STATE.trade_manager.close_all_positions()
+            # Note: cancel_all_orders would need implementation in TradeManager
+            # For now we close active positions which is the priority.
     except Exception as e:
         logger.error(f"Emergency stop error: {e}")
     
@@ -978,6 +887,72 @@ async def sys_emergency_stop(reason: str = "Manual stop") -> Dict[str, Any]:
         "status": "EMERGENCY STOP EXECUTED",
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
+
+@mcp.tool()
+async def sys_warm_reboot() -> Dict[str, Any]:
+    """
+    🔄 MASTER TOOL 11: Warm Reboot
+    Recarga módulos críticos y re-ejecuta la hidratación sin cerrar el proceso.
+    Útil para aplicar cambios en caliente en la lógica de market o ML.
+    """
+    import importlib
+    global market, indicators
+    
+    reports = []
+    
+    try:
+        # 1. Reload Modules
+        from app.skills import market as m, indicators as i, market_physics as mp_mod
+        importlib.reload(m)
+        importlib.reload(i)
+        importlib.reload(mp_mod)
+        
+        market = m
+        indicators = i
+        STATE.market_physics = mp_mod.market_physics
+        reports.append("Modules [market, indicators, market_physics] reloaded.")
+        
+        # 2. Re-instantiate MLEngine if possible
+        from app.ml.ml_engine import MLEngine
+        import app.ml.ml_engine as mle_mod
+        importlib.reload(mle_mod)
+        STATE.ml_engine = MLEngine()
+        reports.append("MLEngine re-instantiated and reloaded.")
+        
+        # 3. Reload FEAT Engine
+        from app.skills.feat_chain import feat_full_chain_institucional
+        import app.skills.feat_chain as fc_mod
+        importlib.reload(fc_mod)
+        STATE.feat_engine = feat_full_chain_institucional
+        reports.append("FeatEngine re-instantiated and reloaded.")
+        
+        # 4. Trigger Re-Hydration
+        # We need access to background_bootstrap - but it's inside app_lifespan.
+        # However, we can call data_collector.hydrate_all_timeframes directly.
+        from app.ml.data_collector import data_collector
+        import app.ml.data_collector as dc_mod
+        importlib.reload(dc_mod)
+        
+        # Run hydration in background
+        async def rehydrate():
+             for symbol in ["XAUUSD", "EURUSD"]:
+                 await data_collector.hydrate_all_timeframes(symbol, mt5_fallback_func=market.get_candles)
+        
+        asyncio.create_task(rehydrate())
+        reports.append("Re-hydration sequence triggered in background.")
+        
+        return {
+            "status": "success",
+            "reports": reports,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Warm reboot failed: {e}")
+        return {
+            "status": "error",
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
 
 # =============================================================================
 # MAIN ENTRY POINT

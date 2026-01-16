@@ -167,9 +167,10 @@ class ZMQBridge:
             self.pub_socket = self.context.socket(zmq.PUB)
             self.pub_socket.bind(f"tcp://0.0.0.0:{self.pub_port}")
 
-            self.sub_socket = self.context.socket(zmq.SUB)
+            # 1. SUB Socket (Incoming from MT5) - Changed to PULL for PUSH-PULL Pipeline
+            self.sub_socket = self.context.socket(zmq.PULL)
             self.sub_socket.bind(f"tcp://0.0.0.0:{self.sub_port}")
-            self.sub_socket.setsockopt_string(zmq.SUBSCRIBE, "")
+            # PULL sockets do not use setsockopt(SUBSCRIBE)
 
             self.running = True
             logger.info(f"ZMQ Bridge LISTENING on tcp://0.0.0.0:{self.sub_port}")
@@ -269,7 +270,8 @@ class ZMQBridge:
                         # This is the CRITICAL fix - prevents loop blocking
                         await asyncio.to_thread(cb, data)
                 except Exception as e:
-                    logger.error(f"Callback error ({cb.__name__ if hasattr(cb, '__name__') else 'anon'}): {e}")
+                    import traceback
+                    logger.error(f"Callback error ({cb.__name__ if hasattr(cb, '__name__') else 'anon'}): {e}\n{traceback.format_exc()}")
 
     async def _heartbeat(self):
         """

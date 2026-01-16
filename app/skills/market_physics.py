@@ -11,7 +11,7 @@ The Sensory Cortex: Institutional-grade market physics calculator.
 """
 import logging
 import numpy as np
-from typing import Dict, Optional, Deque
+from typing import Dict, List, Optional, Deque
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
@@ -83,6 +83,44 @@ class MarketPhysics:
         self._cached_atr: float = 0.0
         
         logger.info("[SATELLITE] Market Physics Engine Online (ATR-Normalized, NumPy Accelerated)")
+
+    def hydrate(self, ticks: List[Dict]) -> None:
+        """
+        [P0 FIX] Profound Hydration Protocol.
+        Populates buffers with historical data to avoid warmup lag.
+        
+        Args:
+            ticks: List of historical ticks/candles
+        """
+        if not ticks:
+            return
+            
+        logger.info(f"🌊 [PHYSICS] Hydrating with {len(ticks)} samples...")
+        
+        for tick in ticks:
+            price = float(tick.get('bid', 0.0) or tick.get('close', 0.0))
+            vol = float(tick.get('tick_volume', 0.0) or tick.get('real_volume', 0.0))
+            ts = tick.get('time')
+            if isinstance(ts, str):
+                try:
+                    ts = datetime.fromisoformat(ts.replace('Z', '+00:00')).timestamp()
+                except ValueError:
+                    ts = None
+            
+            self.price_window.append(price)
+            self.volume_window.append(vol)
+            if ts:
+                self.timestamps.append(ts)
+            else:
+                # Synthetic sequential timestamp if missing
+                last_ts = self.timestamps[-1] if self.timestamps else datetime.now().timestamp()
+                self.timestamps.append(last_ts + 0.01)
+                
+        # Calculate initial ATR
+        if len(self.price_window) >= 2:
+            self._cached_atr = self._calculate_atr(np.array(self.price_window))
+            
+        logger.info(f"✅ [PHYSICS] Hydration complete. ATR={self._cached_atr:.4f}")
 
     def _calculate_atr(self, prices: np.ndarray) -> float:
         """

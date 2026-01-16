@@ -4,7 +4,7 @@
 //|             Atomic Execution | Risk Parity | Latency Guard       |
 //+------------------------------------------------------------------+
 #property copyright "FEAT Systems AI | HFT Architect: Omega"
-#property version   "3.00"
+#property version   "3.02" // Force Rebuild 102 (Fix ZMQ Constants)
 #property strict
 
 #include <Trade/Trade.mqh>
@@ -23,7 +23,8 @@ input bool     Verbose           = true;           // Verbose Logging
 
 // --- GLOBALS ---
 CTrade      g_trade;
-CInterop    g_interop;
+CInterop    g_interop;  // RX (Subscriber)
+CInterop    g_tx;       // TX (Publisher)
 string      g_symbol;
 
 //+------------------------------------------------------------------+
@@ -177,13 +178,24 @@ int OnInit()
    
    Executor = new CExecutionUnit(&RiskGuard, 123456);
    
-   // Init ZMQ
+   // FORENSIC LOGGING
+   Print(">>> [FORENSIC] STEP 1: RX BRIDGE INIT (Subscriber)...");
    if(!g_interop.Init(false)) { // Subscriber
-      Print("CRITICAL: ZMQ Execution Bridge Failed.");
+      Print("<<< [FORENSIC] FAILURE: RX Bridge Init returned false. Check Journal for ZMQ Error.");
       return(INIT_FAILED);
    }
+   Print(">>> [FORENSIC] STEP 1: RX OK.");
+   
+   // Init TX (Publisher)
+   Print(">>> [FORENSIC] STEP 2: TX BRIDGE INIT (Publisher/PUSH)...");
+   if(!g_tx.Init(true)) { // Publisher
+       Print("<<< [FORENSIC] FAILURE: TX Bridge Init returned false. Check Journal for ZMQ Error.");
+       return(INIT_FAILED);
+   }
+   Print(">>> [FORENSIC] STEP 2: TX OK.");
    
    EventSetMillisecondTimer(100);
+   Print(">>> [FORENSIC] STEP 3: TIMER SET. ENGINE ONLINE.");
    Print("[EXECUTION] ENGINE READY | SPREAD GUARD: ON | LATENCY CHECK: ON");
    return(INIT_SUCCEEDED);
 }
@@ -194,8 +206,30 @@ int OnInit()
 void OnDeinit(const int reason)
 {
    EventKillTimer();
+   EventKillTimer();
    g_interop.Shutdown();
+   g_tx.Shutdown();
    delete Executor;
+}
+
+//+------------------------------------------------------------------+
+//| TIMER                                                            |
+//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
+//| TICK                                                             |
+//+------------------------------------------------------------------+
+void OnTick()
+{
+   MqlTick tick;
+   if(!SymbolInfoTick(_Symbol, tick)) return;
+   
+   // Simple JSON for extreme speed
+   string json = StringFormat(
+      "{\"type\":\"TICK\",\"symbol\":\"%s\",\"bid\":%.5f,\"ask\":%.5f,\"time\":%llu,\"vol\":%llu}",
+      _Symbol, tick.bid, tick.ask, tick.time_msc, tick.volume
+   );
+   
+   g_tx.Send(json, true); // Non-blocking fire-and-forget
 }
 
 //+------------------------------------------------------------------+

@@ -135,12 +135,19 @@ class FourLayerEMA:
         spread = max(ema_values) - min(ema_values) if len(ema_values) > 1 else 0
         compression = (spread / avg_value * 1000) if avg_value > 0 else 0
         
-        # Slope: compare current avg to 1-bar-ago avg
-        if len(df) > 1:
-            prev_emas = [close.ewm(span=p, adjust=False).mean().iloc[-2] 
-                         for p in periods if p <= len(df)]
-            prev_avg = np.mean(prev_emas) if prev_emas else avg_value
-            slope = avg_value - prev_avg
+        # Stable Slope: Use Linear Regression over last 3-5 bars to filter M1 noise
+        window = 5
+        if len(df) >= window:
+            # Use numpy for stable linear regression slope
+            y = []
+            for i in range(1, window + 1):
+                # Calculate avg for each of the last 'window' bars
+                past_emas = [close.ewm(span=p, adjust=False).mean().iloc[-i] 
+                             for p in periods if p <= len(df)]
+                y.insert(0, np.mean(past_emas) if past_emas else avg_value)
+            
+            x = np.arange(len(y))
+            slope, _ = np.polyfit(x, y, 1)
         else:
             slope = 0.0
         
@@ -356,16 +363,12 @@ class StructureEngine:
             df["close"].shift(1) >= df["last_l_fractal"].shift(1)
         )
 
-        # CHOCH (Simplified): Cross of EMA 9/21 aligned with a break
-        ema9 = df["close"].ewm(span=9).mean()
-        ema21 = df["close"].ewm(span=21).mean()
-        df["choch_bull"] = (
-            (ema9 > ema21) & (ema9.shift(1) <= ema21.shift(1)) & df["bos_bull"]
-        )
-        df["choch_bear"] = (
-            (ema9 < ema21) & (ema9.shift(1) >= ema21.shift(1)) & df["bos_bear"]
-        )
-
+        # CHOCH (Change of Character): Reversal - 1st break against current trend
+        # We define trend based on Operative (L2) vs Macro (L3)
+        # For M1 Sniper, we prioritize speed: Pure fractal break
+        df["choch_bull"] = df["bos_bull"] & (df["close"].shift(1) < df["last_l_fractal"].shift(1))
+        df["choch_bear"] = df["bos_bear"] & (df["close"].shift(1) > df["last_h_fractal"].shift(1))
+        
         return df
 
     def compute_feat_index(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -442,63 +445,403 @@ class StructureEngine:
 
     def detect_zones(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Detect Supply/Demand zones based on fractal clustering.
+        Detect Supply/Demand zones based on fractal clustering with Time-Based Decay.
         
         A zone is formed when 2+ fractals occur within ATR distance.
-        Zone strength = number of touches / age in bars.
-        
-        Returns:
-            DataFrame with zone columns added
+        Zone strength = (touches / 5.0) * decay_factor
         """
-        if len(df) < 20:
+        if "close" not in df.columns or len(df) < 20:
             df["zone_type"] = "NONE"
             df["zone_high"] = 0.0
             df["zone_low"] = 0.0
             df["zone_strength"] = 0.0
             return df
         
+        # Ensure fractals are identified
         df = self.identify_fractals(df)
         
-        # Calculate ATR for zone tolerance
-        atr = (df["high"] - df["low"]).rolling(14).mean()
-        zone_tolerance = atr * 0.5  # Half ATR as zone width
+        # ATR for zone width tolerance
+        atr = (df["high"] - df["low"]).rolling(14).mean().iloc[-1]
+        zone_tolerance = atr * 0.5 if atr > 0 else 0.0001
         
-        # Initialize zone columns
+        # Initial state
         df["zone_type"] = "NONE"
         df["zone_high"] = 0.0
         df["zone_low"] = 0.0
         df["zone_strength"] = 0.0
         
-        # Find high fractal clusters (supply zones)
-        high_fractals = df[df["fractal_high"]]["high"].values
-        if len(high_fractals) >= 2:
-            for i, level in enumerate(high_fractals[:-1]):
-                # Count touches within tolerance
-                tolerance = zone_tolerance.iloc[-1] if len(zone_tolerance) > 0 else level * 0.005
-                touches = sum(1 for h in high_fractals if abs(h - level) < tolerance)
-                if touches >= 2:
-                    # Supply zone detected
-                    df.loc[df.index[-1], "zone_type"] = "SUPPLY"
-                    df.loc[df.index[-1], "zone_high"] = level + tolerance
-                    df.loc[df.index[-1], "zone_low"] = level - tolerance
-                    df.loc[df.index[-1], "zone_strength"] = min(1.0, touches / 5.0)
-                    break
+        current_idx = len(df) - 1
         
-        # Find low fractal clusters (demand zones)
-        low_fractals = df[df["fractal_low"]]["low"].values
-        if len(low_fractals) >= 2 and df.iloc[-1]["zone_type"] == "NONE":
-            for i, level in enumerate(low_fractals[:-1]):
-                tolerance = zone_tolerance.iloc[-1] if len(zone_tolerance) > 0 else level * 0.005
-                touches = sum(1 for l in low_fractals if abs(l - level) < tolerance)
+        # History lookback for zone detection (last 100 bars)
+        lookback = min(100, len(df))
+        history = df.tail(lookback)
+        
+        # 1. Supply Zones (High Fractal Clusters)
+        high_indices = history.index[history["fractal_high"]].tolist()
+        if len(high_indices) >= 2:
+            # Check most recent high fractals first
+            for idx in reversed(high_indices):
+                level = df.at[idx, "high"]
+                # Find other high fractals near this level
+                matches = [i for i in high_indices if abs(df.at[i, "high"] - level) < zone_tolerance]
+                touches = len(matches)
                 if touches >= 2:
-                    # Demand zone detected
-                    df.loc[df.index[-1], "zone_type"] = "DEMAND"
-                    df.loc[df.index[-1], "zone_high"] = level + tolerance
-                    df.loc[df.index[-1], "zone_low"] = level - tolerance
-                    df.loc[df.index[-1], "zone_strength"] = min(1.0, touches / 5.0)
+                    # Supply zone confirmed
+                    first_touch_idx = matches[0]
+                    age = current_idx - first_touch_idx
+                    decay = 1.0 / (1.0 + 0.01 * age) # 1% force loss per bar
+                    
+                    df.loc[df.index[-1], "zone_type"] = "SUPPLY"
+                    df.loc[df.index[-1], "zone_high"] = level + zone_tolerance
+                    df.loc[df.index[-1], "zone_low"] = level - zone_tolerance
+                    df.loc[df.index[-1], "zone_strength"] = min(1.0, (touches / 5.0) * decay)
                     break
+                    
+        # 2. Demand Zones (Low Fractal Clusters) - only check if no supply zone detected
+        if df.iloc[-1]["zone_type"] == "NONE":
+            low_indices = history.index[history["fractal_low"]].tolist()
+            if len(low_indices) >= 2:
+                for idx in reversed(low_indices):
+                    level = df.at[idx, "low"]
+                    matches = [i for i in low_indices if abs(df.at[i, "low"] - level) < zone_tolerance]
+                    touches = len(matches)
+                    if touches >= 2:
+                        first_touch_idx = matches[0]
+                        age = current_idx - first_touch_idx
+                        decay = 1.0 / (1.0 + 0.01 * age)
+                        
+                        df.loc[df.index[-1], "zone_type"] = "DEMAND"
+                        df.loc[df.index[-1], "zone_high"] = level + zone_tolerance
+                        df.loc[df.index[-1], "zone_low"] = level - zone_tolerance
+                        df.loc[df.index[-1], "zone_strength"] = min(1.0, (touches / 5.0) * decay)
+                        break
         
         return df
+
+    def get_zone_status(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Returns the status of the nearest Supply/Demand zone.
+        """
+        df = self.detect_zones(df)
+        last_row = df.iloc[-1]
+        
+        if last_row["zone_type"] == "NONE":
+            return {
+                "nearest_zone": "NONE",
+                "distance_to_zone": 0.0,
+                "zone_strength": 0.0,
+                "is_in_zone": False
+            }
+        
+        # Calculate distance from current price to zone
+        current_price = last_row["close"]
+        zone_high = last_row["zone_high"]
+        zone_low = last_row["zone_low"]
+        
+        if last_row["zone_type"] == "SUPPLY":
+            distance = zone_high - current_price
+            is_in_zone = current_price <= zone_high and current_price >= zone_low
+        else:  # DEMAND
+            distance = current_price - zone_low
+            is_in_zone = current_price <= zone_high and current_price >= zone_low
+        
+        return {
+            "nearest_zone": last_row["zone_type"],
+            "distance_to_zone": float(distance),
+            "zone_strength": float(last_row["zone_strength"]),
+            "is_in_zone": is_in_zone
+        }
+
+    def get_structural_health(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Returns a health score for the current structure.
+        
+        Health = (BOS Strength + Zone Strength + Trend Alignment) / 3
+        
+        Returns:
+            dict with health score and contributing factors
+        """
+        df = self.detect_structural_shifts(df)
+        df = self.detect_zones(df)
+        
+        last_row = df.iloc[-1]
+        
+        # 1. BOS Strength (0-1)
+        bos_strength = 0.0
+        if last_row["bos_bull"] or last_row["bos_bear"]:
+            bos_strength = 0.8
+        elif last_row["choch_bull"] or last_row["choch_bear"]:
+            bos_strength = 0.5
+        
+        # 2. Zone Strength (0-1)
+        zone_strength = last_row["zone_strength"]
+        
+        # 3. Trend Alignment (0-1)
+        # Check if price is above/below recent fractals
+        trend_alignment = 0.5
+        if last_row["fractal_high"] and last_row["fractal_low"]:
+            if last_row["close"] > last_row["last_h_fractal"]:
+                trend_alignment = 0.8  # Uptrend
+            elif last_row["close"] < last_row["last_l_fractal"]:
+                trend_alignment = 0.8  # Downtrend
+            else:
+                trend_alignment = 0.5  # Neutral
+        
+        # Calculate overall health
+        health_score = (bos_strength + zone_strength + trend_alignment) / 3
+        
+        return {
+            "health_score": round(health_score, 2),
+            "bos_strength": round(bos_strength, 2),
+            "zone_strength": round(zone_strength, 2),
+            "trend_alignment": round(trend_alignment, 2),
+            "status": "HEALTHY" if health_score > 0.6 else 
+                      "NEUTRAL" if health_score > 0.3 else "WEAK"
+        }
+
+    def get_structural_report(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Returns a comprehensive structural report.
+        """
+        mae = self.mae_recognizer.detect_mae_pattern(df)
+        zones = self.detect_zones(df)
+        health = self.get_structural_health(df)
+        
+        return {
+            "mae_pattern": {
+                "phase": mae["phase"],
+                "is_expansion": mae["is_expansion"],
+                "status": mae["status"]
+            },
+            "zones": {
+                "nearest_zone": zones.iloc[-1]["zone_type"],
+                "distance_to_zone": float(zones.iloc[-1]["zone_high"] - zones.iloc[-1]["zone_low"]),
+                "zone_strength": float(zones.iloc[-1]["zone_strength"])
+            },
+            "health": health
+        }
+
+    def get_structural_summary(self, df: pd.DataFrame) -> str:
+        """
+        Returns a human-readable summary of the current structure.
+        """
+        report = self.get_structural_report(df)
+        
+        # Build summary string
+        summary = f"Structural Report:\n"
+        summary += f"- MAE Phase: {report['mae_pattern']['phase']} ({report['mae_pattern']['status']})\n"
+        summary += f"- Health Score: {report['health']['health_score']} ({report['health']['status']})\n"
+        summary += f"- Nearest Zone: {report['zones']['nearest_zone']} (Strength: {report['zones']['zone_strength']})\n"
+        summary += f"- Trend Alignment: {report['health']['trend_alignment']}\n"
+        
+        return summary
+
+    def get_structural_score(self, df: pd.DataFrame) -> float:
+        """
+        Returns a single structural score (0-100).
+        """
+        report = self.get_structural_report(df)
+        
+        # Weighted score calculation
+        score = (
+            report['health']['health_score'] * 0.4 +
+            report['zones']['zone_strength'] * 0.3 +
+            report['mae_pattern']['is_expansion'] * 0.2 +
+            report['health']['trend_alignment'] * 0.1
+        ) * 100
+        
+        return round(float(score), 2)
+
+    def get_structural_risk(self, df: pd.DataFrame) -> float:
+        """
+        Returns a risk score (0-100).
+        
+        Risk = (MAE Volatility + Zone Proximity + Trend Strength) / 3
+        
+        Returns:
+            dict with risk score and contributing factors
+        """
+        report = self.get_structural_report(df)
+        
+        # 1. MAE Volatility (0-1)
+        # Higher volatility = higher risk
+        mae_volatility = 0.0
+        if report['mae_pattern']['phase'] == "EXPANSION":
+            mae_volatility = 0.8
+        elif report['mae_pattern']['phase'] == "ACCUMULATION":
+            mae_volatility = 0.5
+        elif report['mae_pattern']['phase'] == "DISTRIBUTION":
+            mae_volatility = 0.5
+        elif report['mae_pattern']['phase'] == "CONTRACTION":
+            mae_volatility = 0.2
+        
+        # 2. Zone Proximity (0-1)
+        # Closer to zone = higher risk
+        zone_proximity = 1.0 - report['zones']['zone_strength']
+        
+        # 3. Trend Strength (0-1)
+        # Weaker trend = higher risk
+        trend_risk = 1.0 - report['health']['trend_alignment']
+        
+        # Calculate overall risk
+        risk_score = (mae_volatility + zone_proximity + trend_risk) / 3
+        
+        return round(float(risk_score * 100), 2)
+
+    def get_structural_opportunities(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+        """
+        Returns a list of potential trading opportunities.
+        
+        Returns:
+            list of opportunity dicts with:
+                - type: "BUY" or "SELL"
+                - zone: "SUPPLY" or "DEMAND"
+                - confidence: 0-1
+                - risk_reward_ratio: float
+                - reason: str
+        """
+        report = self.get_structural_report(df)
+        opportunities = []
+        
+        # Check for bullish opportunities
+        if report['mae_pattern']['phase'] == "ACCUMULATION" and report['zones']['nearest_zone'] == "DEMAND":
+            opportunities.append({
+                "type": "BUY",
+                "zone": "DEMAND",
+                "confidence": round(report['health']['health_score'] * 0.8, 2),
+                "risk_reward_ratio": 1.0 / (1.0 - report['zones']['zone_strength']),
+                "reason": "Price in Demand zone after Accumulation"
+            })
+        
+        # Check for bearish opportunities
+        if report['mae_pattern']['phase'] == "DISTRIBUTION" and report['zones']['nearest_zone'] == "SUPPLY":
+            opportunities.append({
+                "type": "SELL",
+                "zone": "SUPPLY",
+                "confidence": round(report['health']['health_score'] * 0.8, 2),
+                "risk_reward_ratio": 1.0 / (1.0 - report['zones']['zone_strength']),
+                "reason": "Price in Supply zone after Distribution"
+            })
+        
+        # Check for trend continuation opportunities
+        if report['health']['trend_alignment'] > 0.7:
+            if report['zones']['nearest_zone'] == "DEMAND":
+                opportunities.append({
+                    "type": "BUY",
+                    "zone": "DEMAND",
+                    "confidence": round(report['health']['health_score'] * 0.6, 2),
+                    "risk_reward_ratio": 1.0 / (1.0 - report['zones']['zone_strength']),
+                    "reason": "Trend continuation in Demand zone"
+                })
+            elif report['zones']['nearest_zone'] == "SUPPLY":
+                opportunities.append({
+                    "type": "SELL",
+                    "zone": "SUPPLY",
+                    "confidence": round(report['health']['health_score'] * 0.6, 2),
+                    "risk_reward_ratio": 1.0 / (1.0 - report['zones']['zone_strength']),
+                    "reason": "Trend continuation in Supply zone"
+                })
+        
+        return opportunities
+
+    def get_structural_strategy(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Returns a complete trading strategy based on current structure.
+        """
+        report = self.get_structural_report(df)
+        opportunities = self.get_structural_opportunities(df)
+        
+        # Select best opportunity
+        best_opportunity = None
+        if opportunities:
+            best_opportunity = max(opportunities, key=lambda x: x['confidence'])
+        
+        # Determine strategy type
+        strategy_type = "NEUTRAL"
+        if best_opportunity:
+            if best_opportunity['confidence'] > 0.7:
+                strategy_type = "STRONG_OPPORTUNITY"
+            elif best_opportunity['confidence'] > 0.5:
+                strategy_type = "MODERATE_OPPORTUNITY"
+            else:
+                strategy_type = "WEAK_OPPORTUNITY"
+        
+        return {
+            "strategy_type": strategy_type,
+            "best_opportunity": best_opportunity,
+            "all_opportunities": opportunities,
+            "structural_health": report['health'],
+            "mae_pattern": report['mae_pattern'],
+            "zones": report['zones']
+        }
+
+    def get_structural_risk_reward(self, df: pd.DataFrame) -> float:
+        """
+        Returns the risk/reward ratio for the current structure.
+        
+        Returns:
+            float: risk/reward ratio (higher is better)
+        """
+        report = self.get_structural_report(df)
+        
+        # Calculate risk/reward based on zone strength
+        if report['zones']['zone_strength'] > 0:
+            risk_reward = 1.0 / (1.0 - report['zones']['zone_strength'])
+        else:
+            risk_reward = 0.0
+        
+        return round(float(risk_reward), 2)
+
+    def get_structural_bias(self, df: pd.DataFrame) -> str:
+        """
+        Returns the overall market bias based on structure.
+        
+        Returns:
+            str: "BULLISH", "BEARISH", or "NEUTRAL"
+        """
+        report = self.get_structural_report(df)
+        
+        # Calculate bias based on trend alignment and zone strength
+        if report['health']['trend_alignment'] > 0.6 and report['zones']['zone_strength'] > 0.5:
+            return "BULLISH"
+        elif report['health']['trend_alignment'] < 0.4 and report['zones']['zone_strength'] > 0.5:
+            return "BEARISH"
+        else:
+            return "NEUTRAL"
+
+    def get_structural_zones(self, df: pd.DataFrame) -> List[Dict[str, Any]]:
+        """
+        Returns all detected supply and demand zones.
+        
+        Returns:
+            list of zone dicts with:
+                - type: "SUPPLY" or "DEMAND"
+                - level: price level
+                - strength: 0-1
+                - distance_from_price: float
+        """
+        report = self.get_structural_report(df)
+        return report['zones']['zones']
+
+    def get_structural_trend(self, df: pd.DataFrame) -> str:
+        """
+        Returns the current trend direction.
+        
+        Returns:
+            str: "BULLISH", "BEARISH", or "NEUTRAL"
+        """
+        report = self.get_structural_report(df)
+        return report['health']['trend']
+
+    def get_structural_trend_alignment(self, df: pd.DataFrame) -> float:
+        """
+        Returns the trend alignment score (0-1).
+        
+        Returns:
+            float: trend alignment score
+        """
+        report = self.get_structural_report(df)
+        return report['health']['trend_alignment']
 
 
 structure_engine = StructureEngine()

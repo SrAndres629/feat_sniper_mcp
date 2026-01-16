@@ -230,7 +230,7 @@ async def get_volatility_metrics(symbol: str, timeframe: str = "H1", period: int
         "volatility_status": status
     }
 
-async def get_market_snapshot(symbol: str, timeframe: str = "M5") -> Dict[str, Any]:
+async def get_snapshot(symbol: str, timeframe: str = "M5") -> Dict[str, Any]:
     """
     Obtiene una radiografa completa del mercado en un solo llamado.
     Combina: ltima vela, Quote actual, Mtricas de Cuenta y Volatilidad.
