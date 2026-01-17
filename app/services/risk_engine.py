@@ -109,6 +109,23 @@ class TheVault:
         
         return None
     
+    def record_realized_profit(self, profit: float):
+        """
+        [SENIOR COMPOUNDING] 
+        Splits realized profit 50/50 between Vault (Safety) and Reinvestment (Growth).
+        """
+        if profit <= 0:
+            return
+
+        vault_share = profit * self.VAULT_PERCENTAGE
+        growth_share = profit - vault_share
+
+        self.vault_balance += vault_share
+        self.trading_capital += growth_share
+        
+        logger.info(f"[VAULT] Realized Profit Split: +${vault_share:.2f} Vault, +${growth_share:.2f} Compounding")
+        self._save_state()
+    
     def get_effective_margin(self, account_free_margin: float) -> float:
         """
         Retorna el margen efectivo para trading (excluyendo vault virtual).
@@ -193,66 +210,87 @@ class RiskEngine:
             logger.warning(f"🛡️ RISK VETO on {symbol}: Regime={regime}, VolReason={vol_reason}, SpreadToxic={is_spread_toxic}, CB_Mult={cb_multiplier:.2f}")
             return 0.0
             
-        # 3. Dynamic Scaling by Regime
-        regime_multiplier = 1.0
         if regime == "TURBULENT":
             regime_multiplier = 0.5 # 50% Reduction for turbulence
             logger.info(f"🌪️ TURBULENCE DETECTED: Scaling risk to 50% for {symbol}")
 
-        base_lot = await self.get_adaptive_lots(symbol, sl_points, allocation["lot_multiplier"])
+        # [LEVEL 41] BAYESIAN KELLY SIZING (The Body) - REFINED
+        # Using exact user specification for Damped Kelly.
+        
+        uncertainty = market_data.get("brain_uncertainty", 0.05) 
+        
+        # Calculate Target Risk Percentage using Damped Kelly
+        target_risk_pct = self._calculate_damped_kelly(confidence, uncertainty)
+        
+        # Convert Target Risk % to Neural Multiplier for get_adaptive_lots
+        # get_adaptive_lots uses: risk_amount = equity * (settings.effective_risk_cap/100) * multiplier
+        # We want: risk_amount = equity * target_risk_pct
+        # So: multiplier = target_risk_pct / (settings.effective_risk_cap/100)
+        
+        base_risk_pct = settings.effective_risk_cap / 100.0
+        if base_risk_pct <= 0: base_risk_pct = 0.01 # Avoid div by zero (fallback 1%)
+        
+        neural_multiplier = target_risk_pct / base_risk_pct
+        
+        base_lot = await self.get_adaptive_lots(symbol, sl_points, neural_multiplier)
         final_lot = base_lot * cb_multiplier * regime_multiplier
         
         # 4. Shadow Force (Master Directive)
         trading_mode = os.getenv("TRADING_MODE", "SHADOW")
         if trading_mode == "SHADOW":
-            logger.info(f"🌌 SHADOW EXECUTION: Signal valid, simulated lot: {final_lot:.2f}")
-            # Note: We return the lot, but skip execution in TradeManager or similar layers.
-            # For calculate_dynamic_lot, the purpose is the calculation.
+            logger.info(f"🌌 SHADOW EXECUTION: Signal valid, simulated lot: {final_lot:.2f} (KellyRisk: {target_risk_pct*100:.2f}%, Unc: {uncertainty:.3f})")
         
         return max(0.01, final_lot) if final_lot > 0 else 0.0
 
+    def _calculate_damped_kelly(self, win_prob: float, uncertainty: float, risk_reward_ratio: float = 1.5) -> float:
+        """
+        [LEVEL 41] Damped Kelly Criterion (User Specified).
+        
+        Formula:
+        1. Safety Clamp: Unc > 0.08 -> Risk = 0
+        2. Kelly: f = (p(b+1) - 1) / b
+        3. Damping: factor = 0.5 * (1 - (Unc / 0.08))
+        4. Max Risk: Cap at 0.02 (2%)
+        """
+        # 1. SAFETY CLAMP
+        # If noise is too high (8% std dev in prediction), stay out.
+        if uncertainty > 0.08:
+            return 0.0
+            
+        # 2. GENERAL KELLY FORMULA
+        # p = win_prob, b = risk_reward_ratio
+        kelly_fraction = (win_prob * (risk_reward_ratio + 1) - 1) / risk_reward_ratio
+        
+        # Negative Expectancy check
+        if kelly_fraction <= 0:
+            return 0.0
+            
+        # 3. UNCERTAINTY DAMPING
+        # Reduces bet size linearly with uncertainty.
+        # Unc=0 -> 0.5 (Half Kelly). Unc=0.08 -> 0.0 (No Bet).
+        damping_factor = 0.5 * (1.0 - (uncertainty / 0.08))
+        final_fraction = kelly_fraction * max(0.0, damping_factor)
+        
+        # 4. HARD LIMITS (Account Protection)
+        # Never risk more than 2% per trade.
+        max_risk_per_trade = 0.02
+        final_risk_pct = min(final_fraction, max_risk_per_trade)
+        
+        return final_risk_pct
+
     async def get_neural_allocation(self, alpha_confidence: float) -> Dict[str, float]:
         """
-        Determina la asignacin de capital basada en la confianza neuronal.
+        Legacy allocation helper. Kept for aggressive/defensive labels only.
         """
         allocation = {
-            "scalp_pct": 0.50,
-            "swing_pct": 0.50,
-            "lot_multiplier": 1.0,
-            "can_dual": True,
             "aggressiveness": "TEPID"
         }
-        
-        # SNIPER MODE (Alpha > 0.85)
-        if alpha_confidence > 0.85:
-            allocation.update({
-                "scalp_pct": 0.25,
-                "swing_pct": 0.75,
-                "lot_multiplier": 1.5,
-                "aggressiveness": "SNIPER"
-            })
+        if alpha_confidence > 0.85: allocation["aggressiveness"] = "SNIPER"
+        elif alpha_confidence > 0.70: allocation["aggressiveness"] = "ASSERTIVE"
+        elif alpha_confidence < 0.60: allocation["aggressiveness"] = "DEFENSIVE"
             
-        # CONFIDENT (Alpha > 0.70)
-        elif alpha_confidence > 0.70:
-            allocation.update({
-                "scalp_pct": 0.40,
-                "swing_pct": 0.60,
-                "lot_multiplier": 1.25,
-                "aggressiveness": "ASSERTIVE"
-            })
-            
-        # WEAK/DOUBT (< 0.60 per Model 3 check)
-        elif alpha_confidence < 0.60:
-             allocation.update({
-                "scalp_pct": 0.90,
-                "swing_pct": 0.10,
-                "lot_multiplier": 0.0, # Zero risk preferred
-                "can_dual": False,
-                "aggressiveness": "DEFENSIVE"
-            })
-
-        logger.info(f"[NEURAL RISK] Alpha: {alpha_confidence:.2f} | Mode: {allocation['aggressiveness']} | Size: {allocation['lot_multiplier']}x")
         return allocation
+
 
     async def get_adaptive_lots(self, symbol: str, sl_points: int, neural_multiplier: float = 1.0) -> float:
         """

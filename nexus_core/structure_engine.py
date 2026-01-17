@@ -448,7 +448,7 @@ class StructureEngine:
         Detect Supply/Demand zones based on fractal clustering with Time-Based Decay.
         
         A zone is formed when 2+ fractals occur within ATR distance.
-        Zone strength = (touches / 5.0) * decay_factor
+        Zone strength = (touches / 5.0) * decay_factor * [PVP_BOOST]
         """
         if "close" not in df.columns or len(df) < 20:
             df["zone_type"] = "NONE"
@@ -457,6 +457,10 @@ class StructureEngine:
             df["zone_strength"] = 0.0
             return df
         
+        # [PVP INTEGRATION]
+        from app.skills.volume_profile import volume_profile
+        profile = volume_profile.get_profile(df, bins=50)
+
         # Ensure fractals are identified
         df = self.identify_fractals(df)
         
@@ -491,15 +495,22 @@ class StructureEngine:
                     age = current_idx - first_touch_idx
                     decay = 1.0 / (1.0 + 0.01 * age) # 1% force loss per bar
                     
+                    # [PHYSICS] Volume Density Boost
+                    vol_boost = volume_profile.get_zone_quality(level+zone_tolerance, level-zone_tolerance, profile)
+                    
                     df.loc[df.index[-1], "zone_type"] = "SUPPLY"
                     df.loc[df.index[-1], "zone_high"] = level + zone_tolerance
                     df.loc[df.index[-1], "zone_low"] = level - zone_tolerance
-                    df.loc[df.index[-1], "zone_strength"] = min(1.0, (touches / 5.0) * decay)
+                    
+                    # Final Strength Calculation
+                    raw_strength = min(1.0, (touches / 5.0))
+                    df.loc[df.index[-1], "zone_strength"] = min(1.0, raw_strength * decay * vol_boost)
                     break
                     
         # 2. Demand Zones (Low Fractal Clusters) - only check if no supply zone detected
         if df.iloc[-1]["zone_type"] == "NONE":
             low_indices = history.index[history["fractal_low"]].tolist()
+
             if len(low_indices) >= 2:
                 for idx in reversed(low_indices):
                     level = df.at[idx, "low"]
@@ -510,10 +521,16 @@ class StructureEngine:
                         age = current_idx - first_touch_idx
                         decay = 1.0 / (1.0 + 0.01 * age)
                         
+                        # [PHYSICS] Volume Density Boost
+                        vol_boost = volume_profile.get_zone_quality(level+zone_tolerance, level-zone_tolerance, profile)
+                        
                         df.loc[df.index[-1], "zone_type"] = "DEMAND"
                         df.loc[df.index[-1], "zone_high"] = level + zone_tolerance
                         df.loc[df.index[-1], "zone_low"] = level - zone_tolerance
-                        df.loc[df.index[-1], "zone_strength"] = min(1.0, (touches / 5.0) * decay)
+                        
+                        # Final Strength Calculation
+                        raw_strength = min(1.0, (touches / 5.0))
+                        df.loc[df.index[-1], "zone_strength"] = min(1.0, raw_strength * decay * vol_boost)
                         break
         
         return df

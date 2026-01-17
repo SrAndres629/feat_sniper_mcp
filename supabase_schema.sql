@@ -16,6 +16,26 @@ CREATE TABLE IF NOT EXISTS public.sniper_signals (
     metadata JSONB -- Extra ML metrics (deltaFlow, RSI, etc)
 );
 
+-- 1b. Table for High-Frequency Neural State (Dashboard Stream)
+CREATE TABLE IF NOT EXISTS public.neural_signals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    symbol TEXT NOT NULL,
+    price DECIMAL NOT NULL,
+    alpha_confidence DECIMAL,
+    acceleration DECIMAL,
+    hurst DECIMAL,
+    
+    -- PVP Context (Level 46)
+    poc_price DECIMAL,
+    vah_price DECIMAL,
+    val_price DECIMAL,
+    energy_score DECIMAL,
+    
+    metadata JSONB
+);
+ALTER PUBLICATION supabase_realtime ADD TABLE neural_signals;
+
 -- 2. Table for Model Performance Tracking
 CREATE TABLE IF NOT EXISTS public.model_performance (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

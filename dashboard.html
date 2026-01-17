@@ -7,6 +7,9 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js for PVP Reality Check -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <script>
         tailwind.config = {
             theme: {
@@ -45,6 +48,20 @@
             }
         }
 
+        .silent-mode .log-technical {
+            display: none;
+        }
+
+        .toggle-silent {
+            transition: all 0.3s ease;
+        }
+
+        .toggle-silent.active {
+            background-color: #00ff41;
+            color: #000;
+            box-shadow: 0 0 10px #00ff41;
+        }
+
         /* Custom scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
@@ -68,10 +85,16 @@
         <div class="flex items-center gap-4">
             <h1 class="text-2xl font-bold text-nexus-green matrix-text">FEAT NEXUS <span
                     class="text-xs text-gray-500">// SENTINEL WAR ROOM</span></h1>
-            <div id="status-badge" class="bg-red-900 text-red-100 text-xs px-2 py-0.5 rounded uppercase tracking-wider">
-                OFFLINE</div>
-        </div>
-        <div class="text-xs text-nexus-dim" id="clock">00:00:00 UTC</div>
+            <div class="flex items-center gap-6">
+                <div id="status-badge"
+                    class="bg-red-900 text-red-100 text-xs px-2 py-0.5 rounded uppercase tracking-wider">
+                    OFFLINE</div>
+                <button id="silent-toggle" onclick="toggleSilentMode()"
+                    class="toggle-silent border border-nexus-dim text-nexus-dim text-[10px] px-2 py-0.5 rounded uppercase hover:bg-nexus-dim hover:text-black transition-all">
+                    Silent: OFF
+                </button>
+            </div>
+            <div class="text-xs text-nexus-dim" id="clock">00:00:00 UTC</div>
     </header>
 
     <!-- MAIN GRID -->
@@ -107,10 +130,16 @@
                         <div class="text-xs text-gray-500">Physics Accel</div>
                         <div class="text-2xl font-bold text-yellow-400" id="accel">0.00</div>
                     </div>
-                    <div class="bg-black p-3 rounded border border-gray-800 col-span-2">
-                        <div class="text-xs text-gray-500">Hurst Exponent</div>
-                        <div class="text-xl font-bold text-blue-400" id="hurst">0.50 <span
-                                class="text-xs text-gray-600 font-normal">(Random Walk)</span></div>
+                    <div
+                        class="bg-black p-3 rounded border border-gray-800 col-span-2 flex justify-between items-center">
+                        <div>
+                            <div class="text-xs text-gray-500">Hurst Exp</div>
+                            <div class="text-xl font-bold text-blue-400" id="hurst">0.50</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-xs text-gray-500">Kinetic State</div>
+                            <div class="text-lg font-bold text-gray-400" id="kinetic-pattern">WAITING...</div>
+                        </div>
                     </div>
                 </div>
                 <div class="mt-4 text-xs text-gray-600">
@@ -122,15 +151,52 @@
         <!-- CENTER: THE ORACLE (Logs) -->
         <div class="col-span-6 border border-nexus-dim bg-black rounded shadow-lg flex flex-col relative">
             <div
-                class="bg-nexus-dim bg-opacity-20 p-2 text-xs uppercase font-bold text-nexus-green border-b border-nexus-dim flex justify-between">
-                <span>System Logs (Filtered)</span>
-                <span class="cursor-pointer hover:text-white"
-                    onclick="document.getElementById('logs').innerHTML=''">[CLEAR]</span>
+                class="bg-nexus-dim bg-opacity-20 p-2 text-xs uppercase font-bold text-nexus-green border-b border-nexus-dim flex justify-between items-center">
+                <div class="flex gap-4">
+                    <span id="tab-logs-btn" class="cursor-pointer text-white border-b-2 border-nexus-green pb-1"
+                        onclick="switchTab('logs')">System Logs</span>
+                    <span id="tab-evo-btn"
+                        class="cursor-pointer text-gray-400 hover:text-nexus-green transition-all pb-1"
+                        onclick="switchTab('evo')">Neural Evolution</span>
+                </div>
+                <span class="cursor-pointer hover:text-white" onclick="clearLogs()">[CLEAR]</span>
             </div>
-            <div id="logs" class="flex-1 overflow-y-auto p-4 font-mono text-sm space-y-1">
-                <!-- Logs injected here -->
-                <div class="text-gray-600 italic">Waiting for broadcast...</div>
+
+            <!-- LOGS VIEW -->
+            <div id="logs-view" class="flex-1 flex flex-col overflow-hidden">
+                <!-- CHART CONTAINER -->
+                <div class="h-1/2 min-h-[250px] border-b border-nexus-dim p-2 relative bg-black">
+                    <canvas id="pvpChart"></canvas>
+                    <div class="absolute top-2 left-2 text-[10px] text-gray-500 uppercase">PVP Structure (M1)</div>
+                </div>
+
+                <div id="logs" class="flex-1 overflow-y-auto p-4 font-mono text-sm space-y-1">
+                    <div class="text-gray-600 italic">Waiting for broadcast...</div>
+                </div>
             </div>
+
+            <!-- EVOLUTION VIEW -->
+            <div id="evo-view" class="flex-1 hidden flex-col overflow-hidden p-4">
+                <div class="grid grid-cols-3 gap-4 mb-4">
+                    <div class="bg-nexus-gray p-2 border border-nexus-dim rounded">
+                        <div class="text-[10px] text-gray-500 uppercase">Generation</div>
+                        <div id="evo-gen" class="text-xl font-bold text-white">0</div>
+                    </div>
+                    <div class="bg-nexus-gray p-2 border border-nexus-dim rounded">
+                        <div class="text-[10px] text-gray-500 uppercase">Best Fitness</div>
+                        <div id="evo-fitness" class="text-xl font-bold text-nexus-green">0.00</div>
+                    </div>
+                    <div class="bg-nexus-gray p-2 border border-nexus-dim rounded">
+                        <div class="text-[10px] text-gray-500 uppercase">Status</div>
+                        <div id="evo-status" class="text-xl font-bold text-yellow-500">STANDBY</div>
+                    </div>
+                </div>
+                <div id="evo-terminal"
+                    class="flex-1 bg-black border border-gray-800 p-2 font-mono text-[11px] overflow-y-auto text-blue-300">
+                    <div class="text-gray-700">// GA Laboratory Initialized...</div>
+                </div>
+            </div>
+
             <!-- Scanline effect -->
             <div class="pointer-events-none absolute inset-0 bg-linear-to-b from-transparent to-nexus-green opacity-5">
             </div>
@@ -172,6 +238,43 @@
 
         // State
         let client;
+        let pvpChart;
+        const MAX_POINTS = 50;
+
+        function initChart() {
+            const ctx = document.getElementById('pvpChart').getContext('2d');
+            pvpChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Price', data: [], borderColor: '#ffffff', borderWidth: 2, tension: 0.1, pointRadius: 0 },
+
+                        // [MULTIFRACTAL LAYER CENTROIDS]
+                        { label: 'Micro (Intent)', data: [], borderColor: '#dc2626', borderWidth: 1, borderDash: [2, 2], pointRadius: 0 }, // Red Dashed
+                        { label: 'Struct (Path)', data: [], borderColor: '#16a34a', borderWidth: 2, pointRadius: 0 }, // Green Solid
+                        { label: 'Macro (Memory)', data: [], borderColor: '#2563eb', borderWidth: 2, pointRadius: 0 }, // Blue Solid
+                        { label: 'Bias (Regime)', data: [], borderColor: '#4b5563', borderWidth: 3, pointRadius: 0 }, // Gray Thick
+
+                        // [PVP CONTEXT]
+                        { label: 'POC', data: [], borderColor: '#fbbf24', borderWidth: 1, borderDash: [5, 5], pointRadius: 0 }, // Gold
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            grid: { color: '#333' },
+                            ticks: { color: '#888', callback: function (value) { return value.toFixed(2); } }
+                        }
+                    }
+                }
+            });
+        }
 
         function updateClock() {
             const now = new Date();
@@ -179,7 +282,27 @@
         }
         setInterval(updateClock, 1000);
 
+        let silentMode = false;
+
+        function toggleSilentMode() {
+            silentMode = !silentMode;
+            const btn = document.getElementById('silent-toggle');
+            const body = document.body;
+
+            if (silentMode) {
+                btn.innerText = "Silent: ON";
+                btn.classList.add('active');
+                body.classList.add('silent-mode');
+            } else {
+                btn.innerText = "Silent: OFF";
+                btn.classList.remove('active');
+                body.classList.remove('silent-mode');
+            }
+        }
+
         async function init() {
+            initChart();
+
             const { createClient } = supabase;
             client = createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -202,14 +325,46 @@
                 })
                 .subscribe();
 
-            // 3. Signals Channel
+            // 3. Signals Channel (Neural + PVP)
             client.channel('neural_signals')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'neural_signals' }, payload => {
                     updateSignals(payload.new);
                 })
                 .subscribe();
 
+            // 4. Evolution Channel
+            client.channel('neural_evolution')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'neural_evolution' }, payload => {
+                    updateEvolution(payload.new);
+                })
+                .subscribe();
+
             console.log("✅ Nexus Uplink Established.");
+        }
+
+        function switchTab(tab) {
+            const logsView = document.getElementById('logs-view');
+            const evoView = document.getElementById('evo-view');
+            const logsBtn = document.getElementById('tab-logs-btn');
+            const evoBtn = document.getElementById('tab-evo-btn');
+
+            if (tab === 'logs') {
+                logsView.classList.remove('hidden');
+                evoView.classList.add('hidden');
+                logsBtn.className = "cursor-pointer text-white border-b-2 border-nexus-green pb-1";
+                evoBtn.className = "cursor-pointer text-gray-400 hover:text-nexus-green transition-all pb-1";
+            } else {
+                logsView.classList.add('hidden');
+                evoView.classList.remove('hidden');
+                evoView.classList.add('flex'); // Add flex when showing
+                logsBtn.className = "cursor-pointer text-gray-400 hover:text-nexus-green transition-all pb-1";
+                evoBtn.className = "cursor-pointer text-white border-b-2 border-nexus-green pb-1";
+            }
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+            document.getElementById('evo-terminal').innerHTML = '<div class="text-gray-700">// Terminal Cleared...</div>';
         }
 
         function addLog(entry) {
@@ -220,14 +375,24 @@
             if (entry.level === "WARNING") colorClass = "text-yellow-500";
             if (entry.level === "ERROR") colorClass = "text-red-500 font-bold";
 
-            div.className = `flex gap-2 text-xs font-mono border-b border-gray-900 pb-1 ${colorClass}`;
+            // [SILENT LOGIC] Categorize technical logs for filtering
+            // ERROR and WARNING are ALWAYS shown regardless of content
+            const isHighSeverity = entry.level === "ERROR" || entry.level === "WARNING";
+            const isTechnicalContent = entry.message.includes("HTTP Request") ||
+                entry.message.includes("Heartbeat") ||
+                entry.message.includes("Connection Established") ||
+                entry.message.includes("Starting worker");
+
+            const isTechnical = isTechnicalContent && !isHighSeverity;
+
+            div.className = `flex gap-2 text-xs font-mono border-b border-gray-900 pb-1 ${colorClass} ${isTechnical ? 'log-technical' : ''}`;
             div.innerHTML = `
                <span class="text-gray-600">[${entry.timestamp.split('T')[1].split('.')[0]}]</span>
                <span class="flex-1 break-words opacity-90 hover:opacity-100 transition-opacity">${entry.message}</span>
-           `;
+            `;
 
             container.prepend(div);
-            if (container.children.length > 50) container.lastElementChild.remove();
+            if (container.children.length > 100) container.lastElementChild.remove();
         }
 
         function updateMetrics(data) {
@@ -243,6 +408,7 @@
         }
 
         function updateSignals(data) {
+            // 1. Text Metrics
             if (data.alpha_confidence) {
                 const el = document.getElementById('alpha');
                 el.innerText = data.alpha_confidence.toFixed(2);
@@ -255,6 +421,78 @@
                 if (h > 0.6) status = "(Trending)";
                 if (h < 0.4) status = "(Mean Rev)";
                 document.getElementById('hurst').innerHTML = `${h.toFixed(2)} <span class="text-xs text-gray-600 font-normal">${status}</span>`;
+            }
+
+            // [LEVEL 49] Kinetic Pattern Display
+            if (data.metadata && data.metadata.kinetic) {
+                const pat = data.metadata.kinetic.label || "UNKNOWN";
+                const coh = data.metadata.kinetic.coherence || 0.0;
+                const el = document.getElementById('kinetic-pattern');
+
+                el.innerText = pat;
+
+                if (pat.includes("EXPANSION")) el.className = "text-lg font-bold text-nexus-green blink";
+                else if (pat === "COMPRESSION") el.className = "text-lg font-bold text-yellow-500";
+                else if (pat === "FALSE_REVERSAL") el.className = "text-lg font-bold text-red-500 blink";
+                else if (pat === "REGIME_CHANGE") el.className = "text-lg font-bold text-blue-400 blink";
+                else el.className = "text-lg font-bold text-gray-500";
+            }
+
+            // 2. Chart Update (Price vs Multifractal Kinetic Layers + PVP)
+            if (pvpChart && data.price) {
+                const timeStr = new Date().toLocaleTimeString();
+
+                // Add Label
+                pvpChart.data.labels.push(timeStr);
+
+                // Add Data Points [Indices match initChart]
+                // 0: Price
+                pvpChart.data.datasets[0].data.push(data.price);
+
+                // 1: Micro (Red Dashed) - Intent
+                pvpChart.data.datasets[1].data.push(data.centroid_micro || null);
+
+                // 2: Struct (Green Solid) - Reality
+                pvpChart.data.datasets[2].data.push(data.centroid_struct || null);
+
+                // 3: Macro (Blue Solid) - Memory
+                pvpChart.data.datasets[3].data.push(data.centroid_macro || null);
+
+                // 4: Bias (Gray Thick) - Regime
+                pvpChart.data.datasets[4].data.push(data.bias_val || null);
+
+                // 5: POC (Gold Dashed) - PVP Anchor
+                pvpChart.data.datasets[5].data.push(data.poc_price || null);
+
+                // Note: We removed VAH/VAL from chart to reduce noise per instruction "REDUCIR RUIDO VISUAL"
+                // Can re-enable if user asks, but focus is on Centroids vs POC.
+
+                // Shift Window
+                if (pvpChart.data.labels.length > MAX_POINTS) {
+                    pvpChart.data.labels.shift();
+                    pvpChart.data.datasets.forEach(bs => bs.data.shift());
+                }
+
+                pvpChart.update();
+            }
+        }
+
+        function updateEvolution(data) {
+            if (data.generation !== undefined) document.getElementById('evo-gen').innerText = data.generation;
+            if (data.best_fitness !== undefined) document.getElementById('evo-fitness').innerText = data.best_fitness.toFixed(4);
+            if (data.status) {
+                const statusEl = document.getElementById('evo-status');
+                statusEl.innerText = data.status;
+                statusEl.className = `text-xl font-bold ${data.status === 'TRAINING' ? 'text-yellow-500 blink' : 'text-nexus-green'}`;
+            }
+
+            if (data.message) {
+                const container = document.getElementById('evo-terminal');
+                const div = document.createElement('div');
+                div.className = "mb-1 border-l-2 border-blue-900 pl-2";
+                div.innerHTML = `<span class="text-gray-600">[GEN ${data.generation || '?'}]</span> ${data.message}`;
+                container.prepend(div);
+                if (container.children.length > 50) container.lastElementChild.remove();
             }
         }
 

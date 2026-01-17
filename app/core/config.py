@@ -88,6 +88,10 @@ class Settings(BaseSettings):
         1280,
     )
     LAYER_BIAS_PERIOD: int = 2048  # Layer 4: Gravity (SMMA)
+    
+    # [LEVEL 49] KINETIC PATTERN THRESHOLDS
+    KINETIC_COMPRESSION_THRESH: float = 0.3 # Knot Threshold
+    KINETIC_EXPANSION_THRESH: float = 0.8  # Fan Threshold
 
     # =========================================================================
     # ML/NEURAL NETWORK CONFIGURATION (Single Source of Truth)
@@ -121,6 +125,7 @@ class Settings(BaseSettings):
     # =========================================================================
     # VERSION 2.0 INSTITUTIONAL EXTENSIONS
     # =========================================================================
+    MODELS_DIR: str = "models" # [P1 FIX] Directory for saved models
     ML_MODEL_PATH: Optional[str] = "models/setup_classifier.pkl"
     MIN_LIQUIDITY_DEPTH: float = 1000000.0  # USD equivalent in DoM
     ENABLE_CIRCUIT_BREAKER: bool = True

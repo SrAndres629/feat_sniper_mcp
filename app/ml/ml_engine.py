@@ -132,24 +132,27 @@ class HurstBuffer:
 
 
 class ModelLoader:
-    """Loads Pure Hybrid Logic (PyTorch). No Scikit-Learn GBMs."""
+    """Loads Pure Hybrid Logic (PyTorch) with Probabilistic Capabilities."""
     
     @staticmethod
     def load_hybrid(symbol: str) -> Optional[Dict[str, Any]]:
-        """Loads the HybridSniper (TCN-BiLSTM) model."""
+        """Loads the HybridProbabilistic (TCN-BiLSTM) model."""
         path = os.path.join(MODELS_DIR, f"hybrid_{symbol}_v1.pt")
         
         try:
-            from app.ml.models.hybrid_v1 import HybridSniper
+            from app.ml.models.hybrid_probabilistic import HybridProbabilistic
+            from app.ml.models.anomaly import AnomalyDetector # [LEVEL 44] Immune System
             
             input_dim = len(FEATURE_NAMES)
-            model = HybridSniper(input_dim=input_dim, hidden_dim=128, num_classes=3)
+            # Instantiate Probabilistic Model
+            model = HybridProbabilistic(input_dim=input_dim, hidden_dim=128, num_classes=3)
+            anomaly_detector = AnomalyDetector(contamination=ANOMALY_CONTAMINATION)
             
             if os.path.exists(path):
                 data = torch.load(path, map_location="cpu")
                 model.load_state_dict(data["state_dict"])
                 acc = data.get("best_acc", 0.0)
-                logger.info(f"Loaded Hybrid Model for {symbol} (Acc: {acc:.2f})")
+                logger.info(f"Loaded HybridProbabilistic Model for {symbol} (Acc: {acc:.2f})")
             else:
                 logger.warning(f"No trained model for {symbol}. Using Untrained Network.")
                 
@@ -161,34 +164,7 @@ class ModelLoader:
             return None
 
 
-class AnomalyDetector:
-    """IsolationForest-based Anomaly detection."""
-    def __init__(self, contamination: float = ANOMALY_CONTAMINATION):
-        from sklearn.ensemble import IsolationForest
-        self.model = IsolationForest(
-            n_estimators=100,
-            contamination=contamination,
-            random_state=42,
-            n_jobs=1 
-        )
-        self.is_fitted: bool = False
-        self.threshold: float = 0.5 
-        
-    def fit(self, X: np.ndarray) -> None:
-        try:
-            self.model.fit(X)
-            self.is_fitted = True
-            logger.info(f"AnomalyDetector fitted on {len(X)} samples")
-        except Exception:
-            pass
-            
-    def is_anomaly(self, features: Dict[str, float]) -> bool:
-        if not self.is_fitted: return False
-        x = np.array([[features.get(k, 0) for k in FEATURE_NAMES]])
-        # decision_function gives negative score for outliers
-        score = self.model.predict(x)[0] # 1 for inlier, -1 for outlier
-        return score == -1
-
+from app.ml.models.anomaly import anomaly_detector # [LEVEL 44] Immune System Singleton
 
 class MLEngine:
     """
@@ -198,7 +174,7 @@ class MLEngine:
     def __init__(self):
         self.models: Dict[str, Dict[str, Any]] = {}
         
-        self.anomaly_detector = AnomalyDetector()
+        self.anomaly_detector = anomaly_detector # Use the singleton
         self.hurst_buffer = HurstBuffer()
         self.fractal_analyzer = fractal_analyzer
         
@@ -210,8 +186,46 @@ class MLEngine:
         # States
         self.macro_bias: Dict[str, str] = {}
         self.kill_zone_filter: bool = True
+        self.last_loop_time = time.time()
+        self.jitter_threshold = 0.5 # 500ms
         
         logger.info("MLEngine Online (Hybrid TCN-BiLSTM Only)")
+
+    async def check_loop_jitter(self):
+        """Monitors loop frequency for latency spikes."""
+        now = time.time()
+        delta = now - self.last_loop_time
+        if delta > self.jitter_threshold:
+            logger.warning(f"[LATENCY] ML Loop Jitter detected: {delta*1000:.2f}ms")
+        self.last_loop_time = now
+
+    def hydrate_hurst(self, symbol: str, prices: List[float]) -> None:
+        """Compatibility wrapper for server hydration."""
+        if not prices: return
+        for p in prices:
+            self.hurst_buffer.push(symbol, p)
+        logger.info(f"Hydrated Hurst Buffer for {symbol} with {len(prices)} samples.")
+
+    def hydrate_sequences(self, symbol: str, features_list: List[Dict]) -> None:
+        """Compatibility wrapper for server hydration."""
+        if not features_list: return
+        self._ensure_model(symbol)
+        seq_len = self.seq_len_map.get(symbol, 32)
+        if symbol not in self.sequence_buffers:
+            self.sequence_buffers[symbol] = deque(maxlen=seq_len)
+        
+        for f in features_list:
+            self.sequence_buffers[symbol].append(f)
+        logger.info(f"Hydrated Sequence Buffer for {symbol} with {len(features_list)} samples.")
+
+    async def ensemble_predict_async(self, symbol: str, context: Dict) -> Dict:
+        """Alias for backward compatibility with older server tools."""
+        return await self.predict_async(symbol, context)
+
+    def update_macro_bias(self, symbol: str, bias: str):
+        """Compatibility wrapper for macro bias updates."""
+        self.macro_bias[symbol] = bias
+        logger.info(f"Updated Macro Bias for {symbol}: {bias}")
 
     def hydrate(self, symbol: str, prices: List[float], features_list: List[Dict]) -> None:
         """Deep Hydration logic."""
@@ -239,8 +253,8 @@ class MLEngine:
                 if symbol not in self.sequence_buffers:
                     self.sequence_buffers[symbol] = deque(maxlen=seq_len)
 
-    def predict_hybrid_uncertainty(self, sequence: List[Dict], symbol: str, n_iter=30) -> Dict:
-        """Monte Carlo Dropout Inference."""
+    def predict_hybrid_uncertainty(self, sequence: List[Dict], symbol: str, n_iter=20) -> Dict:
+        """Monte Carlo Dropout Inference (Ensemble) with PVP-FEAT Latent State."""
         self._ensure_model(symbol)
         model_data = self.models.get(symbol)
         if not model_data: return {"p_win": 0.5, "uncertainty": 1.0}
@@ -255,17 +269,58 @@ class MLEngine:
         ], dtype=np.float32)
         
         # Padding if sequence too short
+        seq_len = self.seq_len_map.get(symbol, 32)
         if len(seq_array) < seq_len:
-             # pad with 0
-             pass 
+             # simple zero padding (or repeat)
+             diff = seq_len - len(seq_array)
+             pad = np.zeros((diff, len(FEATURE_NAMES)), dtype=np.float32)
+             seq_array = np.concatenate([pad, seq_array])
              
-        x = torch.tensor(seq_array).unsqueeze(0)
+        x = torch.tensor(seq_array).unsqueeze(0).to(self.device)
         
-        model.train() # Enable Dropout
+        # [LEVEL 41] Compute Latent Inputs Z_t from latest market state
+        latest_state = sequence[-1]
+        # We need a DataFrame row like object or dict
+        # Assuming latest_state is a dict. feat_processor expects Series/Dict
+        metrics = feat_processor.compute_latent_vector(pd.Series(latest_state))
+        
+        # Prepare Tensors for FeatEncoder
+        # Shapes must be (Batch, Dim)
+        feat_input = {
+            "form": torch.tensor([[
+                metrics["skew"], metrics["kurtosis"], metrics["entropy"], 0.0 # extra padding if needed or specific metric
+            ]], dtype=torch.float32).to(self.device),
+            
+            "space": torch.tensor([[
+                metrics["dist_poc"], 0.0, 0.0 # placeholders for density integrals if not ready
+            ]], dtype=torch.float32).to(self.device),
+            
+            "accel": torch.tensor([[
+                metrics["energy_z"], metrics["poc_vel"], 0.0 # placeholder
+            ]], dtype=torch.float32).to(self.device),
+            
+            "time": torch.tensor([[
+                0.0, 0.0, 1.0, metrics["cycle_prog"] # Hardcoded NY session for now + prog
+            ]], dtype=torch.float32).to(self.device),
+            
+            # [LEVEL 50] Kinetic Tensorization (No Placeholders)
+            # Extracted from `metrics` via FeatProcessor's `compute_latent_vector` logic
+            # The keys must match what FeatProcessor now returns (kinetic_pattern_id, kinetic_coherence, etc)
+            "kinetic": torch.tensor([[
+                metrics.get("kinetic_pattern_id", 0.0), # Pattern ID (0-4)
+                metrics.get("kinetic_coherence", 0.0), # Coherence (0-1)
+                metrics.get("layer_alignment", 0.0), # Helper (Bull/Bear)
+                metrics.get("dist_bias", 0.0) # Dist to Bias Line (Fixed Key)
+            ]], dtype=torch.float32).to(self.device)
+        }
+        
+        model.train() # Enable Dropout Layers globally
         scores = []
         with torch.no_grad():
             for _ in range(n_iter):
-                logits = model(x)
+                # Force dropout for epistemic uncertainty sampling
+                # Pass latent features
+                logits = model(x, feat_input=feat_input, force_dropout=True)
                 probs = torch.softmax(logits, dim=-1)[0]
                 # 0:SELL, 1:HOLD, 2:BUY
                 p_sell = probs[0].item()
@@ -302,7 +357,9 @@ class MLEngine:
             
             # 3. Anomaly Check
             if self.anomaly_detector.is_anomaly(features):
-                logger.warning(f"Anomaly Detected on {symbol}")
+                logger.critical(f"🦠 TOXIC DATA DETECTED on {symbol}. TRIGGERING IMMUNE RESPONSE.")
+                from app.core.system_guard import system_sentinel
+                system_sentinel.trigger_kill_switch(f"ML Anomaly detected on {symbol}")
                 return self._neutral(symbol, "ANOMALY_DETECTED")
                 
             # 4. Inference
@@ -330,9 +387,41 @@ class MLEngine:
             logger.error(f"Inference Error: {e}")
             return self._neutral(symbol, f"ERROR: {str(e)}")
 
-    def record_trade_result(self, lstm_prob: float, result_pips: float, gbm_prob=0.0):
-        """Feedback loop endpoint."""
-        # Could save to RLAIF or specialized metric tracker
-        pass
+    async def record_trade_result(self, ticket: int, profit: float, symbol: str, context: Dict):
+        """
+        [LEVEL 43] RLAIF FEEDBACK LOOP (Experience Replay).
+        Saves the outcome of a trade to train the 'HybridProbabilistic' model later.
+        
+        Tuple: (State, Action, Reward)
+        State: 'context' (Neural Context at entry)
+        Action: BUY/SELL (Implied by trade type in context or separate arg)
+        Reward: 'profit' (Realized PnL)
+        """
+        try:
+            timestamp = datetime.now(timezone.utc).isoformat()
+            
+            # 1. Calculate Reward Signal
+            reward_score = profit # Raw PnL for now
+            
+            experience = {
+                "ticket": ticket,
+                "timestamp": timestamp,
+                "symbol": symbol,
+                "outcome": "WIN" if profit > 0 else "LOSS",
+                "profit": profit,
+                "reward_score": reward_score,
+                "state_vector": context.get("feat_vector", {}), # If available
+                "raw_context": context # Full snapshot for reconstruction
+            }
+            
+            # 2. Append to Replay Buffer (JSONL)
+            buffer_path = os.path.join(self.data_dir, "experience_replay.jsonl")
+            with open(buffer_path, "a") as f:
+                f.write(json.dumps(experience) + "\n")
+                
+            logger.info(f"🧠 EXPERIENCE REPLAY: Recorded Trade #{ticket} (${profit:.2f}) for future training.")
+            
+        except Exception as e:
+            logger.error(f"RLAIF Record Error: {e}")
 
 ml_engine = MLEngine()

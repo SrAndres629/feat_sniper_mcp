@@ -139,5 +139,46 @@ class SupabaseSync:
             lambda: self._client.table("bot_activity_log").insert(payload).execute()
         )
 
+    @resilient(max_retries=1, failure_threshold=20)
+    async def log_neural_state(self, state: Dict[str, Any]) -> None:
+        """
+        [LEVEL 46] High-Frequency sync of Neural Cortex State for Real-time Dashboard.
+        Pushes Probabilities + PVP Context + Immune Status.
+        """
+        if not self._client:
+            return
+
+        # Flatten the nested state for SQL table
+        # state = neural_service.get_latest_state()
+        probs = state.get("predictions", {})
+        pvp = state.get("pvp_context", {})
+        immune = state.get("immune_system", {})
+        
+        payload = {
+            "symbol": state.get("symbol", "WAIT"),
+            "price": state.get("price", 0.0),
+            "alpha_confidence": float(probs.get("buy", 0.0) if probs.get("buy") > 0.5 else probs.get("sell", 0.0)),
+            "acceleration": 0.0, # Placeholder or need to pass explicitly
+            "hurst": 0.5, # Placeholder
+            
+            # PVP
+            "poc_price": float(pvp.get("poc", 0.0)),
+            "vah_price": float(pvp.get("vah", 0.0)),
+            "val_price": float(pvp.get("val", 0.0)),
+            "energy_score": float(pvp.get("energy", 0.0)),
+            
+            "metadata": {
+                "probs": probs,
+                "immune": immune,
+                "kinetic": state.get("kinetic_context", {}), # [LEVEL 49]
+                "uncertainty": state.get("uncertainty", 0.0)
+            }
+        }
+        
+        import anyio
+        await anyio.to_thread.run_sync(
+            lambda: self._client.table("neural_signals").insert(payload).execute()
+        )
+
 # Instancia global
 supabase_sync = SupabaseSync()

@@ -50,26 +50,48 @@ class FEATFeatures:
         
         kinetic_field /= (kinetic_field.sum() + 1e-9)
 
-        # 3. Flow Field (CVD Intensity)
-        # Use REAL CVD if tick data available, otherwise tick-rule approximation
+        # 3. Flow Field (OFI - Order Flow Imbalance)
+        # Delta = Buy Vol - Sell Vol
+        flow_field = np.zeros(len(centers))
+        ofi_signal = 0.0 # Normalized -1.0 to 1.0
+        
         if tick_cvd and 'cvd_series' in tick_cvd and len(tick_cvd['cvd_series']) > 0:
-            # Real CVD from MT5 tick flags - resample to match bins
+            # Real CVD from MT5 tick flags
             cvd_series = np.array(tick_cvd['cvd_series'])
-            # Normalize and project to price bins (simplified: use last N values)
             cvd_resampled = np.interp(
                 np.linspace(0, len(cvd_series)-1, len(centers)),
                 np.arange(len(cvd_series)),
                 cvd_series
             )
             flow_field = cvd_resampled
+            # Global OFI Signal from real delta
+            net_delta = tick_cvd.get("delta", 0.0)
+            total_vol = tick_cvd.get("volume", 1.0)
+            ofi_signal = np.clip(net_delta / (total_vol + 1e-9), -1.0, 1.0)
         else:
-            # Fallback: Tick-rule approximation for the heat map
-            deltas = np.diff(prices, prepend=prices[0])
-            flow_delta = deltas * volumes
-            flow_field = np.zeros(len(centers))
+            # [APPROXIMATION] "Within-Candle" Delta
+            # Delta ≈ Vol * (2*(Close-Low)/(High-Low) - 1)
+            # This captures buying pressure better than Close > Close[1]
+            h = df['high'].values
+            l = df['low'].values
+            c = df['close'].values
+            v = df['volume'].values
+            
+            # Avoid division by zero
+            rng = h - l
+            rng[rng == 0] = 1e-9
+            
+            # Buying Pressure Ratio (-1 to 1)
+            pressure = (2 * (c - l) / rng) - 1.0
+            deltas = v * pressure
+            
+            # Project to bins
             for i in range(len(indices)):
                 if indices[i] < len(flow_field):
-                    flow_field[indices[i]] += flow_delta[i]
+                    flow_field[indices[i]] += deltas[i]
+            
+            # Global OFI Signal (Sum of weighted deltas)
+            ofi_signal = np.clip(np.sum(deltas) / (np.sum(v) + 1e-9), -1.0, 1.0)
 
         # 4. Composite Energy Tensor
         # E = Density * Kinetic * tanh(Flow)
@@ -80,10 +102,22 @@ class FEATFeatures:
         std_e = np.std(energy_tensor) + 1e-9
         energy_tensor_norm = (energy_tensor - mean_e) / std_e
 
+        # [SCALAR METRICS FOR HYBRID MODEL]
+        # Skew: Distribution vs Price (Absorption Tension)
+        poc_idx = int(np.argmax(density_field))
+        avg_idx = np.sum(np.arange(len(density_field)) * density_field) # Center of Mass
+        skew = (avg_idx - poc_idx) / (len(density_field) * 0.5) # Normalized -1 to 1
+
+        # Energy Score: Total system activation
+        energy_score = float(np.mean(np.abs(energy_tensor_norm)))
+
         return {
             "energy_tensor": energy_tensor_norm.tolist(),
-            "poc_idx": int(np.argmax(density_field)),
+            "poc_idx": poc_idx,
             "max_energy_idx": int(np.argmax(np.abs(energy_tensor_norm))),
+            "skew": float(skew),
+            "energy_score": energy_score,
+            "ofi_signal": float(ofi_signal),
             "cvd_source": "real_mt5_ticks" if tick_cvd else "tick_rule_approximation",
             "metadata": {
                 "bins": bins_n,
@@ -96,32 +130,84 @@ class FEATFeatures:
     def extract_scalar_features(self, df: pd.DataFrame) -> Dict[str, float]:
         """
         Legacy scalar features for LightGBM baseline.
+        [FIX] Now computes PVP metrics internally using MathEngine.
         """
-        # Integration with market_physics is expected here
-        from app.skills.market_physics import market_physics
-        pvp = market_physics.calculate_pvp_feat(df)
-        cvd = market_physics.calculate_cvd_metrics(df)
-        energy = market_physics.calculate_energy_map(df)
-        
-        # Structure Engine (FourJarvis Protocol)
+        # 1. Physics & Structure
+        # ----------------------
         struct_results = structure_engine.compute_feat_index(df).iloc[-1].to_dict()
-        
-        # Acceleration Engine (A)
         accel_results = acceleration_engine.compute_acceleration_features(df).iloc[-1].to_dict()
         
+        # 2. PVP / Volume Profile (Computed Locally)
+        # ------------------------------------------
+        pvp_metrics = self._compute_pvp_metrics(df)
+        
+        # 3. Energy Map Summary
+        # ---------------------
+        energy_map = self.generate_energy_map(df, bins_n=50)
+        energy_tensor = np.array(energy_map.get("energy_tensor", []))
+        energy_score = np.mean(np.abs(energy_tensor)) if len(energy_tensor) > 0 else 0.0
+        
         return {
-            "z_score_poc": pvp.get("z_score", 0),
-            "cvd_imbalance": cvd.get("imbalance_ratio", 0),
-            "energy_score": energy.get("energy_score", 0),
-            "absorption_tension": energy.get("absorption_tension", 0),
+            "z_score_poc": pvp_metrics.get("z_score_poc", 0),
+            "cvd_imbalance": 0.0, # Placeholder until tick_cvd is fully integrated
+            "energy_score": energy_score,
+            "absorption_tension": pvp_metrics.get("skew", 0),
+            
             "feat_form_score": struct_results.get("feat_form", 0),
             "feat_space_score": struct_results.get("feat_space", 0),
             "feat_acceleration_score": struct_results.get("feat_acceleration", 0),
             "feat_time_score": struct_results.get("feat_time", 0),
             "feat_index": struct_results.get("feat_index", 0),
+            
             "accel_trigger": accel_results.get("accel_flag", 0),
             "accel_score": accel_results.get("accel_score", 0),
             "accel_type": accel_results.get("accel_type", "normal")
+        }
+
+    def _compute_pvp_metrics(self, df: pd.DataFrame) -> Dict[str, float]:
+        """
+        Helper: Computes simplified Volume Profile metrics for scalar features.
+        """
+        if len(df) < 20:
+            return {"z_score_poc": 0.0, "skew": 0.0}
+            
+        prices = df['close'].to_numpy()
+        volumes = df['volume'].to_numpy()
+        
+        # Use MathEngine for fast binning
+        bin_size = (np.max(prices) - np.min(prices)) / 50
+        if bin_size == 0: bin_size = 0.0001
+            
+        centers, vol_profile = bin_volume_fast(prices, volumes, bin_size)
+        
+        # Find POC (Point of Control)
+        poc_idx = np.argmax(vol_profile)
+        poc_price = centers[poc_idx]
+        current_price = prices[-1]
+
+        # Calculate Value Area (70%)
+        from nexus_core.math_engine import calculate_value_area_fast
+        total_vol = np.sum(vol_profile)
+        vah, val = calculate_value_area_fast(centers, vol_profile, total_vol, 0.70)
+        
+        # Z-Score of Price vs POC Distribution
+        # Use simple standard deviation of prices weighted by volume
+        avg_price = np.average(prices, weights=volumes)
+        variance = np.average((prices - avg_price)**2, weights=volumes)
+        std_price = np.sqrt(variance)
+        
+        z_score_poc = (current_price - poc_price) / (std_price + 1e-9)
+        
+        # Skew (Absorption Tension): Is volume concentrated above or below mean?
+        skew = (avg_price - poc_price) / (std_price + 1e-9)
+        
+        return {
+            "z_score_poc": z_score_poc,
+            "skew": skew,
+            "poc_price": poc_price,
+            "vah": vah,
+            "val": val,
+            "total_volume": total_vol
         }
 
     def apply_feat_engineering(self, df: pd.DataFrame) -> pd.DataFrame:

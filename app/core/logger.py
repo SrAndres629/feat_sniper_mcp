@@ -19,8 +19,8 @@ def setup_logger(name="NexusCore"):
     if logger.hasHandlers():
         logger.handlers.clear()
 
-    # 3. NUNCA propagar al root logger (que podría imprimir en consola)
-    logger.propagate = False
+    # 3. Propagar al root logger para permitir visibilidad en consola (warnings/errors)
+    logger.propagate = True
 
     # 4. Handler de Archivo UNICAMENTE
     try:

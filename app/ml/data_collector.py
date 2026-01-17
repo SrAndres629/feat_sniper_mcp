@@ -846,3 +846,43 @@ async def get_h4_bias(symbol: str) -> Dict[str, Any]:
         }
     
     return {"symbol": symbol, "H4_Trend": "NEUTRAL", "error": "No H4 data available"}
+
+
+if __name__ == "__main__":
+    import argparse
+    import asyncio
+    from app.core.mt5_conn import mt5_conn
+    import MetaTrader5 as mt5
+
+    parser = argparse.ArgumentParser(description="FEAT Mass Data Collector")
+    parser.add_argument("--symbol", type=str, default="XAUUSD", help="Symbol to collect")
+    parser.add_argument("--days", type=int, default=180, help="Days of history")
+    parser.add_argument("--timeframe", type=str, default="M1", help="Timeframe (M1, M5, etc)")
+    
+    args = parser.parse_args()
+
+    async def run_collector():
+        logger.info(f"🚀 Starting Mass Collection for {args.symbol} ({args.days} days)...")
+        if not mt5_conn.connected:
+            await mt5_conn.startup()
+            
+        tf = TIMEFRAME_MAP.get(args.timeframe.upper(), 1)
+        # Convert string TF to MT5 constant
+        mt5_tf = getattr(mt5, f"TIMEFRAME_{args.timeframe.upper()}", mt5.TIMEFRAME_M1)
+        
+        num_bars = args.days * (1440 // TIMEFRAME_MAP.get(args.timeframe.upper(), 1))
+        logger.info(f"📥 Fetching {num_bars} bars...")
+        
+        rates = mt5.copy_rates_from_pos(args.symbol, mt5_tf, 0, num_bars)
+        if rates is not None and len(rates) > 0:
+            df = pd.DataFrame(rates)
+            df['time'] = pd.to_datetime(df['time'], unit='s')
+            logger.info(f"✅ Success: Downloaded {len(df)} candles.")
+            # Here we could save to DB, but for Evolution we mostly need the file or GA history
+            # The start_evolution.py script already has logic to tensorize this.
+        else:
+            logger.error(f"❌ Failed to fetch data for {args.symbol}")
+            
+        await mt5_conn.shutdown()
+
+    asyncio.run(run_collector())

@@ -48,20 +48,22 @@ class Chomp1d(nn.Module):
     def forward(self, x):
         return x[:, :, :-self.chomp_size].contiguous()
 
-class HybridSniper(nn.Module):
+class HybridProbabilistic(nn.Module):
     """
-    [ARCH-HYBRID-V1] Level 25 Engine using TCN-BiLSTM-Attention.
-    Optimized for RTX 3060.
+    [ARCH-HYBRID-PROB-V1] Probabilistic Hybrid Model (TCN-BiLSTM-Attention).
+    Supports Monte Carlo Dropout for Epistemic Uncertainty Estimation.
     """
     def __init__(self, input_dim, hidden_dim=128, num_classes=3, dropout=0.2):
-        super(HybridSniper, self).__init__()
+        super(HybridProbabilistic, self).__init__()
+        
         
         # Block 1: TCN (Temporal Convolutional Network)
-        # 3 Layers of Dilated Convolutions
+        # TCN accepts (Batch, Channels, Seq_Len)
+        # input_dim now includes +7 PVP Features (approx 18-25 total)
         self.tcn_channels = 64
-        self.tcn1 = TemporalBlock(input_dim, self.tcn_channels, kernel_size=3, stride=1, dilation=1, padding=2)
-        self.tcn2 = TemporalBlock(self.tcn_channels, self.tcn_channels, kernel_size=3, stride=1, dilation=2, padding=4)
-        self.tcn3 = TemporalBlock(self.tcn_channels, self.tcn_channels, kernel_size=3, stride=1, dilation=4, padding=8)
+        self.tcn1 = TemporalBlock(input_dim, self.tcn_channels, kernel_size=3, stride=1, dilation=1, padding=2, dropout=dropout)
+        self.tcn2 = TemporalBlock(self.tcn_channels, self.tcn_channels, kernel_size=3, stride=1, dilation=2, padding=4, dropout=dropout)
+        self.tcn3 = TemporalBlock(self.tcn_channels, self.tcn_channels, kernel_size=3, stride=1, dilation=4, padding=8, dropout=dropout)
         
         # Block 2: Bi-LSTM (Context)
         self.lstm = nn.LSTM(
@@ -78,18 +80,34 @@ class HybridSniper(nn.Module):
         # Block 3: Attention Mechanism (Dot-Product)
         self.attention = nn.Linear(lstm_out_dim, 1)
         
-        # Output Layer
-        self.fc = nn.Linear(lstm_out_dim, num_classes) # [SELL, HOLD, BUY]
+        # [LEVEL 41] PVP-FEAT Latent Encoder Integration
+        from app.ml.models.feat_encoder import FeatEncoder
+        self.feat_encoder = FeatEncoder(output_dim=32)
         
-    def forward(self, x):
+        # Output Layer
+        # Input is Context (Hidden*2) + Latent State (32)
+        self.fc = nn.Linear(lstm_out_dim + 32, num_classes) # [SELL, HOLD, BUY]
+        
+        self.dropout_rate = dropout
+        
+    def forward(self, x, feat_input=None, force_dropout=False):
+        """
+        Forward pass with optional forced dropout for MC sampling.
+        feat_input: Dictionary of tensors {form, space, accel, time, kinetic}
+        """
         # x: (Batch, Seq_Len, Features)
         
         # 1. TCN Processing
         # Requires (Batch, Channels, Seq_Len)
         x_tcn = x.permute(0, 2, 1)
         x_tcn = self.tcn1(x_tcn)
+        if force_dropout: x_tcn = F.dropout(x_tcn, p=self.dropout_rate, training=True)
+        
         x_tcn = self.tcn2(x_tcn)
+        if force_dropout: x_tcn = F.dropout(x_tcn, p=self.dropout_rate, training=True)
+        
         x_tcn = self.tcn3(x_tcn)
+        if force_dropout: x_tcn = F.dropout(x_tcn, p=self.dropout_rate, training=True)
         
         # Back to (Batch, Seq_Len, Channels) for LSTM
         x_lstm_in = x_tcn.permute(0, 2, 1)
@@ -97,14 +115,38 @@ class HybridSniper(nn.Module):
         # 2. Bi-LSTM Processing
         lstm_out, _ = self.lstm(x_lstm_in) # (Batch, Seq, Hidden*2)
         
+        if force_dropout:
+            lstm_out = F.dropout(lstm_out, p=self.dropout_rate, training=True)
+        
         # 3. Attention
-        # Calculate attention weights
         attn_scores = self.attention(lstm_out) # (Batch, Seq, 1)
         attn_weights = F.softmax(attn_scores, dim=1)
         
-        # Weighted sum
+        # Weighted sum (Temporal Context)
         context = (lstm_out * attn_weights).sum(dim=1) # (Batch, Hidden*2)
         
+        if force_dropout:
+            context = F.dropout(context, p=self.dropout_rate, training=True)
+
+        # [LEVEL 41] Latent Fusion
+        if feat_input is not None:
+            # [LEVEL 50] Pass Kinetic Tensor
+            z_t = self.feat_encoder(
+                feat_input["form"], 
+                feat_input["space"], 
+                feat_input["accel"], 
+                feat_input["time"],
+                feat_input.get("kinetic") # Optional
+            ) # (Batch, 32)
+            
+            # Fuse Temporal Context + Structural State
+            fusion = torch.cat([context, z_t], dim=1)
+        else:
+            # Fallback (Zero Vector for Z_t)
+            batch_size = x.size(0)
+            z_dummy = torch.zeros(batch_size, 32).to(x.device)
+            fusion = torch.cat([context, z_dummy], dim=1)
+
         # 4. Classification
-        logits = self.fc(context)
-        return logits # Softmax is applied in Loss or Inference wrapper
+        logits = self.fc(fusion)
+        return logits

@@ -26,11 +26,14 @@ class AutoTuner:
         self.generations = 5
         self.mutation_rate = 0.2
         
-        # Base Gene Pool (Ranges)
+        # Base Gene Pool (Ranges) - [LEVEL 34] EXPANDED ANALYSIS & MANAGEMENT
         self.gene_bounds = {
-            "ALPHA_CONFIDENCE_THRESHOLD": (0.55, 0.85),
-            "ATR_TRAILING_MULTIPLIER": (1.0, 3.5),
-            "RISK_PER_TRADE_PERCENT": (0.5, 2.0)
+            "ALPHA_CONFIDENCE_THRESHOLD": (0.60, 0.90),
+            "ATR_TRAILING_MULTIPLIER": (1.5, 4.0),
+            "ATR_SL_MULTIPLIER": (1.0, 3.0),
+            "ATR_TP_MULTIPLIER": (2.0, 6.0),
+            "RISK_PER_TRADE_PERCENT": (0.5, 2.0),
+            "COMPOUND_SHARE": (0.3, 0.7) # 30% to 70% share for reinvestment
         }
         
     def evolve_population(self):
@@ -54,7 +57,7 @@ class AutoTuner:
         
         best_overall = None
         best_fitness = -float('inf')
-        
+
         # 2. Generations
         for gen in range(self.generations):
             # Evaluate Fitness
@@ -84,57 +87,98 @@ class AutoTuner:
                 
             population = next_generation
             
+            # Broadcast Generation Progress to Dashboard
+            self._broadcast_progress(
+                gen=gen+1,
+                best_fitness=gen_fitness,
+                population_size=self.population_size,
+                status="TRAINING",
+                message=f"Generation {gen+1} complete. Best Fitness: {gen_fitness:.4f}"
+            )
+            
         # 3. Save Winner
         if best_overall:
             logger.info(f"🏆 Evolution Complete. Winner: {best_overall}")
+            self._broadcast_progress(
+                gen=self.generations,
+                best_fitness=best_fitness,
+                best_dna=best_overall,
+                status="COMPLETED",
+                message=f"🏆 Evolution Successful! DNA Optimized: {list(best_overall.keys())}"
+            )
             self._save_genes(best_overall)
 
     def _evaluate_fitness(self, genes: Dict, history: List[Dict]) -> float:
         """
-        Virtual Replay: Simulates PnL if these genes were active.
+        [SENIOR RLAIF] Virtual Replay with Constitutional Penalties.
+        Evaluates not just PnL, but quality of execution vs Physics.
         """
-        simulated_pnl = 0.0
+        total_score = 0.0
         trades_taken = 0
+        winning_trades = 0
         
         threshold = genes["ALPHA_CONFIDENCE_THRESHOLD"]
         risk = genes["RISK_PER_TRADE_PERCENT"]
-        stop_mult = genes["ATR_TRAILING_MULTIPLIER"]
+        
+        # Ranges from genes (if optimized)
+        # Note: In a real simulation, these would change the outcome of entries/exits.
+        # Here we use them as heuristics on existing history.
         
         for record in history:
-            # Reconstruct State (Idealized)
+            # We look for RLAIF JUDGMENT or raw experience
             snapshot = record.get("state_snapshot", {})
+            pnl = record.get("pnl", 0.0)
             
-            # We use recorded 'confidence' or 'lstm_prob'
-            original_confidence = snapshot.get("confidence", 0.6)
+            # 1. Extraction of Constitutional Metrics
+            # If the record is a result of a previous Critic run, it has these.
+            # Otherwise we look at the snapshot.
+            original_confidence = snapshot.get("confidence", record.get("lstm_conf", 0.6))
+            feat_score = snapshot.get("feat_score", record.get("feat_score", 50.0))
+            acceleration = snapshot.get("acceleration", record.get("acceleration", 0.0))
             
-            # Would we trade?
+            # 2. Entry Decision (Neural Gating)
             if original_confidence >= threshold:
-                # Yes, we trade.
-                # Outcome logic:
-                # If we have 'pnl' in record, that's the result of the ORIGINAL strategy.
-                # To simulate NEW strategy result, we need candle data (hard).
-                # SImplification: We assume the 'direction' is correct if PnL > 0.
-                
-                # If original PnL > 0 -> We win. Scale by risk.
-                # If original PnL < 0 -> We lose. Scale by risk.
-                
-                # BUT, tighter stops (ATR Mult) might mitigate loss or cut win short.
-                # This is a heuristic simulation.
-                
-                pnl = record.get("pnl", 0.0)
-                
-                # Apply Risk Scaling
-                scaled_pnl = pnl * risk 
-                
-                simulated_pnl += scaled_pnl
                 trades_taken += 1
-            else:
-                # We skipped this trade. PnL 0.
-                pass
                 
-        # Fitness Function
-        if trades_taken == 0: return -1.0
-        return simulated_pnl
+                # 3. RLAIF FITNESS LOGIC
+                # Basic PnL scaled by risk
+                trade_reward = pnl * risk
+                
+                # PENALTY: Luck-based gain (Bad Process + Good Outcome)
+                if pnl > 0 and feat_score < 60:
+                    # High penalty for winning by chance/noise
+                    trade_reward *= 0.2
+                    logger.debug(f"⚠️ GA: Luck-based trade penalized (Score: {feat_score})")
+                
+                # PENALTY: Physics Violation (Low acceleration)
+                if abs(acceleration) < 0.1:
+                    trade_reward -= 5.0 # Flat penalty for trading dead markets
+                
+                # BONUS: Structural Integrity (Good Process + Good Outcome)
+                if pnl > 0 and feat_score >= 75:
+                    trade_reward *= 1.5 
+                
+                # FATAL: Trading against Macro Gravity (Simplified check if available)
+                # if record.get("trend_aligned") == False: trade_reward -= 10.0
+
+                total_score += trade_reward
+                if pnl > 0: winning_trades += 1
+        
+        # 4. Global Performance Metrics (Profit / Hour Ratio equivalent)
+        if trades_taken == 0:
+            return -100.0 # Heavy penalty for too defensive genes
+            
+        win_rate = winning_trades / trades_taken
+        
+        # Fitness combines PnL, WinRate and Stability
+        # We want a positive gain per hour ratio
+        fitness = total_score / (len(history) / 100.0) # Normalized
+        
+        # Penalize low win-rate if below survival threshold
+        if win_rate < 0.35:
+            fitness *= 0.5
+            
+        return round(fitness, 4)
 
     def _random_individual(self) -> Dict:
         return {
@@ -181,7 +225,7 @@ class AutoTuner:
                         data.append(json.loads(line))
                     except: pass
         except: pass
-        return data[-200:] # Use last 200
+        return data[-10000:] # Increased for Mass Training (180 days)
 
     def _save_genes(self, genes: Dict):
         # Writes strictly to config/dynamic_params.json for System-wide Adoption
@@ -192,6 +236,29 @@ class AutoTuner:
             logger.info(f"[AUTO-TUNER] Successfully updated {self.output_path}")
         except Exception as e:
             logger.error(f"[AUTO-TUNER] Failed to write config: {e}")
+
+    def _broadcast_progress(self, gen: int, best_fitness: float, population_size: int = 20, 
+                           best_dna: Dict = None, status: str = "IDLE", message: str = ""):
+        """Sends GA metrics to Supabase for the Neural Evolution Dashboard."""
+        try:
+            from app.services.supabase_sync import supabase_sync
+            data = {
+                "generation": gen,
+                "best_fitness": best_fitness,
+                "population_size": population_size,
+                "best_dna": best_dna,
+                "status": status,
+                "message": message
+            }
+            # We use the neural_evolution table
+            # Assuming supabase_sync has an insert method for generic tables or we use client directly
+            if hasattr(supabase_sync, 'client') and supabase_sync.client:
+                supabase_sync.client.table("neural_evolution").insert(data).execute()
+                logger.debug(f"[GA_BROADCAST] Status: {status} | Gen: {gen}")
+            else:
+                logger.warning("[GA_BROADCAST] Supabase Client unavailable.")
+        except Exception as e:
+            logger.error(f"[GA_BROADCAST] Error: {e}")
 
 # Singleton Instance
 auto_tuner = AutoTuner()

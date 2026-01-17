@@ -22,12 +22,14 @@ if sys.platform == "win32":
 # Silenciar Warnings de Inmediato
 import warnings
 
-# Filter specific Pydantic/PyIceberg deprecation noise GLOBALLY and EARLY
-warnings.filterwarnings("ignore", module="pyiceberg")
-warnings.filterwarnings("ignore", module="pydantic")
-# Catch-all
-warnings.filterwarnings("ignore", category=DeprecationWarning)
-warnings.simplefilter("ignore")
+# Filter specific noise while preserving actual system warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pyiceberg")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic")
+try:
+    from pydantic import PydanticDeprecatedSince20
+    warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
+except: pass
+# os.environ["PYTHONWARNINGS"] = "ignore"  # Too aggressive
 
 _original_stdout = sys.stdout
 _original_stderr = sys.stderr
@@ -42,10 +44,7 @@ os.environ["OTEL_METRICS_EXPORTER"] = "none"
 os.environ["OTEL_LOGS_EXPORTER"] = "none"
 os.environ["OTEL_CONSOLE_EXPORT"] = "0"
 
-
-
 # 3. CRITICAL: Override ALL logger formats BEFORE any third-party imports
-# This prevents 'correlation_id' KeyError from docket/fastmcp default formatters
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -53,18 +52,26 @@ from logging.handlers import RotatingFileHandler
 root_logger = logging.getLogger()
 root_logger.handlers.clear()
 
-# Create a SIMPLE format that works everywhere (no correlation_id)
+# Create formats
 SIMPLE_FORMAT = logging.Formatter('%(asctime)s | %(levelname)s | %(name)s | %(message)s')
+CONSOLE_FORMAT = logging.Formatter('\033[93m%(levelname)s:\033[0m %(message)s') # Colored for emphasis
 
 try:
     os.makedirs('logs', exist_ok=True)
-    # File handler with simple format
+    # File handler (Full Info)
     file_handler = RotatingFileHandler('logs/mcp_debug.log', maxBytes=10*1024*1024, backupCount=3)
     file_handler.setFormatter(SIMPLE_FORMAT)
     root_logger.addHandler(file_handler)
+    
+    # Console handler (Silent but Critical)
+    # Filters out noise, only shows WARNING and above to the human
+    console_handler = logging.StreamHandler(_original_stdout) # Use original to bypass redirect
+    console_handler.setLevel(logging.WARNING)
+    console_handler.setFormatter(CONSOLE_FORMAT)
+    root_logger.addHandler(console_handler)
+
     root_logger.setLevel(logging.INFO)
 except Exception:
-    # Fallback to NullHandler if file logging fails
     root_logger.addHandler(logging.NullHandler())
 
 # Force override for problematic third-party loggers
@@ -302,12 +309,17 @@ class NexusState:
             self.calendar_guard = calendar_guard
             self.chronos_engine = chronos_engine
             self.market = market
-            self.circuit_breaker = cb
             self.feat_engine = feat_full_chain_institucional
             self.ml_engine = MLEngine()
+            self.circuit_breaker = cb
+
+            # [SENIOR LINKAGE] Connecting TradeManager to CircuitBreaker
+            from app.core.zmq_bridge import zmq_bridge
+            self.trade_manager = TradeManager(zmq_bridge)
+            if self.circuit_breaker:
+                self.circuit_breaker.set_trade_manager(self.trade_manager)
             
-            # Bind trade manager once zmq is active (handled in startup_sequence)
-            logger.info("✅ Services Bound to NexusState")
+            logger.info("✅ Services Bound to NexusState and SRE Linked")
         except Exception as e:
             logger.critical(f"🛑 FAILED TO BIND SERVICES: {e}")
             raise
@@ -446,8 +458,35 @@ class NexusState:
                     from app.ml.fuzzy_logic import fuzzy_logic
 
                     if "M1" in candles_by_tf:
+                        df_m1 = candles_by_tf["M1"]
+                        
+                        # [GHOST TOOLS WIRING] 
+                        # 1. Fractal Analysis (Chaos)
+                        from app.ml.fractal_analysis import fractal_analyzer
+                        fractal_res = fractal_analyzer.analyze_timeframe(df_m1)
+                        hurst_exp = fractal_res.get("hurst", 0.5)
+                        fractal_dim = fractal_res.get("complexity", 1.5)
+                        
+                        # 2. Liquidity Intelligence (Sweeps & Pools)
+                        from app.skills.liquidity_detector import detect_liquidity_pools, detect_asian_sweep
+                        liq_pools = detect_liquidity_pools(df_m1)
+                        asia_sweep = detect_asian_sweep(df_m1) # Returns dict with 'asian_sweep' bool
+                        
+                        is_sweep = 1.0 if asia_sweep.get("asian_sweep", False) else 0.0
+                        
+                        # 3. Temporal Probability (Bayesian Priors)
+                        from app.ml.temporal_features import temporal_feature_generator
+                        # Extract time from last candle
+                        last_ts = pd.to_datetime(df_m1.index[-1]) if isinstance(df_m1.index, pd.DatetimeIndex) else pd.to_datetime(df_m1['time'].iloc[-1])
+                        # Adjust to Bolivia/Market Time (UTC-4 approx) if needed, or just use hour/min
+                        # Assuming server time is relevant or data is UTC. 
+                        # temporal_features uses "block logic"
+                        block_key = f"{last_ts.hour:02d}:{(last_ts.minute // 15) * 15:02d}"
+                        time_prior = temporal_feature_generator.priors.get_prior(block_key)
+                        expansion_prob = time_prior.get("expansion_prob", 0.5)
+
                         # Generate Energy Tensor (Density + Kinetic + Flow)
-                        energy_map = feat_features.generate_energy_map(candles_by_tf["M1"])
+                        energy_map = feat_features.generate_energy_map(df_m1)
                         pvp_energy = energy_map.get("poc_idx", 25) / 50.0
                         
                         # Calculate Actual PVP Price for Reversion Logic
@@ -455,18 +494,36 @@ class NexusState:
                         bin_sz = e_meta.get("bin_size", 0.0)
                         r_min = e_meta.get("range_min", 0.0)
                         poc_idx = energy_map.get("poc_idx", 25)
+                        
+                        # [PVP SCALARS]
+                        pvp_skew = energy_map.get("skew", 0.0)
+                        pvp_energy_score = energy_map.get("energy_score", 0.0)
+                        ofi_signal = energy_map.get("ofi_signal", 0.0)
+                        
                         if bin_sz > 0 and r_min > 0:
                             poc_price = r_min + (poc_idx * bin_sz)
                         
-                        # [LEVEL 18] CLUSTERING & FUZZY LOGIC
                         # 1. Update & Predict Regime
-                        last_candle = candles_by_tf["M1"].iloc[-1]
+                        last_candle = df_m1.iloc[-1]
+                        atr_val = regime.atr if regime else 0.001
+                        vol_val = last_candle.get('tick_volume', 100) 
+                        
+                        # 1. Update & Predict Regime
+                        last_candle = df_m1.iloc[-1]
                         atr_val = regime.atr if regime else 0.001
                         vol_val = last_candle.get('tick_volume', 100) 
                         
                         market_regime.update(atr_val, vol_val) # Online Learning
                         regime_label = market_regime.predict(atr_val, vol_val)
                         
+                        # [SENSOR FUSION: MULTIFRACTAL KINETIC LAYER]
+                        # Compute Cloud States (Micro/Struct/Macro) instead of raw EMAs
+                        from nexus_core.kinetic_engine import kinetic_engine
+                        kinetic_state = kinetic_engine.compute_kinetic_state(df_m1)
+                        
+                        # [LEVEL 49] COGNITIVE PATTERN RECOGNITION
+                        kinetic_patterns = kinetic_engine.detect_kinetic_patterns(kinetic_state)
+
                         # 2. Fuzzy Logic Evaluation
                         rsi_val = data.get("rsi", 50.0)
                         accel_val = regime.acceleration_score if regime else 0.0
@@ -475,11 +532,29 @@ class NexusState:
                     else:
                         regime_label = "UNKNOWN"
                         fuzzy_score = 0.0
+                        pvp_skew = 0.0
+                        pvp_energy_score = 0.0
+                        ofi_signal = 0.0
+                        hurst_exp = 0.5
+                        fractal_dim = 1.5
+                        is_sweep = 0.0
+                        expansion_prob = 0.5
+                        kinetic_state = {}
+                        kinetic_patterns = {"pattern_id": 0, "control_layer": "NOISE", "kinetic_coherence": 0.0}
                         
                 except Exception as e:
                     logger.warning(f"Cognitive Engine Error: {e}")
                     regime_label = "UNKNOWN"
                     fuzzy_score = 0.0
+                    pvp_skew = 0.0
+                    pvp_energy_score = 0.0
+                    ofi_signal= 0.0
+                    hurst_exp = 0.5
+                    fractal_dim = 1.5
+                    is_sweep = 0.0
+                    expansion_prob = 0.5
+                    kinetic_state = {}
+                    kinetic_patterns = {"pattern_id": 0, "control_layer": "NOISE", "kinetic_coherence": 0.0}
                                
                 # 3. Inject into Neural Context
                 neural_context = {
@@ -494,81 +569,75 @@ class NexusState:
                     "mtf_composite_score": mtf_score,
                     "fractal_alignment": mtf_alignment,
                     "pvp_energy": pvp_energy,
+                    "pvp_skew": pvp_skew,
+                    "pvp_energy_score": pvp_energy_score,
+                    "ofi_signal": ofi_signal,
                     "vol_intensity": regime.vol_z_score if regime else 0.0,
                     "news_event": 1.0 if news_risk.get("is_news_time") else 0.0,
                     "market_regime": regime_label,
                     "fuzzy_score": fuzzy_score,
-                    "poc_price": poc_price
+                    "poc_price": poc_price,
+                    # [GHOST TOOLS INJECTION]
+                    "hurst_exponent": hurst_exp,
+                    "fractal_dimension": fractal_dim,
+                    "liquidity_sweep": is_sweep,
+                    "time_expansion_prob": expansion_prob,
+                    # [MULTIFRACTAL KINETIC LAYER INJECTION]
+                    **kinetic_state,
+                    # [COGNITIVE PATTERNS]
+                    "kinetic_pattern_id": float(kinetic_patterns.get("pattern_id", 0)),
+                    "kinetic_coherence": kinetic_patterns.get("kinetic_coherence", 0.0)
                 }
                 
                 brain_score = await self.ml_engine.predict_async(symbol, neural_context) if self.ml_engine else {"p_win": 0.5, "uncertainty": 0}
                 
-                # 4. Probabilistic Fusion (Total Convergence)
-                # Map p_win (0.0-1.0) to lstm_conf for fusion equation
-                lstm_conf = brain_score.get('p_win', 0.5)
-                norm_struct = struct_score / 100.0
-                norm_mtf = mtf_score  # Already 0-1
+                # 4. THE GREAT CONVERGENCE (Level 50) - Logic Fusion
+                from nexus_core.convergence_engine import convergence_engine
                 
-                # Fuzzy Confidence Normalization (-10..10 -> 0..1)
-                norm_fuzzy = (fuzzy_score + 10) / 20.0 
+                convergence = convergence_engine.evaluate(
+                    neural_result=brain_score,
+                    kinetic_patterns=kinetic_patterns,
+                    market_state=neural_context
+                )
                 
-                norm_physics = regime.acceleration_score / 10.0 if regime else 0.5
-                norm_physics = max(0.0, min(1.0, norm_physics))
+                final_probability = convergence.score
                 
-                # Weights: LSTM (25%), Structure (25%), MTF (20%), Fuzzy (15%), Physics (15%)
-                final_probability = (lstm_conf * 0.25) + (norm_struct * 0.25) + (norm_mtf * 0.2) + (norm_fuzzy * 0.15) + (norm_physics * 0.15)
-                
-                # [LEVEL 25] ALIGNMENT CHECK (ML Direction vs Regime Trend)
-                if regime and regime.trend in ["BULLISH", "BEARISH"]:
-                    ml_p_win = brain_score.get('p_win', 0.5)
-                    ml_says_buy = ml_p_win > 0.5
-                    trend_says_buy = (regime.trend == "BULLISH")
-                    
-                    if ml_says_buy != trend_says_buy:
-                        # Conflict: ML and Trend disagree. 
-                        # We crush the probability to prevent trading against the AI's conviction.
-                        final_probability *= 0.2 
-                        logger.warning(f"[ALIGNMENT] CONFLICT: ML(p={ml_p_win:.2f}) disagrees with Trend({regime.trend}). Vetoing.")
-
-                # [STRATEGIC REGIME FILTER - STRICT]
-                is_long_bias = final_probability > 0.5
-                
-                if regime_label == "CHAOS":
-                    final_probability *= 0.5 # Penalize Chaos
-                    logger.warning(f"[REGIME] CHAOS DETECTED on {symbol}. Confidence Halved.")
-                    
-                # [LEVEL 32] UNSUPERVISED ANOMALY GUARDIAN
-                # Checks for Out-of-Distribution events using Isolation Forest
-                if regime and regime.is_anomaly(data.get("atr", 0.001), data.get("vol_z", 0.0)):
-                    final_probability = 0.0 # COMPLETE VETO
-                    logger.warning(f"[GUARDIAN] ANOMALY DETECTED (Black Swan). Trade Vetoed.")
-                    
-                elif regime_label == "CALM":
-                    # Reversion Logic: Only Buy Low (Below POC), Sell High (Above POC)
-                    dist_to_poc = price - poc_price
-                    # If Long bias but Price > POC (Buying High) -> Penalize
-                    if is_long_bias and dist_to_poc > 0:
-                         penalty = 0.3
-                         final_probability -= penalty
-                         logger.info(f"[REGIME] CALM Filter: Penalized BUY > PVP (-{penalty})")
-                    # If Short bias but Price < POC (Selling Low) -> Penalize
-                    elif not is_long_bias and dist_to_poc < 0:
-                         penalty = 0.3
-                         final_probability -= penalty
-                         logger.info(f"[REGIME] CALM Filter: Penalized SELL < PVP (-{penalty})")
-
-                elif regime_label == "TENDENCIA":
-                    # Trend Logic: Follow Macro Flow
-                    physics_trend = regime.trend if regime else "NEUTRAL"
-                    if is_long_bias and physics_trend == "BEARISH":
-                         final_probability -= 0.4 # Severe penalty for Counter-Trend
-                         logger.info("[REGIME] TREND Filter: Penalized Counter-Trend BUY")
-                    elif not is_long_bias and physics_trend == "BULLISH":
-                         final_probability -= 0.4
-                         logger.info("[REGIME] TREND Filter: Penalized Counter-Trend SELL")
- 
-                
+                # Update Brain Score key for dashboard consistency
                 brain_score['alpha_confidence'] = round(final_probability, 3)
+                
+                # Check Vetoes (Logging)
+                if convergence.vetoes:
+                    logger.warning(f"✋ CONVERGENCE VETO: {symbol} blocked by {convergence.vetoes}")
+                    brain_score['execute_trade'] = False
+                else:
+                    # Only execute if Score > Threshold (handled in loop below)
+                    brain_score['execute_trade'] = (final_probability > settings.ALPHA_CONFIDENCE_THRESHOLD)
+
+                # [LEVEL 46] NEURAL CORTEX SYNC
+                # Broadcast state to the Living Dashboard (Local + Cloud)
+                from app.services.neural_state import neural_service
+                from app.core.system_guard import system_sentinel
+                
+                # 1. Update Local Memory (Fast)
+                neural_service.update_state(
+                    symbol=symbol,
+                    price=price,
+                    probs={
+                        "buy": final_probability if convergence.direction == "BUY" else 0.0,
+                        "sell": final_probability if convergence.direction == "SELL" else 0.0,
+                        "hold": 0.0 
+                    },
+                    uncertainty=brain_score.get("uncertainty", 0.0),
+                    feature_vector=neural_context,
+                    sentinel_status=system_sentinel.check_health()
+                )
+                
+                # 2. Sync to Cloud (Fire & Forget for Dashboard)
+                if self.supabase_sync:
+                    # We pass the formatted state from the service to ensure consistency
+                    current_state = neural_service.get_latest_state()
+                    # Creating a task to avoid blocking trade loop
+                    asyncio.create_task(self.supabase_sync.log_neural_state(current_state))
 
                 # 5. Active Trade Management (The Hands - Reactive)
                 # Close existing trades if probability decays significantly
@@ -616,12 +685,19 @@ class NexusState:
                     dynamic_lot = await self.risk_engine.calculate_dynamic_lot(
                         confidence=brain_score.get('alpha_confidence', 0),
                         volatility=regime.atr if regime else 0.0,
-                        symbol=data.get('symbol', 'XAUUSD'), market_data=data
+                        symbol=data.get('symbol', 'XAUUSD'), 
+                        market_data={**data, "brain_uncertainty": uncertainty}
                     ) if self.risk_engine else 0
                     
                     # Apply Cap
                     dynamic_lot = min(dynamic_lot, lot_cap)
                     
+                    from app.core.system_guard import system_sentinel # [LEVEL 44] Immune System checks
+                    
+                    if not system_sentinel.is_safe():
+                        logger.critical(f"🛑 TRADING HALTED: System Sentinel Kill Switch Active. Reason: {system_sentinel.kill_reason}")
+                        return
+
                     if dynamic_lot > 0 and self.trade_manager:
                         res = await self.trade_manager.execute_order(direction, {
                             "symbol": data.get('symbol', 'XAUUSD'),
@@ -922,6 +998,25 @@ async def brain_run_inference(context_data: Dict[str, Any] = None) -> Dict[str, 
         "prediction": prediction,
         "timestamp": datetime.now().isoformat()
     }
+
+@mcp.tool()
+async def brain_evolve_networks(days: int = 5, symbol: str = "XAUUSD") -> Dict[str, Any]:
+    """
+    🧬 MASTER TOOL 11: Neural Evolution
+    Inicia el ciclo de evolución genética para optimizar parámetros de análisis y gestión.
+    Usa datos de MT5 para 'Virtual Replay' y busca maximizar el ratio de ganancias/hora.
+    """
+    try:
+        from tools.start_evolution import run_evolution_cycle
+        # Run in background to avoid blocking MCP
+        asyncio.create_task(run_evolution_cycle(symbol=symbol, days=days))
+        return {
+            "status": "EVOLUTION_STARTED",
+            "message": f"Ciclo de evolución iniciado para {symbol} ({days} días). Sigue el progreso en el Dashboard Tab: Evolution",
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        return {"status": "ERROR", "error": str(e)}
 
 @mcp.tool()
 async def risk_analyze_trade(entry: float, stop: float, symbol: str = "XAUUSD") -> Dict[str, Any]:

@@ -399,6 +399,16 @@ async def get_system_health():
 # PHASE 14: FEAT INTEGRATION ENDPOINTS
 # =============================================================================
 
+@app.get("/sniper/neural-state", response_model=ResponseModel[dict])
+async def get_neural_state():
+    """
+    [LEVEL 46] The Neural MRI Endpoint.
+    Returns the real-time cognitive state of the system for visualization.
+    """
+    from app.services.neural_state import neural_service
+    return ResponseModel(status="success", data=neural_service.get_latest_state())
+
+
 
 @app.get("/feat/deployment", response_model=ResponseModel[dict])
 async def get_deployment_status():

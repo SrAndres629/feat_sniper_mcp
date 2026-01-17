@@ -43,7 +43,16 @@ class PhysicsAwareLoss(nn.Module):
         # Violation 2: Strong SELL prediction but Low Acceleration (Accel is magnitude)
         sell_violation = torch.relu(prob_sell - accel) 
         
-        # Total Penalty
-        physics_penalty = torch.mean(buy_violation + sell_violation) * self.physics_lambda
+        # [LEVEL 40] EPISTEMIC HUMILITY (Calibration Penalty)
+        # If model is confident (Low Entropy) but violating physics, penalty is squared.
+        # "Don't be confidently wrong."
+        physics_error = buy_violation + sell_violation
         
-        return ce + physics_penalty
+        # Entropy (Uncertainty)
+        entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=1)
+        # Low entropy = High confidence. 
+        # We want High Entropy if Physics Error is High.
+        
+        calibration_penalty = physics_error * (1.0 / (entropy + 0.1)) # Higher penalty if uncertainty is low
+        
+        return ce + (torch.mean(calibration_penalty) * self.physics_lambda)

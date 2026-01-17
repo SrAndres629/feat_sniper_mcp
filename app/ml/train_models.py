@@ -19,84 +19,17 @@ SYMBOL = "XAUUSD"
 SEQ_LEN = 50
 
 
-class LSTMWithAttention:
+class HybridTrainer:
     """
-    LSTM with self-attention mechanism for sequential patterns.
-    Proper PyTorch implementation with causal scaling.
+    [LEVEL 40] Training Pipeline for Probabilistic Hybrid Model.
     """
-    
-    def __init__(self, input_dim: int, hidden_dim: int = 64, num_layers: int = 2, num_classes: int = 2, bidirectional: bool = True):
-        import torch
-        import torch.nn as nn
-        
-        self.input_dim = input_dim
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
-        self.num_classes = num_classes
-        self.bidirectional = bidirectional
+    def __init__(self):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         
-        # Build model
-        self.model = self._build_model()
-        
-    def _build_model(self):
-        import torch.nn as nn
-        
-        class LSTMNet(nn.Module):
-            def __init__(self, input_dim, hidden_dim, num_layers, num_classes, bidirectional):
-                super().__init__()
-                
-                # Layer 1: CNN 1D (Feature Extraction)
-                # Maps features -> 32 filters
-                self.cnn_filters = 32
-                self.cnn = nn.Conv1d(
-                    in_channels=input_dim,
-                    out_channels=self.cnn_filters,
-                    kernel_size=3,
-                    padding=1
-                )
-                self.relu = nn.ReLU()
-                
-                # Layer 2: Bi-LSTM (Temporal Context)
-                # Input features is now cnn_filters
-                self.lstm = nn.LSTM(
-                    input_size=self.cnn_filters, 
-                    hidden_size=hidden_dim, 
-                    num_layers=num_layers,
-                    batch_first=True, 
-                    dropout=0.2, 
-                    bidirectional=bidirectional
-                )
-                
-                # Bi-LSTM outputs hidden_dim * 2 features
-                self.lstm_out_dim = hidden_dim * 2 if bidirectional else hidden_dim
-                
-                # Layer 3: Attention Mechanism
-                self.attention = nn.Linear(self.lstm_out_dim, 1)
-                
-                # Layer 4: Final Classification
-                self.fc = nn.Linear(self.lstm_out_dim, num_classes)
-                
-            def forward(self, x):
-                import torch.nn.functional as F
-                # x shape: (batch, seq_len, features)
-                
-                # 1. CNN Preamble
-                # Permute to (batch, features, seq_len) for Conv1d
-                x_cnn = x.permute(0, 2, 1) 
-                x_cnn = self.relu(self.cnn(x_cnn))
-                
-                # Permute back to (batch, seq_len, filters) for LSTM
-                x_lstm_in = x_cnn.permute(0, 2, 1)
-                
-                # 2. LSTM Processing
-                lstm_out, _ = self.lstm(x_lstm_in)  # (batch, seq, hidden*dirs)
-                
-                # 3. Self-attention
-                attn_weights = F.softmax(self.attention(lstm_out), dim=1)
-                context = (lstm_out * attn_weights).sum(dim=1)
-                
-                return self.fc(context)
+    def build_model(self, input_dim):
+        from app.ml.models.hybrid_probabilistic import HybridProbabilistic
+        model = HybridProbabilistic(input_dim=input_dim, hidden_dim=128, num_classes=3)
+        return model.to(self.device)
         
         return LSTMNet(
             self.input_dim, 
@@ -176,8 +109,8 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
     
     # 5. Initialize model
     input_dim = X.shape[1]
-    lstm_wrapper = LSTMWithAttention(input_dim=input_dim)
-    model = lstm_wrapper.model.to(device)
+    from app.ml.models.hybrid_probabilistic import HybridProbabilistic
+    model = HybridProbabilistic(input_dim=input_dim, hidden_dim=64, num_classes=3).to(device)
     
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)

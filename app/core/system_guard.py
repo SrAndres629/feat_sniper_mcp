@@ -21,7 +21,7 @@ import sys
 import time
 import logging
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Deque
+from typing import Dict, List, Optional, Tuple, Deque, Any
 import hashlib
 from dataclasses import dataclass, field
 from enum import Enum
@@ -588,3 +588,57 @@ def validate_model_artifacts(models_dir: str = "models") -> bool:
     logger.info(f"[GUARDIAN] ✅ All {valid_count} artifacts validated successfully")
     
     return True
+
+# =============================================================================
+# SYSTEM SENTINEL - The Immune System Core
+# =============================================================================
+
+class SystemSentinel:
+    """
+    [LEVEL 44] Central Defense Hub.
+    Manages DEFCON state, Kill Switch, and Health Heartbeat.
+    """
+    def __init__(self):
+        self.kill_switch_active = False
+        self.kill_reason = None
+        self.last_heartbeat = time.time()
+        self.defcon = 5 # 5=Normal, 1=Nuclear
+        
+    def trigger_kill_switch(self, reason: str):
+        """IMMEDIATE SYSTEM SHUTDOWN PROTOCOL."""
+        if not self.kill_switch_active:
+            self.kill_switch_active = True
+            self.kill_reason = reason
+            self.defcon = 1
+            logger.critical(f"🚨 KILL SWITCH ACTIVATED: {reason}")
+            # Potential: Async notification to admin (Telegram/Discord)
+            
+    def reset_kill_switch(self, auth_token: str = "ADMIN_RESET"):
+        """Manual reset of the defense system."""
+        self.kill_switch_active = False
+        self.kill_reason = None
+        self.defcon = 5
+        logger.info("🟢 Kill Switch RESET. System Nominal.")
+        
+    def is_safe(self) -> bool:
+        """Master Gate for Trading Execution."""
+        return not self.kill_switch_active
+
+    def check_health(self) -> Dict[str, Any]:
+        """Real-time Health Aggregation."""
+        ram_status = resource_predictor.predict_oom()
+        
+        # Auto-trigger if RAM is critical
+        if ram_status["status"] == "CRITICAL" and not self.kill_switch_active:
+            self.trigger_kill_switch(f"RAM CRITICAL: {ram_status.get('message')}")
+            
+        return {
+            "safe": self.is_safe(),
+            "kill_switch": self.kill_switch_active,
+            "reason": self.kill_reason,
+            "ram": ram_status,
+            "defcon": self.defcon
+        }
+
+# Singleton
+system_sentinel = SystemSentinel()
