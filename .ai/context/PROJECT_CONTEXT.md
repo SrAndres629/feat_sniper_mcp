@@ -1,29 +1,34 @@
-# 🧠 PROJECT_CONTEXT.md: The Technical Landscape
+# 🧠 PROJECT_CONTEXT.md: The Technical Landscape (v3.1)
 
-## 🚀 Current Architectural State (Level 62)
-The system has surpassed deterministic logic, operating now on a **Probabilistic Convergence Framework**.
+## 🚀 Current Architectural State (Level 66 - Immortal)
+The system has transitioned from a centralized "God Object" into a **Tricameral Asynchronous Framework**, ensuring zero single-point-of-failure.
 
-### 1. The Cognition Loop
-The "Synaptic Path" follows this strict hierarchy:
-1. **Context Acquisition**: M1/M5 MT5 OHLCV Data.
-2. **Spatio-Temporal Engineering**: `FEATProcessor` creates 50x50 Spatial Maps + 18-dim Latent Vectors.
-3. **Neural Adaptation**: `MLEngine` (Hybrid TCN-BiLSTM) generates Multi-Head predictions (Alpha, Prob, Vol, Class).
-4. **Bayesian Fusion**: `ConvergenceEngine` evaluates Neural Alpha vs Kinetic Coherence.
-5. **Epistemic Gate**: Signal is blocked if Uncertainty > `settings.CONVERGENCE_MAX_UNCERTAINTY`.
+### 1. The Cognition Loop (Nexus Engine)
+The "Immortal Path" follows this strict hierarchy:
+1. **ZMQ Ingestion**: Real-time MT5 tick stream handled in dedicated background loop.
+2. **Spatio-Temporal Engineering**: `FEATProcessor` (now vectorized v3.1) creates 50x50 Spatial Maps for any historical depth.
+3. **Neural Adaptation**: `MLEngine` generates Multi-Head predictions.
+4. **Bayesian Convergence**: Evaluates Neural Alpha vs Kinetic Coherence.
+5. **Epistemic Gate**: If Uncertainty > `settings.CONVERGENCE_MAX_UNCERTAINTY`, logic is blocked.
 
-### 2. Physical Foundations
-- **Momentum & Kinetic Centroids**: Market is analyzed as 4 EMA Physics Layers (Micro, Structure, Macro, Bias).
-- **PVP (Price Volume Profile)**: Resistance zones are calculated via High-Frequency Volume Density Integrals.
-- **Newtonian Gating**: Signals must align with price acceleration vectors to pass.
+### 2. C2 Command & Control
+- **Streamlit Dashboard**: Provides warfare-grade UI for Live Operations and Neural Vision.
+- **Bilateral Commands**: Adjusting `RISK_FACTOR` or `PANIC_CLOSE` via `data/app_commands.json` without stopping the core engine.
 
-### 3. Institutional Risk (The Body)
-- **Bayesian Kelly**: Lot sizing is proportional to $\frac{Probability}{Uncertainty}$.
-- **Performance Damping**: Real-time Profit Factor (from `DriftMonitor`) automatically scales risk up or down.
-- **The Vault**: 50% of realized profits are electronically "locked" from the trading margin.
+### 3. Modular Integrity (Atomic Fission)
+- **Constraint**: All "God Objects" (>500 lines) are being dismantled into atomic subpackages.
+- **Example**: `nexus_core/structure_engine/` is the flagship modular implementation.
+- **Stability**: `__init__.py` files ensure backward compatibility while codebase remains lean.
+
+### 4. Institutional Risk & Shield
+- **Bayesian Kelly**: Lot sizing proportional to $\frac{Probability}{Uncertainty}$.
+- **Performance Damping**: Real-time Profit Factor (from `DriftMonitor`) automatically scales risk.
+- **The Vault**: 50% of realized profits are electronically "locked" from the margin.
 
 ---
 
-## 🛡️ Critical Constraints for AI
-- **Precision**: No hardcoded magic numbers. Use `app/core/config.py`.
-- **Numba Optimization**: High-frequency math MUST use `@njit` where possible.
-- **Fail-Stop**: If a critical system (Risk/ML) fails to load, `mcp_server.py` MUST halt startup.
+## 🛡️ Critical Constraints for AI (Antigravity Protocol)
+- **Precision**: Zero hardcoded magic numbers. Use `app/core/config.py`.
+- **Modularity**: New logic MUST be added to specific modules, keeping file size < 300 lines.
+- **Process Supervision**: `nexus_daemon.py` is the entry point. It handles all process lifecycles.
+- **Fail-Stop**: Critical failures in the `NexusEngine` trigger an immediate shutdown of Trading Operations while keeping the Dashboard and MCP alive for investigation.

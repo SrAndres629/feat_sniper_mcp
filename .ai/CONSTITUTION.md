@@ -1,4 +1,4 @@
-# 🛡️ .ai/CONSTITUTION.md: Iron Dome v3.0
+# 🛡️ .ai/CONSTITUTION.md: Immortal Core v3.1
 
 ## 🌌 Sovereign Identity
 **System Name**: FEAT Sniper Nexus (Level 50+)  
@@ -11,11 +11,12 @@
 1.  **Physics Veto**: La física siempre anula a la red neuronal. Si la aceleración o el volumen no validan el trade, la inferencia neural es **VETOED**.
 2.  **No-Ghosting**: Prohibido el uso de `pass`, `TODO` o dejar código muerto/comentado sin una justificación estructural nivel Senior. Todo cambio debe ser funcional y completo.
 3.  **Kelly-Lock**: La fórmula de riesgo (Kelly) y los multiplicadores de damping son inmutables sin autorización explícita de nivel Admin. No se aceptan propuestas que relajen la seguridad para "aumentar ganancias".
-4.  **Epistemic Humility**: Si la incertidumbre calculada (Monte Carlo) supera el umbral institucional, la operación es descartada inmediatamente.
+4.  **Atomic Fission (Cognitive Rule)**: Ningún archivo debe superar las 300 líneas de código. Los "God Objects" son considerados deuda técnica crítica y deben ser divididos en módulos atómicos para garantizar la precisión del Agente.
+5.  **Epistemic Humility**: Si la incertidumbre calculada (Monte Carlo) supera el umbral institucional, la operación es descartada inmediatamente.
 
 ---
 
-## �️ Tech Stack
+## ️ Tech Stack
 - **Neural Core**: PyTorch (TCN-BiLSTM + Attention)
 - **High-Perf Math**: Numba JIT (@njit optimized)
 - **Infrastructure**: Supabase (Telemetry), MetaTrader 5 (Bridge)
@@ -35,3 +36,4 @@
 ## �️ Habilidades de Élite (.ai/skills/)
 - [Math Optimization](file:///.ai/skills/math_optimization.md)
 - [Trade Safety Protocol](file:///.ai/skills/trade_safety.md)
+- [Atomic Fission (Refactoring)](file:///.ai/skills/refactor_fission.md)
