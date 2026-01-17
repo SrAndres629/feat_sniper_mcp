@@ -471,10 +471,13 @@ async def execute_twin_trade(signal: Dict[str, Any]) -> Dict[str, Any]:
         sl = exec_price + (sl_pips * point)
     
     # --- ORDEN A: SCALP (El Sueldo) ---
+    # Smart Sizing: High Confidence (0.9) for Scalp
+    scalp_vol = await risk_engine.calculate_dynamic_lot(0.95, 0.01, symbol, sl_pips)
+    
     scalp_request = {
         "action": mt5.TRADE_ACTION_DEAL,
         "symbol": symbol,
-        "volume": 0.01,
+        "volume": scalp_vol,
         "type": mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL,
         "price": exec_price,
         "sl": sl,
@@ -489,14 +492,17 @@ async def execute_twin_trade(signal: Dict[str, Any]) -> Dict[str, Any]:
     scalp_result = await mt5_conn.execute(mt5.order_send, scalp_request)
     if scalp_result and scalp_result.retcode == mt5.TRADE_RETCODE_DONE:
         results["scalp_ticket"] = scalp_result.order
-        logger.info(f" SCALP ENTRY: Ticket {scalp_result.order} | TP: ${settings.SCALP_TARGET_USD}")
+        logger.info(f" SCALP ENTRY: Ticket {scalp_result.order} | Vol: {scalp_vol} | TP: ${settings.SCALP_TARGET_USD}")
     
     # --- ORDEN B: SWING (La Riqueza) --- Solo si hay margen
     if allocation["can_dual"]:
+        # Smart Sizing: Slightly lower confidence (0.8) for Swing to conserve risk
+        swing_vol = await risk_engine.calculate_dynamic_lot(0.85, 0.01, symbol, sl_pips)
+        
         swing_request = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol,
-            "volume": 0.01,
+            "volume": swing_vol,
             "type": mt5.ORDER_TYPE_BUY if direction == "BUY" else mt5.ORDER_TYPE_SELL,
             "price": exec_price,
             "sl": sl,

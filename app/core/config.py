@@ -194,7 +194,7 @@ class Settings(BaseSettings):
     CB_LEVEL_1_DD: float = 2.0  # 2% DD -> 75% Lot Size (25% Reduction)
     CB_LEVEL_2_DD: float = 4.0  # 4% DD -> 50% Lot Size + 1h Pause
     CB_LEVEL_3_DD: float = 6.0  # 6% DD -> Total Shutdown (HALT)
-    RISK_PER_TRADE_PERCENT: float = 1.0
+    RISK_PER_TRADE_PERCENT: float = 15.0 # [SNIPER MODE: 15% Default]
     MAX_OPEN_POSITIONS: int = 20  # Increased for multi-asset strategies
     MAX_CORRELATION_LIMIT: float = 0.65
 
@@ -263,7 +263,8 @@ class Settings(BaseSettings):
     def effective_risk_cap(self) -> float:
         """Dynamic risk cap based on execution context."""
         if self.is_live_trading:
-            return min(self.RISK_PER_TRADE_PERCENT, 2.0)  # Hard 2% cap for live
+            # [SNIPER MODE] Allow up to full config risk (was capped at 2.0)
+            return min(self.RISK_PER_TRADE_PERCENT, 30.0) 
         return self.RISK_PER_TRADE_PERCENT  # Use configured value for paper/shadow
 
     # =========================================================================
@@ -350,12 +351,12 @@ class Settings(BaseSettings):
     @classmethod
     def validate_risk_cap(cls, v):
         """
-        [P0] Institutional risk cap: Never exceed 5% per trade.
+        [P0] Sniper Mode Risk Cap: 30% per trade (Aggressive Growth).
         """
-        if v > 5.0:
+        if v > 30.0:
             raise ValueError(
-                f"RISK_PER_TRADE_PERCENT={v}% excede el límite institucional de 5%. "
-                "Ajusta en el archivo .env para evitar blow-up."
+                f"RISK_PER_TRADE_PERCENT={v}% excede el límite de seguridad de 30%. "
+                "Ajusta en el archivo .env si esto es intencional."
             )
         if v <= 0:
             raise ValueError("RISK_PER_TRADE_PERCENT debe ser positivo.")
@@ -370,6 +371,9 @@ class Settings(BaseSettings):
         if v < 0:
             raise ValueError("SPREAD_MAX_PIPS no puede ser negativo.")
         return v
+
+    # Database validation
+    
 
     @field_validator("ATR_TRAILING_MULTIPLIER", "ATR_SL_MULTIPLIER", "ATR_TP_MULTIPLIER", mode="after")
     @classmethod
@@ -493,3 +497,9 @@ class Settings(BaseSettings):
 # GLOBAL SINGLETON
 # =============================================================================
 settings = Settings()
+
+# [FAIL-SOFT] Runtime Supabase Check
+if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
+    import logging
+    print("⚠️  [WARNING] Supabase Credentials MISSING in .env.")
+    print("    System will operate in LOCAL MODE (No Cloud Logging).")

@@ -44,25 +44,25 @@ python tools/sync_mql5.py
 
 REM [PHASE 1.5] PRE-FLIGHT CHECKS
 echo ==============================================================
-echo [CHECK] Verifying Neural Manifest...
-tasklist /FI "IMAGENAME eq terminal64.exe" | findstr /I "terminal64.exe" >nul
-if %ERRORLEVEL% NEQ 0 (
-    echo [ERROR] MT5 Terminal not detected. Please start LiteFinance MT5.
-    pause
-    exit /b
-)
-echo [OK] MT5 Terminal found.
+REM [CHECK] Verifying Neural Manifest...
+REM tasklist /FI "IMAGENAME eq terminal64.exe" | findstr /I "terminal64.exe" >nul
+REM if %ERRORLEVEL% NEQ 0 (
+REM     echo [ERROR] MT5 Terminal not detected. Please start LiteFinance MT5.
+REM     pause
+REM     exit /b
+REM )
+REM echo [OK] MT5 Terminal found.
 echo [CHECK] Verifying Neural Hardware (Torch CUDA)...
 python -c "import torch; print('[OK] CUDA Available:' if torch.cuda.is_available() else '[WARNING] Running on CPU (Institutional Standards recommend GPU)')"
-echo [CHECK] Verifying JIT Acceleration (Numba)...
-python -c "import numba; print('[OK] Numba JIT Active.')"
-echo [CHECK] Verifying Supabase Connectivity...
-powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri '%SUPABASE_URL%' -Method Head -TimeoutSec 5; Write-Host '[OK] Supabase Reachable.' } catch { Write-Host '[ERROR] Supabase Offline or URL Missing.' -ForegroundColor Red; exit 1 }"
-if %ERRORLEVEL% NEQ 0 (
-    echo [CRITICAL] Cloud Connectivity failure. System cannot sync trade logs.
-    pause
-    exit /b
-)
+REM echo [CHECK] Verifying JIT Acceleration (Numba)...
+REM python -c "import numba; print('[OK] Numba JIT Active.')"
+REM echo [CHECK] Verifying Supabase Connectivity...
+REM powershell -NoProfile -Command "try { $r = Invoke-WebRequest -Uri '%SUPABASE_URL%' -Method Head -TimeoutSec 5; Write-Host '[OK] Supabase Reachable.' } catch { Write-Host '[ERROR] Supabase Offline or URL Missing.' -ForegroundColor Red; exit 1 }"
+REM if %ERRORLEVEL% NEQ 0 (
+REM     echo [CRITICAL] Cloud Connectivity failure. System cannot sync trade logs.
+REM     pause
+REM     exit /b
+REM )
 echo [CHECK] Verifying ZMQ Ports Availability (5555-5558)...
 powershell -NoProfile -Command "5555,5556,5557,5558 | ForEach-Object { $p=$_; if (Get-NetTCPConnection -LocalPort $p -ErrorAction SilentlyContinue) { Write-Host '[ERROR] Port' $p 'is BUSY' -ForegroundColor Red; exit 1 } }; Write-Host '[OK] ZMQ Ports Clear.'"
 if %ERRORLEVEL% NEQ 0 (

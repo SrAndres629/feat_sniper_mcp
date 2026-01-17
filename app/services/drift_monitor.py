@@ -34,11 +34,11 @@ class DriftMonitor:
     """
     
     DRIFT_THRESHOLDS = {
-        "win_rate_min": 0.45,           # Alerta si cae por debajo de 45%
-        "profit_factor_min": 1.0,       # Alerta si cae por debajo de 1.0
-        "calibration_error_max": 0.3,   # Alerta si error > 30%
-        "consecutive_losses_max": 5,    # Alerta tras 5 pérdidas seguidas
-        "ks_pvalue_min": 0.05           # [NEW] Alerta si p-value K-S < 5% (regime shift)
+        "win_rate_min": 0.30,           # [SNIPER] Asymmetric Payoff allows lower WR (aiming for 1:5 RR)
+        "profit_factor_min": 1.1,       # Must stay profitable regardless of WR
+        "calibration_error_max": 0.4,   # Allow more noise in M1
+        "consecutive_losses_max": 8,    # [SNIPER] M1 noise tolerance increased
+        "ks_pvalue_min": 0.01           # [SNIPER] Strict regime shift only (99% confidence)
     }
     
     def __init__(self, window_size: int = 50):

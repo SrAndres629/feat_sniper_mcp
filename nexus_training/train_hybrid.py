@@ -277,8 +277,13 @@ def load_real_data(symbol: str, db_path: str = "data/market_data.db", seq_len=60
         ]
         static_feats["kinetic"].append(k_vec)
         
-        # Context placeholders (can be expanded with real logic)
-        static_feats["form"].append([row.get('entropy_proxy',0), 0,0,0])
+        # Context placeholders (Expanded for Sniper Mode H4 Context)
+        # Form Vector: [Entropy, H4_Bias_Dist, 0, 0]
+        static_feats["form"].append([
+            row.get('entropy_proxy', 0), 
+            row.get('dist_bias', 0), # <--- [SNIPER] Inject H4 Context (Bias Distance)
+            0, 0
+        ])
         static_feats["space"].append([row.get('dist_poc_norm',0), 0,0])
         static_feats["accel"].append([row.get('energy_z_score',0), 0,0])
         static_feats["time"].append([0,0,0,0])

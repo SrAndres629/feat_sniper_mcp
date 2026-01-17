@@ -120,6 +120,7 @@ class MTFCompositeScore:
     # Thresholds (Probabilistic)
     THRESHOLD_SIGNAL: float = 0.70
     THRESHOLD_SNIPER: float = 0.85
+    THRESHOLD_SNIPER_TRIGGER: float = 0.80 # M1 Score requisite for override
     
     @property
     def is_valid_setup(self) -> bool:
@@ -329,6 +330,29 @@ class FractalMTFEngine:
         if total > 0:
             result.alignment_percentage = (max(bullish, bearish) / total) * 100
             result.primary_direction = 1 if bullish > bearish else -1
+
+        # [SNIPER MODE LOGIC]
+        # Validates user request: "Si M1 da señal fuerte, debe disparar aunque H1 esté neutral"
+        # Pre-requisite: H4 must NOT be opposing (H4 Bias Validation)
+        
+        m1 = tf_scores.get("M1")
+        h4 = tf_scores.get("H4")
+        
+        # [DOCTORAL STANDARD] Use defined constant, no magic numbers.
+        if m1 and m1.score >= result.THRESHOLD_SNIPER_TRIGGER: # Strong Sniper Trigger
+            h4_direction = h4.direction if h4 else 0
+            m1_direction = m1.direction
+            
+            # Check for Conflict (H4 against M1)
+            is_conflict = (h4_direction != 0) and (h4_direction != m1_direction)
+            
+            if not is_conflict:
+                # BOOST SCORE to Guarantee Trigger
+                # We map the strong M1 score directly to composite, ensuring it crosses THRESHOLD
+                boosted_score = max(result.composite_score, m1.score)
+                if boosted_score >= result.THRESHOLD_SNIPER:
+                    result.composite_score = boosted_score
+                    result.reasoning.append(f"🎯 Sniper Override: M1 Strong ({m1.score}) + H4 Aligned/Neutral")
 
     def _determine_trade(
         self, 

@@ -14,8 +14,8 @@ MT5_TERMINAL_ID = "065434634B76DD288A1DDF20131E8DDB"
 MT5_BASE_PATH = os.path.join(os.getenv("APPDATA"), "MetaQuotes", "Terminal", MT5_TERMINAL_ID, "MQL5")
 
 MANIFEST = {
-    "FEAT_Sniper_Master_Core/FEAT_Visualizer.mq5": "Indicators",
-    "FEAT_Sniper_Master_Core/UnifiedModel_Main.mq5": "Experts",
+    "FEAT_Sniper_Master_Core/FEAT_Visualizer.mq5": "Indicators/FEAT",
+    "FEAT_Sniper_Master_Core/UnifiedModel_Main.mq5": "Experts/FEAT",
     "FEAT_Sniper_Master_Core/Include/UnifiedModel/CInterop.mqh": "Include/UnifiedModel",
     "FEAT_Sniper_Master_Core/Include/UnifiedModel/CVisuals.mqh": "Include/UnifiedModel",
     "FEAT_Sniper_Master_Core/Include/UnifiedModel/CFSM.mqh": "Include/UnifiedModel"

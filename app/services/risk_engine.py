@@ -347,6 +347,19 @@ class RiskEngine:
             risk_amount = equity * risk_percent * neural_multiplier
             lot_size = risk_amount / (sl_points * point_value)
             
+            # [SNIPER MICRO-SCALING]
+            # If lot_size is e.g. 0.004 (< 0.01 min), normally we floor to 0.
+            # But in Asymmetric Warfare ($20 account), we need to check if 0.01 is 'tolerable'.
+            # Tolerable means: Actual Risk USD < Settings.MAX_RISK_USD ($6 for 30%)
+            min_lot = symbol_info.volume_min
+            if lot_size < min_lot and min_lot > 0:
+                actual_risk_at_min = min_lot * sl_points * point_value
+                max_tolerable_risk = equity * (settings.effective_risk_cap / 100) # e.g. 30%
+                
+                if actual_risk_at_min <= max_tolerable_risk:
+                     logger.info(f"🔫 SNIPER FORCE: Calculated {lot_size:.4f} < Min {min_lot}, but Risk ${actual_risk_at_min:.2f} is within limit (${max_tolerable_risk:.2f}). Forcing {min_lot}.")
+                     lot_size = min_lot
+            
             # Clamp to symbol limits
             lot_size = max(symbol_info.volume_min, min(lot_size, symbol_info.volume_max))
             
