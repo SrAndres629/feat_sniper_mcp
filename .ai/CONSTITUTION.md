@@ -1,38 +1,37 @@
-# 🛡️ .ai/CONSTITUTION.md: Iron Dome Protocol v2.0
+# 🛡️ .ai/CONSTITUTION.md: Iron Dome v3.0
 
 ## 🌌 Sovereign Identity
-**System Name**: FEAT Sniper Nexus  
+**System Name**: FEAT Sniper Nexus (Level 50+)  
 **Operational Mode**: Institutional Probability  
-**Status**: Level 62 (Integral Sync)
+**Governor**: Chief AI Architect & Systems Governor
 
 ---
 
-## 📜 Mandatory Safety Protocols (Martial Law)
-1. **Zero Tolerance for Technical Debt**: Prohibido el uso de `pass`, `TODO` o implementaciones parciales. Todo código debe ser Senior-Ready y completo.
-2. **Physics Superiority**: Ninguna orden es válida si no pasa el triple filtro de la Física (Aceleración > Umbral, Volumen > Media, Coherencia Cinética > 0.8).
-3. **Kelly or Death**: El lotaje debe calcularse estrictamente mediante el Damped Kelly Criterion integrado con la incertidumbre de Monte Carlo.
-4. **Veto Autonomy**: El Agente tiene la obligación de VETAR cualquier cambio que degrade la seguridad del Risk Engine, incluso si el usuario lo solicita (deberá solicitar confirmación explícita con advertencia de riesgo).
+## 📜 Prime Directives (Martial Law)
+1.  **Physics Veto**: La física siempre anula a la red neuronal. Si la aceleración o el volumen no validan el trade, la inferencia neural es **VETOED**.
+2.  **No-Ghosting**: Prohibido el uso de `pass`, `TODO` o dejar código muerto/comentado sin una justificación estructural nivel Senior. Todo cambio debe ser funcional y completo.
+3.  **Kelly-Lock**: La fórmula de riesgo (Kelly) y los multiplicadores de damping son inmutables sin autorización explícita de nivel Admin. No se aceptan propuestas que relajen la seguridad para "aumentar ganancias".
+4.  **Epistemic Humility**: Si la incertidumbre calculada (Monte Carlo) supera el umbral institucional, la operación es descartada inmediatamente.
 
 ---
 
-## 🚫 Prohibited Operations
-- **No Hardcoded Lots**: Nunca usar valores estáticos para el volumen.
-- **No Direct DB Mutation**: Todas las escrituras a Supabase deben pasar por el `SupabaseSync` service.
-- **No Unoptimized Math**: Toda función iterativa en `NEXUS_CORE` debe estar optimizada con `@njit` (Numba).
+## �️ Tech Stack
+- **Neural Core**: PyTorch (TCN-BiLSTM + Attention)
+- **High-Perf Math**: Numba JIT (@njit optimized)
+- **Infrastructure**: Supabase (Telemetry), MetaTrader 5 (Bridge)
+- **Mathematical Framework**: Stochastic Physics + Multifractal Kinetic Layers
 
 ---
 
-## 🧠 Live Memory Hierarchy (.ai/memory/)
-| Component           | Function                                      | Link                                                                         |
-| ------------------- | --------------------------------------------- | ---------------------------------------------------------------------------- |
-| **Active State**    | Live performance and current system level.    | [.ai/memory/active_state.json](file:///.ai/memory/active_state.json)         |
-| **Project Context** | Technical landscape and current architecture. | [.ai/memory/PROJECT_CONTEXT.md](file:///.ai/memory/PROJECT_CONTEXT.md)       |
-| **Risk Governance** | Rules for Kelly, Drawdown, and Vault.         | [.ai/memory/01_risk_governance.md](file:///.ai/memory/01_risk_governance.md) |
-| **Neural Brain**    | TCN-BiLSTM architecture details.              | [.ai/memory/neural_brain.md](file:///.ai/memory/neural_brain.md)             |
+## 🗺️ Mapa de Contexto (.ai/context/)
+| Componente          | Descripción                          | Enlace                                                                         |
+| ------------------- | ------------------------------------ | ------------------------------------------------------------------------------ |
+| **Project State**   | Resumen del estado operativo actual. | [.ai/context/project_state.md](file:///.ai/context/project_state.md)           |
+| **Neural Anatomy**  | Diagrama estructural de la red.      | [.ai/context/neural_anatomy.md](file:///.ai/context/neural_anatomy.md)         |
+| **Risk Governance** | Reglas de Kelly y Drawdown.          | [.ai/context/01_risk_governance.md](file:///.ai/context/01_risk_governance.md) |
 
 ---
 
-## 🛠️ Executable Skills (.ai/skills/)
-- [Retraining Workflow](file:///.ai/skills/workflow_retraining.md)
-- [Deployment Checklist](file:///.ai/skills/workflow_deployment.md)
-- [Emergency Diagnostics](file:///.ai/skills/workflow_debugging.md)
+## �️ Habilidades de Élite (.ai/skills/)
+- [Math Optimization](file:///.ai/skills/math_optimization.md)
+- [Trade Safety Protocol](file:///.ai/skills/trade_safety.md)
