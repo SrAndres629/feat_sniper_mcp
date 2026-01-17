@@ -34,7 +34,7 @@ class TradeManager:
         """
         warmup_remaining = self.warmup_period - (time.time() - self.start_time)
         if warmup_remaining > 0:
-            logger.warning(f"🕒 WARM-UP ACTIVE: Blocking {action}. {int(warmup_remaining)}s remaining.")
+            logger.warning(f"[WAIT] WARM-UP ACTIVE: Blocking {action}. {int(warmup_remaining)}s remaining.")
             return {"status": "WAITING_FOR_WARMUP", "remaining": int(warmup_remaining)}
         # 0. Check Simulation Mode (Fase 5 Hook)
         import os
@@ -51,7 +51,7 @@ class TradeManager:
             from app.core.zmq_bridge import zmq_bridge
             asyncio.create_task(zmq_bridge.send_command(
                 "SHADOW_RESULT",
-                action=action,
+                shadow_action=action, # Renamed to avoid duplicate 'action'
                 symbol=params.get('symbol'),
                 lot=params.get('volume'),
                 p_win=params.get('p_win', 0.5),
@@ -111,7 +111,7 @@ class TradeManager:
             
             # REAL ACK IMPLEMENTATION: Send command and wait for confirmation
             if self.zmq_bridge:
-                import asyncio
+                # import asyncio - REDUNDANT/SHADOWING REMOVED
                 from app.core.config import settings
                 
                 max_retries = settings.MAX_ORDER_RETRIES

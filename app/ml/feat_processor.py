@@ -65,8 +65,20 @@ class FeatProcessor:
         """
         Applies Structure, Acceleration, and Space logic to the DataFrame.
         """
-        # [PHASE 0] Returns Engineering
+        # [PHASE 0] Returns Engineering (Log-Returns)
         df["log_ret"] = np.log(df["close"] / df.get("close", df["close"]).shift(1)).fillna(0)
+
+        # [LEVEL 64] Z-SCORE NORMALIZATION (Warfare Engineering)
+        # Robust against Fat Tails.
+        # Window: 50 (Dynamic Regime Window)
+        df["rolling_mean_50"] = df["close"].rolling(window=50).mean()
+        df["rolling_std_50"] = df["close"].rolling(window=50).std()
+        df["price_z_score"] = (df["close"] - df["rolling_mean_50"]) / (df["rolling_std_50"] + 1e-9)
+        
+        # Volume Z-Score (already partial, making it explicit here)
+        df["vol_mean_50"] = df["volume"].rolling(window=50).mean()
+        df["vol_std_50"] = df["volume"].rolling(window=50).std()
+        df["volume_z_score"] = (df["volume"] - df["vol_mean_50"]) / (df["vol_std_50"] + 1e-9)
 
         # 1. Structure Engine (Fractals, BOS, Zones)
         df = structure_engine.detect_structural_shifts(df)
@@ -93,22 +105,50 @@ class FeatProcessor:
 
         # 3. Standard Indicators (Speed Optimized)
         # [SENSOR FUSION CHANNEL A: MULTIFRACTAL KINETIC LAYER]
-        # Calculate Cloud States (Micro, Structure, Macro, Bias)
-        from nexus_core.kinetic_engine import kinetic_engine
+        # Calculate Cloud States (Micro, Structure, Macro, Bias) - Vectorized for Training
+        periods = {
+            "micro": settings.LAYER_MICRO_PERIODS,
+            "structure": settings.LAYER_OPERATIVE_PERIODS,
+            "macro": settings.LAYER_MACRO_PERIODS
+        }
         
-        # Optimized: Pass strictly what's needed or the full DF. 
-        # KineticEngine handles full DF well.
-        # This replaces the manual EMA calc 8, 21, 50, 200
-        kinetic_state = kinetic_engine.compute_kinetic_state(df)
+        atr = (df["high"] - df["low"]).rolling(14).mean().fillna(df["close"]*0.001)
         
-        # [LEVEL 49] COGNITIVE PATTERN RECOGNITION
-        kinetic_patterns = kinetic_engine.detect_kinetic_patterns(kinetic_state)
+        centroids = {}
+        for name, p_list in periods.items():
+            emas = []
+            for p in p_list:
+                emas.append(df["close"].ewm(span=p, adjust=False).mean())
+            
+            # Layer Centroid (Mean of EMAs)
+            centroid = pd.concat(emas, axis=1).mean(axis=1)
+            centroids[name] = centroid
+            
+            # Girth (Compression)
+            df[f"{name}_compression"] = pd.concat(emas, axis=1).std(axis=1) / (atr + 1e-9)
+            # Distance to Price
+            df[f"dist_{name}"] = (df["close"] - centroid) / (atr + 1e-9)
+            # Slope
+            df[f"{name}_slope"] = centroid.diff(1) / (atr + 1e-9)
+            
+        # Bias Line (2048)
+        bias = df["close"].ewm(alpha=1.0/settings.LAYER_BIAS_PERIOD, adjust=False).mean()
+        df["dist_bias"] = (df["close"] - bias) / (atr + 1e-9)
+        df["bias_slope"] = bias.diff(1) / (atr + 1e-9)
+
+        # Layer Alignment (Bullish: Price > Micro > Structure > Macro)
+        aligned_bull = (df["close"] > centroids["micro"]) & (centroids["micro"] > centroids["structure"]) & (centroids["structure"] > centroids["macro"])
+        aligned_bear = (df["close"] < centroids["micro"]) & (centroids["micro"] < centroids["structure"]) & (centroids["structure"] < centroids["macro"])
         
-        # Broadcast Cloud Metrics & Patterns to DF Columns
-        for k, v in kinetic_state.items():
-            df[k] = v
-        for k, v in kinetic_patterns.items():
-            df[k] = v
+        df["layer_alignment"] = 0.0
+        df.loc[aligned_bull, "layer_alignment"] = 1.0
+        df.loc[aligned_bear, "layer_alignment"] = -1.0
+        
+        # Pattern ID (Simplified Vectorized Mapping)
+        df["kinetic_pattern_id"] = 0
+        df.loc[df["layer_alignment"] != 0, "kinetic_pattern_id"] = 1 # Expansion
+        # Compression (Knot)
+        df.loc[(df["micro_compression"] < 0.3) | (df["structure_compression"] < 0.3), "kinetic_pattern_id"] = 2
         
         # ATR (Average True Range) for Normalization
         high_low = df["high"] - df["low"]
@@ -343,18 +383,25 @@ class FeatProcessor:
         # 1. Slice the window for the map
         window = df.tail(bins)
         
-        # 2. Define Price Bounds
-        price_min = window["low"].min()
-        price_max = window["high"].max()
-        price_range = price_max - price_min + 1e-9
+        # 2. Define Price Bounds using Sigma (The Lens)
+        # This prevents outliers from flattening the image.
+        mean_price = window["close"].mean()
+        std_price = window["close"].std()
+        if std_price == 0: std_price = 1.0
+        
+        # Clip view to +/- 3 Sigma (99.7% of data)
+        price_min = mean_price - (3.0 * std_price)
+        price_max = mean_price + (3.0 * std_price)
+        price_range = price_max - price_min
         
         # 3. Initialize Map (1, Bins, Bins) - 1 channel for Conv2D
         energy_map = np.zeros((bins, bins), dtype=np.float32)
         
         # 4. Fill Map
         for i, (idx, row) in enumerate(window.iterrows()):
-            # Find price bin
-            price_bin = int(((row["close"] - price_min) / price_range) * (bins - 1))
+            # Find price bin (Clamped)
+            normalized_price = (row["close"] - price_min) / (price_range + 1e-9)
+            price_bin = int(normalized_price * (bins - 1))
             price_bin = max(0, min(bins - 1, price_bin))
             
             # Add volume weight

@@ -31,7 +31,7 @@ class AnomalyDetector:
             try:
                 self.model = joblib.load(self.model_path)
                 self.is_trained = True
-                logger.info(f"🛡️ Anomaly Detector loaded from {self.model_path}")
+                logger.info(f"[SHIELD] Anomaly Detector loaded from {self.model_path}")
             except Exception as e:
                 logger.warning(f"Could not load Anomaly Detector: {e}")
 

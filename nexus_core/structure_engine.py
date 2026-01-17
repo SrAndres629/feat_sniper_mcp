@@ -481,58 +481,56 @@ class StructureEngine:
         history = df.tail(lookback)
         
         # 1. Supply Zones (High Fractal Clusters)
-        high_indices = history.index[history["fractal_high"]].tolist()
-        if len(high_indices) >= 2:
-            # Check most recent high fractals first
-            for idx in reversed(high_indices):
-                level = df.at[idx, "high"]
-                # Find other high fractals near this level
-                matches = [i for i in high_indices if abs(df.at[i, "high"] - level) < zone_tolerance]
+        # Using integer positioning to avoid label ambiguity/duplicates
+        high_positions = np.where(history["fractal_high"])[0]
+        if len(high_positions) >= 2:
+            for pos in reversed(high_positions):
+                level = history.iloc[pos]["high"]
+                # Vectorized distance check
+                dist = np.abs(history["high"].values - level)
+                matches = np.where(dist < zone_tolerance)[0]
                 touches = len(matches)
                 if touches >= 2:
-                    # Supply zone confirmed
-                    # Get integer position for age calculation
-                    idx_pos = df.index.get_loc(idx)
-                    age = current_idx - idx_pos
-                    decay = 1.0 / (1.0 + 0.01 * age) # 1% force loss per bar
+                    # Age calculation based on whole df index
+                    actual_idx = history.index[pos]
+                    idx_pos = df.index.get_loc(actual_idx)
+                    # If multiple matches, get_loc returns slice/series, we need scalar
+                    if not isinstance(idx_pos, int):
+                        idx_pos = idx_pos.start if isinstance(idx_pos, slice) else idx_pos[0]
                     
-                    # [PHYSICS] Volume Density Boost
+                    age = current_idx - idx_pos
+                    decay = 1.0 / (1.0 + 0.01 * age)
                     vol_boost = volume_profile.get_zone_quality(level+zone_tolerance, level-zone_tolerance, profile)
                     
                     df.loc[df.index[-1], "zone_type"] = "SUPPLY"
                     df.loc[df.index[-1], "zone_high"] = level + zone_tolerance
                     df.loc[df.index[-1], "zone_low"] = level - zone_tolerance
-                    
-                    # Final Strength Calculation
-                    raw_strength = min(1.0, (touches / 5.0))
-                    df.loc[df.index[-1], "zone_strength"] = min(1.0, raw_strength * decay * vol_boost)
+                    df.loc[df.index[-1], "zone_strength"] = min(1.0, (touches / 5.0) * decay * vol_boost)
                     break
                     
-        # 2. Demand Zones (Low Fractal Clusters) - only check if no supply zone detected
+        # 2. Demand Zones (Low Fractal Clusters)
         if df.iloc[-1]["zone_type"] == "NONE":
-            low_indices = history.index[history["fractal_low"]].tolist()
-
-            if len(low_indices) >= 2:
-                for idx in reversed(low_indices):
-                    level = df.at[idx, "low"]
-                    matches = [i for i in low_indices if abs(df.at[i, "low"] - level) < zone_tolerance]
+            low_positions = np.where(history["fractal_low"])[0]
+            if len(low_positions) >= 2:
+                for pos in reversed(low_positions):
+                    level = history.iloc[pos]["low"]
+                    dist = np.abs(history["low"].values - level)
+                    matches = np.where(dist < zone_tolerance)[0]
                     touches = len(matches)
                     if touches >= 2:
-                        # Get integer position for age calculation
-                        idx_pos = df.index.get_loc(idx)
+                        actual_idx = history.index[pos]
+                        idx_pos = df.index.get_loc(actual_idx)
+                        if not isinstance(idx_pos, int):
+                            idx_pos = idx_pos.start if isinstance(idx_pos, slice) else idx_pos[0]
+                            
                         age = current_idx - idx_pos
                         decay = 1.0 / (1.0 + 0.01 * age)
-                        
-                        # [PHYSICS] Volume Density Boost
                         vol_boost = volume_profile.get_zone_quality(level+zone_tolerance, level-zone_tolerance, profile)
                         
                         df.loc[df.index[-1], "zone_type"] = "DEMAND"
                         df.loc[df.index[-1], "zone_high"] = level + zone_tolerance
                         df.loc[df.index[-1], "zone_low"] = level - zone_tolerance
-                        
-                        # Final Strength Calculation
-                        raw_strength = min(1.0, (touches / 5.0))
-                        df.loc[df.index[-1], "zone_strength"] = min(1.0, raw_strength * decay * vol_boost)
+                        df.loc[df.index[-1], "zone_strength"] = min(1.0, (touches / 5.0) * decay * vol_boost)
                         break
         
         return df
@@ -580,6 +578,7 @@ class StructureEngine:
         Returns:
             dict with health score and contributing factors
         """
+        
         df = self.detect_structural_shifts(df)
         df = self.detect_zones(df)
         

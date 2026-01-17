@@ -1,0 +1,310 @@
+import asyncio
+import logging
+import time
+import pandas as pd
+import numpy as np
+import MetaTrader5 as mt5_ref
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+
+from app.core.config import settings
+from app.core.zmq_bridge import zmq_bridge
+from app.ml.feat_processor import feat_processor
+from app.services.circuit_breaker import circuit_breaker
+from app.services.state_exporter import state_exporter
+
+logger = logging.getLogger("nexus.engine")
+
+class NexusEngine:
+    """
+    [LEVEL 64] THE IMMORTAL CORE
+    ============================
+    Independent trading engine responsible for:
+    - MT5 Data Hydration & Tick Ingestion
+    - Neural Inference (TCN-BiLSTM)
+    - Execution & Risk Management
+    - Sentinel Monitoring
+    """
+    def __init__(self):
+        self.running = True
+        self.last_scan_time = 0.0
+        self.context_cache = {"in_zone": False, "session": "OFF"}
+        self.brain_semaphore = asyncio.Semaphore(20)
+        self._background_tasks = set()
+        
+        # Service Placeholders
+        self.ml_engine = None
+        self.risk_engine = None
+        self.trade_manager = None
+        self.structure_engine = None
+        self.market_physics = None
+        self.mtf_engine = None
+        self.chronos_engine = None
+        
+        # Sentinels
+        self.jitter_sentinel = None
+        self.drift_sentinel = None
+
+    async def initialize(self):
+        """Sequential bootstrap of warfare assets."""
+        logger.info("⚔️ NexusEngine: Initializing Immortal Core...")
+        try:
+            from app.skills.market_physics import market_physics as mp
+            from app.services.risk_engine import RiskEngine
+            from app.skills.trade_mgmt import TradeManager
+            from app.ml.ml_engine import MLEngine
+            from nexus_core.structure_engine import structure_engine
+            from app.skills import market
+            from app.skills.calendar import chronos_engine
+            from nexus_core.mtf_engine import mtf_engine
+            from app.sentinels.jitter import JitterSentinel
+            from app.sentinels.drift import DriftSentinel
+            from app.ml.automl.orchestrator import automl_orchestrator
+
+            self.market_physics = mp
+            self.risk_engine = RiskEngine()
+            self.structure_engine = structure_engine
+            self.ml_engine = MLEngine()
+            self.mtf_engine = mtf_engine
+            self.chronos_engine = chronos_engine
+            self.market = market
+            self.trade_manager = TradeManager(zmq_bridge)
+            
+            # Link Circuit Breaker
+            circuit_breaker.set_trade_manager(self.trade_manager)
+            
+            # Initialize Sentinels
+            self.jitter_sentinel = JitterSentinel(self.ml_engine)
+            self.drift_sentinel = DriftSentinel(automl_orchestrator)
+            
+            # Launch Background Loops
+            self._spawn_task(self.zmq_processing_loop())
+            self._spawn_task(self.jitter_sentinel.run_loop())
+            self._spawn_task(self.drift_sentinel.run_loop())
+            self._spawn_task(self.dashboard_heartbeat())
+            self._spawn_task(self.state_export_loop())
+            self._spawn_task(self.command_processor_loop())
+            
+            logger.info("✅ NexusEngine: All Systems Operational.")
+        except Exception as e:
+            logger.critical(f"🔥 NexusEngine: Initialization Failure: {e}")
+            raise
+
+    def _spawn_task(self, coro):
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    async def zmq_processing_loop(self):
+        """Real-Time Market Pulse Ingestion."""
+        logger.info("📡 NexusEngine: ZMQ Bridge Listening...")
+        while self.running:
+            try:
+                msg = zmq_bridge.check_messages()
+                if msg:
+                    await self.on_market_update(msg)
+                    # Use a very small sleep to yield control but keep latency sub-ms
+                    await asyncio.sleep(0.0001)
+                else:
+                    await asyncio.sleep(0.001)
+            except Exception as e:
+                logger.error(f"ZMQ Processing Error: {e}")
+                await asyncio.sleep(1.0)
+
+    async def on_market_update(self, data):
+        """Core signal handling logic."""
+        # 1. Heartbeat
+        circuit_breaker.heartbeat()
+        if self.jitter_sentinel: self.jitter_sentinel.heartbeat()
+
+        # 2. Position Updates (from MT5)
+        if data.get("action") == "POSITION_UPDATE":
+            self._handle_position_update(data)
+            return
+
+        # 3. Physics Ingestion
+        regime = self.market_physics.ingest_tick(data) if self.market_physics else None
+        
+        # 4. Trigger Analysis
+        in_killzone = self._check_killzone()
+        in_zone = self.context_cache.get("in_zone", False)
+        
+        # Performance Scan (Periodic)
+        now = time.time()
+        if (now - self.last_scan_time) >= 60.0:
+            self.last_scan_time = now
+            self._spawn_task(self.execute_vision_protocol(data, regime, mode="SCAN"))
+        
+        # Sniper Trigger
+        is_breakout = self._is_physics_breakout(regime)
+        if (in_killzone or in_zone) and is_breakout:
+            self._spawn_task(self.execute_vision_protocol(data, regime, mode="FULL"))
+
+    def _handle_position_update(self, data):
+        ticket = data.get("ticket")
+        if data.get("status") == "CLOSED":
+            self.trade_manager.unregister_position(ticket)
+        else:
+            self.trade_manager.register_position(
+                ticket=ticket, 
+                entry_price=data.get("price", 0),
+                atr=data.get("atr", 0), 
+                is_buy=data.get("type") == "BUY"
+            )
+
+    def _check_killzone(self) -> bool:
+        if self.chronos_engine:
+            return self.chronos_engine.validate_window().get("is_valid", False)
+        return False
+
+    def _is_physics_breakout(self, regime) -> bool:
+        if not regime: return False
+        return (regime.is_accelerating and regime.acceleration_score > 1.2) or \
+               getattr(regime, 'is_initiative_candle', False)
+
+    async def execute_vision_protocol(self, data, regime, mode: str = "FULL"):
+        """High-Level Inference & Execution."""
+        async with self.brain_semaphore:
+            try:
+                symbol = data.get('symbol', 'XAUUSD')
+                price = float(data.get('bid', 0) or data.get('close', 0))
+                
+                # Context Awareness (MTF)
+                target_tfs = ["M1", "M5", "H1", "H4"]
+                candles = {}
+                for tf in target_tfs:
+                    c_res = await self.market.get_candles(symbol, tf, 100)
+                    if c_res.get("status") == "success":
+                         df = pd.DataFrame(c_res["candles"])
+                         # Clean/Numeric Conversion
+                         for c in ['open', 'high', 'low', 'close', 'tick_volume']:
+                             if c in df.columns: df[c] = pd.to_numeric(df[c])
+                         candles[tf] = df
+
+                if "M1" not in candles: return
+
+                # Structural Mapping
+                processed_df = feat_processor.apply_feat_engineering(candles["M1"])
+                last_row = processed_df.iloc[-1]
+                
+                if self.structure_engine:
+                    report = self.structure_engine.get_structural_report(candles["M1"])
+                    self.context_cache["in_zone"] = (report['zones']['distance_to_zone'] < (price * settings.ZONE_PROXIMITY_FACTOR))
+
+                if mode == "SCAN": return
+
+                # Neural Logic
+                latent_vector = feat_processor.compute_latent_vector(last_row)
+                feature_names = settings.NEURAL_FEATURE_NAMES
+                input_vec = [latent_vector.get(name, 0.0) for name in feature_names]
+                
+                prediction = await self.ml_engine.predict_hybrid(input_vec, symbol)
+                
+                # Strategy Convergence
+                from app.ml.convergence import convergence_engine
+                cv = convergence_engine.evaluate_convergence(
+                    neural_alpha=prediction.get("alpha_multiplier", 1.0),
+                    kinetic_coherence=latent_vector.get("kinetic_coherence", 0.0),
+                    p_win=prediction.get("p_win", 0.5),
+                    uncertainty=prediction.get("uncertainty", 0.1)
+                )
+
+                # Execution decision
+                if cv.score > settings.ALPHA_CONFIDENCE_THRESHOLD and not cv.vetoes:
+                    await self._execute_trade(symbol, cv.direction, price, last_row, prediction, latent_vector)
+
+            except Exception as e:
+                logger.error(f"Vision Protocol Error: {e}", exc_info=True)
+
+    async def _execute_trade(self, symbol, direction, price, row, prediction, features):
+        lot = await self.risk_engine.calculate_dynamic_lot(
+            confidence=prediction.get("p_win", 0.5),
+            volatility=row.get("atr14", 0.0),
+            symbol=symbol,
+            market_data={**prediction, "brain_uncertainty": prediction.get("uncertainty", 0.1)}
+        )
+        
+        if lot > 0:
+            res = await self.trade_manager.execute_order(direction, {
+                "symbol": symbol,
+                "volume": lot,
+                "magic": settings.MT5_MAGIC_NUMBER,
+                "comment": "NEXUSCORE_V3"
+            })
+            
+            if res.get("status") == "EXECUTED":
+                self.trade_manager.register_position(
+                    ticket=res["ticket"],
+                    entry_price=price,
+                    atr=row.get("atr14", 0.0),
+                    is_buy=(direction == "BUY"),
+                    context={**features, "p_win": prediction.get("p_win", 0.5)}
+                )
+
+    async def dashboard_heartbeat(self):
+        while self.running:
+            try:
+                if mt5_ref.terminal_info():
+                    acc = mt5_ref.account_info()
+                    if acc:
+                        # StateExporter picks this up from State
+                        pass
+            except Exception: pass
+            await asyncio.sleep(5)
+
+    async def state_export_loop(self):
+        while self.running:
+            try:
+                acc_info = self.market.get_account_info() if self.market else None
+                positions = self.market.get_positions() if self.market else []
+                from app.services.neural_service import neural_service
+                latest_neural = neural_service.get_latest_state()
+                
+                data = {
+                    "account": {
+                        "balance": acc_info.balance if acc_info else 0,
+                        "equity": acc_info.equity if acc_info else 0,
+                        "pnl": acc_info.profit if acc_info else 0,
+                        "margin_level": acc_info.margin_level if acc_info else 0
+                    },
+                    "positions_count": len(positions),
+                    "symbol": "XAUUSD",
+                    "risk_factor": settings.RISK_FACTOR,
+                    "circuit_breaker": {
+                        "status": "CLOSED" if circuit_breaker.is_ok() else "TRIPPED",
+                        "latency": circuit_breaker.get_last_latency()
+                    },
+                    **latest_neural
+                }
+                await state_exporter.export(data)
+            except Exception as e:
+                logger.error(f"State Export Error: {e}")
+            await asyncio.sleep(1.0)
+
+    async def command_processor_loop(self):
+        cmd_file = "data/app_commands.json"
+        while self.running:
+            if os.path.exists(cmd_file):
+                try:
+                    with open(cmd_file, 'r') as f: commands = json.load(f)
+                    os.remove(cmd_file)
+                    for cmd in commands:
+                        act = cmd.get("action")
+                        p = cmd.get("params", {})
+                        if act == "SET_RISK_FACTOR": settings.RISK_FACTOR = p.get("value", 1.0)
+                        elif act == "PANIC_CLOSE_ALL" and self.trade_manager: await self.trade_manager.close_all_positions()
+                        elif act == "RELOAD_MODELS" and self.ml_engine: await self.ml_engine.reload_weights()
+                except Exception as e: logger.error(f"Command Error: {e}")
+            await asyncio.sleep(0.5)
+
+    async def shutdown(self):
+        logger.info("👋 NexusEngine: Initiating Safe Shutdown...")
+        self.running = False
+        for task in self._background_tasks:
+            task.cancel()
+        if self.trade_manager:
+            await self.trade_manager.cleanup()
+        logger.info("✅ NexusEngine: Shutdown Complete.")
+
+# Single Instance for the Process
+engine = NexusEngine()

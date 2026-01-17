@@ -104,6 +104,49 @@ class KineticEngine:
         metrics["bias_val"] = bias_val
         metrics["bias_slope"] = (bias_val - bias_prev) / atr
         
+        # --- 2.5 PHYSICS ENGINE V3.0 (Efficiency of Flow) ---
+        # Mass = Tick Volume (Energy required to move price)
+        # Force = Mass * Acceleration
+        # Efficiency = Displacement / Effort
+        
+        if "volume" in df.columns:
+            # Mass: Smoothed Volume to reduce noise
+            mass = df["volume"].rolling(3).mean().iloc[-1]
+            
+            # Acceleration: Change in Price Velocity (Micro Slope Delta)
+            # Velocity ~ Micro Slope
+            # Accel ~ Change in Micro Slope
+            micro_slope = (centroids["micro"] - prev_centroid) # reusing raw diff before ATR division
+            
+            # Note: We need previous slope. approximating with current slope for now or tracking state.
+            # Better approximation: Accel = (Close - 2*Close[-1] + Close[-2]) 
+            # Let's use the explicit derivation:
+            p0 = df["close"].iloc[-1]
+            p1 = df["close"].iloc[-2]
+            p2 = df["close"].iloc[-3] if len(df) > 2 else p1
+            
+            velocity = p0 - p1
+            prev_velocity = p1 - p2
+            acceleration = velocity - prev_velocity
+            
+            # Force (Market Impact)
+            force = mass * abs(acceleration)
+            metrics["physics_force"] = force
+            metrics["physics_mass"] = mass
+            metrics["physics_accel"] = acceleration
+            
+            # Efficiency (Displacement per Unit of Force)
+            # Avoid div by zero. 
+            # High Eff = Price moved easily (Vacuum)
+            # Low Eff = Price moved hard (Wall)
+            metrics["flow_efficiency"] = abs(velocity) / (mass + 1e-9)
+            
+            # Friction (Inverse Efficiency)
+            metrics["friction_coeff"] = (mass + 1e-9) / (abs(velocity) + 1e-9)
+        else:
+            metrics["physics_force"] = 0.0
+            metrics["flow_efficiency"] = 0.0
+        
         # --- 3. INTER-LAYER RELATIONSHIPS (The "Change in Relation") ---
         
         # A. Micro vs Structure (Intent vs Reality)

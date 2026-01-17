@@ -79,8 +79,8 @@ class CircuitBreaker:
         # [SENIOR FIX] Persisted Rate Limiter
         self.rate_limiter = PersistedTokenBucket(capacity=20, fill_rate=0.5) # 1 order / 2s
         
-        # Tolerance: 15 seconds of silence = DEATH
-        self.max_latency = 15.0 
+        # Tolerance: 10 minutes of silence = DEATH (Deep Sync Allowance)
+        self.max_latency = 600.0 
         self.trade_manager: Optional[Any] = None 
         self._daily_opening_balance: Optional[float] = None
 
