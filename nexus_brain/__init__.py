@@ -1,4 +1,6 @@
 """
 FEAT NEXUS: Neural Brain Module
-Contains Hybrid Architectures (GBM + CNN + LSTM)
+================================
+Master orchestrator for Hybrid Neuro-Mathematical Architectures.
+Integrates TCN-BiLSTM temporal context with Spatial Vision and Kinetic Intent.
 """

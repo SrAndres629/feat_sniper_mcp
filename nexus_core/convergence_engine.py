@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 
@@ -8,6 +9,8 @@ logger = logging.getLogger("FEAT.Convergence")
 class ConvergenceSignal:
     score: float          # 0.0 to 1.0 (Final Confidence)
     direction: str        # BUY, SELL, WAIT
+    alpha: float          # Lot size multiplier (0.5 to 1.5)
+    volatility: float     # Estimated regime intensity (0.0 to 1.0)
     vetoes: List[str]     # List of reasons if blocked
     meta: Dict[str, Any]  # Debug metadata
 
@@ -24,10 +27,41 @@ class ConvergenceEngine:
     """
     
     def __init__(self):
-        # Thresholds (load from config in future)
-        self.MIN_SCORE_EXECUTE = 0.70
-        self.MIN_KINETIC_COHERENCE = 0.5
-        self.MAX_NEURAL_UNCERTAINTY = 0.05
+        from app.core.config import settings
+        self.settings = settings
+        
+    def evaluate_convergence(self, 
+                             neural_alpha: float,
+                             kinetic_coherence: float,
+                             p_win: float,
+                             uncertainty: float) -> ConvergenceSignal:
+        """
+        [LEVEL 62] Unified Probabilistic Fusion (Surgical Path).
+        Streamlined wrapper for the multi-head cognition loop.
+        """
+        # [PHASE 1] Epistemic Veto
+        vetoes = []
+        if uncertainty > self.settings.CONVERGENCE_MAX_UNCERTAINTY:
+            vetoes.append(f"UNSTABLE_EPISTEMIC ({uncertainty:.3f})")
+            
+        # [PHASE 2] Fusion Logic (Bayesian Weighted)
+        # Simplified for high-speed SNIPER path
+        base_prob = p_win * (1.0 + (kinetic_coherence * 0.2))
+        final_score = min(1.0, base_prob * neural_alpha)
+        
+        # [PHASE 3] Directionality
+        direction = "BUY" if p_win > 0.5 else "SELL"
+        if final_score < self.settings.CONVERGENCE_MIN_SCORE:
+            direction = "WAIT"
+            
+        return ConvergenceSignal(
+            score=final_score,
+            direction=direction,
+            alpha=neural_alpha,
+            volatility=uncertainty, # Proxy for now
+            vetoes=vetoes,
+            meta={"path": "LEVEL_62_FAST"}
+        )
         
     def evaluate(self, 
                  neural_result: Dict[str, Any],
@@ -71,7 +105,7 @@ class ConvergenceEngine:
             vetoes.append(f"HURST_CHAOS ({hurst:.2f})")
             
         # A2. Epistemic Uncertainty (The "I don't know" Guard)
-        if uncertainty > self.MAX_NEURAL_UNCERTAINTY:
+        if uncertainty > self.settings.CONVERGENCE_MAX_UNCERTAINTY:
             vetoes.append(f"HIGH_UNCERTAINTY ({uncertainty:.3f})")
             
         # B. Kinetic Chaos (The "Market is confused" Guard)
@@ -95,57 +129,62 @@ class ConvergenceEngine:
 
         # 3. SCORING LAYER (Fusion Equation)
         # ----------------------------------
+        # 3. PROBABILISTIC FUSION LAYER (Log-Likelihood)
+        # --------------------------------------------
         if not vetoes:
-            # Base: Neural Probability (0.0 - 1.0)
-            # We map 0.5 to 0.0 confidence, 1.0 to 1.0 confidence (Linear projection for Bull)
-            # For Sell: 0.5 to 0.0, 0.0 to 1.0 confidence.
+            # P(Success) = Sigmoid( Sum( Logit(P_i) ) )
+            # Neural Logit
+            eps = 1e-6
+            p_win = max(min(p_win, 1 - eps), eps)
+            logit_neural = float(np.log(p_win / (1 - p_win)))
             
-            raw_conf = 0.0
-            if p_win > 0.5:
+            # Kinetic Evidence (Normalized to Log-Space)
+            # Alignment boosts likelihood of the neural direction
+            k_evidence = 0.0
+            if (p_win > 0.5 and k_align > 0) or (p_win < 0.5 and k_align < 0):
+                k_evidence = k_coh * 0.5 # Confidence multiplier
+            
+            # Structural Evidence
+            s_evidence = (struct_score - 50.0) / 100.0 # Range [-0.5, 0.5]
+            if p_win < 0.5: s_evidence *= -1 # Flip for Sell conviction
+            
+            # Alpha/Volatility Evidence
+            alpha_raw = neural_result.get("alpha_multiplier", 1.0)
+            vol_raw = neural_result.get("volatility_regime", 0.5)
+            
+            # Conviction Factor
+            conviction = (alpha_raw * (1.0 - vol_raw)) * 0.2
+            
+            # Fusion sum
+            total_logit = logit_neural + k_evidence + s_evidence + conviction
+            
+            # Map back to [0, 1] probability
+            score = 1.0 / (1.0 + np.exp(-total_logit))
+            
+            # Determine Final Direction based on Score
+            if score > 0.5:
                 direction = "BUY"
-                raw_conf = (p_win - 0.5) * 2 # 0.6 -> 0.2, 0.9 -> 0.8
+                final_conf = (score - 0.5) * 2
             else:
                 direction = "SELL"
-                raw_conf = (0.5 - p_win) * 2 # 0.4 -> 0.2, 0.1 -> 0.8
-                
-            # Boosters (Confirmation)
-            kinetic_boost = 0.0
-            if direction == "BUY" and k_align > 0: kinetic_boost += 0.1
-            if direction == "SELL" and k_align < 0: kinetic_boost += 0.1
-            if k_coh > 0.8: kinetic_boost += 0.05
+                final_conf = (0.5 - score) * 2
             
-            struct_boost = 0.0
-            if direction == "BUY" and struct_score > 60: struct_boost += 0.1
-            if direction == "SELL" and struct_score < 40: struct_boost += 0.1
-            
-            # [LEVEL 35] OFI Divergence Logic
-            ofi_penalty = 0.0
-            if direction == "BUY" and ofi < -0.2: ofi_penalty = 0.2
-            if direction == "SELL" and ofi > 0.2: ofi_penalty = 0.2
-            
-            # Total Fusion
-            score = raw_conf + kinetic_boost + struct_boost - ofi_penalty
-            
-            # Penalties
-            if uncertainty > 0.03: score -= 0.1 # Mild uncertainty penalty
-            
-            # Cap
-            score = min(max(score, 0.0), 1.0)
-            
-            # Final Execution Check
-            if score < self.MIN_SCORE_EXECUTE:
-                vetoes.append(f"LOW_CONVERGENCE_SCORE ({score:.2f})")
+            # Final Execution Check (Ph.D. Strictness)
+            if score < self.settings.CONVERGENCE_MIN_SCORE and score > (1 - self.settings.CONVERGENCE_MIN_SCORE):
+                vetoes.append(f"LOW_PROBABILISTIC_CONVERGENCE ({score:.2f})")
                 direction = "WAIT"
 
         return ConvergenceSignal(
             score=score,
             direction=direction,
+            alpha=neural_result.get("alpha_multiplier", 1.0),
+            volatility=neural_result.get("volatility_regime", 0.5),
             vetoes=vetoes,
             meta={
                 "p_win": p_win,
                 "k_id": k_id,
-                "k_align": k_align,
-                "struct": struct_score
+                "alpha": neural_result.get("alpha_multiplier", 1.0),
+                "regime": neural_result.get("volatility_regime", 0.5)
             }
         )
 

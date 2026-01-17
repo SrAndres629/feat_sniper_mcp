@@ -1,10 +1,8 @@
 """
-Dashboard HTTP Server
-=====================
-Serves dashboard.html on http://localhost:8080 to fix file:// origin issues
-that block Supabase Realtime WebSocket connections.
-
-Usage: python serve_dashboard.py
+Dashboard HTTP Server [LEGACY/DEPRECATED]
+=========================================
+Note: Use `nexus.bat` to launch the modern Streamlit Visual Cortex.
+This script remains as a fallback for the old dashboard.html.
 """
 
 import http.server

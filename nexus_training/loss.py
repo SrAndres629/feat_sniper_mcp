@@ -3,56 +3,50 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class PhysicsAwareLoss(nn.Module):
+class ConvergentSingularityLoss(nn.Module):
     """
-    [ARCH-HYBRID-V1] Physics-Regularized Loss Function.
-    Penalizes the model if it predicts strong moves (BUY/SELL) against Physics Laws (Acceleration).
+    [LEVEL 54] THE NEURO-MATHEMATICAL SINGULARITY LOSS.
+    Enforces triple-domain consistency:
+    1.  Temporal Class Error (CrossEntropy)
+    2.  Kinetic Violation (Acceleration vs Direction)
+    3.  Spatial Anomaly (Vision vs Probability)
     """
-    def __init__(self, physics_lambda=0.5):
-        super(PhysicsAwareLoss, self).__init__()
+    def __init__(self, kinetic_lambda=0.5, spatial_lambda=0.3):
+        super(ConvergentSingularityLoss, self).__init__()
         self.ce_loss = nn.CrossEntropyLoss()
-        self.physics_lambda = physics_lambda
+        self.k_lambda = kinetic_lambda
+        self.s_lambda = spatial_lambda
         
-    def forward(self, pred, target, physics_inputs):
+    def forward(self, pred, target, physics, x_map=None):
         """
-        pred: Logits (Batch, 3) [SELL, HOLD, BUY]
-        target: Labels (Batch) [0, 1, 2]
-        physics_inputs: (Batch, Features) where feature 'acceleration' is normalized 0-1
+        pred: (Batch, 3) [SELL, HOLD, BUY]
+        target: (Batch)
+        physics: (Batch) - Kinetic Acceleration factor
+        x_map: (Batch, 1, 50, 50) - Spatial Liquidity Map
         """
-        # 1. Classification Error (CrossEntropy expects logits)
         ce = self.ce_loss(pred, target)
         
-        # 2. Physics Violation
-        # Convert logits to probabilities
+        # 1. KINETIC PENALTY (Laws of Physics)
         probs = F.softmax(pred, dim=1)
+        prob_dir = probs[:, 2] - probs[:, 0] # Net directional bias
         
-        # Extract Probabilities
-        prob_sell = probs[:, 0]
-        prob_buy = probs[:, 2]
+        # If directional intent is high but acceleration is low -> Penalty
+        kinetic_violation = torch.abs(prob_dir) * (1.0 - physics)
         
-        # Extract Acceleration (Assuming it's the last feature or passed specifically)
-        # For this implementation, we assume physics_inputs contains 'acceleration' at index -1
-        # In practice, the DataLoader should yield this specifically.
-        # If physics_inputs is just the features tensor, we need to know the index.
-        # Assuming 'acceleration' is passed as a separate tensor of shape (Batch,)
-        accel = physics_inputs
-        
-        # Violation 1: Strong BUY prediction but Low Acceleration
-        buy_violation = torch.relu(prob_buy - accel)
-        
-        # Violation 2: Strong SELL prediction but Low Acceleration (Accel is magnitude)
-        sell_violation = torch.relu(prob_sell - accel) 
-        
-        # [LEVEL 40] EPISTEMIC HUMILITY (Calibration Penalty)
-        # If model is confident (Low Entropy) but violating physics, penalty is squared.
-        # "Don't be confidently wrong."
-        physics_error = buy_violation + sell_violation
-        
-        # Entropy (Uncertainty)
-        entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=1)
-        # Low entropy = High confidence. 
-        # We want High Entropy if Physics Error is High.
-        
-        calibration_penalty = physics_error * (1.0 / (entropy + 0.1)) # Higher penalty if uncertainty is low
-        
-        return ce + (torch.mean(calibration_penalty) * self.physics_lambda)
+        # 2. SPATIAL PENALTY (Vision Consensus)
+        # If the model predicts a BUY but there is an "Energy Wall" (high density) 
+        # above price in the energy map, penalize the overconfidence.
+        spatial_violation = 0.0
+        if x_map is not None:
+            # Simple Spatial Heuristic: Sum of density in top half vs bottom half
+            # In a real PhD implementation, this would be a Cross-Attention mapping
+            top_density = torch.sum(x_map[:, :, :25, :], dim=(1,2,3))
+            bot_density = torch.sum(x_map[:, :, 25:, :], dim=(1,2,3))
+            
+            # Predict BUY (2) but high top density (Wall) -> Risk
+            buy_risk = probs[:, 2] * (top_density / (top_density + bot_density + 1e-9))
+            # Predict SELL (0) but high bottom density (Floor) -> Risk
+            sell_risk = probs[:, 0] * (bot_density / (top_density + bot_density + 1e-9))
+            spatial_violation = buy_risk + sell_risk
+            
+        return ce + (torch.mean(kinetic_violation) * self.k_lambda) + (torch.mean(spatial_violation) * self.s_lambda)

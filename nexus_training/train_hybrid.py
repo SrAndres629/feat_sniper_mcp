@@ -15,7 +15,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # [LEVEL 50] Use the Advanced Probabilistic Model
 from app.ml.models.hybrid_probabilistic import HybridProbabilistic
-from nexus_training.loss import PhysicsAwareLoss
+from nexus_training.loss import ConvergentSingularityLoss
 from app.core.config import settings
 
 # Logger Setup
@@ -30,38 +30,31 @@ class SniperDataset(Dataset):
     2. Static/Latent Features (FeatEncoder)
     3. Physics Labels (Loss)
     """
-    def __init__(self, sequences, labels, physics, static_features: Dict[str, np.ndarray]):
+    def __init__(self, sequences, labels, physics, static_features: Dict[str, np.ndarray], spatial_maps: np.ndarray = None):
         self.sequences = torch.FloatTensor(sequences)
         self.labels = torch.LongTensor(labels)
         self.physics = torch.FloatTensor(physics)
         
         # [LEVEL 41] Static Features for FeatEncoder
-        # Check if keys exist, else zero-init
         self.form = torch.FloatTensor(static_features.get("form", np.zeros((len(labels), 4))))
         self.space = torch.FloatTensor(static_features.get("space", np.zeros((len(labels), 3))))
         self.accel = torch.FloatTensor(static_features.get("accel", np.zeros((len(labels), 3))))
         self.time = torch.FloatTensor(static_features.get("time", np.zeros((len(labels), 4))))
-        self.kinetic = torch.FloatTensor(static_features.get("kinetic", np.zeros((len(labels), 4)))) # [LEVEL 50]
+        self.kinetic = torch.FloatTensor(static_features.get("kinetic", np.zeros((len(labels), 4))))
+        
+        # [LEVEL 54] Spatial Energy Maps
+        if spatial_maps is not None:
+            self.spatial_maps = torch.FloatTensor(spatial_maps)
+        else:
+            self.spatial_maps = torch.zeros((len(labels), 1, 50, 50))
         
     def __len__(self):
         return len(self.labels)
         
     def __getitem__(self, idx):
-        # Package feat_input on the fly
-        feat_input = {
-            "form": self.form[idx].unsqueeze(0), # (1, 4) to match batch dim expectation if needed usually just (dim)
-            "space": self.space[idx].unsqueeze(0),
-            "accel": self.accel[idx].unsqueeze(0),
-            "time": self.time[idx].unsqueeze(0),
-            "kinetic": self.kinetic[idx].unsqueeze(0)
-        }
-        # Note: Dataloader collate will stack these. 
-        # Actually standard collate works well if we return dicts, but let's correct shapes in loop
-        
-        # Return flattened dict elements to be stacked by Collate? 
-        # Simpler: Return Tuple, reconstruct Dict in loop
         return self.sequences[idx], self.labels[idx], self.physics[idx], \
-               self.form[idx], self.space[idx], self.accel[idx], self.time[idx], self.kinetic[idx]
+               self.form[idx], self.space[idx], self.accel[idx], self.time[idx], \
+               self.kinetic[idx], self.spatial_maps[idx]
 
 def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
     """
@@ -106,7 +99,7 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
     model = HybridProbabilistic(input_dim=input_dim, hidden_dim=64, num_classes=3).to(device)
     
     # 3. Loss & Optimizer
-    criterion = PhysicsAwareLoss(physics_lambda=0.5).to(device)
+    criterion = ConvergentSingularityLoss(kinetic_lambda=0.5, spatial_lambda=0.3).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5)
     
@@ -120,13 +113,13 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
         total = 0
         
         progress = tqdm(dataloader, desc=f"Epoch {epoch+1}/{epochs}")
-        for seq, label, phys_val, f_form, f_space, f_accel, f_time, f_kin in progress:
+        for seq, label, phys_val, f_form, f_space, f_accel, f_time, f_kin, f_map in progress:
             
             # Prepare Data
-            # Model expects (Batch, Seq_Len, Channels) and handles permute internally
             seq = seq.to(device) 
             label = label.to(device)
             phys_val = phys_val.to(device)
+            f_map = f_map.to(device)
             
             # Reconstruct Feat Input Dict
             feat_input = {
@@ -134,7 +127,8 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
                 "space": f_space.to(device),
                 "accel": f_accel.to(device),
                 "time": f_time.to(device),
-                "kinetic": f_kin.to(device)
+                "kinetic": f_kin.to(device),
+                "spatial_map": f_map  # [LEVEL 54]
             }
             
             optimizer.zero_grad()
@@ -142,8 +136,8 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
             # Forward
             logits = model(seq, feat_input=feat_input) # (Batch, 3)
             
-            # Loss (Physics Aware)
-            loss = criterion(logits, label, phys_val)
+            # Loss (Singularity Aware)
+            loss = criterion(logits, label, phys_val, x_map=f_map)
             
             # Backward
             loss.backward()

@@ -12,17 +12,22 @@ import os
 import logging
 
 from sklearn.ensemble import IsolationForest
+from sklearn.cluster import MiniBatchKMeans
+from sklearn.preprocessing import StandardScaler
+from app.core.config import settings
+
+logger = logging.getLogger("feat.market_regime")
 
 class MarketRegime:
-    def __init__(self, n_clusters=3):
-        self.n_clusters = n_clusters
-        self.model_path = "models/kmeans_regime.pkl"
-        self.scaler_path = "models/kmeans_scaler.pkl"
-        self.anomaly_path = "models/isolation_forest.pkl"
+    def __init__(self, n_clusters=None):
+        self.n_clusters = n_clusters or settings.REGIME_CLUSTERS
+        self.model_path = settings.REGIME_MODEL_PATH
+        self.scaler_path = settings.REGIME_SCALER_PATH
+        self.anomaly_path = settings.ANOMALY_MODEL_PATH
         
-        self.model = MiniBatchKMeans(n_clusters=n_clusters, random_state=42, n_init="auto")
+        self.model = MiniBatchKMeans(n_clusters=self.n_clusters, random_state=42, n_init="auto")
         # [LEVEL 32] UNSUPERVISED ANOMALY DETECTION
-        self.anomaly_detector = IsolationForest(contamination=0.05, random_state=42)
+        self.anomaly_detector = IsolationForest(contamination=settings.ANOMALY_CONTAMINATION, random_state=42)
         self.scaler = StandardScaler()
         
         self.is_fitted = False

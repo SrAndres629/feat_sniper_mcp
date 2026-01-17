@@ -2,6 +2,29 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+class SpatialCortex(nn.Module):
+    """
+    [C] COMPONENT - SPATIAL CORTEX (Vision)
+    CNN-based feature extractor for 50x50 Liquidity Energy Maps.
+    """
+    def __init__(self, output_dim=32):
+        super(SpatialCortex, self).__init__()
+        self.conv1 = nn.Conv2d(1, 16, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool2d(2, 2) # 50 -> 25
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1) # 25 -> 12
+        self.conv3 = nn.Conv2d(32, 64, kernel_size=3, padding=1) # 12 -> 6
+        
+        # Output: 64 * 6 * 6 = 2304
+        self.fc = nn.Linear(64 * 6 * 6, output_dim)
+
+    def forward(self, x):
+        # x: (Batch, 1, 50, 50)
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
+        x = self.pool(F.relu(self.conv3(x)))
+        x = x.view(x.size(0), -1)
+        return F.relu(self.fc(x))
+
 class TemporalBlock(nn.Module):
     """
     TCN Block: Dilated Convolution + Chomp + ReLU + Dropout
@@ -53,15 +76,17 @@ class HybridProbabilistic(nn.Module):
     [ARCH-HYBRID-PROB-V1] Probabilistic Hybrid Model (TCN-BiLSTM-Attention).
     Supports Monte Carlo Dropout for Epistemic Uncertainty Estimation.
     """
-    def __init__(self, input_dim, hidden_dim=128, num_classes=3, dropout=0.2):
+    def __init__(self, input_dim=None, hidden_dim=128, num_classes=3, dropout=0.2):
         super(HybridProbabilistic, self).__init__()
         
+        # Zero-Hardcoding Dimension Invariants
+        self.input_dim = input_dim or settings.NEURAL_INPUT_DIM
+        self.hidden_dim = hidden_dim
+        self.num_classes = num_classes
         
         # Block 1: TCN (Temporal Convolutional Network)
-        # TCN accepts (Batch, Channels, Seq_Len)
-        # input_dim now includes +7 PVP Features (approx 18-25 total)
-        self.tcn_channels = 64
-        self.tcn1 = TemporalBlock(input_dim, self.tcn_channels, kernel_size=3, stride=1, dilation=1, padding=2, dropout=dropout)
+        self.tcn_channels = settings.NEURAL_TCN_CHANNELS # Load from central settings
+        self.tcn1 = TemporalBlock(self.input_dim, self.tcn_channels, kernel_size=3, stride=1, dilation=1, padding=2, dropout=dropout)
         self.tcn2 = TemporalBlock(self.tcn_channels, self.tcn_channels, kernel_size=3, stride=1, dilation=2, padding=4, dropout=dropout)
         self.tcn3 = TemporalBlock(self.tcn_channels, self.tcn_channels, kernel_size=3, stride=1, dilation=4, padding=8, dropout=dropout)
         
@@ -82,13 +107,36 @@ class HybridProbabilistic(nn.Module):
         
         # [LEVEL 41] PVP-FEAT Latent Encoder Integration
         from app.ml.models.feat_encoder import FeatEncoder
+        # Unified Latent output: 32 (Structural) + 32 (Spatial)
         self.feat_encoder = FeatEncoder(output_dim=32)
         
-        # Output Layer
-        # Input is Context (Hidden*2) + Latent State (32)
-        self.fc = nn.Linear(lstm_out_dim + 32, num_classes) # [SELL, HOLD, BUY]
+        # [LEVEL 54] Spatial Cortex (Vision)
+        self.spatial_cortex = SpatialCortex(output_dim=32)
+        
+        # [LEVEL 56] Multi-Head Production Outputs
+        # Fusion: Temporal(2*Hidden) + Structural(32) + Spatial(32)
+        fusion_dim = lstm_out_dim + 32 + 32
+        
+        # 1. Directional Logits: [SELL, HOLD, BUY]
+        self.head_direction = nn.Linear(fusion_dim, num_classes)
+        
+        # 2. Probability of Win Head (Binary Confidence)
+        self.head_p_win = nn.Linear(fusion_dim, 1)
+        
+        # 3. Volatility Regime Head (Adaptive SL/TP)
+        self.head_volatility = nn.Linear(fusion_dim, 1)
+        
+        # 4. Risk Alpha (Lot Size Multiplier)
+        self.head_alpha = nn.Linear(fusion_dim, 1)
         
         self.dropout_rate = dropout
+        
+        # Doctoral Metadata
+        self.metadata = {
+            "version": "2.1.0-SINGULARITY",
+            "arch": "Hybrid-TCN-BiLSTM-Vision",
+            "capabilities": ["MC-Dropout", "Multi-Head", "Physics-Gating"]
+        }
         
     def forward(self, x, feat_input=None, force_dropout=False):
         """
@@ -139,14 +187,27 @@ class HybridProbabilistic(nn.Module):
                 feat_input.get("kinetic") # Optional
             ) # (Batch, 32)
             
-            # Fuse Temporal Context + Structural State
-            fusion = torch.cat([context, z_t], dim=1)
+            # [LEVEL 54] Spatial Fusion
+            s_t = feat_input.get("spatial_map")
+            if s_t is not None:
+                z_s = self.spatial_cortex(s_t) # (Batch, 32)
+            else:
+                z_s = torch.zeros(x.size(0), 32).to(x.device)
+            
+            # Fuse Temporal Context + Structural State + Spatial Energy
+            fusion = torch.cat([context, z_t, z_s], dim=1)
         else:
-            # Fallback (Zero Vector for Z_t)
+            # Fallback (Zero Vector for Z_t and Z_s)
             batch_size = x.size(0)
             z_dummy = torch.zeros(batch_size, 32).to(x.device)
-            fusion = torch.cat([context, z_dummy], dim=1)
+            s_dummy = torch.zeros(batch_size, 32).to(x.device)
+            fusion = torch.cat([context, z_dummy, s_dummy], dim=1)
 
-        # 4. Classification
-        logits = self.fc(fusion)
-        return logits
+        # 4. Unified Fusion Output (Multi-Head)
+        outputs = {
+            "logits": self.head_direction(fusion),
+            "p_win": torch.sigmoid(self.head_p_win(fusion)),
+            "volatility": torch.sigmoid(self.head_volatility(fusion)),
+            "alpha": torch.sigmoid(self.head_alpha(fusion))
+        }
+        return outputs

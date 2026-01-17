@@ -127,6 +127,48 @@ class FEATFeatures:
             }
         }
 
+    def generate_2d_energy_map(self, df: pd.DataFrame, bins: int = 50) -> np.ndarray:
+        """
+        [LEVEL 55] NEURO-MATHEMATICAL SINGULARITY
+        Generates a 50x50 Spatio-Temporal Energy Tensor.
+        Y-Axis: Price Bins (Spatial)
+        X-Axis: Time Steps (Temporal Evolution)
+        """
+        if len(df) < bins:
+            return np.zeros((bins, bins))
+            
+        # Use last N bars
+        df_target = df.iloc[-bins:]
+        prices = df_target["close"].values
+        volumes = df_target["volume"].values
+        
+        min_p = prices.min()
+        max_p = prices.max()
+        range_p = max_p - min_p if max_p > min_p else 1.0
+        
+        # Grid initialization
+        grid = np.zeros((bins, bins))
+        
+        # Physics Mapping: 
+        # Each candle projects its energy onto the 2D manifold
+        for i in range(bins):
+            # Price position in bins
+            price_bin = int(((prices[i] - min_p) / range_p) * (bins - 1))
+            price_bin = max(0, min(bins - 1, price_bin))
+            
+            # Volume Intensity (Energy)
+            vol_intensity = volumes[i] / (df["volume"].rolling(20).mean().iloc[-bins+i] + 1e-9)
+            
+            # Spatial Decay (Kernel): Spread energy to nearby bins to simulate price influence
+            # Simplified Gaussian spread
+            grid[price_bin, i] = vol_intensity
+            if price_bin > 0: grid[price_bin-1, i] = vol_intensity * 0.5
+            if price_bin < bins-1: grid[price_bin+1, i] = vol_intensity * 0.5
+                
+        # Z-Score Normalization for Neural Consistency
+        grid = (grid - np.mean(grid)) / (np.std(grid) + 1e-9)
+        return grid
+
     def extract_scalar_features(self, df: pd.DataFrame) -> Dict[str, float]:
         """
         Legacy scalar features for LightGBM baseline.
@@ -134,7 +176,8 @@ class FEATFeatures:
         """
         # 1. Physics & Structure
         # ----------------------
-        struct_results = structure_engine.compute_feat_index(df).iloc[-1].to_dict()
+        df = structure_engine.detect_structural_shifts(df)
+        health = structure_engine.get_structural_health(df)
         accel_results = acceleration_engine.compute_acceleration_features(df).iloc[-1].to_dict()
         
         # 2. PVP / Volume Profile (Computed Locally)
@@ -153,11 +196,11 @@ class FEATFeatures:
             "energy_score": energy_score,
             "absorption_tension": pvp_metrics.get("skew", 0),
             
-            "feat_form_score": struct_results.get("feat_form", 0),
-            "feat_space_score": struct_results.get("feat_space", 0),
-            "feat_acceleration_score": struct_results.get("feat_acceleration", 0),
-            "feat_time_score": struct_results.get("feat_time", 0),
-            "feat_index": struct_results.get("feat_index", 0),
+            "feat_form_score": health.get("overall_form_score", 0),
+            "feat_space_score": health.get("zone_confidence", 0),
+            "feat_acceleration_score": health.get("mae_confidence", 0),
+            "feat_time_score": health.get("layer_alignment", 0),
+            "feat_index": health.get("health_score", 0),
             
             "accel_trigger": accel_results.get("accel_flag", 0),
             "accel_score": accel_results.get("accel_score", 0),
@@ -218,23 +261,19 @@ class FEATFeatures:
         if df.empty: return df
         
         # 1. Structure Engine
-        df = structure_engine.detect_structure(df)
+        df = structure_engine.detect_structural_shifts(df)
         df = structure_engine.detect_zones(df)
         
         # 2. Acceleration Engine
-        # Returns a dataframe with columns like 'accel_score', 'disp_norm', etc.
         accel_df = acceleration_engine.compute_acceleration_features(df)
-        
-        # Join acceleration features
-        # Ensure we don't duplicate columns if they already exist
         cols_to_use = accel_df.columns.difference(df.columns)
         df = df.join(accel_df[cols_to_use])
         
-        # 3. Compute Final Index
-        # This adds feat_form, feat_space, feat_acceleration, feat_time, feat_index
-        index_res = structure_engine.compute_feat_index(df)
-        cols_to_use_idx = index_res.columns.difference(df.columns)
-        df = df.join(index_res[cols_to_use_idx])
+        # 3. Compute Health metrics as features
+        # We broadcast the health score to the dataframe
+        health = structure_engine.get_structural_health(df)
+        df["feat_index"] = health.get("health_score", 0.0)
+        df["feat_form"] = health.get("overall_form_score", 0.0)
         
         return df
 

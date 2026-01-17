@@ -13,7 +13,7 @@ const GlassCard = ({ children, className = "" }: { children: React.ReactNode, cl
     animate={{ opacity: 1, y: 0 }}
     className={`glass p-6 rounded-xl relative overflow-hidden ${className}`}
   >
-    <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-aqua/30 to-transparent" />
+    <div className="absolute top-0 left-0 w-full h-px bg-linear-to-r from-transparent via-aqua/30 to-transparent" />
     {children}
   </motion.div>
 );
@@ -34,29 +34,52 @@ const MetricBox = ({ label, value, icon: Icon, color = "aqua" }: any) => (
 
 export default function Dashboard() {
   const [signals, setSignals] = useState<any[]>([]);
+  const [neuralState, setNeuralState] = useState<any>({
+    win_confidence: 0,
+    alpha_multiplier: 1.0,
+    volatility_regime: 0,
+    price: 0,
+    uncertainty: 0,
+    pvp: { energy: 0, dist_poc: 0, skew: 0, entropy: 0 }
+  });
   const [expandedSignal, setExpandedSignal] = useState<string | null>(null);
-  const [score, setScore] = useState(92);
-  const [status, setStatus] = useState("OPERATIONAL");
-  const [pnl, setPnl] = useState({ daily: 1450.25, total: 32400.00, hourly: 82.50, velocity: 120.50 });
+  const [score, setScore] = useState(0);
+  const [status, setStatus] = useState("SYNCING");
+  const [pnl, setPnl] = useState({ daily: 0, total: 0, hourly: 0, velocity: 0 });
   const [history, setHistory] = useState<any[]>([]);
-  const [twinEngine, setTwinEngine] = useState({ scalp: 10.0, swing: 10.0, mode: "TWIN" });
+  const [twinEngine, setTwinEngine] = useState({ scalp: 0, swing: 0, mode: "NEURAL" });
 
   useEffect(() => {
-    // Real-time signal subscription
-    const channel = supabase
-      .channel('live-signals')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'feat_signals' }, payload => {
-        setSignals(prev => [payload.new, ...prev].slice(0, 10));
-        let conf = payload.new.confidence;
-        if (conf <= 1) conf = conf * 100;
-        setScore(Math.round(conf));
+    // 4-Head Neural Telemetry subscription
+    const neuralChannel = supabase
+      .channel('neural-updates')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'neural_signals' }, payload => {
+        const data = payload.new;
+        setNeuralState({
+          win_confidence: data.alpha_confidence || 0,
+          alpha_multiplier: data.alpha_multiplier || 1.0,
+          volatility_regime: data.volatility_regime || 0,
+          price: data.price || 0,
+          uncertainty: data.metadata?.uncertainty || 0,
+          pvp: {
+            energy: data.energy_score || 0,
+            dist_poc: data.dist_poc || 0,
+            skew: data.skew || 0,
+            entropy: data.entropy || 0
+          }
+        });
+        setScore(Math.round((data.alpha_confidence || 0) * 100));
+        setStatus("ACTIVE");
       })
       .subscribe();
 
     // Fetch Financial Performance every 30 seconds
     const fetchPerformance = async () => {
       try {
-        // En una implementación real, esto llamaría al MCP
+        const { data: vault } = await supabase.from('vault_state').select('*').single();
+        if (vault) {
+          setPnl(prev => ({ ...prev, total: vault.trading_capital }));
+        }
       } catch (e) {
         console.error("Failed to fetch financial performance", e);
       }
@@ -67,6 +90,7 @@ export default function Dashboard() {
 
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(neuralChannel);
       clearInterval(interval);
     };
   }, []);
@@ -139,7 +163,7 @@ export default function Dashboard() {
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-5xl font-bold tracking-tighter text-glow-aqua">{score}%</span>
-                  <span className="text-[10px] text-gray-400 uppercase tracking-widest mt-2">FEAT Confidence</span>
+                  <span className="text-[10px] text-gray-400 uppercase tracking-widest mt-2">{neuralState.win_confidence > 0.8 ? 'DOCTORAL ALPHA' : 'NEURAL FLOW'}</span>
                 </div>
               </div>
 
@@ -156,10 +180,10 @@ export default function Dashboard() {
             </GlassCard>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <MetricBox label="Capital Scalp" value={`$${twinEngine.scalp}`} icon={Zap} color="aqua" />
-              <MetricBox label="Capital Swing" value={`$${twinEngine.swing}`} icon={Target} color="gold" />
-              <MetricBox label="Profit/Hour" value={`$${pnl.velocity}`} icon={Activity} color="green-sniper" />
-              <MetricBox label="Engine Mode" value={twinEngine.mode} icon={Shield} color="aqua" />
+              <MetricBox label="Neural Alpha" value={`x${neuralState.alpha_multiplier.toFixed(2)}`} icon={Zap} color="gold" />
+              <MetricBox label="Vol Regime" value={neuralState.volatility_regime.toFixed(2)} icon={Activity} color="white" />
+              <MetricBox label="Entropy" value={neuralState.pvp.entropy.toFixed(2)} icon={Database} color="aqua" />
+              <MetricBox label="Uncertainty" value={neuralState.uncertainty.toFixed(3)} icon={Shield} color="red-sniper" />
             </div>
 
             {/* TRADE JOURNAL */}

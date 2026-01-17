@@ -1,9 +1,20 @@
 $ErrorActionPreference = "Stop"
 
 # --- Configuration ---
-$SourceDir = "c:\Users\acord\OneDrive\Desktop\Bot\feat_sniper_mcp\FEAT_Sniper_Master_Core"
+$CurrentDir = Get-Location
+$SourceDir = "$CurrentDir\FEAT_Sniper_Master_Core"
 $MT5DataDir = "C:\Users\acord\AppData\Roaming\MetaQuotes\Terminal\065434634B76DD288A1DDF20131E8DDB\MQL5"
 $CompilerPath = "C:\Program Files\LiteFinance MT5 Terminal\metaeditor64.exe"
+
+# --- Pre-Flight Checks ---
+if (!(Test-Path $CompilerPath)) {
+    Write-Host "[ERROR] metaeditor64.exe not found at $CompilerPath" -ForegroundColor Red
+    exit 1
+}
+if (!(Test-Path $MT5DataDir)) {
+    Write-Host "[ERROR] MT5 Data Directory not found. Check Terminal ID." -ForegroundColor Red
+    exit 1
+}
 
 $DestIndicators = "$MT5DataDir\Indicators\FEAT_Sniper"
 $DestIncludes = "$MT5DataDir\Include\UnifiedModel"

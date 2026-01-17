@@ -16,7 +16,7 @@ import json
 from enum import Enum
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, model_validator, computed_field
-from typing import Optional, Tuple, Literal
+from typing import List, Dict, Any, Optional, Tuple, Literal
 from pathlib import Path
 
 
@@ -108,6 +108,29 @@ class Settings(BaseSettings):
     ALPHA_CONFIDENCE_THRESHOLD: float = 0.60  # Minimum confidence to execute trade
     ENSEMBLE_MIN_WEIGHT: float = 0.15  # Minimum weight for any model
     ENSEMBLE_MAX_WEIGHT: float = 0.85  # Maximum weight for any model
+    
+    # [P0 RESTORED] Institutional Safety Constants
+    SPREAD_MAX_PIPS: float = 50.0
+    ATR_SL_MULTIPLIER: float = 2.0
+    ATR_TP_MULTIPLIER: float = 4.0
+    DECISION_TTL_MS: int = 1000
+
+    # [LEVEL 56] DOCTORAL NEURAL ARCHITECTURE
+    NEURAL_INPUT_DIM: int = 18  # Total features (Temporal + Structural + Kinetic)
+    NEURAL_HIDDEN_DIM: int = 128
+    NEURAL_TCN_CHANNELS: int = 64
+    NEURAL_NUM_CLASSES: int = 3  # [SELL, HOLD, BUY]
+    NEURAL_OUTPUT_HEADS: Tuple[str, ...] = ("logits", "p_win", "volatility", "alpha")
+    MC_DROPOUT_SAMPLES: int = 20  # For Epistemic Uncertainty Estimation
+    SPATIAL_BINS: int = 50  # 50x50 Vision Resolution
+    
+    # [LEVEL 61] NEURAL FEATURE SET (18 DIMENSIONS)
+    NEURAL_FEATURE_NAMES: Tuple[str, ...] = (
+        "dist_micro", "dist_struct", "dist_macro", "dist_bias", 
+        "layer_alignment", "kinetic_coherence", "kinetic_pattern_id",
+        "dist_poc", "pos_in_va", "density", "energy", "skew", "entropy",
+        "form", "space", "accel", "time", "kalman_score"
+    )
 
     # =========================================================================
     # API SETTINGS
@@ -131,6 +154,38 @@ class Settings(BaseSettings):
     ENABLE_CIRCUIT_BREAKER: bool = True
     CB_FAILURE_THRESHOLD: int = 5
     MESSAGING_BROKER_URL: Optional[str] = None  # For Kafka/RabbitMQ future scaling
+    
+    # [LEVEL 61] AUTOML SOVEREIGN CONFIG
+    AUTOML_ENABLED: bool = True
+    AUT_EVO_INTERVAL_MINUTES: int = 30
+    AUTOML_DRIFT_WIN_RATE_THRESHOLD: float = 0.55
+    AUTOML_DRIFT_BIAS_THRESHOLD: float = 0.15
+    AUTOML_DRIFT_MIN_TRADES: int = 30
+    AUTOML_TRAIN_SCRIPT_PATH: str = "nexus_training/train_hybrid.py"
+    
+    # [LEVEL 61] UNSUPERVISED REGIME & ANOMALY CONSTANTS
+    REGIME_CLUSTERS: int = 3
+    REGIME_MODEL_PATH: str = "models/kmeans_regime.pkl"
+    REGIME_SCALER_PATH: str = "models/kmeans_scaler.pkl"
+    ANOMALY_MODEL_PATH: str = "models/isolation_forest.pkl"
+    ANOMALY_CONTAMINATION: float = 0.05
+    AUTOML_MIN_TRADES_FOR_DRIFT: int = 30
+    
+    # [LEVEL 61] INSTITUTIONAL STRUCTURAL SETTINGS
+    STRUCTURAL_PHASE_MAP: Dict[str, float] = {
+        "RANGE": 0.0, "NORMAL": 0.0, "ACCUMULATION": 0.5, "EXPANSION": 1.0, "MOMENTUM": 0.8
+    }
+    ZONE_PROXIMITY_FACTOR: float = 0.0005 # Factor of price
+    
+    # [LEVEL 61] MARKET PHYSICS THRESHOLDS
+    PHYSICS_INITIATIVE_VOL_THRESHOLD: float = 2.5
+    PHYSICS_INITIATIVE_VEL_THRESHOLD: float = 1.5
+    PHYSICS_REGIME_SIGMA: float = 2.0
+    
+    # [LEVEL 61] CONVERGENCE ENGINE THRESHOLDS
+    CONVERGENCE_MIN_SCORE: float = 0.75
+    CONVERGENCE_MAX_UNCERTAINTY: float = 0.04
+    CONVERGENCE_MIN_KINETIC_COHERENCE: float = 0.6
 
     # =========================================================================
     # ADVANCED RISK MANAGEMENT
@@ -172,6 +227,30 @@ class Settings(BaseSettings):
         elif self.TRADING_MODE == "BACKTEST":
             return ExecutionMode.BACKTEST
         return ExecutionMode.SHADOW
+
+    # [LEVEL 57] DOCTORAL PRODUCTION LOCKDOWN
+    MT5_MAGIC_NUMBER: int = 123456
+    MT5_ORDER_COMMENT: str = "FEAT_AI_Sniper_V2"
+    
+    # Trade Management Invariants
+    WARMUP_PERIOD_SECONDS: int = 60
+    EXHAUSTION_ATR_THRESHOLD: float = 0.5
+    SCALP_TIME_LIMIT_SECONDS: int = 300
+    
+    # Physics Invariants
+    PHYSICS_MIN_DELTA_T: float = 0.001
+    PHYSICS_MAX_VELOCITY: float = 1e6
+    PHYSICS_MIN_ATR: float = 1e-8
+    PHYSICS_WARMUP_PERIODS: int = 50
+    
+    # Session Killzones (UTC-4 Reference)
+    KILLZONE_NY_START: int = 7
+    KILLZONE_NY_END: int = 11
+    KILLZONE_LONDON_START: int = 3
+    KILLZONE_LONDON_END: int = 5
+    KILLZONE_ASIA_START: int = 20
+    KILLZONE_ASIA_END: int = 0  # Midnight wrap
+    UTC_OFFSET: int = -4
 
     @computed_field
     @property
@@ -292,6 +371,16 @@ class Settings(BaseSettings):
             raise ValueError("SPREAD_MAX_PIPS no puede ser negativo.")
         return v
 
+    @field_validator("ATR_TRAILING_MULTIPLIER", "ATR_SL_MULTIPLIER", "ATR_TP_MULTIPLIER", mode="after")
+    @classmethod
+    def validate_atr_multipliers(cls, v):
+        """
+        [LEVEL 58] Validation of institutional ATR multiples to prevent anomalous behavior.
+        """
+        if v < 0.5 or v > 15.0:
+            raise ValueError(f"Multiplicador ATR ({v}) fuera de rango institucional [0.5, 15.0].")
+        return v
+
     @field_validator("DECISION_TTL_MS", mode="after")
     @classmethod
     def validate_ttl_positive(cls, v):
@@ -381,9 +470,12 @@ class Settings(BaseSettings):
                 # Apply overrides if they match existing fields
                 for key, value in overrides.items():
                     if hasattr(self, key):
-                        # Use setattr safely? BaseSettings fields are not frozen by default
-                        setattr(self, key, value)
-                        # Log inside validator is messy, but effectively silent update
+                        # Attempt to cast to the type of the target attribute
+                        target_type = type(getattr(self, key))
+                        try:
+                            setattr(self, key, target_type(value))
+                        except (ValueError, TypeError):
+                            setattr(self, key, value)
         except Exception as e:
             # Fallback to defaults
             pass

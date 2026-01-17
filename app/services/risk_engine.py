@@ -55,7 +55,8 @@ class TheVault:
             logger.warning(f"[VAULT] Could not load state: {e}")
     
     def _save_state(self):
-        """Persiste estado del Vault."""
+        """Persiste estado del Vault de forma atomica."""
+        import tempfile
         os.makedirs(os.path.dirname(self.VAULT_STATE_FILE) or ".", exist_ok=True)
         data = {
             "initial_capital": self.initial_capital,
@@ -65,8 +66,17 @@ class TheVault:
             "last_trigger_equity": self.last_trigger_equity,
             "last_updated": datetime.now(timezone.utc).isoformat()
         }
-        with open(self.VAULT_STATE_FILE, "w") as f:
-            json.dump(data, f, indent=2)
+        
+        # Atomic Write
+        fd, temp_path = tempfile.mkstemp(dir=os.path.dirname(self.VAULT_STATE_FILE), suffix=".tmp")
+        try:
+            with os.fdopen(fd, 'w') as f:
+                json.dump(data, f, indent=2)
+            os.replace(temp_path, self.VAULT_STATE_FILE)
+        except Exception as e:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            logger.error(f"[VAULT] Atomic write failed: {e}")
     
     def check_vault_trigger(self, current_equity: float) -> Optional[Dict[str, Any]]:
         """
@@ -232,8 +242,24 @@ class RiskEngine:
         
         neural_multiplier = target_risk_pct / base_risk_pct
         
+        # [LEVEL 52] PERFORMANCE ADAPTIVE SIZING (The Profit Pulse)
+        from app.services.drift_monitor import drift_monitor
+        drift_status = drift_monitor.check_drift()
+        performance_multiplier = 1.0
+        
+        if drift_status["status"] != "INSUFFICIENT_DATA":
+            pf = drift_status["metrics"].get("profit_factor", 1.5)
+            # Reward PF > 1.5, Scale back if PF < 1.2
+            if pf < 1.2:
+                performance_multiplier = max(0.2, pf / 1.5)  # Damping
+                logger.warning(f"📉 PERFORMANCE DAMPING: PF={pf:.2f} | Scaling risk to {performance_multiplier:.0%}")
+            elif pf > 2.0:
+                performance_multiplier = 1.2  # Institutional reward cap
+                logger.info(f"🏆 PERFORMANCE REWARD: PF={pf:.2f} | Boosting risk to 120%")
+
+        # Final Lot Calculation
         base_lot = await self.get_adaptive_lots(symbol, sl_points, neural_multiplier)
-        final_lot = base_lot * cb_multiplier * regime_multiplier
+        final_lot = base_lot * cb_multiplier * regime_multiplier * performance_multiplier
         
         # 4. Shadow Force (Master Directive)
         trading_mode = os.getenv("TRADING_MODE", "SHADOW")
@@ -247,33 +273,29 @@ class RiskEngine:
         [LEVEL 41] Damped Kelly Criterion (User Specified).
         
         Formula:
-        1. Safety Clamp: Unc > 0.08 -> Risk = 0
+        1. Safety Clamp: Unc > MAX_UNCERTAINTY_THRESHOLD -> Risk = 0
         2. Kelly: f = (p(b+1) - 1) / b
-        3. Damping: factor = 0.5 * (1 - (Unc / 0.08))
-        4. Max Risk: Cap at 0.02 (2%)
+        3. Damping: factor = 0.5 * (1 - (Unc / MAX_UNCERTAINTY_THRESHOLD))
+        4. Max Risk: Cap at RISK_PER_TRADE_PERCENT
         """
+        max_unc = getattr(settings, "MAX_UNCERTAINTY_THRESHOLD", 0.08)
+        
         # 1. SAFETY CLAMP
-        # If noise is too high (8% std dev in prediction), stay out.
-        if uncertainty > 0.08:
+        if uncertainty > max_unc:
             return 0.0
             
         # 2. GENERAL KELLY FORMULA
-        # p = win_prob, b = risk_reward_ratio
         kelly_fraction = (win_prob * (risk_reward_ratio + 1) - 1) / risk_reward_ratio
         
-        # Negative Expectancy check
         if kelly_fraction <= 0:
             return 0.0
             
         # 3. UNCERTAINTY DAMPING
-        # Reduces bet size linearly with uncertainty.
-        # Unc=0 -> 0.5 (Half Kelly). Unc=0.08 -> 0.0 (No Bet).
-        damping_factor = 0.5 * (1.0 - (uncertainty / 0.08))
+        damping_factor = 0.5 * (1.0 - (uncertainty / max_unc))
         final_fraction = kelly_fraction * max(0.0, damping_factor)
         
         # 4. HARD LIMITS (Account Protection)
-        # Never risk more than 2% per trade.
-        max_risk_per_trade = 0.02
+        max_risk_per_trade = (settings.RISK_PER_TRADE_PERCENT / 100.0) if hasattr(settings, "RISK_PER_TRADE_PERCENT") else 0.02
         final_risk_pct = min(final_fraction, max_risk_per_trade)
         
         return final_risk_pct

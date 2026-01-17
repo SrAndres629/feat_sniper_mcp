@@ -157,21 +157,26 @@ class SupabaseSync:
         payload = {
             "symbol": state.get("symbol", "WAIT"),
             "price": state.get("price", 0.0),
-            "alpha_confidence": float(probs.get("buy", 0.0) if probs.get("buy") > 0.5 else probs.get("sell", 0.0)),
-            "acceleration": 0.0, # Placeholder or need to pass explicitly
-            "hurst": 0.5, # Placeholder
+            "alpha_confidence": float(state.get("win_confidence", 0.0)),
+            "alpha_multiplier": float(state.get("alpha_multiplier", 1.0)),
+            "volatility_regime": float(state.get("volatility_regime", 0.0)),
+            "acceleration": 0.0, # Handled via metadata/kinetic
+            "hurst": 0.5,
             
-            # PVP
+            # PVP / Structural (Doctoral Metrics)
             "poc_price": float(pvp.get("poc", 0.0)),
             "vah_price": float(pvp.get("vah", 0.0)),
             "val_price": float(pvp.get("val", 0.0)),
             "energy_score": float(pvp.get("energy", 0.0)),
+            "skew": float(pvp.get("skew", 0.0)),
+            "entropy": float(pvp.get("entropy", 0.0)),
             
             "metadata": {
                 "probs": probs,
                 "immune": immune,
-                "kinetic": state.get("kinetic_context", {}), # [LEVEL 49]
-                "uncertainty": state.get("uncertainty", 0.0)
+                "kinetic": state.get("kinetic_context", {}),
+                "uncertainty": state.get("uncertainty", 0.0),
+                "timestamp": state.get("timestamp")
             }
         }
         

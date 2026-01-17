@@ -7,6 +7,8 @@ from datetime import datetime
 # Logger
 logger = logging.getLogger("feat.trade_mgmt")
 
+from app.core.config import settings
+
 class TradeManager:
     """
     The Executor: Gestiona el ciclo de vida de las ordenes via ZMQ/MT5.
@@ -18,18 +20,19 @@ class TradeManager:
         self.active_positions = {} # {ticket: {open_time, entry_price, atr, regime}}
         self.start_time = time.time()
         
-        # Phase 13: Exhaustion Exit Parameters
-        self.exhaustion_atr_threshold = 0.5 # 50% ATR profit triggers BE
-        self.scalp_time_limit_seconds = 300 # 5 minutes
+        # [LEVEL 57] Doctoral Config Injection
+        self.exhaustion_atr_threshold = settings.EXHAUSTION_ATR_THRESHOLD
+        self.scalp_time_limit_seconds = settings.SCALP_TIME_LIMIT_SECONDS
+        self.warmup_period = settings.WARMUP_PERIOD_SECONDS
         
-        logger.info("[EXECUTION] Trade Manager Online (Warm-up: 60s, Exhaustion Exit: ON)")
+        logger.info(f"[EXECUTION] Trade Manager Online (Warm-up: {self.warmup_period}s, Exhaustion Exit: ON)")
 
     async def execute_order(self, action: str, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Envia orden al bridge ZMQ.
         Warm-up Protocol: Blocks executions for first 60s to stabilize physics.
         """
-        warmup_remaining = 60 - (time.time() - self.start_time)
+        warmup_remaining = self.warmup_period - (time.time() - self.start_time)
         if warmup_remaining > 0:
             logger.warning(f"🕒 WARM-UP ACTIVE: Blocking {action}. {int(warmup_remaining)}s remaining.")
             return {"status": "WAITING_FOR_WARMUP", "remaining": int(warmup_remaining)}
@@ -87,8 +90,8 @@ class TradeManager:
                 "action": action.upper(),
                 "symbol": symbol,
                 "volume": volume,
-                "magic": 123456, # FEAT Magic Number
-                "comment": "FEAT_AI_Sniper"
+                "magic": settings.MT5_MAGIC_NUMBER,
+                "comment": settings.MT5_ORDER_COMMENT
             }
             
             # Parametros opcionales
@@ -176,7 +179,6 @@ class TradeManager:
         """Closes a position and sends feedback to the ML engine & RLAIF Critic."""
         res = await self.execute_order("CLOSE", {"ticket": ticket})
         
-        # [SENIOR] Closed-loop Feedback Initialization
         if ticket in self.active_positions:
             pos = self.active_positions[ticket]
             
@@ -185,27 +187,41 @@ class TradeManager:
                 from app.ml.rlaif_critic import rlaif_critic
                 trade_result = {
                      "ticket": ticket,
+                     "symbol": pos.get("symbol", "XAUUSD"),
                      "entry_price": pos["entry_price"],
-                     "profit": profit_pips,   # Align key with Critic ("profit")
-                     "duration": (datetime.now() - pos["open_time"]).total_seconds()
+                     "profit": profit_pips,
+                     "duration": (datetime.now() - pos["open_time"]).total_seconds(),
+                     "neural_alpha": pos.get("neural_alpha", 1.0),
+                     "volatility_regime": pos.get("volatility_regime", "LAMINAR")
                 }
                 trade_context = pos.get("context", {})
-                
-                # The Critic saves to JSONL for offline RL training
                 rlaif_critic.critique_trade(trade_result, trade_context)
-                logger.info(f"👨‍⚖️ RLAIF Critic Judged Ticket {ticket}")
+                logger.info(f"👨‍⚖️ RLAIF Critic Judged Ticket {ticket}: Profit={profit_pips:.2f}")
             except Exception as e:
                 logger.error(f"RLAIF Link Error: {e}")
 
-            # 2. Online Learning (Weights)
-            from app.ml.ml_engine import ml_engine
-            if ml_engine:
-                 # Feed back the results for model weight recalibration
-                 ml_engine.record_trade_result(
-                     gbm_prob=pos.get("gbm_prob", 0.5), # Legacy
-                     lstm_prob=pos.get("lstm_prob", 0.5), # Legacy
-                     result_pips=profit_pips
-                 )
+            # 2. Online Learning & Metrics Update
+            try:
+                from app.ml.ml_engine import ml_engine
+                if ml_engine:
+                     ml_engine.record_trade_result(
+                         direction_prob=pos.get("neural_prob", 0.5), 
+                         win_confidence=pos.get("win_confidence", 0.5),
+                         result_pips=profit_pips,
+                         alpha=pos.get("neural_alpha", 1.0),
+                         regime=pos.get("volatility_regime", "LAMINAR")
+                     )
+                
+                # Update Supabase Stats
+                from app.services.supabase_sync import supabase_sync
+                await supabase_sync.log_trade_execution({
+                    "ticket": ticket,
+                    "action": "CLOSE",
+                    "profit": profit_pips,
+                    "status": "SUCCESS" if res.get("status") == "EXECUTED" else "ERROR"
+                })
+            except Exception as e:
+                logger.error(f"ML Feedback Error: {e}")
                  
             self.unregister_position(ticket)
             

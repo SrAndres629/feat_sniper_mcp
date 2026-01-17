@@ -13,24 +13,33 @@ class NeuralService:
             "timestamp": None,
             "predictions": {"buy": 0.0, "sell": 0.0, "hold": 0.0},
             "uncertainty": 0.0,
+            "win_confidence": 0.0,
+            "alpha_multiplier": 1.0,
+            "volatility_regime": 0.0,
             "pvp_context": {
                 "poc": 0.0, "vah": 0.0, "val": 0.0, 
-                "dist_poc": 0.0, "pos_in_va": 0.0, "energy": 0.0
+                "dist_poc": 0.0, "pos_in_va": 0.0, "energy": 0.0,
+                "skew": 0.0, "entropy": 0.0
             },
             "immune_system": {
                 "status": "NORMAL", "anomaly_score": 0.0, "kill_switch": False
             },
             "symbol": "Waiting...",
-            "price": 0.0
+            "price": 0.0,
+            "spatial_map": [],
+            "drift_metrics": {
+                "win_rate": 0.0, "bias": 0.0, "status": "STABLE"
+            }
         }
 
     def update_state(self, 
                      symbol: str, 
                      price: float,
                      probs: Dict[str, float], 
-                     uncertainty: float, 
+                     brain_score: Dict[str, Any],
                      feature_vector: Dict[str, float],
-                     sentinel_status: Dict[str, Any]):
+                     sentinel_status: Dict[str, Any],
+                     spatial_map: Optional[Any] = None):
         """
         Updates the global neural state from live inference.
         """
@@ -39,14 +48,19 @@ class NeuralService:
             "symbol": symbol,
             "price": price,
             "predictions": probs,
-            "uncertainty": uncertainty,
+            "uncertainty": brain_score.get("uncertainty", 0.0),
+            "win_confidence": brain_score.get("win_confidence", 0.0),
+            "alpha_multiplier": brain_score.get("alpha_multiplier", 1.0),
+            "volatility_regime": brain_score.get("volatility_regime", 0.0),
             "pvp_context": {
                 "poc": feature_vector.get("poc_price", 0.0),
                 "vah": feature_vector.get("vah_price", 0.0),
                 "val": feature_vector.get("val_price", 0.0),
-                "dist_poc": feature_vector.get("dist_poc_norm", 0.0),
+                "dist_poc": feature_vector.get("dist_poc", 0.0), # Standardize key
                 "pos_in_va": feature_vector.get("pos_in_va", 0.0),
-                "energy": feature_vector.get("energy_score", 0.0)
+                "energy": feature_vector.get("energy", 0.0),
+                "skew": feature_vector.get("skew", 0.0), # Doctoral Metrics
+                "entropy": feature_vector.get("entropy", 0.0)
             },
             "immune_system": {
                 "status": "ANOMALY" if sentinel_status.get("kill_switch") else "NORMAL",
@@ -56,12 +70,17 @@ class NeuralService:
             # [LEVEL 49] Cognitive Patterns
             "kinetic_context": {
                 "pattern_id": feature_vector.get("kinetic_pattern_id", 0),
-                "pattern_name": "UNKNOWN", # Helper needed to map ID back to Name if not passed
+                "pattern_name": "UNKNOWN",
                 "coherence": feature_vector.get("kinetic_coherence", 0.0),
-                # Mapping helper
                 "label": ["NOISE", "EXPANSION", "COMPRESSION", "FALSE_REVERSAL", "REGIME_CHANGE"][int(feature_vector.get("kinetic_pattern_id", 0))] 
                          if 0 <= int(feature_vector.get("kinetic_pattern_id", 0)) <= 4 else "UNKNOWN"
-            }
+            },
+            # [LEVEL 61] AUTOML TELEMETRY
+            "drift_metrics": brain_score.get("drift_metrics", {
+                "win_rate": 0.0, "bias": 0.0, "status": "UNKNOWN"
+            }),
+            # [LEVEL 54] VISUAL CORTEX DATA
+            "spatial_map": spatial_map.tolist() if spatial_map is not None else []
         }
         
         # [LEVEL 51] SYNAPSE PERSISTENCE

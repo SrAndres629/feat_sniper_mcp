@@ -8,48 +8,52 @@ class FeatEncoder(nn.Module):
     Compresses Market Microstructure (Form, Space, Acceleration, Time) 
     into a dense latent vector Z_t.
     """
-    def __init__(self, output_dim=32):
+    def __init__(self, output_dim=32, dims: Optional[Dict[str, int]] = None):
         super(FeatEncoder, self).__init__()
         
-        # 1. FORM Sub-network (Profile Geometry)
-        # Inputs: Skew, Kurtosis, Value Concentration, Entropy
+        # Default dimensions if not provided (Production Constants)
+        self.dims = dims or {
+            "form": 4, 
+            "space": 3, 
+            "accel": 3, 
+            "time": 4, 
+            "kinetic_meta": 3,
+            "pattern_embed": 4,
+            "num_patterns": 6 # 0:Noise, 1:Retrace, 2:Reversal, 3:FalseRev, 4:Breakout, 5:RegimeChange
+        }
+        
+        # 1. FORM Sub-network
         self.form_net = nn.Sequential(
-            nn.Linear(4, 16),
+            nn.Linear(self.dims["form"], 16),
             nn.ReLU(),
             nn.Linear(16, 8)
         )
         
-        # 2. SPACE Sub-network (Liquidity Density)
-        # Inputs: Dist to POC, Density > VAH, Density < VAL
+        # 2. SPACE Sub-network
         self.space_net = nn.Sequential(
-            nn.Linear(3, 16),
+            nn.Linear(self.dims["space"], 16),
             nn.ReLU(),
             nn.Linear(16, 8)
         )
         
-        # 3. ACCELERATION Sub-network (Energy)
-        # Inputs: Energy Z-Score, POC Velocity, Volume Velocity
+        # 3. ACCELERATION Sub-network
         self.accel_net = nn.Sequential(
-            nn.Linear(3, 16),
+            nn.Linear(self.dims["accel"], 16),
             nn.ReLU(),
             nn.Linear(16, 8)
         )
         
-        # 4. TIME Sub-network (Cycle)
-        # Inputs: Session (One-Hot x3), Cycle Progress
+        # 4. TIME Sub-network
         self.time_net = nn.Sequential(
-            nn.Linear(4, 16),
+            nn.Linear(self.dims["time"], 16),
             nn.ReLU(),
             nn.Linear(16, 8)
         )
         
-        # 5. KINETIC Sub-network (Cognitive Patterns) [LEVEL 50]
-        # Input 1: Pattern ID (0-4) -> Embedding(4)
-        self.pattern_embedding = nn.Embedding(5, 4)
-        # Input 2: Coherence, Alignment, Bias Dist (3 floats)
-        # Total to Dense: 4 (embed) + 3 (float) = 7
+        # 5. KINETIC Sub-network
+        self.pattern_embedding = nn.Embedding(self.dims["num_patterns"], self.dims["pattern_embed"])
         self.kinetic_net = nn.Sequential(
-            nn.Linear(7, 16),
+            nn.Linear(self.dims["pattern_embed"] + self.dims["kinetic_meta"], 16),
             nn.ReLU(),
             nn.Linear(16, 8)
         )

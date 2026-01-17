@@ -10,7 +10,11 @@ import numpy as np
 import json
 import gzip
 import os
+import logging
 from typing import List, Dict, Any
+from app.core.config import settings
+
+logger = logging.getLogger("feat.processor")
 
 # Internal Engines
 from nexus_core.structure_engine import structure_engine
@@ -61,6 +65,9 @@ class FeatProcessor:
         """
         Applies Structure, Acceleration, and Space logic to the DataFrame.
         """
+        # [PHASE 0] Returns Engineering
+        df["log_ret"] = np.log(df["close"] / df.get("close", df["close"]).shift(1)).fillna(0)
+
         # 1. Structure Engine (Fractals, BOS, Zones)
         df = structure_engine.detect_structural_shifts(df)
         df = structure_engine.detect_zones(df)  # Supply/Demand zone detection
@@ -165,66 +172,66 @@ class FeatProcessor:
         
         # 3. Form Metrics (Entropy/Skew) require full profile construction. 
         # We will assume these are computed by a dedicated loop or simplified here.
-        # Simplification: Price Range Entropy
-        # Rolling Log Returns Entropy
-        returns = np.log(df["close"] / df["close"].shift(1))
-        # Rolling standard deviation as proxy for entropy of distribution width
-        df["entropy_proxy"] = returns.rolling(20).std() * 100
+        # [LEVEL 62] STOCHASTIC PHYSICS NORMALIZATION
+        # Replace heuristic flags with probabilistic log-likelihoods where possible
+        df["feat_form"] = (df["high"] - df["low"]) / (df["atr14"] + 1e-9)
+        df["feat_space"] = np.abs(df["close"] - df["vwap"]) / (df["atr14"] + 1e-9)
+        
+        # [LEVEL 55] PRODUCTION MATH (Zero-Placeholder Removal)
+        # rolling skew of returns (window=30)
+        df["skew"] = df["log_ret"].rolling(30).skew().fillna(0)
+        
+        # Rolling entropy proxy: standard deviation of returns scaled
+        # Institutional Entropy uses Log-Scaling
+        df["entropy"] = np.log1p(df["log_ret"].rolling(20).std().fillna(0) * 100)
         
         return df
 
     def compute_latent_vector(self, row: pd.Series) -> Dict[str, float]:
         """
-        [LEVEL 47] SENSOR FUSION PROTOCOL
-        Extracts Kinetic (Channel A), Structural (Channel B), and Temporal (Channel C) features.
+        [LEVEL 62] THE ADAPTOR (Ph.D. Institutional Alignment)
+        Converts a row of processed data into the definitive Neural Context.
+        Standardized Field Names (config.NEURAL_FEATURE_NAMES alignment).
         """
         atr = row.get("atr14", 1.0) + 1e-9
         close = row["close"]
         
-        return {
-            # --- CHANNEL A: KINETIC LAYERS (Multifractal) ---
-            # 1. Micro Layer (Intent)
-            "micro_compression": row.get("micro_compression", 1.0),
+        # 1. Kinetic Features (Channel A)
+        # -------------------------------
+        kinetic = {
             "dist_micro": row.get("dist_micro", 0.0),
-            
-            # 2. Structure Layer (Reality)
-            "struct_compression": row.get("structure_compression", 1.0),
-            "dist_struct": row.get("dist_structure", 0.0),
-            
-            # 3. Macro Layer (Memory)
-            "macro_compression": row.get("macro_compression", 1.0),
+            "dist_struct": row.get("dist_structure", 0.0),  # Map structure -> struct
             "dist_macro": row.get("dist_macro", 0.0),
-            
-            # 4. Bias (Absolute)
             "dist_bias": row.get("dist_bias", 0.0),
-            
-            # 5. Relationships
-            "delta_micro_struct": row.get("delta_micro_struct", 0.0),
-            "delta_struct_macro": row.get("delta_struct_macro", 0.0),
             "layer_alignment": row.get("layer_alignment", 0.0),
-            
-            # 6. Cognitive Patterns (Level 49)
-            "kinetic_pattern_id": float(row.get("pattern_id", 0)),
             "kinetic_coherence": row.get("kinetic_coherence", 0.0),
-
-            # --- CHANNEL B: STRUCTURAL (Terrain / PVP) ---
-            "dist_poc_norm": (close - row.get("poc_price", close)) / atr,
-            "pos_in_va": 1.0 if (row.get("val", -1) <= close <= row.get("vah", -1)) else 0.0,
-            "density_zone": row.get("density_zone", 0.0),
-            "energy_score": row.get("energy_score", 0.0),
-            "skew": 0.0, # Placeholder
-            
-            # --- CHANNEL C: TEMPORAL / SPACE ---
-            "cycle_prog": (row.name.minute / 60.0) if hasattr(row.name, 'minute') else 0.5,
-            
-            # Absolute Levels (Context for Decoder)
-            "poc_price": row.get("poc_price", 0.0),
-            "vah_price": row.get("vah", 0.0),
-            "val_price": row.get("val", 0.0),
-            "centroid_micro": row.get("centroid_micro", 0.0),
-            "centroid_struct": row.get("centroid_structure", 0.0), 
-            "bias_val": row.get("bias_val", 0.0)
+            "kinetic_pattern_id": float(row.get("pattern_id", 0))
         }
+
+        # 2. Structural/Liquidity Features (Channel B)
+        # -------------------------------------------
+        structural = {
+            "dist_poc": (close - row.get("poc_price", close)) / atr,
+            "pos_in_va": 1.0 if (row.get("val", -1) <= close <= row.get("vah", -1)) else 0.0,
+            "density": row.get("density_zone", 0.0),
+            "energy": row.get("energy_score", 0.0),
+            "skew": row.get("skew", 0.0),
+            "entropy": row.get("entropy", 0.0)
+        }
+
+        # 3. Physics & Form Features (Channel C)
+        # -------------------------------------
+        # Synchronized with NEURAL_FEATURE_NAMES: form, space, accel, time, kalman_score
+        physics = {
+            "form": row.get("feat_form", 0.5),
+            "space": row.get("feat_space", 0.5),
+            "accel": row.get("feat_acceleration", 0.5),
+            "time": row.get("feat_time", 0.5),
+            "kalman_score": row.get("kalman_score", 0.0)
+        }
+
+        # Consolidated Flat Vector that GUARANTEES matches settings.NEURAL_FEATURE_NAMES
+        return {**kinetic, **structural, **physics}
         """
         Saves DataFrame to Parquet format (Snappy compression).
         """
@@ -320,5 +327,45 @@ class FeatProcessor:
         vec_np = np.nan_to_num(vec_np, nan=0.0, posinf=1.0, neginf=-1.0)
         
         return vec_np
+
+    def generate_energy_map(self, df: pd.DataFrame, bins: int = 50) -> np.ndarray:
+        """
+        [LEVEL 54] THE VISUAL SENSOR.
+        Generates a 50x50 Spatial Matrix (Energy Map) from liquidity density.
+        
+        X-axis: Time buckets (50 bins)
+        Y-axis: Price buckets (50 bins)
+        Value: Volume Density normalized by Sigma.
+        """
+        if df.empty or len(df) < bins:
+            return np.zeros((1, bins, bins), dtype=np.float32)
+
+        # 1. Slice the window for the map
+        window = df.tail(bins)
+        
+        # 2. Define Price Bounds
+        price_min = window["low"].min()
+        price_max = window["high"].max()
+        price_range = price_max - price_min + 1e-9
+        
+        # 3. Initialize Map (1, Bins, Bins) - 1 channel for Conv2D
+        energy_map = np.zeros((bins, bins), dtype=np.float32)
+        
+        # 4. Fill Map
+        for i, (idx, row) in enumerate(window.iterrows()):
+            # Find price bin
+            price_bin = int(((row["close"] - price_min) / price_range) * (bins - 1))
+            price_bin = max(0, min(bins - 1, price_bin))
+            
+            # Add volume weight
+            energy_map[price_bin, i] = row["volume"]
+            
+        # 5. Normalization (Vision Standard)
+        # Scale 0-1 based on window max to highlight relative hotspots
+        max_vol = energy_map.max()
+        if max_vol > 0:
+            energy_map = energy_map / max_vol
+            
+        return energy_map.reshape(1, bins, bins)
 
 feat_processor = FeatProcessor()

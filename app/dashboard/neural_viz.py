@@ -115,6 +115,34 @@ def render_tensor_map(kinetic):
     )
     return fig
 
+def render_energy_heatmap(energy_map):
+    # energy_map is a list of lists (50x50)
+    if not energy_map:
+        return None
+    
+    z_data = np.array(energy_map)
+    # Origin lower means low price bins at bottom
+    fig = px.imshow(
+        z_data,
+        labels=dict(x="Time", y="Price Bins", color="Energy"),
+        color_continuous_scale='Viridis',
+        origin='lower'
+    )
+    
+    fig.update_layout(
+        title="SPATIO-TEMPORAL ENERGY MANIFOLD",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#1e2130",
+        font=dict(color="white", family="Courier New"),
+        margin=dict(l=10, r=10, t=40, b=10),
+        coloraxis_showscale=False
+    )
+    
+    fig.update_xaxes(showgrid=False, zeroline=False, showticklabels=False)
+    fig.update_yaxes(showgrid=False, zeroline=False, showticklabels=False)
+    
+    return fig
+
 # 4. Main App Loop
 st.title("FEAT NEXUS // VISUAL CORTEX")
 
@@ -132,23 +160,27 @@ while True:
             p_buy = data.get("buy", 0.0)
             p_sell = data.get("sell", 0.0)
             
-            # Determine Dominant
             direction = "HOLD"
             conf = 0.0
             if p_buy > 0.6: direction = "BUY"; conf = p_buy
             elif p_sell > 0.6: direction = "SELL"; conf = p_sell
             
+            # [LEVEL 57] Doctoral Metrics Injection
+            alpha = state.get("alpha_multiplier", 1.0)
+            win_conf = state.get("win_confidence", conf)
+            vol = state.get("volatility_regime", 0.0)
+            
             c1.metric("SYMBOL", state.get("symbol", "---"))
-            c2.metric("PRICE", f"{state.get('price', 0):.2f}")
-            c3.metric("UNCERTAINTY", f"{state.get('uncertainty', 0):.3f}")
-            c4.metric("SYSTEM STATUS", state.get("immune_system", {}).get("status", "OK"), 
-                      delta_color="inverse" if state.get("immune_system", {}).get("status") != "NORMAL" else "normal")
+            c2.metric("WIN CONF.", f"{win_conf*100:.1f}%")
+            c3.metric("ALPHA MULTI", f"x{alpha:.2f}")
+            c4.metric("VOLATILITY", f"{vol:.2f}")
 
             # Main Vis
+            st.divider()
             m1, m2 = st.columns([2, 1])
             
             with m1:
-                st.plotly_chart(render_neural_gauge(conf, direction), use_container_width=True)
+                st.plotly_chart(render_neural_gauge(win_conf, direction), use_container_width=True)
                 
             with m2:
                 st.subheader("Kinetic Tensor")
@@ -166,6 +198,22 @@ while True:
             col_a.metric("POC Distance", f"{pvp.get('dist_poc', 0):.4f}")
             col_b.metric("In Value Area", "YES" if pvp.get("pos_in_va") > 0 else "NO")
             col_c.metric("Energy Score", f"{pvp.get('energy', 0):.2f}")
+            
+            # [LEVEL 54] VISUAL CORTEX HEATMAP
+            map_data = state.get("spatial_map", [])
+            if map_data:
+                fig_map = render_energy_heatmap(map_data)
+                if fig_map:
+                    st.plotly_chart(fig_map, use_container_width=True)
+            
+            # Heatmap below metrics
+            st.divider()
+            map_data = state.get("spatial_map", [])
+            if map_data:
+                import numpy as np # Needed for render helper
+                fig_map = render_energy_heatmap(map_data)
+                if fig_map:
+                    st.plotly_chart(fig_map, use_container_width=True)
 
     else:
         with placeholder.container():

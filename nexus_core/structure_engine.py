@@ -491,8 +491,9 @@ class StructureEngine:
                 touches = len(matches)
                 if touches >= 2:
                     # Supply zone confirmed
-                    first_touch_idx = matches[0]
-                    age = current_idx - first_touch_idx
+                    # Get integer position for age calculation
+                    idx_pos = df.index.get_loc(idx)
+                    age = current_idx - idx_pos
                     decay = 1.0 / (1.0 + 0.01 * age) # 1% force loss per bar
                     
                     # [PHYSICS] Volume Density Boost
@@ -517,8 +518,9 @@ class StructureEngine:
                     matches = [i for i in low_indices if abs(df.at[i, "low"] - level) < zone_tolerance]
                     touches = len(matches)
                     if touches >= 2:
-                        first_touch_idx = matches[0]
-                        age = current_idx - first_touch_idx
+                        # Get integer position for age calculation
+                        idx_pos = df.index.get_loc(idx)
+                        age = current_idx - idx_pos
                         decay = 1.0 / (1.0 + 0.01 * age)
                         
                         # [PHYSICS] Volume Density Boost

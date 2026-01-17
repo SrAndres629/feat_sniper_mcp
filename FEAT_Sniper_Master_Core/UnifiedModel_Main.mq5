@@ -106,7 +106,7 @@ public:
       m_magic = magic;
    }
    
-   ulong Execute(string action, double vol, double sl, double tp, long timestamp)
+   ulong Execute(string action, double vol, double sl, double tp, long timestamp, int magic, string comment)
    {
       // 1. Guard Checks
       if(!m_risk.CheckSpread()) return 0;
@@ -122,17 +122,21 @@ public:
       int retries = 3;
       ulong resultTicket = 0;
       
+      // Set Magic for this execution block
+      g_trade.SetExpertMagicNumber(magic > 0 ? magic : m_magic);
+      
       while(retries > 0) {
          bool res = false;
+         string finalComment = (comment != "") ? comment : "FEAT_HFT_AUTO";
          
          if(action == "BUY") 
-            res = g_trade.Buy(safeVol, g_symbol, 0, brokerSL, brokerTP, "FEAT_HFT_BUY");
+            res = g_trade.Buy(safeVol, g_symbol, 0, brokerSL, brokerTP, finalComment);
          else if(action == "SELL") 
-            res = g_trade.Sell(safeVol, g_symbol, 0, brokerSL, brokerTP, "FEAT_HFT_SELL");
+            res = g_trade.Sell(safeVol, g_symbol, 0, brokerSL, brokerTP, finalComment);
             
          if(res) {
             resultTicket = g_trade.ResultOrder();
-            if(Verbose) Print("[EXECUTION] SUCCESS | Ticket: ", resultTicket);
+            if(Verbose) Print("[EXECUTION] SUCCESS | Ticket: ", resultTicket, " | Magic: ", magic);
             break; 
          } else {
             uint err = g_trade.ResultRetcode();
@@ -270,8 +274,11 @@ void ProcessCommand(string json)
    string error = "";
    
    if(action == "BUY" || action == "SELL") {
-      Print(">>> SIGNAL RECEIVED: ", action, " Vol:", vol);
-      ticket = Executor.Execute(action, vol, sl, tp, (long)ts);
+      int magic = (int)StringToInteger(ExtractJsonValue(json, "magic"));
+      string comment = ExtractJsonValue(json, "comment");
+      
+      Print(">>> SIGNAL RECEIVED: ", action, " Vol:", vol, " Magic:", magic);
+      ticket = Executor.Execute(action, vol, sl, tp, (long)ts, magic, comment);
       
       if(ticket == 0) {
          result = "ERROR";

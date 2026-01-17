@@ -19,13 +19,15 @@ from dataclasses import dataclass, field
 import pandas as pd
 import numpy as np
 
+from app.core.config import settings
+
 logger = logging.getLogger("FEAT.LiquidityIntelligence")
 
-# Kill Zone Definitions (UTC-4 / Bolivia-Colombia time)
+# [LEVEL 57] Doctoral KILL_ZONES (Linked to Settings)
 KILL_ZONES = {
-    "NY": {"start": 7, "end": 11},      # New York Open
-    "LONDON": {"start": 3, "end": 5},   # London Open
-    "ASIA": {"start": 20, "end": 0},    # Asia (wraps midnight)
+    "NY": {"start": settings.KILLZONE_NY_START, "end": settings.KILLZONE_NY_END},
+    "LONDON": {"start": settings.KILLZONE_LONDON_START, "end": settings.KILLZONE_LONDON_END},
+    "ASIA": {"start": settings.KILLZONE_ASIA_START, "end": settings.KILLZONE_ASIA_END},
 }
 
 
@@ -53,10 +55,12 @@ def get_current_kill_zone(utc_offset: int = -4) -> Optional[str]:
     return None
 
 
-def is_in_kill_zone(zone: str = "NY", utc_offset: int = -4) -> bool:
+def is_in_kill_zone(zone: str = "NY", utc_offset: int = None) -> bool:
     """
     Verifica si estamos dentro de una Kill Zone especfica.
     """
+    if utc_offset is None:
+        utc_offset = settings.UTC_OFFSET
     current = get_current_kill_zone(utc_offset)
     return current == zone
 
