@@ -1,159 +1,174 @@
 import streamlit as st
-import requests
+import json
+import time
 import pandas as pd
 import plotly.graph_objects as go
-import time
-import json
+import plotly.express as px
 from datetime import datetime
+import os
 
-# CONFIG
-API_URL = "http://localhost:8000/sniper/neural-state"
+# [LEVEL 51] NEURAL CORTEX VISUALIZER
+# A "Doctorate Level" interface for observing the Quantum Brain in real-time.
+
+# 1. Page Config (Immersive Mode)
 st.set_page_config(
-    page_title="FEAT NEURAL MRI",
+    page_title="FEAT NEXUS | Visual Cortex",
     page_icon="🧠",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# STYLING
+# Custom CSS for "Sci-Fi" Aesthetic
 st.markdown("""
-<style>
-    .stApp { background-color: #0E1117; color: #FAFAFA; }
-    .metric-card {
-        background-color: #262730;
-        padding: 15px;
-        border-radius: 10px;
-        border: 1px solid #4F4F4F;
-        text-align: center;
+    <style>
+    .reportview-container {
+        background: #0e1117;
     }
-    .big-number { font-size: 2em; font-weight: bold; }
-    .label { font-size: 0.8em; color: #A0A0A0; }
-</style>
-""", unsafe_allow_html=True)
+    .main {
+        background: #0e1117;
+        color: #e0e0e0;
+    }
+    .metric-card {
+        background-color: #1e2130;
+        border: 1px solid #2e3b4e;
+        border-radius: 5px;
+        padding: 15px;
+        margin-bottom: 10px;
+    }
+    h1, h2, h3 {
+        color: #00ffcc;
+        font-family: 'Courier New', monospace;
+    }
+    .stProgress > div > div > div > div {
+        background-color: #00ffcc;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-def fetch_brain_state():
-    try:
-        resp = requests.get(API_URL, timeout=2)
-        if resp.status_code == 200:
-            data = resp.json().get("data", {})
-            return data
-    except Exception as e:
+# 2. Data Connection
+STATE_FILE = "data/live_state.json"
+
+def load_state():
+    if not os.path.exists(STATE_FILE):
         return None
-    return None
+    try:
+        with open(STATE_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return None
 
-# HEADER
-col_h1, col_h2 = st.columns([3, 1])
-with col_h1:
-    st.title("🧠 FEAT Neural Cortex MRI")
-with col_h2:
-    st.caption(f"Last Sync: {datetime.now().strftime('%H:%M:%S')}")
+# 3. Component Rendering
+def render_neural_gauge(prob, direction="BUY"):
+    color = "green" if direction == "BUY" else "red"
+    if direction == "HOLD": color = "gray"
+    
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number+delta",
+        value = prob * 100,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {'text': f"NEURAL CONFIDENCE ({direction})", 'font': {'size': 20, 'color': color}},
+        delta = {'reference': 80, 'increasing': {'color': color}},
+        gauge = {
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "white"},
+            'bar': {'color': color},
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 2,
+            'bordercolor': "#333",
+            'steps': [
+                {'range': [0, 50], 'color': '#333'},
+                {'range': [50, 80], 'color': '#555'},
+                {'range': [80, 100], 'color': '#1e2130'} # Zone
+            ],
+            'threshold': {
+                'line': {'color': "cyan", 'width': 4},
+                'thickness': 0.75,
+                'value': 80
+            }
+        }
+    ))
+    fig.update_layout(paper_bgcolor = "rgba(0,0,0,0)", font = {'color': "white", 'family': "Courier New"})
+    return fig
 
-# MAIN LOOP
+def render_tensor_map(kinetic):
+    # Radar Chart for Kinetic Tensor
+    categories = ['Pattern Strength', 'Coherence', 'Alignment', 'Bias Slope']
+    
+    # Normalize for visual
+    pid = min(kinetic.get("pattern_id", 0) * 20, 100) # Scale 0-4 to 0-100
+    coh = kinetic.get("coherence", 0) * 100
+    # Alignment is -1 to 1. Map to 0-100.
+    # We visualizing intensity, so abs(alignment)
+    align = abs(float(kinetic.get("coherence", 0))) * 100 
+    
+    values = [pid, coh, align, 50] # Placeholder for Bias
+    
+    fig = px.line_polar(r=values, theta=categories, line_close=True)
+    fig.update_traces(fill='toself', line_color='#00ffcc')
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)",
+        polar=dict(
+            bgcolor="#1e2130",
+            radialaxis=dict(visible=True, range=[0, 100], showticklabels=False, linecolor="#333"),
+            angularaxis=dict(linecolor="#333", color="white")
+        ),
+        font=dict(color="white")
+    )
+    return fig
+
+# 4. Main App Loop
+st.title("FEAT NEXUS // VISUAL CORTEX")
+
+# Auto-Refresh Placeholder
 placeholder = st.empty()
 
 while True:
-    state = fetch_brain_state()
+    state = load_state()
     
-    if not state or not state.get("timestamp"):
+    if state:
         with placeholder.container():
-            st.warning("Waiting for Neural Signal... (Is Nexus running?)")
-        time.sleep(2)
-        continue
-        
-    probs = state.get("predictions", {})
-    pvp = state.get("pvp_context", {})
-    immune = state.get("immune_system", {})
-    
-    with placeholder.container():
-        # --- ROW 1: VITAL SIGNS ---
-        c1, c2, c3, c4 = st.columns(4)
-        
-        with c1:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="label">SYMBOL</div>
-                <div class="big-number">{state.get('symbol', '---')}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            # Header
+            c1, c2, c3, c4 = st.columns(4)
+            data = state.get("predictions", {})
+            p_buy = data.get("buy", 0.0)
+            p_sell = data.get("sell", 0.0)
             
-        with c2:
-            st.markdown(f"""
-            <div class="metric-card">
-                <div class="label">PRICE</div>
-                <div class="big-number">{state.get('price', 0.0):.2f}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            # Determine Dominant
+            direction = "HOLD"
+            conf = 0.0
+            if p_buy > 0.6: direction = "BUY"; conf = p_buy
+            elif p_sell > 0.6: direction = "SELL"; conf = p_sell
             
-        with c3:
-            uncert = state.get('uncertainty', 0.0)
-            color = "#00FF00" if uncert < 0.3 else "#FF0000"
-            st.markdown(f"""
-            <div class="metric-card" style="border-color: {color};">
-                <div class="label">UNCERTAINTY</div>
-                <div class="big-number" style="color: {color};">{uncert:.4f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        with c4:
-            status = immune.get('status', 'NORMAL')
-            color = "#FF0000" if status != 'NORMAL' else "#00FF00"
-            st.markdown(f"""
-            <div class="metric-card" style="border-color: {color};">
-                <div class="label">IMMUNE SYSTEM</div>
-                <div class="big-number" style="color: {color};">{status}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            c1.metric("SYMBOL", state.get("symbol", "---"))
+            c2.metric("PRICE", f"{state.get('price', 0):.2f}")
+            c3.metric("UNCERTAINTY", f"{state.get('uncertainty', 0):.3f}")
+            c4.metric("SYSTEM STATUS", state.get("immune_system", {}).get("status", "OK"), 
+                      delta_color="inverse" if state.get("immune_system", {}).get("status") != "NORMAL" else "normal")
 
-        st.markdown("---")
+            # Main Vis
+            m1, m2 = st.columns([2, 1])
+            
+            with m1:
+                st.plotly_chart(render_neural_gauge(conf, direction), use_container_width=True)
+                
+            with m2:
+                st.subheader("Kinetic Tensor")
+                k_ctx = state.get("kinetic_context", {})
+                st.info(f"Pattern: {k_ctx.get('label', 'UNKNOWN')}")
+                st.progress(min(k_ctx.get("coherence", 0), 1.0))
+                st.caption(f"Coherence: {k_ctx.get('coherence', 0):.2f}")
+                
+            # PVP Context
+            st.divider()
+            st.subheader("PVP Context Space")
+            pvp = state.get("pvp_context", {})
+            
+            col_a, col_b, col_c = st.columns(3)
+            col_a.metric("POC Distance", f"{pvp.get('dist_poc', 0):.4f}")
+            col_b.metric("In Value Area", "YES" if pvp.get("pos_in_va") > 0 else "NO")
+            col_c.metric("Energy Score", f"{pvp.get('energy', 0):.2f}")
 
-        # --- ROW 2: THE BRAIN (Probabilities) ---
-        c_brain, c_eyes = st.columns([1, 2])
-        
-        with c_brain:
-            st.subheader("🤖 Cortex Probabilities")
-            labels = ['BUY', 'SELL', 'HOLD']
-            values = [probs.get('buy', 0), probs.get('sell', 0), probs.get('hold', 0)]
-            colors = ['#00CC96', '#EF553B', '#636EFA']
+    else:
+        with placeholder.container():
+            st.warning("📡 Waiting for Neural Link... (mcp_server.py not running?)")
             
-            fig = go.Figure(data=[go.Pie(labels=labels, values=values, hole=.6, marker_colors=colors)])
-            fig.update_layout(showlegend=False, margin=dict(t=0, b=0, l=0, r=0), height=250, paper_bgcolor='rgba(0,0,0,0)')
-            st.plotly_chart(fig, use_container_width=True)
-
-        # --- ROW 3: THE EYES (PVP Structure) ---
-        with c_eyes:
-            st.subheader("👁️ Institutional Vision (PVP)")
-            
-            # Simple Gauge for Position in Range
-            vah = pvp.get('vah', 0)
-            val = pvp.get('val', 0)
-            poc = pvp.get('poc', 0)
-            price = state.get('price', 0)
-            
-            fig_gauge = go.Figure(go.Indicator(
-                mode = "number+gauge+delta",
-                value = price,
-                domain = {'x': [0, 1], 'y': [0, 1]},
-                title = {'text': "Price vs Structure"},
-                delta = {'reference': poc, 'increasing': {'color': "green"}},
-                gauge = {
-                    'axis': {'range': [val - 10, vah + 10], 'tickwidth': 1, 'tickcolor': "white"},
-                    'bar': {'color': "white"},
-                    'bgcolor': "black",
-                    'steps': [
-                        {'range': [val, vah], 'color': "rgba(0, 100, 255, 0.3)"},
-                        {'range': [poc-0.5, poc+0.5], 'color': "rgba(255, 0, 0, 0.8)"}],
-                    'threshold': {
-                        'line': {'color': "yellow", 'width': 4},
-                        'thickness': 0.75,
-                        'value': price}}))
-            
-            fig_gauge.update_layout(height=250, margin=dict(t=30, b=0, l=20, r=20), paper_bgcolor='rgba(0,0,0,0)', font={'color': "white"})
-            st.plotly_chart(fig_gauge, use_container_width=True)
-            
-            # Metrics
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Dist to POC", f"{pvp.get('dist_poc', 0):.2f} σ")
-            m2.metric("In Value Area?", "YES" if pvp.get('pos_in_va') > 0.5 else "NO")
-            m3.metric("Energy Score", f"{int(pvp.get('energy', 0))}")
-
-    time.sleep(1) # Refresh Rate
+    time.sleep(1) # Fast Poll

@@ -64,6 +64,23 @@ class NeuralService:
             }
         }
         
+        # [LEVEL 51] SYNAPSE PERSISTENCE
+        # Write state to disk for Streamlit Dashboard (Visual Cortex)
+        try:
+            import os
+            # Atomic write to avoid read-conflicts
+            temp_path = "data/live_state.json.tmp"
+            final_path = "data/live_state.json"
+            
+            with open(temp_path, 'w') as f:
+                json.dump(self._state, f)
+            
+            os.replace(temp_path, final_path)
+            
+        except Exception as e:
+            # Non-blocking error
+            pass
+        
     def get_latest_state(self) -> Dict[str, Any]:
         return self._state
 
