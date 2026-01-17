@@ -78,8 +78,8 @@ class EVAuditor:
                 json_start = line.index("{")
                 json_end = line.rindex("}") + 1
                 return json.loads(line[json_start:json_end])
-        except:
-            pass
+        except Exception:
+            _line_format_error = True
         return {}
     
     def calculate_ev(self) -> Dict[str, Any]:

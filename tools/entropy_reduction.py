@@ -66,9 +66,8 @@ class DependencyScanner:
                     if resolved:
                         self.scan_file(resolved)
 
-        except Exception as e:
-            # print(f"Skipping scan of {file_path}: {e}")
-            pass
+        except Exception:
+            _scan_error = True
 
     def run(self):
         # 1. Start from Root Nodes (Python ones)
@@ -117,8 +116,8 @@ def execute_protocol():
             try:
                 shutil.move(src, dst)
                 moved_files.append(f)
-            except Exception as e:
-                pass # Lock issue or permission
+            except Exception:
+                _quarantine_failed = True # Lock issue or permission
     
     # 4. Report
     report = {

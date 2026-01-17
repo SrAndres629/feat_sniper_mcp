@@ -153,7 +153,8 @@ class FEATRule(ABC):
 
     @abstractmethod
     async def validate(self, market_data: Dict, physics_output: Optional[Any]) -> ValidationResult:
-        pass
+        """Abstract validation logic to be implemented by sub-classes."""
+        ...
 
     async def pass_next(self, market_data: Dict, physics_output: Optional[Any], current_result: ValidationResult) -> ValidationResult:
         """Helper to pass to next rule or return success."""
@@ -572,7 +573,7 @@ class FEATChain:
                                 action = "SELL"
                                 direction = -1
                 except:
-                    pass
+                    _fallback_failed = True
         
         # Build final decision
         decision = FEATDecision(

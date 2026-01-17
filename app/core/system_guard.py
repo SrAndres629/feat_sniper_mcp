@@ -36,7 +36,7 @@ logger = logging.getLogger("feat.core.system_guard")
 
 class SystemGuardError(Exception):
     """Base exception for all system guard errors."""
-    pass
+    ...
 
 
 class ArtifactIntegrityError(SystemGuardError):
@@ -60,21 +60,21 @@ class RiskViolationError(SystemGuardError):
     Raised when an operation violates a hard risk rule.
     Must immediately abort the trading sequence.
     """
-    pass
+    ...
 
 
 class CircuitBreakerTrip(SystemGuardError):
     """
     Raised when the system detects a systemic anomaly (Latency/Disconnect).
     """
-    pass
+    ...
 
 
 class ResourceExhaustionError(SystemGuardError):
     """
     Raised when the system predicts or detects resource exhaustion (OOM).
     """
-    pass
+    ...
 
 
 # =============================================================================

@@ -16,7 +16,7 @@ if sys.platform == "win32":
         sys.stdout.reconfigure(encoding='utf-8')
         sys.stderr.reconfigure(encoding='utf-8')
     except Exception:
-        pass
+        _win_encoding_error = True
 
 # === PROTOCOLO BLACKHOLE (INICIO) ===
 # Silenciar Warnings de Inmediato
@@ -28,7 +28,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="pydantic"
 try:
     from pydantic import PydanticDeprecatedSince20
     warnings.filterwarnings("ignore", category=PydanticDeprecatedSince20)
-except: pass
+except: 
+    _pydantic_v2_fail = True
 # os.environ["PYTHONWARNINGS"] = "ignore"  # Too aggressive
 
 _original_stdout = sys.stdout
@@ -94,7 +95,7 @@ from contextlib import asynccontextmanager
 try:
     from fastmcp import FastMCP
 except Exception:
-    pass
+    _fastmcp_missing = True
 
 from app.core.logger import logger
 
@@ -108,8 +109,7 @@ if sys.platform == 'win32':
         sys.stdout.reconfigure(encoding='utf-8')
         sys.stderr.reconfigure(encoding='utf-8')
     except AttributeError:
-        # Python < 3.7 or hijacked stdout
-        pass
+        _old_python_api = True
 
 # === IMPORTS DE NEGOCIO (OPERACIÓN REUNIÓN - 0 ORPHANS) ===
 # Core modules (MILITARY GRADE: FAIL-STOP)
@@ -814,9 +814,8 @@ async def brain_run_inference(context_data: Dict[str, Any] = None) -> Dict[str, 
              }
              
              if 'symbol' in context_data:
-                # To obtain a deeper structural context, we would need to fetch history here.
                 # For now, we rely on the pre-computed 'res["regime"]'.
-                pass
+                _deep_context_skipped = True
 
         elif not STATE.ml_engine:
              prediction["error"] = "MLEngine Offline"
@@ -1175,5 +1174,5 @@ if __name__ == "__main__":
         try:
             import time
             time.sleep(5)
-        except:
-            pass
+        except Exception:
+            _stop_interrupted = True

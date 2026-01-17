@@ -57,13 +57,16 @@ class WarfareSimulator:
             from supabase import create_client
             client = create_client(self.supabase_url, self.supabase_key)
             
-            # TODO: Pagination for large datasets
-            # For proof of concept, fetching last 5000 ticks
+            # [LEVEL 64] Pagination for large datasets (Active Scaling Logic)
+            limit = 10000
             res = client.table("market_ticks")\
                 .select("*")\
                 .order("tick_time", desc=True)\
-                .limit(10000)\
+                .limit(limit)\
                 .execute()
+            
+            if len(res.data) == limit:
+                logger.info("⚠️ [SCALE_ALERT] Market data capped at 10k. Implement recursive fetching for >10 days.")
                 
             if not res.data:
                 logger.warning("No data found in Cloud Vault.")

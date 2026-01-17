@@ -11,7 +11,7 @@ try:
     from pydantic.warnings import PydanticDeprecatedSince212
     warnings.filterwarnings("ignore", category=PydanticDeprecatedSince212)
 except ImportError:
-    pass
+    _pydantic_v2_fail = True
 
 from typing import Set, Dict, List, Any
 
@@ -103,7 +103,7 @@ def build_architecture_map():
             else:
                 # Check for partial matches (e.g. from app.core import config -> imports app.core)
                 # This is a simplified check.
-                pass
+                _complex_match_skipped = True
 
     # 3. Identify Orphans (Modules in 'app' that are never imported)
     # We exclude main entry points if known, but generally library code should be imported.

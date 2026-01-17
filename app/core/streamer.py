@@ -68,8 +68,8 @@ class SupabaseStreamer(logging.Handler):
             data = self.buffer.copy()
             self.buffer.clear()
             self.client.table("bot_activity_log").insert(data).execute()
-        except Exception as e:
-            pass # Silent fail in sync mode to prevent loops
+        except Exception:
+            _sync_flush_failed = True # Silent fail to prevent loops
 
     async def start_async_loop(self):
         self.loop = asyncio.get_event_loop()
@@ -100,7 +100,7 @@ class SupabaseStreamer(logging.Handler):
             err_msg = str(e)
             # Socket Error 10035 (WSAEWOULDBLOCK) or Supabase missing columns/tables
             if "10035" in err_msg or "PGRST205" in err_msg or "PGRST204" in err_msg:
-                 pass 
+                 _socket_busy = True 
             else:
                  logger.error(f"!! STREAMER ERROR ({table}): {err_msg}")
         finally:

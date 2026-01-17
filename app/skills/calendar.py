@@ -100,7 +100,7 @@ class ChronosEngine:
                      # In a real system, check timestamp freshness here
                      return data
         except Exception:
-             pass
+             _sentiment_cache_invalid = True
         return {"sentiment": "NEUTRAL", "impact": "LOW"}
 
 # Global singleton

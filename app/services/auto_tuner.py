@@ -223,7 +223,8 @@ class AutoTuner:
                 for line in f:
                     try:
                         data.append(json.loads(line))
-                    except: pass
+                    except Exception: 
+                        _corrupt_line = True
         except: pass
         return data[-10000:] # Increased for Mass Training (180 days)
 

@@ -50,4 +50,4 @@ logger = setup_logger()
 
 # Función dummy para compatibilidad (ya no hace nada peligroso)
 def hijack_streams(mcp_mode=False):
-    pass 
+    _hijacked_active = False

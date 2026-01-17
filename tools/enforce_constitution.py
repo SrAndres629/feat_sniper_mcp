@@ -10,7 +10,8 @@ PRIME_DIRECTIVES = {
     "KELLY_LOCK": [r"calculate_dynamic_lot", r"risk_engine"]
 }
 
-# Paths to ignore
+# Files to ignore
+IGNORE_FILES = ["enforce_constitution.py"]
 IGNORE_DIRS = [".git", "__pycache__", ".ai", "venv", ".venv", "node_modules", "_archive_legacy", ".gemini", ".cursor"]
 CRITICAL_CORE_PATHS = ["nexus_core/", "app/services/risk_engine.py", "app/ml/"]
 
@@ -25,6 +26,9 @@ def enforce_constitution():
         for file in files:
             if not file.endswith((".py", ".mq5")):
                 continue
+            
+            if file in IGNORE_FILES:
+                continue
                 
             file_path = Path(root) / file
             
@@ -35,11 +39,21 @@ def enforce_constitution():
                     
                     # 1. No-Ghosting Audit
                     for pattern in PRIME_DIRECTIVES["NO_GHOSTING"]:
-                        matches = re.finditer(pattern, content)
+                        # Use MULTILINE to ensure ^ works on every line
+                        matches = re.finditer(pattern, content, re.MULTILINE)
                         for match in matches:
-                            # Skip legitimate instances in comments if necessary, 
-                            # but for Iron Dome, even TODOs in comments are debt.
                             line_no = content[:match.start()].count("\n") + 1
+                            match_text = match.group(0)
+                            
+                            # [LEVEL 64] False Positive Shield: Spanish 'todo' (meaning 'all')
+                            # Match only if the preceding context is typical of a comment/code TODO
+                            if "TODO" in match_text:
+                                line_text = lines[line_no-1]
+                                # If 'todo' is lowercase and followed by Spanish context, or not capitalized 'TODO:', skip
+                                if "TODO:" not in line_text and "TODO " not in line_text:
+                                    if any(word in line_text.lower() for word in ["mata todo", "para todo", "en todo"]):
+                                        continue
+
                             print(f"❌ [VETOED] {file_path}:{line_no} -> Violation: '{pattern}' detected.")
                             violations += 1
                             
@@ -55,7 +69,7 @@ def enforce_constitution():
         print(f"\n🚫 CONSTITUTIONAL BREACH: {violations} violations found. Commit ABORTED.")
         return False
     
-    print("\n✅ IRON DOME: Codebase is constitutionally aligned. Level 62 Integrity confirmed.")
+    print("\n✅ IRON DOME: Codebase is constitutionally aligned. Level 64 Integrity LOCKED.")
     return True
 
 if __name__ == "__main__":

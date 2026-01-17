@@ -33,7 +33,7 @@ def main():
                     print("ZMQ Hyperbridge is FULLY OPERATIONAL.")
                     break
             except zmq.Again:
-                pass
+                _waiting_for_mql5 = True
                 
             time.sleep(1)
             

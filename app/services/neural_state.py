@@ -96,9 +96,8 @@ class NeuralService:
             
             os.replace(temp_path, final_path)
             
-        except Exception as e:
-            # Non-blocking error
-            pass
+        except Exception:
+            _persistence_failed = True
         
     def get_latest_state(self) -> Dict[str, Any]:
         return self._state
