@@ -1,13 +1,17 @@
 """
-Market Physics Engine - ATR-Normalized Acceleration (P0 REPAIR)
-================================================================
+Market Physics Engine v2.0 - Microstructure Hydrodynamics (Doctoral Grade)
+==========================================================================
 The Sensory Cortex: Institutional-grade market physics calculator.
 
-[P0 REPAIR] Fixes:
-- ATR Normalization: Velocity divided by ATR for asset-agnostic metrics
-- Acceleration is now dimensionless (works identically for Gold and Bitcoin)
-- Added ATR calculation from price window
-- Improved documentation of physical formulas
+Architecture based on "Market Microstructure Theory" (Kyle/Amihud):
+- Mass (Inertia) != Volume. Mass = LIQUIDITY DEPTH (Resistance).
+- Force != Price Change. Force = ORDER FLOW IMBALANCE (Aggression).
+- Dynamics: Price moves when Aggression consumes Liquidity.
+
+Key Metrics:
+1. Amihud Illiquidity (ILLIQ): Cost of moving price (Proxy for Lack of Depth).
+2. Order Flow Imbalance (OFI): Net aggressive buy/sell pressure.
+3. Impact Pressure: True "Power" of the move (OFI * ILLIQ).
 """
 import logging
 import numpy as np
@@ -24,67 +28,55 @@ logger = logging.getLogger("feat.market_physics")
 
 @dataclass
 class MarketRegime:
-    """[LEVEL 61] Stochastic Market State Representation."""
-    is_accelerating: bool
-    is_initiative_candle: bool
-    acceleration_score: float
-    vol_z_score: float
-    acceleration_prob: float  # P(Accelerating | Price, Volume, Time)
-    energy_score: float       # Kinetic Energy (Mass * Velocity^2)
+    """[LEVEL 64] Institutional Microstructure State."""
+    is_accelerating: bool       # True if Impact > Resistance
+    is_liquidity_vacuum: bool   # True if Low Resistance (Thin Book)
+    is_absorption: bool         # True if High Force + Low Move (Iceberg)
+    
+    impact_pressure: float      # The effective force displacing price
+    liquidity_resistance: float # The estimated mass (Inverse ILLIQ)
+    ofi_score: float           # Order Flow Imbalance Z-Score
+    
     trend: str
-    atr: float
     timestamp: str
 
 
 class MarketPhysics:
     """
-    The Sensory Cortex: Motor de Física de Mercado Institucional.
+    The Sensory Cortex: Motor de Física de Microestructura.
     
-    [P0 REPAIR] ATR-Normalized Acceleration Formula:
+    Reemplaza la física Newtoniana ingenua con Dinámica de Fluidos de Mercado.
     
-        Raw Velocity = ΔP / Δt                    [USD/second]
-        Normalized Velocity = Raw Velocity / ATR  [dimensionless]
-        Acceleration = Vol_Intensity × |Norm_Velocity|  [dimensionless]
-    
-    This makes acceleration ASSET-AGNOSTIC:
-    - A 0.5% move in Gold (from $2000) = acceleration X
-    - A 0.5% move in BTC (from $60000) = acceleration X (same!)
-    
-    [P0-1 FIX] Invariantes de Física Garantizados:
-    - MIN_DELTA_T: Floor de 1ms para evitar división por cero
-    - Monotonía Temporal: Timestamps siempre crecientes (causalidad)
-    - Aceleración Finita: Matemáticamente acotada en todos los escenarios
+    Equation of Motion:
+        ΔP ~ Force / Mass
+        ΔP ~ OFI / Liquidity
+        
+    We approximate 'Liquidity Mass' using the Amihud Illiquidity Ratio inverse.
+    We approximate 'Force' (OFI) using the Tick Rule on Volume.
     """
     
-    # Physical Invariants [LEVEL 57]
+    # Physics Constants
     MIN_DELTA_T: float = settings.PHYSICS_MIN_DELTA_T
-    MAX_VELOCITY: float = settings.PHYSICS_MAX_VELOCITY
-    MIN_ATR: float = settings.PHYSICS_MIN_ATR
-    WARMUP_PERIODS: int = settings.PHYSICS_WARMUP_PERIODS
+    WARMUP_PERIODS: int = 50 # Need statistical significance for Z-scores
+    DECAY_FACTOR: float = 0.95 # Generic decay for EWMA calculations
 
     def __init__(self, window_size: int = 100):
         self.window_size = window_size
         
         # Circular buffers for raw data
         self.timestamps: Deque[float] = deque(maxlen=window_size)
-        self.volume_window: Deque[float] = deque(maxlen=window_size)
-        self.price_window: Deque[float] = deque(maxlen=window_size)
+        self.prices: Deque[float] = deque(maxlen=window_size)
+        self.volumes: Deque[float] = deque(maxlen=window_size)
         
-        # Buffer for acceleration history (for σ calculation)
-        self.acceleration_history: Deque[float] = deque(maxlen=window_size)
+        # Derived Microstructure buffers
+        self.returns_abs: Deque[float] = deque(maxlen=window_size) # |Rt|
+        self.ofi_history: Deque[float] = deque(maxlen=window_size)
         
-        # [P0 FIX] Cache ATR for efficiency
-        self._cached_atr: float = 0.0
-        
-        logger.info("[SATELLITE] Market Physics Engine Online (ATR-Normalized, NumPy Accelerated)")
+        logger.info("[SATELLITE] Market Physics v2.0 Online (Microstructure Hydrodynamics)")
 
     def hydrate(self, ticks: List[Dict]) -> None:
         """
-        [P0 FIX] Profound Hydration Protocol.
-        Populates buffers with historical data to avoid warmup lag.
-        
-        Args:
-            ticks: List of historical ticks/candles
+        Populates buffers with historical data for cold-start readiness.
         """
         if not ticks:
             return
@@ -92,176 +84,136 @@ class MarketPhysics:
         logger.info(f"[PHYSICS] Hydrating with {len(ticks)} samples...")
         
         for tick in ticks:
-            price = float(tick.get('bid', 0.0) or tick.get('close', 0.0))
-            vol = float(tick.get('tick_volume', 0.0) or tick.get('real_volume', 0.0))
-            ts = tick.get('time')
-            if isinstance(ts, str):
-                try:
-                    ts = datetime.fromisoformat(ts.replace('Z', '+00:00')).timestamp()
-                except ValueError:
-                    ts = None
+            self.ingest_tick(tick, is_hydration=True)
             
-            self.price_window.append(price)
-            self.volume_window.append(vol)
-            if ts:
-                self.timestamps.append(ts)
-            else:
-                # Synthetic sequential timestamp if missing
-                last_ts = self.timestamps[-1] if self.timestamps else datetime.now().timestamp()
-                self.timestamps.append(last_ts + 0.01)
-                
-        # Calculate initial ATR
-        if len(self.price_window) >= 2:
-            self._cached_atr = self._calculate_atr(np.array(self.price_window))
-            
-        logger.info(f"[PHYSICS] Hydration complete. ATR={self._cached_atr:.4f}")
+        logger.info("[PHYSICS] Hydration detailed analysis complete.")
 
-    def _calculate_atr(self, prices: np.ndarray) -> float:
+    def ingest_tick(self, data: Dict, force_timestamp: float = None, is_hydration: bool = False) -> Optional[MarketRegime]:
         """
-        Calculate Average True Range from price series.
-        
-        For tick data without full OHLC, we approximate ATR as the 
-        average of absolute price changes (simplified True Range).
-        
-        [P0 FIX] This enables asset-agnostic velocity normalization.
-        
-        Args:
-            prices: Array of closing prices
-            
-        Returns:
-            float: ATR value (same units as price)
-        """
-        if len(prices) < 2:
-            return self.MIN_ATR
-        
-        # Simplified ATR: mean of absolute price changes
-        price_changes = np.abs(np.diff(prices))
-        atr = np.mean(price_changes)
-        
-        # Floor to prevent division by zero
-        return max(atr, self.MIN_ATR)
-
-    def ingest_tick(self, data: Dict, force_timestamp: float = None) -> Optional[MarketRegime]:
-        """
-        Ingesta de Ticks con cálculo de física JIT.
-        
-        Args:
-            data: Dict with 'bid'/'close' and 'tick_volume'/'real_volume'
-            force_timestamp: Optional forced timestamp for backtesting
-            
-        Returns:
-            MarketRegime if enough data, None during warmup
+        Ingesta de Ticks con cálculo de microestructura.
         """
         try:
-            # 1. Extraction and Normalization
+            # 1. Extraction
             vol = float(data.get('tick_volume', 0.0) or data.get('real_volume', 0.0))
             price = float(data.get('bid', 0.0) or data.get('close', 0.0))
             ts = force_timestamp if force_timestamp else datetime.now().timestamp()
-
-            # [P0-1 FIX] Temporal Monotonicity Guard
-            if self.timestamps and ts <= self.timestamps[-1]:
-                ts = self.timestamps[-1] + self.MIN_DELTA_T
-                # logger.debug(f"[PHYSICS] Sub-second tick adjusted: ts={ts:.6f}")
-
-            # 2. Update Buffers
-            self.volume_window.append(vol)
-            self.price_window.append(price)
-            self.timestamps.append(ts)
-
-            # Warmup Check - need enough periods for reliable statistics
-            if len(self.price_window) < self.WARMUP_PERIODS:
+            
+            # Guard against zero volume/price artifacts
+            if price <= 0:
                 return None
 
-            # 3. Vectorized Calculation
-            return self._calculate_acceleration_vectorized(vol, price, ts)
+            # [P0] Temporal Monotonicity
+            if self.timestamps and ts <= self.timestamps[-1]:
+                ts = self.timestamps[-1] + self.MIN_DELTA_T
+
+            # 2. Delta Calculations (Tick Rule for OFI)
+            delta_p = 0.0
+            ofi_current = 0.0
+            
+            if len(self.prices) > 0:
+                prev_price = self.prices[-1]
+                delta_p = price - prev_price
+                
+                # Tick Rule:
+                # If price went up, assume buy volume.
+                # If price went down, assume sell volume.
+                # If unchanged, assume continuation of previous direction (simplified to 0 here for robustness)
+                direction = 1.0 if delta_p > 0 else (-1.0 if delta_p < 0 else 0.0)
+                ofi_current = direction * vol
+            
+            # 3. Update Buffers
+            self.timestamps.append(ts)
+            self.prices.append(price)
+            self.volumes.append(vol)
+            self.returns_abs.append(abs(delta_p))
+            self.ofi_history.append(ofi_current)
+
+            # Warmup Check
+            if len(self.prices) < self.WARMUP_PERIODS:
+                if not is_hydration:
+                    # logger.debug(f"Warming up... {len(self.prices)}/{self.WARMUP_PERIODS}")
+                    _warming_up = True
+                return None
+
+            # 4. Compute Metrics
+            return self._compute_regime(price, ts)
 
         except Exception as e:
             logger.error(f"Sensory Cortex Failure: {e}")
             return None
 
-    def _calculate_acceleration_vectorized(self, current_vol: float, current_price: float, current_ts: float) -> MarketRegime:
+    def _compute_regime(self, current_price: float, current_ts: float) -> MarketRegime:
         """
-        [PH.D. REFACTOR] Stochastic FEAT Physics:
-        
-        Converts deterministic triggers into Probabilistic Log-Likelihoods.
-        Computes Kinetic Energy Tensor E = 0.5 * m * v^2 where m is Volume Intensity.
+        Calculates Institutional Metrics: ILLIQ, OFI, Impact.
         """
-        from scipy.stats import norm
+        # Convert to numpy for vector math
+        vols = np.array(self.volumes)
+        rets = np.array(self.returns_abs)
+        ofis = np.array(self.ofi_history)
         
-        # Convert to numpy for vectorized operations
-        vols = np.array(self.volume_window)
-        prices = np.array(self.price_window)
-        times = np.array(self.timestamps)
-
-        # 1. Volume Intensity (Mass)
-        mean_vol = np.mean(vols)
-        std_vol = np.std(vols)
-        vol_intensity = current_vol / max(mean_vol, 1e-6)
-        vol_z = (current_vol - mean_vol) / max(std_vol, 1e-6)
-
-        # 2. ATR-Normalized Velocity
-        if len(prices) >= 2:
-            delta_p = prices[-1] - prices[-2]
-            delta_t = max(times[-1] - times[-2], self.MIN_DELTA_T)
-            raw_velocity = delta_p / delta_t
-            raw_velocity = np.clip(raw_velocity, -self.MAX_VELOCITY, self.MAX_VELOCITY)
-        else:
-            raw_velocity = 0.0
-
-        atr = self._calculate_atr(prices)
-        self._cached_atr = atr
-        norm_velocity = raw_velocity / atr
-
-        # 3. FEAT Acceleration (Dimensionless Momentum)
-        raw_acceleration = vol_intensity * abs(norm_velocity)
-        self.acceleration_history.append(raw_acceleration)
-
-        # 4. Kinetic Energy Calculation (Mass * V^2)
-        energy_score = 0.5 * vol_intensity * (norm_velocity ** 2)
-
-        # 5. Stochastic Regime Detection (P-Value of Acceleration)
-        acc_prob = 0.0
-        is_accelerating = False
-        if len(self.acceleration_history) > 10:
-            acc_array = np.array(self.acceleration_history)
-            acc_mean = np.mean(acc_array)
-            acc_std = max(np.std(acc_array), 1e-6)
-            
-            # Z-Score of current acceleration
-            acc_z = (raw_acceleration - acc_mean) / acc_std
-            # Map Z-Score to CDF (Probability)
-            acc_prob = float(norm.cdf(acc_z))
-            
-            # Deterministic Trigger derived from Probabilistic Threshold
-            threshold_z = settings.PHYSICS_REGIME_SIGMA 
-            is_accelerating = acc_z > threshold_z
+        # 1. Amihud Illiquidity (ILLIQ)
+        # Ratio of |Return| to Volume.
+        # High ILLIQ = Price moves easily with little volume (Low Liquidity).
+        # Low ILLIQ = Price resists movement despite volume (High Liquidity).
+        # We add epsilon to volume to avoid div by zero.
+        epsilon = 1e-6
+        daily_illiq_series = rets / (vols + epsilon)
         
-        trend = "BULLISH" if raw_velocity > 0 else "BEARISH" if raw_velocity < 0 else "NEUTRAL"
-
-        # 6. Initiative Candle (Probabilistic Requirement)
-        is_initiative = (vol_intensity > settings.PHYSICS_INITIATIVE_VOL_THRESHOLD and 
-                         abs(norm_velocity) > settings.PHYSICS_INITIATIVE_VEL_THRESHOLD)
-
+        # We use an EWMA or rolling mean to estimate current friction
+        current_illiq = np.mean(daily_illiq_series[-10:]) if len(daily_illiq_series) >= 10 else daily_illiq_series[-1]
+        
+        # "Resistance" is the inverse of Illiquidity.
+        # High Resistance = Hard to move.
+        liquidity_resistance = 1.0 / (current_illiq + epsilon)
+        
+        # 2. Order Flow Imbalance (OFI) Z-Score
+        # Measures the statistical significance of the buying/selling pressure
+        ofi_mean = np.mean(ofis)
+        ofi_std = np.std(ofis) + epsilon
+        ofi_z = (ofis[-1] - ofi_mean) / ofi_std
+        
+        # 3. Impact Pressure
+        # Aggression * Sensitivity
+        # A large Buy Order (Positive OFI) in a thin market (High ILLIQ) = Massive Impact
+        impact_pressure = ofis[-1] * current_illiq * 1000 # Scaled for readability
+        
+        # 4. Regime Classification
+        
+        # Vacuum: Price moving fast on low volume (High ILLIQ)
+        is_vacuum = current_illiq > (np.mean(daily_illiq_series) + 1.5 * np.std(daily_illiq_series))
+        
+        # Absorption: High OFI (Force) but Low Price Move (High Resistance)
+        # i.e., Price didn't move as much as the force predicted
+        expected_move = ofis[-1] * np.mean(daily_illiq_series)
+        actual_move = rets[-1]
+        
+        # If we pushed strict volume but price didn't budge -> Absorption
+        is_absorption = (abs(ofis[-1]) > np.percentile(np.abs(ofis), 80)) and \
+                        (actual_move < np.mean(rets))
+                        
+        # Acceleration: High Impact Pressure
+        # True displacement happening
+        is_accelerating = abs(impact_pressure) > (np.mean(np.abs(ofis * daily_illiq_series * 1000)) * 1.5)
+        
+        trend = "BULLISH" if ofis[-1] > 0 else "BEARISH" if ofis[-1] < 0 else "NEUTRAL"
+        
         return MarketRegime(
             is_accelerating=is_accelerating,
-            is_initiative_candle=is_initiative,
-            acceleration_score=raw_acceleration,
-            vol_z_score=vol_z,
-            acceleration_prob=acc_prob,
-            energy_score=energy_score,
+            is_liquidity_vacuum=bool(is_vacuum),
+            is_absorption=bool(is_absorption),
+            impact_pressure=float(impact_pressure),
+            liquidity_resistance=float(liquidity_resistance),
+            ofi_score=float(ofi_z),
             trend=trend,
-            atr=atr,
             timestamp=datetime.fromtimestamp(current_ts).isoformat()
         )
 
     def get_status(self) -> Dict:
         """Get current engine status for monitoring."""
         return {
-            "buffer_size": len(self.price_window),
             "window_size": self.window_size,
-            "cached_atr": round(self._cached_atr, 4),
-            "acceleration_history_size": len(self.acceleration_history),
-            "is_warmed_up": len(self.price_window) >= self.WARMUP_PERIODS
+            "samples": len(self.prices),
+            "mode": "MICROSTRUCTURE_V2"
         }
 
 

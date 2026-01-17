@@ -1157,6 +1157,14 @@ async def visual_perception_snapshot(resize_factor: float = 0.5) -> Dict[str, An
 # =============================================================================
 
 if __name__ == "__main__":
+    # [LEVEL 64] AUTO-SYNC AGENTIC ARCHITECTURE
+    try:
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        from tools.sync_manifest import sync_manifest
+        sync_manifest() # Refresh memory on boot
+    except Exception as e:
+        sys.stderr.write(f"⚠️ Memory Sync Failed: {e}\n")
+
     import traceback
     try:
         is_docker = os.environ.get("DOCKER_MODE", "").lower() == "true"
