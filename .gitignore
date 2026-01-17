@@ -38,3 +38,26 @@ package-lock.json
 *.py[cod]
 # Legacy & Waste
 _archive_legacy/
+*.json.tmp
+*.tmp
+
+# [NEW] Performance & Cache Purge
+.numba_cache/
+.pytest_cache/
+.ipynb_checkpoints/
+.cache/
+*.spec
+dist/
+build/
+*.out
+*.bin
+*.ex5
+*.mqh.bak
+*.mq5.bak
+
+# LLM Context Killers (Large automated outputs)
+data/experience_memory.jsonl
+data/neural_signals.db
+data/live_state.json
+data/vault_state.json
+logs/*.log
