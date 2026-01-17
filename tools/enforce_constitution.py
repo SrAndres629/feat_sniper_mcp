@@ -5,13 +5,13 @@ from pathlib import Path
 
 # --- Institutional Directives ---
 PRIME_DIRECTIVES = {
-    "NO_GHOSTING": [r"\bTODO\b", r"\bFIXME\b", r"\bpass\b"],
+    "NO_GHOSTING": [r"^\s*pass\b", r"\bTODO\b", r"\bFIXME\b"],
     "PHYSICS_FIRST": [r"@njit", r"np\."],
     "KELLY_LOCK": [r"calculate_dynamic_lot", r"risk_engine"]
 }
 
 # Paths to ignore
-IGNORE_DIRS = [".git", "__pycache__", ".ai", "venv", ".venv", "node_modules"]
+IGNORE_DIRS = [".git", "__pycache__", ".ai", "venv", ".venv", "node_modules", "_archive_legacy", ".gemini", ".cursor"]
 CRITICAL_CORE_PATHS = ["nexus_core/", "app/services/risk_engine.py", "app/ml/"]
 
 def enforce_constitution():

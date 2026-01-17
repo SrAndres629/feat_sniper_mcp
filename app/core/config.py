@@ -476,9 +476,9 @@ class Settings(BaseSettings):
                             setattr(self, key, target_type(value))
                         except (ValueError, TypeError):
                             setattr(self, key, value)
-        except Exception as e:
-            # Fallback to defaults
-            pass
+        except Exception:
+            # Fallback to defaults if dynamic parameters cannot be loaded
+            return self
         return self
 
     model_config = SettingsConfigDict(

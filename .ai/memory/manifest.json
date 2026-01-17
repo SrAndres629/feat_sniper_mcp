@@ -90329,8 +90329,8 @@
         },
         {
             "path": "app/core/config.py",
-            "hash": "5dc30a0e9d83be17acac00579e6f6fc44f34bf397a6b833076a2394f9d34d661",
-            "size_bytes": 20390
+            "hash": "92a1fb6aa9fb9a2c7007059765bb3987a0fe0f9d130a030800c120dc6a29394d",
+            "size_bytes": 20431
         },
         {
             "path": "app/core/exceptions.py",
@@ -90364,8 +90364,8 @@
         },
         {
             "path": "app/core/mt5_conn.py",
-            "hash": "ba260653b6070b46c260d0ca026b1387b26b0e273a3350f01c7ff7ca2bd95d6f",
-            "size_bytes": 21884
+            "hash": "5c0c24a5a533a08f3935b2cb22c21332ec80936e8619bfe689cc0c9db27a4663",
+            "size_bytes": 21992
         },
         {
             "path": "app/core/observability.py",
@@ -90449,8 +90449,8 @@
         },
         {
             "path": "app/ml/ml_engine.py",
-            "hash": "7a636ef1e7517a7452cc04dc4af02ea1efa76ebd9c25bd26504217bc642d271c",
-            "size_bytes": 19886
+            "hash": "41f376024d89b634ea165064dc2dfc3379f310956fc29b3f128767a4b0fd781d",
+            "size_bytes": 19932
         },
         {
             "path": "app/ml/ml_normalization.py",
@@ -90509,13 +90509,13 @@
         },
         {
             "path": "app/ml/models/feat_encoder.py",
-            "hash": "f51f5d7de3d62d9f011502716c69598cdabc61eaab637793a6f18e41ef0d5316",
-            "size_bytes": 3192
+            "hash": "a2a54e035eee8a0f3c256736f3a6c29ee965018510f4a0759872d27a5d9c08b8",
+            "size_bytes": 3227
         },
         {
             "path": "app/ml/models/hybrid_probabilistic.py",
-            "hash": "82d112d25380982b6aa25d3f5423be49b0aaac7e872889d807c44f5999f12acd",
-            "size_bytes": 8818
+            "hash": "d03b436b9fa0db59f7ce7777d8c0a703dc1bf29a1e0a80207c9c395082d3a4d0",
+            "size_bytes": 8909
         },
         {
             "path": "app/models/schemas.py",
@@ -90539,8 +90539,8 @@
         },
         {
             "path": "app/services/circuit_breaker.py",
-            "hash": "5fdcf2ef3f2a3f529f2551e1dddd7b9b46e0e72117afd1c6c210e8e271eacbfb",
-            "size_bytes": 9917
+            "hash": "85636d81f124a1d361f8c3854abe830e01addde69e2678645bd11109778c3cab",
+            "size_bytes": 9989
         },
         {
             "path": "app/services/compounding.py",
@@ -90674,8 +90674,8 @@
         },
         {
             "path": "app/skills/execution.py",
-            "hash": "4e029e1230953b1ad168629ae8c11ea5f89f5fd1611045c9029fc0bbee40a981",
-            "size_bytes": 25894
+            "hash": "72b6e697febef25c3a9e9ab49882495fccd72887c2a665b616e68384eb12c37d",
+            "size_bytes": 25957
         },
         {
             "path": "app/skills/feat_chain.py",
@@ -90914,8 +90914,8 @@
         },
         {
             "path": "nexus_core/mtf_engine.py",
-            "hash": "2c3ea6abe30cb4dfb6090a812b50b260e6e12a0aeca66268cea2464efb2ac08f",
-            "size_bytes": 19462
+            "hash": "be7f42e956327326b1585253cda49eef62b26116c5e09994246102e60e0655e5",
+            "size_bytes": 19521
         },
         {
             "path": "nexus_core/structure_engine.py",
@@ -90959,8 +90959,8 @@
         },
         {
             "path": "nexus_training/train_hybrid.py",
-            "hash": "748efcd504733c55978a125fcc0846ff30cc70187ad8961c08009267d6afbca4",
-            "size_bytes": 12935
+            "hash": "3c10cae96a4f6e92a82cf09c90ac937162604ff39ec909b19e63656e940229dc",
+            "size_bytes": 12977
         },
         {
             "path": "tests/causality_benchmark.py",
@@ -91049,8 +91049,8 @@
         },
         {
             "path": "tools/enforce_constitution.py",
-            "hash": "ebf89196485cca068a17a95a3bc429e82b9267a2ee8ac197022542b6f50b7123",
-            "size_bytes": 2592
+            "hash": "79b0d305d8fd42b7965f06aa651b408d5d9cefb4f606837c75980b4d3c2e5b24",
+            "size_bytes": 2635
         },
         {
             "path": "tools/entropy_reduction.py",

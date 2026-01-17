@@ -446,8 +446,8 @@ class FractalMTFEngine:
                         result.has_ob = True
                         score += 0.10
                         reasoning.append(f"OrderBlock detected ({len(obs)})")
-                except:
-                    pass
+                except Exception:
+                    logger.debug(f"[{tf.value}] Liquidity scan skipped.")
             
             result.score = min(1.0, max(0.0, score))
             result.reasoning = reasoning

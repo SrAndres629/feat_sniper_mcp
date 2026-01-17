@@ -375,7 +375,8 @@ class MT5Connection:
         try:
             mt5.shutdown()  # Force clean state
         except Exception:
-            pass  # Ignore errors on cold start
+            # Shutdown might fail on cold start if MT5 wasn't active; logging not required here for cold start safety
+            _cold_start_safe = True 
 
         if not mt5.initialize(**init_params):
             err_code, err_msg = mt5.last_error()

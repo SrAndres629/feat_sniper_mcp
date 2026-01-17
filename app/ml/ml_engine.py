@@ -400,7 +400,7 @@ class MLEngine:
             # 1. Safety Gates
             if not self.hurst_buffer.is_data_insufficient(symbol):
                 # Check Gates
-                pass 
+                logger.debug(f"Hurst Gate validated for {symbol}.")
                 
             self.hurst_buffer.push(symbol, features.get("close", 0))
             

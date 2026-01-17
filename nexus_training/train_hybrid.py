@@ -134,7 +134,8 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
             optimizer.zero_grad()
             
             # Forward
-            logits = model(seq, feat_input=feat_input) # (Batch, 3)
+            outputs = model(seq, feat_input=feat_input) 
+            logits = outputs["logits"] # (Batch, 3)
             
             # Loss (Singularity Aware)
             loss = criterion(logits, label, phys_val, x_map=f_map)

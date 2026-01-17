@@ -193,8 +193,8 @@ async def send_order(order_data: TradeOrderRequest, urgency_score: float = 0.5) 
                 symbol_info = await mt5_conn.execute(mt5.symbol_info, symbol)
                 if symbol_info:
                     volatility = float(symbol_info.spread) / 100.0  # Spread as volatility proxy
-            except:
-                pass
+            except Exception:
+                volatility = 0.0 # Default fallback if spread fetch fails
             
             volume = await risk_engine.calculate_dynamic_lot(
                 confidence=urgency_score, # Mapping urgency to confidence for sizing

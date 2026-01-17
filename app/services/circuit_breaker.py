@@ -128,7 +128,7 @@ class CircuitBreaker:
                  logger.warning("📰 NEWS ALERT: High Impact + Uncertain Sentiment. Reducing lot size to 50%.")
                  return 0.5
         except ImportError:
-            pass
+            logger.debug("Chronos Engine not available. Skipping news sentiment check.")
 
         dd = await self.get_drawdown()
         
