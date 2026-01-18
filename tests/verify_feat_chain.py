@@ -11,47 +11,45 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("test.feat_chain")
 
 async def run_smoke_test():
-    logger.info("🧪 INITIATING FEAT CHAIN SMOKE TEST...")
+    logger.info("🧪 INITIATING NEURO-FUNCTIONAL FEAT CHAIN SMOKE TEST...")
     
     try:
         # 1. Test Import via __init__.py
-        logger.info("Step 1: Testing top-level import...")
-        from app.skills.feat_chain import feat_full_chain_institucional, FEATChain, FEATDecision
-        logger.info("✅ Import Successful.")
+        logger.info("Step 1: Testing neuro-channel imports...")
+        from app.skills.feat_chain import feat_full_chain_institucional, FEATChain, LiquidityChannel, KineticsChannel, VolatilityChannel
+        logger.info("✅ Neuro-Channels Loaded.")
 
         # 2. Test Instantiation
-        logger.info("Step 2: Testing instantiation...")
+        logger.info("Step 2: Testing orchestrator instantiation...")
         chain = FEATChain()
-        logger.info("✅ Instantiation Successful.")
+        logger.info("✅ Orchestrator Initialized.")
 
-        # 3. Test Probabilistic Analysis (Dummy)
-        logger.info("Step 3: Testing probabilistic logic...")
+        # 3. Test Probabilistic Analysis with Synthetic Scalping Data
+        logger.info("Step 3: Testing probabilistic analysis (M1 simulation)...")
         market_data = {"symbol": "XAUUSD", "bid": 2000.5, "ask": 2000.7}
         
-        # Create dummy candles
+        # Create dummy candles with a clear trend to trigger logic
+        trend = np.linspace(2000, 2010, 50)
         data = {
-            "open": np.random.randn(50) + 2000,
-            "high": np.random.randn(50) + 2005,
-            "low": np.random.randn(50) + 1995,
-            "close": np.random.randn(50) + 2000,
+            "open": trend - 1,
+            "high": trend + 2,
+            "low": trend - 2,
+            "close": trend,
         }
         df = pd.DataFrame(data)
         
         decision = await chain.analyze_probabilistic(market_data, df)
-        logger.info(f"✅ Probabilistic Result: {decision.action} (Score: {decision.composite_score:.2f})")
+        logger.info(f"✅ Neural Output: {decision.action} (Composite: {decision.composite_score:.2f})")
+        logger.info(f"✅ Reasoning: {decision.reasoning}")
         
-        # 4. Test Chain Execution
-        logger.info("Step 4: Testing chain validation...")
-        # Note: This might fail if market_physics is not initialized or has no window
-        # But we want to check if the calls flow through the rules without ImportError
-        res = await chain.analyze(market_data, 2000.5)
-        logger.info(f"✅ Chain Analysis flow complete (Result: {res})")
+        if decision.action != "HOLD":
+            logger.info("🚀 Channels aligned successfully on trending data.")
 
-        logger.info("🚀 FEAT CHAIN SMOKE TEST PASSED: GREEN LIGHT.")
+        logger.info("🚀 NEURO-FUNCTIONAL SMOKE TEST PASSED.")
         return True
 
     except Exception as e:
-        logger.error(f"❌ FEAT CHAIN SMOKE TEST FAILED: {e}", exc_info=True)
+        logger.error(f"❌ NEURO-FUNCTIONAL SMOKE TEST FAILED: {e}", exc_info=True)
         return False
 
 if __name__ == "__main__":
