@@ -31,3 +31,8 @@ The project is organized under a **Tricameral Asynchronous Architecture**, separ
 ### 🛡️ 5. Supervisor Layer
 - **Daemon**: `nexus_daemon.py`.
 - **Function**: Parent process that launches and monitors the Core, MCP, and Dashboard. Ensures self-healing restarts.
+
+### 🧬 6. Evolutionary Layer (Self-Improvement)
+- **Skill Factory**: Allows the AI to autonomously create new procedural logic to solve emerging challenges.
+- **Cortex Architect**: Systematically optimizes the `.ai/` directory and project documentation for maximum cognitive alignment.
+- **Verificator Sentinel**: Ensures 100% integrity across the decentralized brain.

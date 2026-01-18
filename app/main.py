@@ -72,6 +72,9 @@ async def lifespan(app: FastAPI):
     - Desconecta al cerrar.
     """
     logger.info("Iniciando MT5 Neural Bridge Gateway...")
+    from app.core.lifecycle import lifecycle_manager
+    lifecycle_manager.register_service("api_gateway")
+    
     success = await mt5_conn.startup()
     if not success:
         if settings.HEADLESS_MODE:
@@ -82,6 +85,7 @@ async def lifespan(app: FastAPI):
     yield
 
     await mt5_conn.shutdown()
+    lifecycle_manager.stop_service("api_gateway")
 
 
 # =============================================================================
@@ -349,7 +353,7 @@ async def get_performance(request: HistoryRequest):
 @app.get("/risk/metrics", response_model=ResponseModel[dict])
 async def get_risk_status():
     """Estado actual de exposicin y riesgo de la cuenta."""
-    from app.services.risk_engine import risk_engine
+    from app.services.risk import risk_engine
 
     exposure = await risk_engine.get_total_exposure()
     drawdown_ok = await risk_engine.check_drawdown_limit()

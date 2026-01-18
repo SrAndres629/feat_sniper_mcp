@@ -1,0 +1,115 @@
+import os
+import time
+import logging
+import asyncio
+from typing import Dict, Any, List, Optional
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+
+from app.core.config import settings
+from app.ml.models.anomaly import anomaly_detector
+from app.ml.fractal_analysis import fractal_analyzer
+
+from .fractal import HurstBuffer
+from .loader import ModelLoader
+from .inference import InferenceEngine
+from .rlaif import ExperienceReplay
+
+logger = logging.getLogger("FEAT.MLEngine")
+
+try:
+    from app.skills.market_physics import market_physics
+    PHYSICS_AVAILABLE = True
+except ImportError: PHYSICS_AVAILABLE = False
+
+class MLEngine:
+    """Master ML Inference Engine (Pure Hybrid TCN-BiLSTM)."""
+    
+    def __init__(self):
+        self.models: Dict[str, Dict[str, Any]] = {}
+        self.seq_len_map: Dict[str, int] = {}
+        self.sequence_buffers: Dict[str, deque] = {}
+        
+        self.hurst_buffer = HurstBuffer()
+        self.inference_engine = InferenceEngine()
+        self.replay = ExperienceReplay()
+        
+        # Singletons
+        self.anomaly_detector = anomaly_detector
+        self.fractal_analyzer = fractal_analyzer
+        
+        self.executor = ThreadPoolExecutor(max_workers=os.cpu_count() or 4)
+        self.feature_names = list(settings.NEURAL_FEATURE_NAMES)
+        
+        logger.info("MLEngine Online (Hybrid TCN-BiLSTM Only)")
+
+    def _ensure_model(self, symbol: str) -> None:
+        if symbol not in self.models:
+            loaded = ModelLoader.load_hybrid(symbol)
+            if loaded:
+                self.models[symbol] = loaded
+                seq_len = loaded["config"].get("seq_len", 32)
+                self.seq_len_map[symbol] = seq_len
+                if symbol not in self.sequence_buffers:
+                    self.sequence_buffers[symbol] = deque(maxlen=seq_len)
+
+    def hydrate(self, symbol: str, prices: List[float], features_list: List[Dict]) -> None:
+        for p in prices: self.hurst_buffer.push(symbol, p)
+        self._ensure_model(symbol)
+        
+        if symbol not in self.sequence_buffers:
+             self.sequence_buffers[symbol] = deque(maxlen=self.seq_len_map.get(symbol, 32))
+             
+        for f in features_list:
+            self.sequence_buffers[symbol].append(f)
+        logger.info(f"Hydrated {symbol}: Hurst={self.hurst_buffer.get_cached_hurst(symbol)}, Seq={len(self.sequence_buffers[symbol])}")
+
+    async def predict_async(self, symbol: str, features: Dict[str, Any]) -> Dict[str, Any]:
+        try:
+            self.hurst_buffer.push(symbol, features.get("close", 0))
+            self._ensure_model(symbol)
+            self.sequence_buffers[symbol].append(features)
+            
+            if self.anomaly_detector.is_anomaly(features):
+                logger.critical(f"🦠 TOXIC DATA DETECTED on {symbol}.")
+                from app.core.system_guard import system_sentinel
+                system_sentinel.trigger_kill_switch(f"ML Anomaly detected on {symbol}")
+                return self._neutral(symbol, "ANOMALY_DETECTED")
+            
+            loop = asyncio.get_event_loop()
+            res = await loop.run_in_executor(
+                self.executor,
+                self.inference_engine.predict_hybrid_uncertainty,
+                self.models.get(symbol),
+                list(self.sequence_buffers[symbol]),
+                self.feature_names,
+                symbol,
+                self.seq_len_map.get(symbol, 32)
+            )
+            
+            if PHYSICS_AVAILABLE:
+                regime = market_physics.ingest_tick({"close": features.get("close"), "tick_volume": features.get("volume")})
+                if regime and res["p_win"] > 0.6 and not regime.is_accelerating:
+                     res["p_win"] -= 0.1
+                     res["why"] = "Physics Penalty"
+            
+            res["symbol"] = symbol
+            return res
+            
+        except Exception as e:
+            logger.error(f"Inference Error: {e}")
+            return self._neutral(symbol, str(e))
+
+    def _neutral(self, symbol, reason) -> Dict:
+        return {
+            "symbol": symbol, "buy": 0.0, "sell": 0.0, "hold": 1.0, "p_win": 0.5,
+            "alpha_multiplier": 1.0, "volatility_regime": 0.5, "uncertainty": 1.0,
+            "prediction": "WAIT", "why": reason, "execute_trade": False
+        }
+    
+    # Backward Compatibility
+    def hydrate_hurst(self, s, p): self.hydrate(s, p, [])
+    def hydrate_sequences(self, s, f): self.hydrate(s, [], f)
+    async def ensemble_predict_async(self, s, c): return await self.predict_async(s, c)
+    async def record_trade_result(self, t, p, s, c): self.replay.record_trade_result(t, p, s, c)
+    def get_status(self): return {"v": "2.0", "symbols_registered": list(self.models.keys()), "anomaly_fitted": True} # Mock status

@@ -12,7 +12,8 @@
 2.  **No-Ghosting**: Prohibido el uso de `pass`, `TODO` o dejar código muerto/comentado sin una justificación estructural nivel Senior. Todo cambio debe ser funcional y completo.
 3.  **Kelly-Lock**: La fórmula de riesgo (Kelly) y los multiplicadores de damping son inmutables sin autorización explícita de nivel Admin. No se aceptan propuestas que relajen la seguridad para "aumentar ganancias".
 4.  **Atomic Fission (Cognitive Rule)**: Ningún archivo debe superar las 300 líneas de código. Los "God Objects" son considerados deuda técnica crítica y deben ser divididos en módulos atómicos para garantizar la precisión del Agente.
-5.  **Epistemic Humility**: Si la incertidumbre calculada (Monte Carlo) supera el umbral institucional, la operación es descartada inmediatamente.
+5.  **Self-Evolution (Evolución Autónoma)**: Si una tarea se vuelve repetitiva o el sistema puede mejorar mediante un nuevo protocolo especializado, el Agente DEBE invocar la `SKILL_FACTORY` para diseñar e implementar dicha mejora.
+6.  **Epistemic Humility**: Si la incertidumbre calculada (Monte Carlo) supera el umbral institucional, la operación es descartada inmediatamente.
 
 ---
 
@@ -37,3 +38,6 @@
 - [Math Optimization](file:///.ai/skills/math_optimization.md)
 - [Trade Safety Protocol](file:///.ai/skills/trade_safety.md)
 - [Atomic Fission (Refactoring)](file:///.ai/skills/refactor_fission.md)
+- [Skill Factory (Auto-Evolution)](file:///.ai/skills/skill_factory.md)
+- [Cortex Architect (Neural Memory)](file:///.ai/skills/cortex_architect.md)
+- [Verificator Sentinel (Integrity)](file:///.ai/skills/verificator_sentinel.md)

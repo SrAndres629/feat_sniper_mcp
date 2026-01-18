@@ -50,7 +50,7 @@ class NexusEngine:
         logger.info("⚔️ NexusEngine: Initializing Immortal Core...")
         try:
             from app.skills.market_physics import market_physics as mp
-            from app.services.risk_engine import RiskEngine
+            from app.services.risk import risk_engine as RiskEngine
             from app.skills.trade_mgmt import TradeManager
             from app.ml.ml_engine import MLEngine
             from nexus_core.structure_engine import structure_engine

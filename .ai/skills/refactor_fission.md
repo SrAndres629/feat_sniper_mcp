@@ -5,9 +5,9 @@ Protocol for breaking down monolithic "God Objects" (Python files > 300 lines) i
 
 ## 🛠️ Algorithm of Action (PhD Level)
 
-### 1. Pre-Operation: The "Trust but Verify" Doctrine
-- **MANDATORY**: Create a smoke test script in `tests/verify_[module]_integrity.py` BEFORE any changes.
-- Ensure the original module passes the test.
+### 1. Pre-Operation: The "Verificator Sentinel" Protocol
+- **MANDATORY**: Follow [Verificator Sentinel](./verificator_sentinel.md) to create an integrity test BEFORE any changes.
+- Use `py_compile` to ensure the source is clean.
 
 ### 2. Neuro-Functional Segregation
 Instead of arbitrary cuts, divide logic into **Conceptual Channels** that feed the Neural Brain:
@@ -20,7 +20,12 @@ Instead of arbitrary cuts, divide logic into **Conceptual Channels** that feed t
 ### 3. Package Structure Policy
 - Target file `path/to/module.py` becomes a directory `path/to/module/`.
 - **`__init__.py`**: MUST maintain 100% backward compatibility by exposing singletons and primary classes.
-- **Line Limit**: NO file should exceed **300 lines**. If it does, refactor into sub-packages using this same skill.
+- **Line Limit (The Golden Zone)**:
+    - **Minimum**: 50 lines (Avoid "Nano-Fragmentation" or "Poltergeists").
+    - **Maximum**: 300 lines (Avoid "God Objects").
+    - **Ideal**: 150-200 lines.
+    - *Exceptions*: `__init__.py`, simple Enums/Types (`models.py`), or pure Configuration (`config.py`).
+- **Cohesion Rule (Tactical Unit)**: Do not split files arbitrarily. A file must represent a COMPLETE Concept (e.g., `order_management.py` vs `open_order.py` + `close_order.py`). If a file is < 50 lines, MERGE it with a related sibling.
 
 ### 4. Interface Exposure & Relative Links
 - Use explicit relative imports within the package (`from .liquidity import ...`).
