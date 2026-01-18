@@ -302,7 +302,7 @@ void ProcessCommand(string json)
          "{\"correlation_id\":\"%s\",\"result\":\"%s\",\"ticket\":%llu,\"error\":\"%s\",\"ts\":%llu}",
          correlation_id, result, ticket, error, GetTickCount64()
       );
-      g_interop.Send(ackJson);
+      g_tx.Send(ackJson, true);
       if(Verbose) Print("[ACK] Sent: ", ackJson);
    }
 }

@@ -21,6 +21,8 @@
 
 #define ZMQ_NOBLOCK   1
 #define ZMQ_DONTWAIT  1
+#define ZMQ_SNDHWM    23
+#define ZMQ_RCVHWM    24
 
 // --- DLL IMPORTS (CANONICAL x64) ---
 #import "libzmq.dll"
@@ -132,6 +134,13 @@ bool CInterop::Init(bool is_publisher)
       int val;
       uchar bytes[4];
    };
+   
+   // HWM Protection (1000 messages max buffer)
+   IntUnion u_hwm;
+   u_hwm.val = 1000;
+   zmq_setsockopt(m_socket, ZMQ_SNDHWM, u_hwm.bytes, (ulong)4);
+   zmq_setsockopt(m_socket, ZMQ_RCVHWM, u_hwm.bytes, (ulong)4);
+
    IntUnion u_linger;
    u_linger.val = 0; 
    
