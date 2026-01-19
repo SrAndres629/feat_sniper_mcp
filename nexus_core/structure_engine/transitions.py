@@ -31,11 +31,17 @@ def detect_structural_shifts(df: pd.DataFrame) -> pd.DataFrame:
     weights = {"LONDON": 1.5, "NY": 1.2, "ASIA": 0.5}
     df["session_weight"] = df["session_type"].map(weights).fillna(1.0)
 
-    # 3. ROLLING POC (Fixes Lookahead Bias)
-    # Instead of one profile for all time, we use a rolling Window (24h)
-    # A simplified proxy for POC is a high-volume price area.
-    # We'll use a 20-period rolling high-volume price
-    df["rolling_poc"] = df["close"].rolling(24).mean() # Simplified but causal
+    # 3. DOCTORAL POC (High-Fidelity KDE Integration)
+    # Instead of a rolling mean proxy, we use the real Auction POC.
+    # We calculate the profile for the last 'n' bars (e.g. 50) as the relevant value area.
+    window = 50
+    if len(df) >= window:
+        profile = volume_profile.get_profile(df.tail(window))
+        poc = profile.get("poc", df["close"].iloc[-1])
+    else:
+        poc = df["close"].rolling(24).mean().iloc[-1]
+    
+    df["rolling_poc"] = poc # This becomes a scalar applied to the current state
 
     # 4. SWING BOS (Structural Confirmation)
     # Rule: Candle Close > Previous Swing High

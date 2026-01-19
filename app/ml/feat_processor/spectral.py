@@ -6,6 +6,8 @@ from typing import Dict, Any, List
 from nexus_core.physics_engine.spectral.deca_core import DecaCoreEngine
 from nexus_core.physics_engine.spectral.config import ORDERED_SUBLAYERS
 from nexus_core.physics_engine.spectral.wavelet_filter import WaveletPrism
+from app.skills.volume_profile import volume_profile
+from nexus_core.adaptation_engine import adaptation_engine
 
 class SpectralTensorBuilder:
     """
@@ -16,6 +18,7 @@ class SpectralTensorBuilder:
     def __init__(self):
         self.engine = DecaCoreEngine()
         self.prism = WaveletPrism(wavelet='db4', level=2)
+        self.vol_history = [] # For regime classification
 
     def build_tensors(self, df: pd.DataFrame) -> Dict[str, float]:
         """
@@ -24,11 +27,24 @@ class SpectralTensorBuilder:
         """
         raw_close = df["close"]
         
-        # 1. QUANTUM PRISM: BINOCULAR PRE-PROCESSING
+        # 1. ADAPTATION LAYER: META-BRAIN CONTROL
+        # Logic: Detect regime and adjust math windows
+        current_energy = df["tick_volume"].rolling(5).mean().iloc[-1] # Simple volume-based proxy
+        self.vol_history.append(current_energy)
+        if len(self.vol_history) > 100: self.vol_history.pop(0)
+        
+        adaptive_config = adaptation_engine.get_config_for_regime(
+            current_energy, 
+            np.array(self.vol_history)
+        )
+        
+        # Apply Adaptive Parameters
+        self.prism.level = adaptive_config["wavelet_level"]
+        reg_period = adaptive_config["regress_period"]
+        vol_res = adaptive_config["volume_resolution"]
+
+        # 2. QUANTUM PRISM: BINOCULAR PRE-PROCESSING
         # Canal B: Wavelet Price (Pure Trend/Inertia)
-        # Optimization: We only need the latest denoised value for the snapshot
-        # but the hybrid matrix needs a bit of history for the EMAs.
-        # We'll compute a smaller window of wavelet prices (e.g. last 100) instead of full history.
         wavelet_series = self.prism.denoise_trend(raw_close.iloc[-100:], full_history=True)
         q_metrics = self.prism.get_quantum_tensors(raw_close)
         
@@ -88,16 +104,23 @@ class SpectralTensorBuilder:
         energy_burst = q_metrics['energy_burst_z']
         
         # spectral_divergence: Slope Divergence (Tactical Judas Swing Detection)
-        # We compare slope of Micro (SC1) vs Macro (SC10) over last 5 periods
-        def get_slope(series):
-            y = series.tail(5).values
+        # Adaptive Regression: period shifts from 3 to 12 based on volatility
+        def get_slope(series, p=5):
+            y = series.tail(p).values
             x = np.arange(len(y))
             slope, _, _, _, _ = linregress(x, y)
             return slope
 
-        micro_slope = get_slope(hybrid_matrix["SC_1_NOISE"])
-        macro_slope = get_slope(hybrid_matrix["SC_10_AXIS"])
+        micro_slope = get_slope(hybrid_matrix["SC_1_NOISE"], p=reg_period)
+        macro_slope = get_slope(hybrid_matrix["SC_10_AXIS"], p=reg_period)
         spectral_divergence = micro_slope - macro_slope
+
+        # 7. VOLUME VISION (Operation Liquid Density)
+        # Adaptive Resolution: 64 in stable, 96 in dead markets for precision
+        vol_profile = volume_profile.get_profile(df.tail(vol_res), resolution=vol_res)
+        # profile_tensor is normalized 1D (size 64)
+        vol_tensor = vol_profile.get("profile_tensor", np.zeros(64))
+        vol_shape = vol_profile.get("shape", "Neutral")
 
         return {
             "domino_alignment": float(domino_score),
@@ -107,7 +130,11 @@ class SpectralTensorBuilder:
             "energy_burst": float(energy_burst),
             "trend_purity": float(trend_purity),
             "spectral_divergence": float(spectral_divergence),
-            "sc10_axis": float(sc10)
+            "sc10_axis": float(sc10),
+            "volume_profile_tensor": vol_tensor.tolist() if isinstance(vol_tensor, np.ndarray) else vol_tensor,
+            "volume_shape_label": vol_shape,
+            "vol_scalar": float(adaptive_config["vol_scalar"]),
+            "wavelet_level": int(adaptive_config["wavelet_level"])
         }
 
 # For backward compatibility with previous verification scripts

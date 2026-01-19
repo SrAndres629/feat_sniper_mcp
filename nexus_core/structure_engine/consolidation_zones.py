@@ -1,46 +1,46 @@
 import pandas as pd
 import numpy as np
 
-def detect_consolidation_zones(df: pd.DataFrame, period: int = 20) -> pd.DataFrame:
+def detect_consolidation_zones(df: pd.DataFrame, window: int = 50) -> pd.DataFrame:
     """
-    [v5.0 - DOCTORAL SPACE] Accumulation Zones (ZA) Detection.
-    Definition: Tight range clusters representing contract buildup.
-    Logic: Rango (H-L) < ATR * 0.5 continuously.
+    [v6.0 - DOCTORAL LIQUID DENSITY] Accumulation Zones Detection.
+    Logic: High Kurtosis (concentration) in the KDE Volume Profile + Price near POC.
     """
-    if df.empty: return df
+    if df.empty or len(df) < window: return df
     df = df.copy()
     
-    # Initialize
-    df["is_consolidation"] = False
-    
-    # [DOCTORAL HARDENING] POC (Point of Control)
     from app.skills.volume_profile import volume_profile
     
-    # Calculate POC for the rolling window (e.g., last 50 candles)
-    # This is expensive, so we do it only for the last bar or specific checks.
-    # For DataFrame vectorization, we'll use a simplified approximation:
-    # Weighted Average Price of the last N bars where volume is high.
+    df["is_consolidation"] = False
+    df["poc_dist"] = 0.0
+    df["profile_kurtosis"] = 0.0
     
-    window = 50
-    df["typ_price"] = (df["high"] + df["low"] + df["close"]) / 3
-    df["vol_price"] = df["typ_price"] * df["tick_volume"]
-    
-    # Rolling VWAP as a proxy for POC in M5/M1 context
-    df["rolling_vwap"] = df["vol_price"].rolling(window).sum() / df["tick_volume"].rolling(window).sum()
-    
-    # Logic: Consolidation is when price oscillates AROUND the POC/VWAP
-    # Distortion: Distance from VWAP is small
-    dist_to_vwap = abs(df["close"] - df["rolling_vwap"])
-    atr = (df["high"] - df["low"]).rolling(14).mean()
-    
-    is_consolidation = dist_to_vwap < (atr * 0.5)
-    
-    # Count consecutive candles near POC
-    df["tight_count"] = is_consolidation.astype(int).groupby((is_consolidation != is_consolidation.shift()).cumsum()).cumsum()
-    
-    df["is_consolidation"] = (df["tight_count"] >= 10) & is_consolidation # Needs longer time to be valid accumulation
-    
-    # Optional: Mark the boundaries of the box
-    # For now, simplistic boolean marking
+    # We apply this over a rolling window. For performance, we can skip bars.
+    # Doctoral Optimization: Only calculate every 5 bars to reduce load, or on-demand.
+    for i in range(window, len(df)):
+        sub_df = df.iloc[i-window:i]
+        profile = volume_profile.get_profile(sub_df)
+        
+        if not profile: continue
+        
+        poc = profile["poc"]
+        kurt = profile["kurtosis"]
+        close = df.iloc[i]["close"]
+        
+        # Consolidation Logic:
+        # 1. High Kurtosis (> 3.0) means volume is tightly packed (Aceptación).
+        # 2. Price is within 0.2 ATR of the POC.
+        atr = (df.iloc[i]["high"] - df.iloc[i]["low"]) # local bar range as proxy
+        
+        is_near_poc = abs(close - poc) < (atr * 0.5)
+        is_dense = kurt > 3.0
+        
+        df.iloc[i, df.columns.get_loc("is_consolidation")] = is_near_poc and is_dense
+        df.iloc[i, df.columns.get_loc("poc_dist")] = abs(close - poc)
+        df.iloc[i, df.columns.get_loc("profile_kurtosis")] = kurt
+
+    # Count consecutive consolidation candles
+    df["tight_count"] = df["is_consolidation"].astype(int).groupby((df["is_consolidation"] != df["is_consolidation"].shift()).cumsum()).cumsum()
+    df["is_consolidation"] = (df["tight_count"] >= 5) & df["is_consolidation"]
     
     return df

@@ -222,6 +222,61 @@ def calculate_value_area_fast(centers: np.ndarray, counts: np.ndarray, total_vol
                 
     return centers[right_idx], centers[left_idx] # VAH, VAL
 
+@njit(cache=True)
+def calculate_kde_jit(prices: np.ndarray, weights: np.ndarray, grid: np.ndarray, bandwidth: float) -> np.ndarray:
+    """
+    Pure JIT Gaussian Kernel Density Estimation.
+    Avoids scipy overhead.
+    """
+    n_samples = len(prices)
+    n_grid = len(grid)
+    density = np.zeros(n_grid, dtype=np.float64)
+    
+    # Precompute constant factor
+    inv_bw = 1.0 / bandwidth
+    norm_const = 1.0 / (np.sqrt(2.0 * np.pi) * bandwidth)
+    
+    for i in range(n_grid):
+        g = grid[i]
+        sum_w = 0.0
+        for j in range(n_samples):
+            diff = (g - prices[j]) * inv_bw
+            # Gaussian Kernel: exp(-0.5 * u^2)
+            w = weights[j] * np.exp(-0.5 * diff * diff)
+            sum_w += w
+        density[i] = sum_w * norm_const
+    return density
+
+@njit(cache=True)
+def classify_distribution_shape(skew: float, kurt: float) -> str:
+    """
+    Classifies volume profile distribution shape using 3rd and 4th moments.
+    """
+    # D-Shape (Normal/Balanced): Symmetric and Mesokurtic
+    if abs(skew) < 0.5 and (2.0 < kurt < 4.0):
+        return "D-Shape (Balanced)"
+    
+    # P-Shape (Short Covering/Trend Up): Negative Skew (Long tail at bottom, mass at top)
+    if skew < -0.5:
+        return "P-Shape (Bullish/Short Covering)"
+    
+    # b-Shape (Long Liquidation/Trend Down): Positive Skew (Long tail at top, mass at bottom)
+    if skew > 0.5:
+        return "b-Shape (Bearish/Long Liquidation)"
+    
+    return "Neutral/Irregular"
+
+@njit(cache=True)
+def normalize_tensor_minmax(tensor: np.ndarray) -> np.ndarray:
+    """
+    Scales tensor to [0, 1] range for neural input.
+    """
+    t_min = np.min(tensor)
+    t_max = np.max(tensor)
+    if t_max - t_min < 1e-9:
+        return np.zeros_like(tensor)
+    return (tensor - t_min) / (t_max - t_min)
+
 
 def get_math_engine_stats():
     """Returns math engine telemetry."""
