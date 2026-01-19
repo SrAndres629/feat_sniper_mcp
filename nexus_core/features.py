@@ -262,7 +262,6 @@ class FEATFeatures:
         
         # 1. Structure Engine
         df = structure_engine.detect_structural_shifts(df)
-        df = structure_engine.detect_zones(df)
         
         # 2. Acceleration Engine
         accel_df = acceleration_engine.compute_acceleration_features(df)

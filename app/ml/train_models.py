@@ -110,16 +110,19 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
     # 5. Initialize model
     input_dim = X.shape[1]
     from app.ml.models.hybrid_probabilistic import HybridProbabilistic
+    from app.ml.ml_engine.doctoral_loss import DoctoralLoss
+    
     model = HybridProbabilistic(input_dim=input_dim, hidden_dim=64, num_classes=3).to(device)
     
-    criterion = nn.CrossEntropyLoss()
+    # [MATH SENIOR FULLSTACK] Using Doctoral Loss
+    criterion = DoctoralLoss(num_classes=3, monte_carlo_samples=50, quantile=0.5)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
     best_acc = 0.0
     best_model_state = None
     
     # 6. Training loop
-    logger.info("Starting LSTM training...")
+    logger.info("Starting LSTM training (Doctoral Loss)...")
     for epoch in range(20):
         model.train()
         train_loss = 0.0
@@ -128,8 +131,14 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
             batch_X, batch_y = batch_X.to(device), batch_y.to(device)
             
             optimizer.zero_grad()
-            logits = model(batch_X)
-            loss = criterion(logits, batch_y)
+            
+            # Model returns Dict {"logits", "log_var", ...}
+            outputs = model(batch_X) 
+            
+            # Loss expects Dict targets
+            targets = {"class": batch_y}
+            
+            loss = criterion(outputs, targets)
             loss.backward()
             optimizer.step()
             
@@ -142,7 +151,8 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
         with torch.no_grad():
             for batch_X, batch_y in val_loader:
                 batch_X, batch_y = batch_X.to(device), batch_y.to(device)
-                logits = model(batch_X)
+                outputs = model(batch_X)
+                logits = outputs["logits"]
                 preds = torch.argmax(logits, dim=1)
                 val_correct += (preds == batch_y).sum().item()
                 total_val += batch_y.size(0)

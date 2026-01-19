@@ -58,7 +58,9 @@ class ActionPlan:
     all_zones: List[ProjectedZone] = field(default_factory=list)
     bias: str = "NEUTRAL"
     recommendation: str = "WAIT"
-    confidence: float = 0.0
+    recommendation: str = "WAIT"
+    confidence_score: float = 0.0
+    reasoning: List[str] = field(default_factory=list)
     reasoning: List[str] = field(default_factory=list)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -73,6 +75,6 @@ class ActionPlan:
             "all_zones": [z.to_dict() for z in self.all_zones],
             "bias": self.bias,
             "recommendation": self.recommendation,
-            "confidence": round(self.confidence, 2),
+            "confidence": round(self.confidence_score, 2),
             "reasoning": self.reasoning
         }

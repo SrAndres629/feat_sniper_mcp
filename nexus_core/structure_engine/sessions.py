@@ -7,6 +7,9 @@ def identify_trading_session(dt: pd.Timestamp) -> str:
     Simplified for structural weighting.
     """
     # NYC Time
+    if not hasattr(dt, "time"):
+        return "NY_OPEN" # Default for synthetic data or non-time indices
+
     current_time = dt.time()
     
     # London: 03:00 - 12:00 (Overlap with NY)

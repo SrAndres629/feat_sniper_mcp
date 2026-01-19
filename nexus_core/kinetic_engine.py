@@ -2,20 +2,100 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Any
 
+class KineticValidator:
+    """
+    [DOCTORAL SKILL: ABSORPTION TEST]
+    Validates if an Institutional Impulse is real or a fakeout.
+    """
+    
+    def calculate_feat_force(self, candle: pd.Series, atr: float, rvol: float) -> float:
+        """
+        Fórmula Obligatoria: Force = (Body_Size / (ATR + 1e-9)) * Relative_Volume
+        """
+        body_size = abs(candle["close"] - candle["open"])
+        force = (body_size / (atr + 1e-9)) * rvol
+        return force
+
+    def check_absorption_state(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        State Machine for Absorption Logic.
+        Returns:
+            - state: "NEUTRAL", "IMPULSE", "MONITORING", "CONFIRMED", "FAILED"
+            - progress: (int) candles checked (0-3)
+        """
+        if len(df) < 5: 
+            return {"state": "NEUTRAL", "progress": 0, "feat_force": 0.0}
+        
+        atr = (df["high"] - df["low"]).rolling(14).mean().iloc[-1]
+        if atr == 0: atr = 1e-9
+        
+        # We need to simulate the state machine by looking back.
+        # Find the most recent "Active" Impulse (Force > 2.0) within last 4 candles.
+        
+        active_impulse_idx = None
+        
+        # Check T (current) back to T-3
+        for i in range(0, 4): 
+            idx = -(i + 1) # -1, -2, -3, -4
+            candle = df.iloc[idx]
+            
+            # Calculate RVOL (Simple Proxy) for historical inspection
+            # Ideally passed in, but we'll calculate local
+            vol_mean = df["volume"].iloc[idx-20:idx].mean() if abs(idx) > 20 else df["volume"].mean()
+            rvol = candle["volume"] / (vol_mean + 1e-9)
+            
+            force = self.calculate_feat_force(candle, atr, rvol)
+            
+            if force > 2.0:
+                # Found an impulse
+                active_impulse_idx = idx
+                break
+        
+        if active_impulse_idx is None:
+             # Check current candle specifically if it's an impulse
+             curr = df.iloc[-1]
+             # rvol for current
+             vol_mean = df["volume"].iloc[-21:-1].mean()
+             rvol = curr["volume"] / (vol_mean + 1e-9)
+             force = self.calculate_feat_force(curr, atr, rvol)
+             if force > 2.0:
+                 return {"state": "IMPULSE", "progress": 0, "feat_force": force}
+             return {"state": "NEUTRAL", "progress": 0, "feat_force": force}
+
+        # We have an impulse at active_impulse_idx
+        impulse_candle = df.iloc[active_impulse_idx]
+        impulse_body = abs(impulse_candle["close"] - impulse_candle["open"])
+        is_bull = impulse_candle["close"] > impulse_candle["open"]
+        limit_level = impulse_candle["low"] + (impulse_body * 0.5) if is_bull else impulse_candle["high"] - (impulse_body * 0.5)
+        
+        # Candles since impulse
+        # idx is like -3. So candles are -2, -1. (2 candles passed)
+        candles_passed = abs(active_impulse_idx) - 1
+        
+        # Validate strict 50% defense
+        subsequent = df.iloc[active_impulse_idx+1:]
+        
+        for _, fut in subsequent.iterrows():
+            if is_bull:
+                if fut["close"] < limit_level:
+                    return {"state": "FAILED", "progress": candles_passed, "feat_force": 0.0}
+            else:
+                if fut["close"] > limit_level:
+                    return {"state": "FAILED", "progress": candles_passed, "feat_force": 0.0}
+                    
+        if candles_passed >= 3:
+            return {"state": "CONFIRMED", "progress": 3, "feat_force": 0.0}
+            
+        return {"state": "MONITORING", "progress": candles_passed, "feat_force": 0.0}
+
 class KineticEngine:
     """
     [LEVEL 48] MULTIFRACTAL KINETIC ENGINE
-    ======================================
-    Implements the "Cloud Protocol" for visual simplification.
-    Instead of 40 individual EMAs, we compute the STATE of 4 Layers:
-    1. Micro (Red): Reactivity/Intent
-    2. Structure (Green): Operational Path
-    3. Macro (Blue): Memory/Equilibrium
-    4. Bias (Gray): Absolute Regime
+    ...
     """
     
     def __init__(self):
-        # Layer Definitions (Loaded from Config for Singularity)
+        # Layer Definitions
         from app.core.config import settings
         self.layers = {
             "micro": settings.LAYER_MICRO_PERIODS,
@@ -26,6 +106,9 @@ class KineticEngine:
         # Thresholds
         self.knot_thresh = settings.KINETIC_COMPRESSION_THRESH
         self.expand_thresh = settings.KINETIC_EXPANSION_THRESH
+        
+        # [DOCTORAL]
+        self.validator = KineticValidator()
 
     def compute_kinetic_state(self, df: pd.DataFrame) -> Dict[str, float]:
         """
@@ -55,36 +138,37 @@ class KineticEngine:
             ema_values = []
             
             # Compute all EMAs for this layer
-            # [OPTIMIZATION] We need last 2 points for Slope Calculation
+            # [OPTIMIZATION] We need last 3 points for Acceleration (2nd Derivative)
             for p in periods:
                 series = close.ewm(span=p, adjust=False).mean()
-                ema_values.append(series.iloc[-2:].values) # Get last 2
+                ema_values.append(series.iloc[-3:].values) # Get last 3: [T-2, T-1, T]
             
-            ema_values = np.array(ema_values) # Shape (N_Periods, 2)
+            ema_values = np.array(ema_values) # Shape (N_Periods, 3)
             
-            # A. CENTROID (The "Center of Gravity" of the layer)
-            # Mean across periods for T (current) and T-1 (prev)
-            centroid_series = np.mean(ema_values, axis=0) # [Prev, Curr]
-            centroid = centroid_series[1]
-            prev_centroid = centroid_series[0]
+            # A. CENTROIDS
+            # Mean across periods for T, T-1, T-2
+            centroid_series = np.mean(ema_values, axis=0) # [T-2, T-1, T]
+            centroid = centroid_series[2]
+            prev_centroid = centroid_series[1]
+            prev2_centroid = centroid_series[0]
             
             centroids[layer_name] = centroid
             
             # B. COMPRESSION (Girth/Fan)
             # Standard Deviation of the EMAs at current T
-            spread = np.std(ema_values[:, 1])
+            spread = np.std(ema_values[:, 2])
             metrics[f"{layer_name}_compression"] = spread / atr # Normalized Girth
             
             # C. DISTANCE TO PRICE
             metrics[f"dist_{layer_name}"] = (price - centroid) / atr
             
-            # D. SLOPE (Kinetic Intent)
-            # Velocity of the Centroid
-            slope = (centroid - prev_centroid) / atr
-            metrics[f"{layer_name}_slope"] = slope
-            slopes[layer_name] = slope
-
-            # E. FASTEST MICRO TRACKING (Lag Reduction)
+            # ema_values has [T-1, T]. So we only have 2 points.
+            # To calc acceleration we need 3 points: T, T-1, T-2.
+            # I will assume `prev_slope` is stored or approximating with limited history?
+            # Actually, `ema_values` comes from `close.ewm...iloc[-2:]`. 
+            # I should fetch 3 points to calc Accel.
+            
+            # F. FASTEST MICRO TRACKING (Lag Reduction)
             if layer_name == "micro":
                 # Assuming periods are sorted.
                 # If Period 1 is present (Price), we want the next fastest (e.g. 2 or 3) to measure divergence.
@@ -92,7 +176,7 @@ class KineticEngine:
                 if len(periods) > 1 and periods[0] == 1:
                     fast_idx = 1
                 
-                fastest_ema = ema_values[fast_idx, 1]
+                fastest_ema = ema_values[fast_idx, 2]
                 metrics["dist_micro_fast"] = (price - fastest_ema) / atr
 
         # --- 2. BIAS LINE (The 2048 SMMA) ---
@@ -109,43 +193,93 @@ class KineticEngine:
         # Force = Mass * Acceleration
         # Efficiency = Displacement / Effort
         
+        # --- 2.5 PHYSICS ENGINE V4.0 (FEAT Force & Absorption) ---
+        # [DOCTORAL UPGRADE]
+        # Formula: Force = (Body_Size * Volume) / ATR
+        # Context: "The Strength Test" (Absorption)
+        
         if "volume" in df.columns:
-            # Mass: Smoothed Volume to reduce noise
-            mass = df["volume"].rolling(3).mean().iloc[-1]
+            # 1. VOLUME METRICS FIRST (Needed for FEAT Force)
+            current_vol = df["volume"].iloc[-1]
             
-            # Acceleration: Change in Price Velocity (Micro Slope Delta)
-            # Velocity ~ Micro Slope
-            # Accel ~ Change in Micro Slope
-            micro_slope = (centroids["micro"] - prev_centroid) # reusing raw diff before ATR division
+            # [MATH SENIOR FULLSTACK - subskill_computational]
+            # RVOL: Relative Volume (Vectorized Rolling Mean, No Loops)
+            # ε = 1e-9 for numerical stability
+            mean_vol = df["volume"].rolling(20).mean().iloc[-1]
+            rvol = current_vol / (mean_vol + 1e-9)
+            metrics["rvol"] = rvol
             
-            # Note: We need previous slope. approximating with current slope for now or tracking state.
-            # Better approximation: Accel = (Close - 2*Close[-1] + Close[-2]) 
-            # Let's use the explicit derivation:
-            p0 = df["close"].iloc[-1]
-            p1 = df["close"].iloc[-2]
-            p2 = df["close"].iloc[-3] if len(df) > 2 else p1
+            # 2. BODY METRICS
+            open_p = df["open"].iloc[-1]
+            close_p = df["close"].iloc[-1]
+            body_size = abs(close_p - open_p)
             
-            velocity = p0 - p1
-            prev_velocity = p1 - p2
-            acceleration = velocity - prev_velocity
+            # Wick Ratio (Efficiency)
+            high_p = df["high"].iloc[-1]
+            low_p = df["low"].iloc[-1]
+            range_size = high_p - low_p
+            if range_size == 0: range_size = 1e-9
             
-            # Force (Market Impact)
-            force = mass * abs(acceleration)
-            metrics["physics_force"] = force
-            metrics["physics_mass"] = mass
-            metrics["physics_accel"] = acceleration
+            wick_ratio = (range_size - body_size) / range_size
             
-            # Efficiency (Displacement per Unit of Force)
-            # Avoid div by zero. 
-            # High Eff = Price moved easily (Vacuum)
-            # Low Eff = Price moved hard (Wall)
-            metrics["flow_efficiency"] = abs(velocity) / (mass + 1e-9)
+            # 3. [MATH SENIOR FULLSTACK - Kinetic Physicist]
+            # ═══════════════════════════════════════════════════════════
+            # DOCTORAL FORMULA: Force = (Body / (ATR + ε)) * RVOL
+            # - Body/ATR = Normalized Displacement (Dimensionless)
+            # - RVOL = Relative Volume (Effort relative to market norm)
+            # - Product = True Institutional Force (Comparable across assets)
+            # ═══════════════════════════════════════════════════════════
+            feat_force = (body_size / (atr + 1e-9)) * rvol
             
-            # Friction (Inverse Efficiency)
-            metrics["friction_coeff"] = (mass + 1e-9) / (abs(velocity) + 1e-9)
+            # [MATH SENIOR FULLSTACK - subskill_financial]
+            # Volume Efficiency: Body / (Volume * ATR)
+            # High Eff = Clean Drive (Institutional). Low Eff = Churn (HFT).
+            feat_efficiency = body_size / ((current_vol * atr) + 1e-9)
+            
+            # Store Metrics
+            metrics["feat_force"] = feat_force
+            metrics["feat_efficiency"] = feat_efficiency
+            metrics["wick_ratio"] = wick_ratio
+            
+            # 3. ABSORPTION TEST (State Machine)
+            abs_result = self.validator.check_absorption_state(df)
+            state_map = {"NEUTRAL": 0.0, "IMPULSE": 1.0, "MONITORING": 2.0, "CONFIRMED": 3.0, "FAILED": -1.0}
+            
+            metrics["absorption_state"] = state_map.get(abs_result["state"], 0.0)
+            metrics["absorption_progress"] = float(abs_result["progress"])
+            
+            # Use calculated FEAT Force if available via validator (or keep local calculation)
+            # Validator calculates it for history. Local calc is for current/last.
+            # Let's ensure 'feat_force' matches the latest candle if valid.
+            if abs_result["state"] == "IMPULSE":
+                 metrics["feat_force"] = abs_result["feat_force"]
+            
+            # 3. ABSORPTION TEST (The 50% Rule)
+            # We need to look at the PARENT candle (Impulse) vs recent candles
+            # This is complex on a single-row basis. We check "Is current candle absorbed?"
+            # Improved Logic: We return a 'strength_score' based on recent history.
+            
+            # Simple Proxy: If previous candle was BIG, and current is SMALL and INSIDE -> ABSORPTION/CONTINUATION
+            # If previous was BIG, and current ENGULFS it -> REVERSAL
+            
+            prev_body = abs(df["close"].iloc[-2] - df["open"].iloc[-2])
+            prev_vol = df["volume"].iloc[-2]
+            
+            # [KINETIC REPAIR] Use RVOL for Previous Force (Standardized Unit)
+            prev_mean_vol = df["volume"].rolling(20).mean().iloc[-2]
+            prev_rvol = prev_vol / (prev_mean_vol + 1e-9)
+            
+            prev_force = (prev_body / (atr + 1e-9)) * prev_rvol
+            
+            is_inside = (high_p < df["high"].iloc[-2]) and (low_p > df["low"].iloc[-2])
+            
+            metrics["is_inside_bar"] = 1.0 if is_inside else 0.0
+            metrics["prev_force"] = prev_force
+            
         else:
-            metrics["physics_force"] = 0.0
-            metrics["flow_efficiency"] = 0.0
+            metrics["feat_force"] = 0.0
+            metrics["wick_ratio"] = 0.0
+            metrics["rvol"] = 0.0
         
         # --- 3. INTER-LAYER RELATIONSHIPS (The "Change in Relation") ---
         
@@ -246,12 +380,24 @@ class KineticEngine:
         if d_s < d_m and d_s < d_M: control = "STRUCTURE"
         if d_M < d_m and d_M < d_s: control = "MACRO"
         
+        # 5. One-Hot Encoding (Neural Hygiene)
+        # Instead of returning an integer ID, we return probability/boolean flags
+        
+        is_expansion = (pattern_name.startswith("EXPANSION"))
+        is_compression = (pattern_name == "COMPRESSION")
+        is_reversal = (pattern_name == "DEEP_RETRACEMENT") # or Regime Change
+        is_regime_change = (pattern_name.startswith("REGIME_CHANGE"))
+        
         return {
-            "pattern_id": pattern_id,
-            "pattern_name": pattern_name,
-            "control_layer": control,
+            "kinetic_is_expansion": 1.0 if is_expansion else 0.0,
+            "kinetic_is_compression": 1.0 if is_compression else 0.0,
+            "kinetic_is_reversal": 1.0 if is_reversal else 0.0,
+            "kinetic_is_regime_change": 1.0 if is_regime_change else 0.0,
             "kinetic_coherence": float(abs(alignment)),
-            "layer_alignment": float(alignment) 
+            "layer_alignment": float(alignment),
+            "control_layer_micro": 1.0 if control == "MICRO" else 0.0,
+            "control_layer_structure": 1.0 if control == "STRUCTURE" else 0.0,
+            "control_layer_macro": 1.0 if control == "MACRO" else 0.0
         }
 
 # Singleton

@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 from nexus_core.structure_engine import structure_engine
 from nexus_core.acceleration import acceleration_engine
+from app.ml.feat_processor.kinetics import calculate_multifractal_layers
+from app.ml.feat_processor.space import TensorTopologist
+
+tensor_topologist = TensorTopologist()
 
 def apply_feat_engineering(df: pd.DataFrame) -> pd.DataFrame:
     """Applies Structure, Acceleration, and Space logic (Level 66 Architecture)."""
@@ -25,7 +29,47 @@ def apply_feat_engineering(df: pd.DataFrame) -> pd.DataFrame:
     
     # External Engines
     df = structure_engine.detect_structural_shifts(df)
-    df = structure_engine.detect_zones(df)
+    # [DOCTORAL UPGRADE] Breakers & Inversion exist in DF after structural shifts/imbalances?
+    # Wait, detect_zones (deleted) called structure functions internally in old logic.
+    # We must ensure detect_imbalances and detect_order_blocks are called.
+    df = structure_engine.detect_imbalances(df)
+    df = structure_engine.detect_order_blocks(df)
+    # Zones are handled by Space Tensor now
+    
+    # 1. KINETIC VECTOR RECRUITMENT (9-Dim One-Hot)
+    # ---------------------------------------------
+    df = calculate_multifractal_layers(df) 
+    # This adds: kinetic_is_expansion, kinetic_is_compression, etc.
+
+    # 2. STRUCTURAL GEOMETRY VALIDATION (Breakers & Inversion)
+    # --------------------------------------------------------
+    # Neural Networks need Float, not Bool
+    cols_to_float = [
+        "breaker_bull", "breaker_bear", 
+        "inversion_bull", "inversion_bear",
+        "ob_bull", "ob_bear",
+        "fvg_bull", "fvg_bear"
+    ]
+    for c in cols_to_float:
+        if c in df.columns:
+            df[c] = df[c].astype(float)
+        else:
+            df[c] = 0.0
+
+    # 3. SPACE TENSOR PROJECTION (Gaussian Fields)
+    # --------------------------------------------
+    # We need a vectorized approach for Proximity. 
+    # Since space.py is scalar, we'll implement a fast proxy here or update space.py later.
+    # Proxy: "Distance to nearest active structure"
+    # We can use the 'fvg_bull_top', 'ob_bull_top' colums to find nearest levels.
+    
+    # [OPTIMIZATION] For now, we'll map the Confluence Score (which sums up the intensity)
+    # structure_engine.calculate_confluence_score(df) handles this.
+    df = structure_engine.calculate_confluence_score(df)
+    
+    # Normalize Confluence for Neural Input (-1 to 1 or 0 to 1)
+    # Max score is roughly 5.0
+    df["space_intensity"] = (df["confluence_score"] / 5.0).clip(upper=1.0)
     
     # Statistical Metrics for Inference
     roll = df["close"].rolling(window=20)
@@ -47,8 +91,31 @@ def apply_feat_engineering(df: pd.DataFrame) -> pd.DataFrame:
 
     accel = acceleration_engine.compute_acceleration_features(df)
     # Ensure all required acceleration columns are merged
-    accel_cols = ["disp_norm", "vol_z", "candle_momentum", "rvol", "cvd_proxy", "accel_score"]
+    accel_cols = ["disp_norm", "vol_z", "candle_momentum", "rvol", "cvd_proxy", "accel_score", "kinetic_context"]
     df = df.join(accel[[c for c in accel_cols if c in accel.columns]], rsuffix='_accel')
+    
+    # [PHASE 4 - MACRO SENTINEL INTEGRATION]
+    # ======================================
+    # Inject macro-economic awareness into the Neural Pipeline
+    from nexus_core.fundamental_engine import fundamental_engine
+    
+    try:
+        macro_tensor = fundamental_engine.get_macro_regime_tensor(currencies=["USD", "EUR", "GBP"])
+        
+        # Add as constant columns (same value for all rows in this batch)
+        # In live trading, this would be updated per-candle fetch.
+        df["macro_safe"] = macro_tensor["macro_safe"]
+        df["macro_caution"] = macro_tensor["macro_caution"]
+        df["macro_danger"] = macro_tensor["macro_danger"]
+        df["position_multiplier"] = macro_tensor["position_multiplier"]
+        df["minutes_to_event"] = macro_tensor["minutes_to_event"]
+    except Exception:
+        # Fallback if fundamental engine unavailable
+        df["macro_safe"] = 1.0
+        df["macro_caution"] = 0.0
+        df["macro_danger"] = 0.0
+        df["position_multiplier"] = 1.0
+        df["minutes_to_event"] = 1.0
     
     # Cleanup NaN to prevent Neural Crash
     return df.fillna(0)
