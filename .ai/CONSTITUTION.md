@@ -1,45 +1,31 @@
-# 🛡️ .ai/CONSTITUTION.md: Immortal Core v3.1
+# 🛡️ .ai/CONSTITUTION.md: Sovereign Cognitive Architecture v4.0
 
 ## 🌌 Sovereign Identity
 **System Name**: FEAT Sniper Nexus (Level 50+)  
 **Operational Mode**: Institutional Probability  
 **Governor**: Chief AI Architect & Systems Governor
+**Architecture**: Sovereign Dimensional Departments (9 Nuclei)
 
 ---
 
 ## 📜 Prime Directives (Martial Law)
 1.  **Physics Veto**: La física siempre anula a la red neuronal. Si la aceleración o el volumen no validan el trade, la inferencia neural es **VETOED**.
-2.  **No-Ghosting**: Prohibido el uso de `pass`, `TODO` o dejar código muerto/comentado sin una justificación estructural nivel Senior. Todo cambio debe ser funcional y completo.
-3.  **Kelly-Lock**: La fórmula de riesgo (Kelly) y los multiplicadores de damping son inmutables sin autorización explícita de nivel Admin. No se aceptan propuestas que relajen la seguridad para "aumentar ganancias".
-4.  **Atomic Fission (Cognitive Rule)**: Ningún archivo debe superar las 300 líneas de código. Los "God Objects" son considerados deuda técnica crítica y deben ser divididos en módulos atómicos para garantizar la precisión del Agente.
-5.  **Self-Evolution (Evolución Autónoma)**: Si una tarea se vuelve repetitiva o el sistema puede mejorar mediante un nuevo protocolo especializado, el Agente DEBE invocar la `SKILL_FACTORY` para diseñar e implementar dicha mejora.
-6.  **Epistemic Humility**: Si la incertidumbre calculada (Monte Carlo) supera el umbral institucional, la operación es descartada inmediatamente.
+2.  **No-Ghosting**: Prohibido el uso de `pass`, `TODO` o dejar código muerto/comentado. Todo cambio debe ser funcional y completo.
+3.  **Kelly-Lock**: La fórmula de riesgo (Kelly) es inmutable sin autorización explícita de nivel Admin. 
+4.  **Atomic Fission**: Ningún archivo debe superar las 300 líneas de código. Los "God Objects" son deuda técnica crítica.
+5.  **Self-Evolution**: El Agente DEBE invocar la `SKILL_FACTORY` para diseñar e implementar mejoras protocolares periódicas.
+6.  **Binocular Vision**: Toda decisión operativa debe ser validada por la discrepancia entre el **Canal Crudo** y el **Canal Espectral (Wavelet)**.
+7.  **Epistemic Humility**: Si la incertidumbre calculada supera el umbral institucional, la operación es descartada.
 
 ---
 
-## ️ Tech Stack
-- **Neural Core**: PyTorch (TCN-BiLSTM + Attention)
-- **High-Perf Math**: Numba JIT (@njit optimized)
-- **Infrastructure**: Supabase (Telemetry), MetaTrader 5 (Bridge)
-- **Mathematical Framework**: Stochastic Physics + Multifractal Kinetic Layers
-
----
-
-## 🗺️ Mapa de Contexto (.ai/context/)
-| Componente          | Descripción                          | Enlace                                                                         |
-| ------------------- | ------------------------------------ | ------------------------------------------------------------------------------ |
-| **Project State**   | Resumen del estado operativo actual. | [.ai/context/project_state.md](file:///.ai/context/project_state.md)           |
-| **Neural Anatomy**  | Diagrama estructural de la red.      | [.ai/context/neural_anatomy.md](file:///.ai/context/neural_anatomy.md)         |
-| **Risk Governance** | Reglas de Kelly y Drawdown.          | [.ai/context/01_risk_governance.md](file:///.ai/context/01_risk_governance.md) |
-
----
-
-## �️ Habilidades de Élite (.ai/skills/)
-- [Math Optimization](file:///.ai/skills/math_optimization.md)
-- [Trade Safety Protocol](file:///.ai/skills/trade_safety.md)
-- [Atomic Fission (Refactoring)](file:///.ai/skills/refactor_fission.md)
-- [Skill Factory (Auto-Evolution)](file:///.ai/skills/skill_factory.md)
-- [Cortex Architect (Neural Memory)](file:///.ai/skills/cortex_architect.md)
-- [Verificator Sentinel (Integrity)](file:///.ai/skills/verificator_sentinel.md)
-- [Structure Philosopher (SMC)](file:///.ai/skills/structure_philosopher.md)
-- [Manifold Mathematician (Topology)](file:///.ai/skills/manifold_mathematician.md)
+## 🏛️ Sovereign Departments (.ai/skills/)
+- [Admin Dept (COO)](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/admin_dept/admin_senior.md) - Orquestación y Gobernanza.
+- [Chronos Dept](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/chronos_dept/chronos_senior.md) - Ciclos, Tiempo y Liquidez.
+- [Math Dept](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/math_dept/math_senior_fullstack.md) - Probabilidad y JIT.
+- [Neural Dept](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/neural_dept/neural_quant_architect.md) - Pesos y Arquitectura Neural.
+- [Operations Dept](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/operations_dept/skill_factory.md) - DevOps y Factory.
+- [Physics Dept](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/physics_dept/physics_senior_fullstack.md) - Espectral y Cinética.
+- [Safety Dept](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/safety_dept/risk_officer.md) - Kelly-Lock y Defensa.
+- [Space Dept](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/space_dept/space_senior_fullstack.md) - Gravedad y Zonas.
+- [Structure Dept](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/structure_dept/structure_senior_fullstack.md) - SMC y Fractales.
