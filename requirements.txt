@@ -34,6 +34,7 @@ numba
 plotly>=5.19.0
 optuna>=3.6.0
 scipy>=1.12.0
+PyWavelets>=1.5.0
 torch
 # torch --index-url https://download.pytorch.org/whl/pkgs/cpu (Handle manually if needed)
 
