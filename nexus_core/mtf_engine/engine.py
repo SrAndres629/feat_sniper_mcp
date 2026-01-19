@@ -1,9 +1,10 @@
 import logging
 import pandas as pd
 from typing import Dict, Any, List
-from .models import Timeframe, TimeframeScore, MTFCompositeScore, WEIGHTS
+from .models import Timeframe, TimeframeScore, MTFCompositeScore, get_tf_weight
 from .scoring import analyze_hydrodynamics
 from app.skills.market_physics import market_physics
+from app.core.config import settings
 
 logger = logging.getLogger("feat.mtf")
 
@@ -63,7 +64,8 @@ class FractalMTFEngine:
         bearish = 0
         total = 0
         
-        for tf, weight in WEIGHTS.items():
+        for tf in Timeframe:
+            weight = get_tf_weight(tf)
             key = tf.value
             if key in tf_scores:
                 s = tf_scores[key]
@@ -83,16 +85,16 @@ class FractalMTFEngine:
         m1 = tf_scores.get("M1")
         h4 = tf_scores.get("H4")
         
-        if m1 and m1.score >= result.THRESHOLD_SNIPER_TRIGGER:
+        if m1 and m1.score >= settings.MTF_THRESHOLD_SNIPER_TRIGGER:
             h4_dir = h4.direction if h4 else 0
             if not ((h4_dir != 0) and (h4_dir != m1.direction)):
                 boosted_score = max(result.composite_score, m1.score)
-                if boosted_score >= result.THRESHOLD_SNIPER:
+                if boosted_score >= settings.MTF_THRESHOLD_SNIPER:
                     result.composite_score = boosted_score
                     result.reasoning.append(f"🎯 Sniper Override: M1 Strong ({m1.score})")
 
     def _determine_trade(self, result: MTFCompositeScore, tf_scores: Dict[str, TimeframeScore], current_price: float):
-        if result.composite_score < result.THRESHOLD_SIGNAL: return
+        if result.composite_score < settings.MTF_THRESHOLD_SIGNAL: return
         result.action = "BUY" if result.primary_direction > 0 else "SELL"
         m1 = tf_scores.get("M1")
         m5 = tf_scores.get("M5")
@@ -106,13 +108,13 @@ class FractalMTFEngine:
         else:
             result.entry_type = "MARKET"
         
-        atr_proxy = current_price * 0.001
+        atr_proxy = current_price * settings.MTF_ATR_PROXY_MULTIPLIER
         if result.action == "BUY":
-            result.suggested_sl = current_price - (atr_proxy * 10)
-            result.suggested_tp = current_price + (atr_proxy * 20)
+            result.suggested_sl = current_price - (atr_proxy * settings.MTF_SL_ATR_MULTIPLIER)
+            result.suggested_tp = current_price + (atr_proxy * settings.MTF_TP_ATR_MULTIPLIER)
         else:
-            result.suggested_sl = current_price + (atr_proxy * 10)
-            result.suggested_tp = current_price - (atr_proxy * 20)
+            result.suggested_sl = current_price + (atr_proxy * settings.MTF_SL_ATR_MULTIPLIER)
+            result.suggested_tp = current_price - (atr_proxy * settings.MTF_TP_ATR_MULTIPLIER)
         result.suggested_entry = current_price
 
 mtf_engine = FractalMTFEngine()

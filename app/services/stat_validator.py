@@ -13,6 +13,7 @@ import numpy as np
 from scipy import stats
 from typing import Dict, List, Any
 from datetime import datetime
+from app.core.config import settings
 
 logger = logging.getLogger("feat.stat_validator")
 
@@ -80,7 +81,7 @@ class StatisticalValidator:
         
         # Test 3: Sharpe Ratio
         if np.std(profits) > 0:
-            sharpe = np.mean(profits) / np.std(profits) * np.sqrt(252)  # Annualized
+            sharpe = np.mean(profits) / np.std(profits) * np.sqrt(settings.ANALYTICS_TRADING_DAYS)  # Annualized
         else:
             sharpe = 0.0
         validation["tests"]["sharpe_ratio"] = {

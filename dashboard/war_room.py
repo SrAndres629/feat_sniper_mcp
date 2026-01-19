@@ -7,6 +7,11 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 import os
+import sys
+
+# Add root directory to path to reach app module
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from app.core.config import settings
 
 # [LEVEL 64] C2 COMMAND & CONTROL DASHBOARD
 # Architecture: Isolated UI -> Shared State -> Core Node
@@ -68,8 +73,8 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 2. DATA BRIDGING ---
-STATE_FILE = "data/live_state.json"
-CMD_FILE = "data/app_commands.json"
+STATE_FILE = settings.DASHBOARD_LIVE_STATE_PATH
+CMD_FILE = settings.DASHBOARD_COMMAND_PATH
 
 def load_live_state():
     if not os.path.exists(STATE_FILE): return None
@@ -211,9 +216,9 @@ def render_war_room_tab(state):
         
         st.markdown("---")
         st.markdown("### Neural Weight Management")
-        weights_dir = "app/ml/weights"
+        weights_dir = settings.MODELS_DIR
         if os.path.exists(weights_dir):
-            files = [f for f in os.listdir(weights_dir) if f.endswith(".pth")]
+            files = [f for f in os.listdir(weights_dir) if f.endswith(".pt")]
             selected_model = st.selectbox("Active Weight File", files)
             if st.button("Hot-Reload Weight"):
                 send_command("RELOAD_MODELS", {"file": selected_model})
@@ -224,11 +229,14 @@ def render_war_room_tab(state):
         st.metric("Risk per Trade", f"{state.get('risk_factor', 1.0)/10:.1f}%")
         st.markdown("---")
         st.markdown("### System Logs (Live)")
-        log_file = "logs/mcp_server.log"
+        log_file = "logs/nexus_daemon.log"
         if os.path.exists(log_file):
-            with open(log_file, 'r') as f:
-                logs = f.readlines()[-20:]
-                st.code("".join(logs), language="text")
+            try:
+                with open(log_file, 'r', encoding='utf-8') as f:
+                    logs = f.readlines()[-20:]
+                    st.code("".join(logs), language="text")
+            except: 
+                st.code("Logs currently unavailable.", language="text")
 
 # --- 4. MAIN APP LOOP ---
 
@@ -250,8 +258,8 @@ with tab3:
 
 # Auto-refresh logic
 st.empty()
-time.sleep(1)
+time.sleep(settings.DASHBOARD_REFRESH_SLEEP_SEC)
 if st.button("RECARGAR DASHBOARD"):
     st.rerun()
-st.caption("Auto-refreshing in 1s...")
-st.markdown("""<script>setTimeout(function(){location.reload();}, 2000);</script>""", unsafe_allow_html=True)
+st.caption(f"Auto-refreshing in {settings.DASHBOARD_REFRESH_SLEEP_SEC}s...")
+st.markdown(f"""<script>setTimeout(function(){{location.reload();}}, {settings.DASHBOARD_REFRESH_JS_MS});</script>""", unsafe_allow_html=True)

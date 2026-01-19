@@ -14,6 +14,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Any, Optional
+from app.core.config import settings
 
 logger = logging.getLogger("feat.trade_journal")
 
@@ -23,8 +24,8 @@ class TradeJournal:
     Records all details of each trade for continuous improvement.
     """
     
-    def __init__(self, journal_path: str = "trade_journal.json"):
-        self.journal_path = Path(journal_path)
+    def __init__(self, journal_path: str = None):
+        self.journal_path = Path(journal_path or settings.JOURNAL_PATH)
         self.entries: List[Dict[str, Any]] = []
         self.current_trade: Optional[Dict] = None
         self._load_existing()
@@ -102,13 +103,15 @@ class TradeJournal:
         trade["exit_physics"] = exit_physics
         trade["status"] = "CLOSED"
         
-        # Calculate P&L
+        # Calculate P&L (Pips) - Symbol Agnostic logic
+        # Gold: 1 pip = 0.01 (100x), JPY: 1 pip = 0.01 (100x), Forex: 1 pip = 0.0001 (10000x)
+        multiplier = 100 if "JPY" in trade["symbol"] or "XAU" in trade["symbol"] else 10000
         if trade["direction"] == "BUY":
-            pnl_pips = (exit_price - trade["entry_price"]) * 10000
+            pnl_pips = (exit_price - trade["entry_price"]) * multiplier
         else:
-            pnl_pips = (trade["entry_price"] - exit_price) * 10000
+            pnl_pips = (trade["entry_price"] - exit_price) * multiplier
         
-        trade["pnl_pips"] = round(pnl_pips, 1)
+        trade["pnl_pips"] = round(float(pnl_pips), 2)
         trade["result"] = "WIN" if pnl_pips > 0 else "LOSS"
         
         # Calculate duration

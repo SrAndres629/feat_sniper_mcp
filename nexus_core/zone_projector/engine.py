@@ -4,6 +4,7 @@ import pandas as pd
 from typing import Dict, Any, List, Optional, Tuple
 from .models import ZoneType, VolatilityState, ProjectedZone, ActionPlan
 from .calculations import FIB_LEVELS, EXTENSION_LEVELS
+from app.core.config import settings
 
 logger = logging.getLogger("feat.zones.engine")
 
@@ -19,7 +20,10 @@ class ZoneProjector:
         ca, aa = atr.iloc[-1], atr.iloc[-window:].mean()
         if aa == 0: return VolatilityState.NORMAL, 1.0
         f = ca / aa
-        s = VolatilityState.EXTREME if f > 3.0 else VolatilityState.HIGH if f > 1.5 else VolatilityState.LOW if f < 0.8 else VolatilityState.NORMAL
+        s = VolatilityState.EXTREME if f > settings.ZONE_VOL_EXTREME_TH else \
+            VolatilityState.HIGH if f > settings.ZONE_VOL_HIGH_TH else \
+            VolatilityState.LOW if f < settings.ZONE_VOL_LOW_TH else \
+            VolatilityState.NORMAL
         return s, f
 
     def get_current_killzone(self, utc_offset: int = -4) -> Tuple[bool, str]:
@@ -43,12 +47,14 @@ class ZoneProjector:
     def calculate_retracement_zones(self, ih, il, d, vs, cp) -> List[ProjectedZone]:
         zones, ir = [], ih - il
         levels = FIB_LEVELS["aggressive"] if vs == VolatilityState.HIGH else FIB_LEVELS["deep"] if vs == VolatilityState.LOW else FIB_LEVELS["normal"]
-        pb = 0.75 if vs == VolatilityState.HIGH else 0.7 if vs == VolatilityState.LOW else 0.65
+        pb = settings.ZONE_PROB_BASE_HIGH_VOL if vs == VolatilityState.HIGH else \
+             settings.ZONE_PROB_BASE_LOW_VOL if vs == VolatilityState.LOW else \
+             settings.ZONE_PROB_BASE_NORMAL
         for i, fib in enumerate(levels):
             zm = ih - (ir * fib) if d == "BULLISH" else il + (ir * fib)
             zh, zl = zm + ir*0.02, zm - ir*0.02
             act = ("BUY" if zl < cp else "WAIT") if d == "BULLISH" else ("SELL" if zh > cp else "WAIT")
-            zones.append(ProjectedZone(ZoneType.RETRACEMENT, zh, zl, max(0.3, pb - i*0.1), abs(cp - zm)*10, 1.0, vs in [VolatilityState.HIGH, VolatilityState.EXTREME], f"Fib {fib*100:.1f}%", act))
+            zones.append(ProjectedZone(ZoneType.RETRACEMENT, zh, zl, max(0.3, pb - i*0.1), abs(cp - zm)*settings.ZONE_DIST_MULTIPLIER, 1.0, vs in [VolatilityState.HIGH, VolatilityState.EXTREME], f"Fib {fib*100:.1f}%", act))
         return zones
 
     def calculate_expansion_targets(self, ih, il, d, vs, cp) -> List[ProjectedZone]:
@@ -67,9 +73,9 @@ class ZoneProjector:
         try:
             from app.skills.liquidity_detector import detect_order_blocks, detect_fvg, detect_liquidity_pools
             obs = detect_order_blocks(df, 50)
-            for o in obs: zones.append(ProjectedZone(ZoneType.BOUNCE, o.top, o.bottom, 0.7*o.strength, abs(cp-o.midpoint)*10, 1.0, False, f"{o.zone_type} OB", "BUY" if "BULLISH" in o.zone_type else "SELL"))
+            for o in obs: zones.append(ProjectedZone(ZoneType.BOUNCE, o.top, o.bottom, 0.7*o.strength, abs(cp-o.midpoint)*settings.ZONE_DIST_MULTIPLIER, 1.0, False, f"{o.zone_type} OB", "BUY" if "BULLISH" in o.zone_type else "SELL"))
             fvgs = detect_fvg(df, 30)
-            for f in fvgs: zones.append(ProjectedZone(ZoneType.BOUNCE, f["top"], f["bottom"], 0.65, abs(cp-f["midpoint"])*10, 1.0, False, f"{f['type']} FVG", "BUY" if f["type"] == "BULLISH" else "SELL"))
+            for f in fvgs: zones.append(ProjectedZone(ZoneType.BOUNCE, f["top"], f["bottom"], settings.ZONE_FVG_PROB, abs(cp-f["midpoint"])*settings.ZONE_DIST_MULTIPLIER, 1.0, False, f"{f['type']} FVG", "BUY" if f["type"] == "BULLISH" else "SELL"))
             liq = detect_liquidity_pools(df, 50)
             if liq.get("liquidity_above", 0) > 0: zones.append(ProjectedZone(ZoneType.LIQUIDITY, liq["liquidity_above"]*1.001, liq["liquidity_above"]*0.999, 0.6, abs(cp-liq["liquidity_above"])*10, 1.0, True, "Sell-side Liq", "BREAKOUT_LONG"))
             if liq.get("liquidity_below", 0) > 0: zones.append(ProjectedZone(ZoneType.LIQUIDITY, liq["liquidity_below"]*1.001, liq["liquidity_below"]*0.999, 0.6, abs(cp-liq["liquidity_below"])*10, 1.0, True, "Buy-side Liq", "BREAKOUT_SHORT"))
@@ -98,6 +104,8 @@ class ZoneProjector:
         bl = next((z for z in az if z.zone_type == ZoneType.LIQUIDITY), None)
         
         bias = "LONG" if structure == "BULLISH" else "SHORT" if structure == "BEARISH" else "NEUTRAL"
-        conf = 0.5 + (0.15 if in_kz else 0) + (0.1 if vs == VolatilityState.HIGH else 0) + (0.1 if len([z for z in az if z.probability>0.6])>=3 else 0)
+        conf = 0.5 + (settings.ZONE_CONF_KZ_BOOST if in_kz else 0) + \
+               (settings.ZONE_CONF_VOL_BOOST if vs == VolatilityState.HIGH else 0) + \
+               (0.1 if len([z for z in az if z.probability>0.6])>=3 else 0)
         
         return ActionPlan(cp, structure, vs, in_kz, kz_n, it, bz, bl, az[:10], bias, "WAIT", min(1.0, conf), reasoning)

@@ -10,6 +10,7 @@ import asyncio
 from typing import Dict, Any, Optional
 from app.ml.automl.drift_detector import drift_detector
 from app.ml.automl.tuner import automl_tuner
+from app.core.config import settings
 
 logger = logging.getLogger("FEAT.AutoML.Orchestrator")
 
@@ -45,32 +46,49 @@ class AutoMLOrchestrator:
         """
         Orchestrates the full retraining and tuning loop via subprocess.
         Ensures the system remains non-blocking during heavy compute.
+        Uses asyncio.to_thread for compatibility with Windows SelectorEventLoop.
         """
         import sys
+        import subprocess
         
         script_path = settings.AUTOML_TRAIN_SCRIPT_PATH
         logger.info(f"Step 1: Spawning Evolution Subprocess: {script_path}")
         
-        try:
-            # We run the training script in a separate OS process
-            # Note: In production, we might want to pass specific flags
-            # like --epochs or --auto
-            process = await asyncio.create_subprocess_exec(
-                sys.executable, script_path, "--auto",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+        def run_sync():
+            # Use subprocess.run for simplicity when running in a thread
+            return subprocess.run(
+                [sys.executable, script_path, "--auto"],
+                capture_output=True,
+                text=True,
+                check=False
             )
+
+        try:
+            # We run the training script in a separate OS process via a thread
+            # This avoids the NotImplementedError of create_subprocess_exec on Windows SelectorLoop
+            result = await asyncio.to_thread(run_sync)
             
-            logger.info("Step 2: Monitoring Evolution Progress...")
-            stdout, stderr = await process.communicate()
-            
-            if process.returncode == 0:
+            if result.returncode == 0:
                 logger.info("Step 3: Neural Hardening & Model Promotion Complete.")
-                logger.info("Singularity Evolution Succeded. New model weights initialized.")
+                logger.info("Singularity Evolution Succeeded. New model weights initialized.")
+                
+                # Automatically trigger weight reload in the engine
+                try:
+                    from app.core.nexus_engine import engine
+                    if engine and engine.ml_engine:
+                        await engine.ml_engine.reload_weights()
+                        logger.info("🚀 AI Brain synchronized with new Evolution weights.")
+                except ImportError:
+                    logger.debug("Engine not yet initialized for reload.")
+                except Exception as e:
+                    logger.warning(f"Failed to synchronize weights: {e}")
             else:
-                logger.error(f"❌ Evolution Failed (Code {process.returncode}): {stderr.decode()}")
+                logger.error(f"❌ Evolution Failed (Code {result.returncode})")
+                if result.stderr:
+                    logger.error(f"STDOUT: {result.stdout}")
+                    logger.error(f"STDERR: {result.stderr}")
                 
         except Exception as e:
-            logger.error(f"Failed to orchestrate evolution: {e}")
+            logger.error(f"Failed to orchestrate evolution: {str(e)}", exc_info=True)
 
 automl_orchestrator = AutoMLOrchestrator()

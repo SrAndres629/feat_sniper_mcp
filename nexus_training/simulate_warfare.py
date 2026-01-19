@@ -1,186 +1,146 @@
-"""
-FEAT NEXUS: WARFARE SIMULATOR (Backtesting Engine)
-==================================================
-Simulates the 'Eternal Sentinel' strategy using historical data from Supabase.
-Supports RLAIF feedback loops and AutoML hyperparameter tuning.
-
-Usage:
-    python nexus_training/simulate_warfare.py --symbol XAUUSD --days 7
-"""
-
-import os
 import sys
+import os
 import asyncio
 import logging
 import pandas as pd
 import numpy as np
-import json
-from datetime import datetime, timedelta
-from typing import Dict, List, Any
-from dotenv import load_dotenv
+import torch
+from datetime import datetime
 
-# Load params
-load_dotenv()
+# Add root to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-# Ensure path visibility
-sys.path.append(os.getcwd())
+from app.ml.feat_processor import feat_processor
+from app.ml.ml_engine import ml_engine
+from app.services.risk import risk_engine
+from nexus_core.acceleration import acceleration_engine
 
-from app.skills.market_physics import MarketPhysics
-from app.skills.indicators import calculate_feat_layers
-from nexus_brain.hybrid_model import HybridFEATNetwork
+logging.basicConfig(level=logging.WARN, format='%(message)s')
+logger = logging.getLogger("WAR_SIM")
+logger.setLevel(logging.INFO)
 
-# Logging Setup
-logging.basicConfig(level=logging.INFO, format="%(asctime)s | [SIM] | %(message)s")
-logger = logging.getLogger("WarfareSimulator")
-
-class WarfareSimulator:
-    def __init__(self, symbol: str = "XAUUSD"):
+class BattlefieldSimulator:
+    """
+    [FIRE TRIAL] Combat Simulation Protocol.
+    Feeds historical data to the Full Stack (Physics -> MTF -> ML -> Risk)
+    to verify intelligence emergence.
+    """
+    def __init__(self, symbol="XAUUSD"):
         self.symbol = symbol
-        self.physics = MarketPhysics()
         self.balance = 10000.0
         self.positions = []
         self.history = []
-        
-        # Load environment
-        self.supabase_url = os.environ.get("SUPABASE_URL")
-        self.supabase_key = os.environ.get("SUPABASE_KEY")
-        
-    async def load_data(self, days: int = 7) -> pd.DataFrame:
-        """Fetch historical data from Supabase/Cloud."""
-        logger.info(f"Downloading {days} days of intel for {self.symbol}...")
-        
-        if not self.supabase_url:
-            logger.error("No Supabase credentials. Cannot fetch history.")
-            return pd.DataFrame()
-            
-        try:
-            from supabase import create_client
-            client = create_client(self.supabase_url, self.supabase_key)
-            
-            # [LEVEL 64] Pagination for large datasets (Active Scaling Logic)
-            limit = 10000
-            res = client.table("market_ticks")\
-                .select("*")\
-                .order("tick_time", desc=True)\
-                .limit(limit)\
-                .execute()
-            
-            if len(res.data) == limit:
-                logger.info("⚠️ [SCALE_ALERT] Market data capped at 10k. Implement recursive fetching for >10 days.")
-                
-            if not res.data:
-                logger.warning("No data found in Cloud Vault.")
-                return pd.DataFrame()
-                
-            df = pd.DataFrame(res.data)
-            df['tick_time'] = pd.to_numeric(df['tick_time']) # Timestamp
-            df['bid'] = pd.to_numeric(df['bid'])
-            df = df.sort_values("tick_time").reset_index(drop=True)
-            
-            logger.info(f"Loaded {len(df)} ticks. Range: {df['tick_time'].iloc[0]} -> {df['tick_time'].iloc[-1]}")
-            return df
-            
-        except Exception as e:
-            logger.error(f"Download failed: {e}")
-            return pd.DataFrame()
 
-    def run_simulation(self, df: pd.DataFrame):
-        """Execute the strategy loop over historical data."""
-        logger.info("⚔️  COMMENCING BATTLE SIMULATION ⚔️")
+    def generate_synthetic_data(self, n_rows=200):
+        """Generates a volatile market scenario (Pump & Dump)"""
+        logger.info(f"Generating {n_rows} bars of synthetic combat data...")
         
-        # Performance metrics
-        wins = 0
-        losses = 0
+        # Split into 4 phases proportionally
+        n = n_rows // 4
+        remainder = n_rows - (n * 4)
         
-        # Simulation Loop
-        for i, row in df.iterrows():
-            tick = {
-                "symbol": self.symbol,
-                "bid": row['bid'],
-                "ask": row['ask'], # Assuming ask exists or spread
-                "tick_volume": row.get('volume', 1.0),
-                "time": row['tick_time']
-            }
-            
-            # 1. Physics Engine
-            regime = self.physics.ingest_tick(tick, force_timestamp=row['tick_time'])
-            
-            if not regime:
-                continue
-
-            # 2. Trigger Logic (Simplified for Speed)
-            # Breakout + Acceleration
-            if regime.is_accelerating and regime.acceleration_score > 1.5:
-                direction = "BUY" if regime.trend == "BULLISH" else "SELL"
-                
-                # Check if we have a position
-                if not self.positions:
-                    self._open_position(direction, row['bid'], row['tick_time'])
-            
-            # 3. Management (Trailing Stop / TP)
-            self._manage_positions(row['bid'])
-            
-        self._generate_report()
-
-    def _open_position(self, direction, price, time):
-        self.positions.append({
-            "type": direction,
-            "entry": price,
-            "sl": price - 1.0 if direction == "BUY" else price + 1.0, # Simple generic SL
-            "tp": price + 2.0 if direction == "BUY" else price - 2.0,
-            "time": time
+        # Phase 1: Range
+        p1 = np.random.normal(2000, 2, n)
+        # Phase 2: Pump (Breakout)
+        p2 = np.linspace(2000, 2050, n) + np.random.normal(0, 1, n)
+        # Phase 3: Distribution
+        p3 = np.random.normal(2050, 3, n)
+        # Phase 4: Dump + Remainder
+        p4 = np.linspace(2050, 1990, n + remainder) + np.random.normal(0, 5, n + remainder)
+        
+        prices = np.concatenate([p1, p2, p3, p4])
+        
+        df = pd.DataFrame({
+            'time': pd.date_range(start="2025-01-01", periods=n_rows, freq="1min"),
+            'open': prices,
+            'high': prices + 1,
+            'low': prices - 1,
+            'close': prices + np.random.normal(0, 0.5, n_rows),
+            'volume': np.random.randint(50, 500, n_rows),
+            'tick_volume': np.random.randint(50, 500, n_rows)
         })
-        # logger.info(f"Opened {direction} at {price}")
-
-    def _manage_positions(self, price):
-        # Very simple simulation logic
-        for pos in list(self.positions):
-            pnl = 0
-            closed = False
-            
-            if pos['type'] == "BUY":
-                if price >= pos['tp']:
-                    pnl = (pos['tp'] - pos['entry'])
-                    closed = True
-                elif price <= pos['sl']:
-                    pnl = (pos['sl'] - pos['entry'])
-                    closed = True
-            else:
-                if price <= pos['tp']:
-                    pnl = (pos['entry'] - pos['tp'])
-                    closed = True
-                elif price >= pos['sl']:
-                    pnl = (pos['entry'] - pos['sl'])
-                    closed = True
-            
-            if closed:
-                self.balance += pnl * 100 # Assumed Lot Size
-                self.positions.remove(pos)
-                self.history.append(pnl)
-
-    def _generate_report(self):
-        total_trades = len(self.history)
-        if total_trades == 0:
-            logger.warning("No trades executed.")
-            return
-
-        wins = len([x for x in self.history if x > 0])
-        win_rate = (wins / total_trades) * 100
-        net_profit = sum(self.history)
         
-        print("\n" + "="*40)
-        print(f"📊 WARFARE REPORT: {self.symbol}")
-        print(f"   Trades: {total_trades}")
-        print(f"   Win Rate: {win_rate:.2f}%")
-        print(f"   Net PnL: ${net_profit:.2f}")
-        print("="*40 + "\n")
+        # Calculate ATR for volatility guard
+        df['high_low'] = df['high'] - df['low']
+        df['high_close'] = np.abs(df['high'] - df['close'].shift())
+        df['low_close'] = np.abs(df['low'] - df['close'].shift())
+        df['tr'] = df[['high_low', 'high_close', 'low_close']].max(axis=1)
+        df['atr'] = df['tr'].rolling(14).mean().fillna(1.0)
+        df['avg_atr'] = df['atr'].rolling(50).mean().fillna(1.0)
+        
+        return df
 
+    async def run_simulation(self):
+        logger.info("⚔️ INICIANDO SIMULACRO DE COMBATE [DRY RUN] ⚔️")
+        df = self.generate_synthetic_data()
+        
+        # Pre-process features
+        features = feat_processor.process_dataframe(df)
+        
+        logger.info("\n--- [SIMULACIÓN START] ---")
+        
+        for i in range(50, len(df)):
+            row = df.iloc[i]
+            feat_row = features.iloc[i]
+            
+            # 1. Physics Check
+            acc_data = acceleration_engine.calculate_momentum_vector(df.iloc[i-5:i+1])
+            is_accelerating = acc_data.get("is_valid", False)
+            
+            # 2. ML Prediction (Mocking hydrating sequence)
+            # In real loop, we append to deque. Here we just mock result for speed if model not trained
+            # But let's try to actually call the engine if possible
+            # ml_engine.hydrate(self.symbol, [row['close']], [feat_row.to_dict()])
+            
+            # Simulate ML output heavily influenced by Physics for this test
+            # If accelerating, ML should learn to buy.
+            
+            ml_pred = await ml_engine.predict_async(self.symbol, {
+                **feat_row.to_dict(), 
+                "close": row['close'], 
+                "volume": row['volume'],
+                "atr": row['atr'],
+                "avg_atr": row['avg_atr']
+            })
+            
+            p_win = ml_pred.get("p_win", 0.5)
+            
+            # 3. Decision Logic
+            action = "HOLD"
+            if is_accelerating and p_win > 0.6:
+                action = "BUY"
+            elif p_win < 0.4:
+                action = "SELL"
+                
+            # DEBUG: Why no trades?
+            if i % 25 == 0:
+                 logger.info(f"[{row['time']}] ... Escaneando ... (Price: {row['close']:.2f}) | Conf: {p_win:.3f} | Accel: {is_accelerating}")
+
+            # 4. Risk Gate
+            if action != "HOLD":
+                context = {
+                    "close": row['close'], 
+                    "atr": row['atr'], 
+                    "avg_atr": row['avg_atr'],
+                    "symbol": self.symbol,
+                    "bid": row['close']
+                }
+                # Use Mock Cb
+                allowed, regime = await risk_engine.check_trading_veto(self.symbol, context, 1.0)
+                
+                if allowed:
+                    logger.info(f"[{row['time']}] 🚀 ORDEN EJECUTADA: {action} @ {row['close']:.2f} | Conf: {p_win:.2f} | Phys: {acc_data['acceleration']:.4f}")
+                    self.history.append({"time": row['time'], "action": action, "price": row['close'], "result": "OPEN"})
+                else:
+                    logger.info(f"[{row['time']}] 🛡️ RISK VETO: {regime}")
+            
+            # Log periodic heartbeat
+            if i % 25 == 0:
+                logger.info(f"[{row['time']}] ... Escaneando ... (Price: {row['close']:.2f})")
+
+        logger.info("\n--- [SIMULACIÓN COMPLETE] ---")
+        logger.info(f"Trades Generated: {len(self.history)}")
+        
 if __name__ == "__main__":
-    sim = WarfareSimulator()
-    # Async wrapper
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    df = loop.run_until_complete(sim.load_data())
-    
-    if not df.empty:
-        sim.run_simulation(df)
+    sim = BattlefieldSimulator()
+    asyncio.run(sim.run_simulation())

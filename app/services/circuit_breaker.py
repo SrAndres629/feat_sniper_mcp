@@ -6,6 +6,7 @@ from datetime import datetime
 
 import json
 import os
+from app.core.config import settings
 
 logger = logging.getLogger("feat.circuit_breaker")
 
@@ -15,10 +16,10 @@ class PersistedTokenBucket:
     Ensures that rate limits and punishments survive process crashes/restarts.
     """
 
-    def __init__(self, filename="data/rate_limit.json", capacity=10, fill_rate=0.5):
-        self.filename = filename
-        self.capacity = capacity
-        self.fill_rate = fill_rate # tokens per second (0.5 = 1 every 2s)
+    def __init__(self, filename=None, capacity=None, fill_rate=None):
+        self.filename = filename or settings.CB_RATE_LIMIT_FILE
+        self.capacity = capacity or settings.CB_RATE_LIMIT_CAPACITY
+        self.fill_rate = fill_rate or settings.CB_RATE_LIMIT_FILL_RATE # tokens per second
         self.tokens = capacity
         self.last_update = time.time()
         self._load_state()
@@ -76,11 +77,11 @@ class CircuitBreaker:
         self.current_level = 0  # 0: Safe, 1: Defensive, 2: Survival, 3: Shutdown
         self.pause_until: float = 0.0 # Multi-level operational pause
         
-        # [SENIOR FIX] Persisted Rate Limiter
-        self.rate_limiter = PersistedTokenBucket(capacity=20, fill_rate=0.5) # 1 order / 2s
+        # [SENIOR FIX] Persisted Rate Limiter (Now from Settings)
+        self.rate_limiter = PersistedTokenBucket() 
         
-        # Tolerance: 10 minutes of silence = DEATH (Deep Sync Allowance)
-        self.max_latency = 600.0 
+        # Tolerance: Reliability threshold (Now from Settings)
+        self.max_latency = settings.CB_MAX_LATENCY_SEC 
         self.trade_manager: Optional[Any] = None 
         self._daily_opening_balance: Optional[float] = None
 
@@ -140,12 +141,12 @@ class CircuitBreaker:
         elif dd >= settings.CB_LEVEL_2_DD:
             self.current_level = 2
             if self.pause_until == 0:
-                self.pause_until = time.time() + 3600 # 1h Operational Pause
-                logger.critical("🚨 LEVEL 2 DD REACHED: Triggering 1-hour operational pause.")
-            return 0.50  # 50% Lot Size (Visionary Target)
+                self.pause_until = time.time() + settings.CB_LEVEL_2_PAUSE_SEC 
+                logger.critical(f"🚨 LEVEL 2 DD REACHED: Triggering {settings.CB_LEVEL_2_PAUSE_SEC}s operational pause.")
+            return settings.CB_LEVEL_2_LOT_MULT 
         elif dd >= settings.CB_LEVEL_1_DD:
             self.current_level = 1
-            return 0.75  # 75% Lot Size (Visionary Target)
+            return settings.CB_LEVEL_1_LOT_MULT
         
         self.current_level = 0
         return 1.0
@@ -187,8 +188,8 @@ class CircuitBreaker:
         self._consecutive_failures += 1
         logger.warning(f"[CB] Technical failure recorded ({self._consecutive_failures} consecutive)")
         
-        # Trip circuit after 5 consecutive failures
-        if self._consecutive_failures >= 5:
+        # Trip circuit after failures limit reached
+        if self._consecutive_failures >= settings.CB_CONSECUTIVE_FAILURES_LIMIT:
             logger.critical(f"[CB] Too many failures ({self._consecutive_failures}) - triggering protective shutdown")
             asyncio.create_task(self.emergency_shutdown())
 
@@ -223,7 +224,7 @@ class CircuitBreaker:
                          status_msg += f" (PAUSED for {int(self.pause_until - time.time())}s)"
                      logger.warning(status_msg)
 
-                await asyncio.sleep(5.0)  # Check every 5s
+                await asyncio.sleep(settings.CB_MONITOR_INTERVAL_SEC)
         except asyncio.CancelledError:
             logger.info("[CB] Circuit Breaker Disarmed")
 
@@ -239,6 +240,14 @@ class CircuitBreaker:
                 logger.error(f"Emergency Execution Failed: {e}")
         else:
             logger.error("SRE Error: TradeManager not linked! Manual intervention required.")
+
+    def is_ok(self) -> bool:
+        """Returns True if system is healthy enough to trade."""
+        return not self.is_tripped and self.current_level < 3
+
+    def get_last_latency(self) -> float:
+        """Returns time since last tick in ms."""
+        return (time.time() - self.last_tick_time) * 1000
 
 # Singleton Global
 circuit_breaker = CircuitBreaker()

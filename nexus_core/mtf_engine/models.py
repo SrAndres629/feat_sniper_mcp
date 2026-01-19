@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Dict, Any, List
 from enum import Enum
+from app.core.config import settings
 
 # =============================================================================
 # TIMEFRAME DEFINITIONS
@@ -17,17 +18,9 @@ class Timeframe(Enum):
     M5 = "M5"    # 5-Min - Momentum
     M1 = "M1"    # 1-Min - SNIPER EXECUTION
 
-# Weight per timeframe (must sum to 1.0)
-WEIGHTS = {
-    Timeframe.W1: 0.05,
-    Timeframe.D1: 0.10,
-    Timeframe.H4: 0.20,
-    Timeframe.H1: 0.20,
-    Timeframe.M30: 0.10,
-    Timeframe.M15: 0.15,
-    Timeframe.M5: 0.10,
-    Timeframe.M1: 0.10,
-}
+def get_tf_weight(tf: Timeframe) -> float:
+    """Retrieves timeframe weight from centralized settings."""
+    return settings.MTF_WEIGHTS.get(tf.value, 0.0)
 
 # =============================================================================
 # RESULT STRUCTURES (INSTITUTIONAL GRADE)
@@ -95,10 +88,15 @@ class MTFCompositeScore:
     tf_details: Dict[str, TimeframeScore] = field(default_factory=dict)
     reasoning: List[str] = field(default_factory=list)
     
-    # Thresholds (Probabilistic)
-    THRESHOLD_SIGNAL: float = 0.70
-    THRESHOLD_SNIPER: float = 0.85
-    THRESHOLD_SNIPER_TRIGGER: float = 0.80 # M1 Score requisite for override
+    # Thresholds (Now centralized in Settings)
+    @property
+    def THRESHOLD_SIGNAL(self) -> float: return settings.MTF_THRESHOLD_SIGNAL
+
+    @property
+    def THRESHOLD_SNIPER(self) -> float: return settings.MTF_THRESHOLD_SNIPER
+
+    @property
+    def THRESHOLD_SNIPER_TRIGGER(self) -> float: return settings.MTF_THRESHOLD_SNIPER_TRIGGER
     
     @property
     def is_valid_setup(self) -> bool:

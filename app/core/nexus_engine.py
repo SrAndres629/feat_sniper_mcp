@@ -1,9 +1,12 @@
 import asyncio
 import logging
 import time
+import os
 import pandas as pd
 import numpy as np
 import MetaTrader5 as mt5_ref
+import json
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -60,9 +63,17 @@ class NexusEngine:
             from app.sentinels.jitter import JitterSentinel
             from app.sentinels.drift import DriftSentinel
             from app.ml.automl.orchestrator import automl_orchestrator
+            from app.core.mt5_conn import mt5_conn
+
+            # 1. MT5 Connection (THE BRIDGE)
+            logger.info("🔌 Connecting to MetaTrader 5...")
+            if not await mt5_conn.startup():
+                logger.error("❌ Failed to connect to MT5. Check terminal path and credentials.")
+                # We don't raise here to allow the engine to run in shadow/mock mode if needed, 
+                # but for production parity, we log clearly.
 
             self.market_physics = mp
-            self.risk_engine = RiskEngine()
+            self.risk_engine = RiskEngine
             self.structure_engine = structure_engine
             self.ml_engine = MLEngine()
             self.mtf_engine = mtf_engine
@@ -77,8 +88,11 @@ class NexusEngine:
             self.jitter_sentinel = JitterSentinel(self.ml_engine)
             self.drift_sentinel = DriftSentinel(automl_orchestrator)
             
+            # Initialize ZMQ Bridge with Callback
+            await zmq_bridge.start(callback=self.on_market_update)
+            
             # Launch Background Loops
-            self._spawn_task(self.zmq_processing_loop())
+            # self._spawn_task(self.zmq_processing_loop()) # DEPRECATED: Replaced by ZMQ Callback
             self._spawn_task(self.jitter_sentinel.run_loop())
             self._spawn_task(self.drift_sentinel.run_loop())
             self._spawn_task(self.dashboard_heartbeat())
@@ -96,20 +110,11 @@ class NexusEngine:
         task.add_done_callback(self._background_tasks.discard)
 
     async def zmq_processing_loop(self):
-        """Real-Time Market Pulse Ingestion."""
-        logger.info("📡 NexusEngine: ZMQ Bridge Listening...")
+        """Deprecated: Logic moved to on_market_update callback."""
+        logger.info("📡 NexusEngine: ZMQ Bridge Callback Mode Active.")
+        # Minimal keepalive if needed, but logic is now push-based
         while self.running:
-            try:
-                msg = zmq_bridge.check_messages()
-                if msg:
-                    await self.on_market_update(msg)
-                    # Use a very small sleep to yield control but keep latency sub-ms
-                    await asyncio.sleep(0.0001)
-                else:
-                    await asyncio.sleep(0.001)
-            except Exception as e:
-                logger.error(f"ZMQ Processing Error: {e}")
-                await asyncio.sleep(1.0)
+             await asyncio.sleep(1)
 
     async def on_market_update(self, data):
         """Core signal handling logic."""
@@ -184,7 +189,7 @@ class NexusEngine:
                 if "M1" not in candles: return
 
                 # Structural Mapping
-                processed_df = feat_processor.apply_feat_engineering(candles["M1"])
+                processed_df = feat_processor.process_dataframe(candles["M1"])
                 last_row = processed_df.iloc[-1]
                 
                 if self.structure_engine:
@@ -201,7 +206,7 @@ class NexusEngine:
                 prediction = await self.ml_engine.predict_hybrid(input_vec, symbol)
                 
                 # Strategy Convergence
-                from app.ml.convergence import convergence_engine
+                from nexus_core.convergence_engine import convergence_engine
                 cv = convergence_engine.evaluate_convergence(
                     neural_alpha=prediction.get("alpha_multiplier", 1.0),
                     kinetic_coherence=latent_vector.get("kinetic_coherence", 0.0),
@@ -255,21 +260,20 @@ class NexusEngine:
     async def state_export_loop(self):
         while self.running:
             try:
-                acc_info = self.market.get_account_info() if self.market else None
-                positions = self.market.get_positions() if self.market else []
-                from app.services.neural_service import neural_service
-                latest_neural = neural_service.get_latest_state()
+                acc_info = await self.market.get_account_metrics() if self.market else {}
+                # Use self.ml_engine status instead of neural_service
+                latest_neural = self.ml_engine.get_status() if self.ml_engine else {}
                 
                 data = {
                     "account": {
-                        "balance": acc_info.balance if acc_info else 0,
-                        "equity": acc_info.equity if acc_info else 0,
-                        "pnl": acc_info.profit if acc_info else 0,
-                        "margin_level": acc_info.margin_level if acc_info else 0
+                        "balance": float(acc_info.get("balance", 0)),
+                        "equity": float(acc_info.get("equity", 0)),
+                        "pnl": float(acc_info.get("profit", 0)),
+                        "margin_level": float(acc_info.get("margin_level", 0))
                     },
-                    "positions_count": len(positions),
+                    "positions_count": len(self.trade_manager.active_positions) if self.trade_manager else 0,
                     "symbol": "XAUUSD",
-                    "risk_factor": settings.RISK_FACTOR,
+                    "risk_factor": getattr(settings, "RISK_FACTOR", 1.0),
                     "circuit_breaker": {
                         "status": "CLOSED" if circuit_breaker.is_ok() else "TRIPPED",
                         "latency": circuit_breaker.get_last_latency()

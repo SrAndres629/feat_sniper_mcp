@@ -40,23 +40,26 @@ class InferenceEngine:
         latest_state = sequence[-1]
         metrics = feat_processor.compute_latent_vector(pd.Series(latest_state))
         
+        # [v4.1] Tensor Grouping for FeatEncoder
+        # Mapping aligned with 18D latent structure
         feat_input = {
-            "form": torch.tensor([[metrics["skew"], metrics["kurtosis"], metrics["entropy"], 0.0]], dtype=torch.float32).to(self.device),
-            "space": torch.tensor([[metrics["dist_poc"], 0.0, 0.0]], dtype=torch.float32).to(self.device),
-            "accel": torch.tensor([[metrics["energy_z"], metrics["poc_vel"], 0.0]], dtype=torch.float32).to(self.device),
-            "time": torch.tensor([[0.0, 0.0, 1.0, metrics["cycle_prog"]]], dtype=torch.float32).to(self.device),
-            "kinetic": torch.tensor([[metrics.get("kinetic_pattern_id", 0.0), metrics.get("kinetic_coherence", 0.0), metrics.get("layer_alignment", 0.0), metrics.get("dist_bias", 0.0)]], dtype=torch.float32).to(self.device)
+            "form": torch.tensor([[metrics["skew"], metrics["entropy"], metrics["form"], 0.0]], dtype=torch.float32).to(self.device),
+            "space": torch.tensor([[metrics["dist_poc"], metrics["pos_in_va"], metrics["space"]]], dtype=torch.float32).to(self.device),
+            "accel": torch.tensor([[metrics["energy"], metrics["accel"], metrics["kalman_score"]]], dtype=torch.float32).to(self.device),
+            "time": torch.tensor([[metrics["dist_micro"], metrics["dist_struct"], metrics["dist_macro"], metrics["time"]]], dtype=torch.float32).to(self.device),
+            "kinetic": torch.tensor([[metrics["kinetic_pattern_id"], metrics["kinetic_coherence"], metrics["dist_bias"], metrics["layer_alignment"]]], dtype=torch.float32).to(self.device)
         }
         
         # MC Dropout Sampling
         model.train() 
-        p_win_arr, alpha_arr, logits_arr = [], [], []
+        p_win_arr, alpha_arr, logits_arr, vol_arr = [], [], [], []
         
         with torch.no_grad():
             for _ in range(settings.MC_DROPOUT_SAMPLES):
                 outputs = model(x, feat_input=feat_input, force_dropout=True)
                 p_win_arr.append(outputs["p_win"].item())
                 alpha_arr.append(outputs["alpha"].item())
+                vol_arr.append(outputs["volatility"].item())
                 probs = torch.softmax(outputs["logits"], dim=-1)[0]
                 logits_arr.append((probs[2].item() - probs[0].item() + 1.0) / 2.0)
                 
@@ -67,5 +70,6 @@ class InferenceEngine:
             "win_confidence": float(np.mean(p_win_arr)),
             "alpha_multiplier": float(np.mean(alpha_arr)),
             "directional_score": float(np.mean(logits_arr)),
+            "volatility_regime": float(np.mean(vol_arr)),
             "uncertainty": float(np.std(p_win_arr))
         }

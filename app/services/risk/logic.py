@@ -11,21 +11,22 @@ logger = logging.getLogger("Risk.Logic")
 # =============================================================================
 # KELLY CRITERION (SIZING)
 # =============================================================================
-def calculate_damped_kelly(win_prob: float, uncertainty: float, rr_ratio: float = 1.5) -> float:
+def calculate_damped_kelly(win_prob: float, uncertainty: float, rr_ratio: float = None) -> float:
     """[LEVEL 41] Bayesian Damped Kelly (PhD Protocol)."""
-    max_unc = getattr(settings, "MAX_UNCERTAINTY_THRESHOLD", 0.08)
+    rr = rr_ratio if rr_ratio is not None else settings.RISK_BASE_RR_RATIO
+    max_unc = settings.MAX_UNCERTAINTY_THRESHOLD
     if uncertainty > max_unc: return 0.0
-    k_f = (win_prob * (rr_ratio + 1) - 1) / rr_ratio
+    k_f = (win_prob * (rr + 1) - 1) / rr
     if k_f <= 0: return 0.0
-    damping = 0.5 * (1.0 - (uncertainty / max_unc))
+    damping = settings.RISK_DAMPING_FACTOR * (1.0 - (uncertainty / max_unc))
     final_f = k_f * max(0.0, damping)
-    max_risk = (settings.RISK_PER_TRADE_PERCENT / 100.0) if hasattr(settings, "RISK_PER_TRADE_PERCENT") else 0.02
+    max_risk = settings.effective_risk_cap / 100.0
     return min(final_f, max_risk)
 
 def get_neural_allocation(conf: float) -> str:
-    if conf > 0.85: return "SNIPER"
-    if conf > 0.70: return "ASSERTIVE"
-    if conf < 0.60: return "DEFENSIVE"
+    if conf >= settings.NEURAL_SNIPER_TH: return "SNIPER"
+    if conf >= settings.NEURAL_ASSERTIVE_TH: return "ASSERTIVE"
+    if conf < settings.NEURAL_DEFENSIVE_TH: return "DEFENSIVE"
     return "TEPID"
 
 # =============================================================================

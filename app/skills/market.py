@@ -279,3 +279,7 @@ async def get_snapshot(symbol: str, timeframe: str = "M5") -> Dict[str, Any]:
     }
     
     return snapshot
+
+async def cleanup():
+    """Shuts down MT5 connection gracefully."""
+    await mt5_conn.shutdown()

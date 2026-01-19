@@ -17,15 +17,15 @@ class VolatilityGuard:
         self.halt_reason = ""
         self.current_regime = "LAMINAR"
         
-        # [SENIOR ARCHITECTURE] Relative Thresholds
-        self.rel_threshold = 0.05 # 5% of price (Crisis Cap)
-        self.dead_market_threshold = 0.0005 # 0.05% of price (Low Liquidity)
-        self.multiplier = 3.0
+        # [SENIOR ARCHITECTURE] Relative Thresholds (Now from Settings)
+        self.rel_threshold = settings.VOL_HALT_REL_THRESHOLD 
+        self.dead_market_threshold = settings.VOL_DEAD_MARKET_THRESHOLD
+        self.multiplier = settings.VOL_RATIO_MULTIPLIER
         self._atr_memories: Dict[str, deque] = {}
 
     def _get_memory(self, symbol: str) -> deque:
         if symbol not in self._atr_memories:
-            self._atr_memories[symbol] = deque(maxlen=50)
+            self._atr_memories[symbol] = deque(maxlen=settings.VOL_MEMORY_SAMPLES)
         return self._atr_memories[symbol]
         
     def check_market_toxicity(self, market_data: Dict[str, Any]) -> bool:
@@ -76,5 +76,20 @@ class VolatilityGuard:
         if self.check_market_toxicity(market_data):
             return False, self.halt_reason
         return True, "Safe Volatility"
+
+    def get_regime(self, market_data: Dict[str, Any]) -> str:
+        """Determines market flow regime based on volatility and speed."""
+        if self.is_halted:
+            return "TOXIC"
+        
+        atr = market_data.get("atr", 0)
+        avg_atr = market_data.get("avg_atr", 1)
+        
+        if avg_atr == 0: return "NORMAL"
+        
+        ratio = atr / avg_atr
+        if ratio > settings.VOL_TURBULENT_RATIO: return "TURBULENT"
+        if ratio < settings.VOL_LAMINAR_RATIO: return "LAMINAR"
+        return "NORMAL"
 
 volatility_guard = VolatilityGuard()

@@ -37,12 +37,11 @@ class TradeManager:
             logger.warning(f"[WAIT] WARM-UP ACTIVE: Blocking {action}. {int(warmup_remaining)}s remaining.")
             return {"status": "WAITING_FOR_WARMUP", "remaining": int(warmup_remaining)}
         # 0. Check Simulation Mode (Fase 5 Hook)
-        import os
-        import json
-        mode = os.getenv("TRADING_MODE", "SHADOW") # Default to Shadow for Safety
+        mode = settings.TRADING_MODE
         
-        if mode == "SHADOW" or mode == "SIMULATION":
-            ticket = int(time.time() % 100000) # Dummy ticket for shadow
+        if mode == "SHADOW" or mode == "PAPER":
+            import json
+            ticket = int(time.time() % 100000) 
             params['ticket'] = ticket
             params['status'] = f"{mode}_VALID"
             params['timestamp'] = datetime.now().isoformat()
@@ -258,7 +257,9 @@ class TradeManager:
         if atr_profit >= self.exhaustion_atr_threshold:
             if current_l4_slope < 0:
                 # Physics exhaustion detected - Move to Breakeven
-                new_sl = entry_price + (0.0001 if is_buy else -0.0001) # +1 pip
+                # Symbol Agnostic Pip logic: Gold(0.01), Forex(0.0001)
+                pip_val = 0.01 if "XAU" in pos.get("symbol", "") or "JPY" in pos.get("symbol", "") else 0.0001
+                new_sl = entry_price + (pip_val if is_buy else -pip_val) # +1 pip
                 logger.info(f"🛡️ EXHAUSTION EXIT: Ticket {ticket} moving SL to Breakeven (L4_Slope={current_l4_slope:.4f})")
                 await self.modify_position(ticket, sl=new_sl, tp=pos.get("tp", 0))
                 result["status"] = "BREAKEVEN_SET"
@@ -315,3 +316,9 @@ class TradeManager:
         if ticket in self.active_positions:
             del self.active_positions[ticket]
             logger.info(f"🗑️ Position Unregistered: Ticket {ticket}")
+
+    async def cleanup(self):
+        """Cleanup logic for TradeManager."""
+        self.pending_orders.clear()
+        self.active_positions.clear()
+        logger.info("[EXECUTION] TradeManager cleanup complete.")

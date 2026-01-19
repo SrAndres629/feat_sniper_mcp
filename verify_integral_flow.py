@@ -39,7 +39,7 @@ async def verify_integral_flow():
     
     # 2. Phase A: Feature Engineering (Spatio-Temporal Fusion)
     logger.info("Step 2: Engineering Stochastic Features...")
-    processed_df = feat_processor.apply_feat_engineering(df)
+    processed_df = feat_processor.process_dataframe(df)
     last_row = processed_df.iloc[-1]
     
     # 3. Phase B: Neural Latent Adaptation
@@ -53,9 +53,10 @@ async def verify_integral_flow():
     # 4. Phase C: Neural Inference
     logger.info("Step 4: Executing Stochastic Hybrid Inference (MLEngine)...")
     try:
-        # We Mock predicting for a moment if models aren't loaded, or run real if exists
-        brain_score = await ml_engine.predict_hybrid(feature_vector, "XAUUSD")
-        logger.info(f"✅ Neural Output: p_win={brain_score.get('p_win'):.3f}, alpha={brain_score.get('alpha_multiplier'):.3f}")
+        # Pass the full feature map (dict) as expected by predict_async
+        brain_score = await ml_engine.predict_async("XAUUSD", feature_map)
+        print(f"DEBUG: brain_score={brain_score}")
+        logger.info(f"✅ Neural Output: p_win={brain_score.get('p_win', 0):.3f}, alpha={brain_score.get('alpha_multiplier', 1.0):.3f}")
     except Exception as e:
         logger.error(f"❌ Neural Inference Failed: {e}")
         return
@@ -68,6 +69,8 @@ async def verify_integral_flow():
         p_win=brain_score.get("p_win", 0.5),
         uncertainty=brain_score.get("uncertainty", 0.1)
     )
+    
+    print(f"DEBUG: convergence={convergence}")
     
     logger.info("================================================================")
     logger.info("FINAL ARCHITECTURAL SNAPSHOT")

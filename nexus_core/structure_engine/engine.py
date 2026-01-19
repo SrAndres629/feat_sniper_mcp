@@ -20,7 +20,7 @@ class StructureEngine:
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {
             "atr_window": 14,
-            "weights": {"F": 0.35, "E": 0.25, "A": 0.20, "T": 0.20},
+            "weights": settings.STRUCT_WEIGHTS,
         }
         self.mae_recognizer = MAE_Pattern_Recognizer()
         self.reporter = StructureReporter(self)
@@ -51,13 +51,13 @@ class StructureEngine:
         mae = self.mae_recognizer.detect_mae_pattern(df)
 
         f_score = 0.0
-        if mae["phase"] == "EXPANSION": f_score += 0.4
-        if df["bos_bull"].iloc[-1] or df["bos_bear"].iloc[-1]: f_score += 0.3
-        if df["choch_bull"].iloc[-1] or df["choch_bear"].iloc[-1]: f_score += 0.3
+        if mae["phase"] == "EXPANSION": f_score += settings.STRUCT_EXPANSION_SCORE
+        if df["bos_bull"].iloc[-1] or df["bos_bear"].iloc[-1]: f_score += settings.STRUCT_BOS_SCORE
+        if df["choch_bull"].iloc[-1] or df["choch_bear"].iloc[-1]: f_score += settings.STRUCT_CHOCH_SCORE
 
         fvg_bull = (df["low"] > df["high"].shift(2)).iloc[-1]
         fvg_bear = (df["high"] < df["low"].shift(2)).iloc[-1]
-        e_score = 0.5 if (fvg_bull or fvg_bear) else 0.2
+        e_score = settings.STRUCT_FVG_SCORE_HIGH if (fvg_bull or fvg_bear) else settings.STRUCT_FVG_SCORE_LOW
 
         atr = (df["high"] - df["low"]).rolling(14).mean().iloc[-1]
         curr_range = df["high"].iloc[-1] - df["low"].iloc[-1]

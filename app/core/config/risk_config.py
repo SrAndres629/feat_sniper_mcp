@@ -15,4 +15,4 @@ class RiskSettings(BaseModel):
     VOLATILITY_ADAPTIVE_LOTS: bool = True
     ENABLE_CIRCUIT_BREAKER: bool = True
     CB_FAILURE_THRESHOLD: int = 5
-    MAX_UNCERTAINTY_THRESHOLD: float = 0.08
+    CONVERGENCE_MAX_UNCERTAINTY: float = 0.08

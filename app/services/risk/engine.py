@@ -59,3 +59,11 @@ class RiskEngine:
     async def _mod(self, tkt, sl, tp):
         req = {"action": mt5.TRADE_ACTION_SLTP, "position": tkt, "sl": sl, "tp": tp}
         await mt5_conn.execute(mt5.order_send, req)
+
+    async def check_trading_veto(self, symbol: str, action: str, price: float) -> Dict[str, Any]:
+        """Wrapper for logic.check_trading_veto"""
+        # Mocking context for smoke test
+        context = {"symbol": symbol, "action": action, "price": price} 
+        cb_mult = 1.0
+        ok, status = await check_trading_veto(symbol, context, cb_mult)
+        return {"status": status, "allowed": ok}

@@ -33,7 +33,7 @@ class ModelLoader:
                 logger.warning(f"No trained model for {symbol}. Using Untrained Network.")
                 
             model.eval()
-            return {"model": model, "config": {"seq_len": 32}} 
+            return {"model": model, "config": {"seq_len": settings.LSTM_SEQ_LEN}} 
 
         except Exception as e:
             logger.error(f"Hybrid load failed for {symbol}: {e}")

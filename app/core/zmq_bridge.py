@@ -303,6 +303,28 @@ class ZMQBridge:
                 logger.error(f"HUD Update failed: {e}")
                 await asyncio.sleep(5)
 
+    async def check_messages(self, timeout_ms=10):
+        """Deprecated alias: messages are now pushed via callbacks."""
+        return True
+
+    async def _hud_broadcast_loop(self):
+        """Periodically broadcast HUD state."""
+        while self.running:
+             try:
+                hud_data = {
+                    "action": "HUD_UPDATE",
+                    "metrics": {
+                        "regime": self.current_regime,
+                        "confidence": self.current_ai_confidence,
+                        "timestamp": time.time()
+                    }
+                }
+                await self.send_raw(hud_data)
+                await asyncio.sleep(1)
+             except Exception as e:
+                logger.error(f"HUD Update failed: {e}")
+                await asyncio.sleep(5)
+
     def update_hud_state(self, regime: str = None, ai_confidence: float = None):
         """Updates HUD telemetry state for next broadcast."""
         if regime:

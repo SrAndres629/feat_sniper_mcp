@@ -19,6 +19,11 @@ input string   __EXECUTION__     = "";             // --- EXECUTION PROTOCOL ---
 input int      MaxLatencyMs      = 2000;           // Signal Latency Reject (ms)
 input int      MaxSlippage       = 10;             // Max Slippage (Points)
 input bool     StealthMode       = false;          // Stealth Mode (Hide SL/TP)
+
+input string   __NETWORK__      = "";             // --- NETWORK PROTOCOL ---
+input int      ZmqPort_SUB       = 5556;           // ZMQ Subscriber Port (HUD/Commands)
+input int      ZmqPort_PUB       = 5555;           // ZMQ Publisher Port (Ticks/ACKs)
+input int      ExpertMagicNumber = 123456;         // Expert Magic Number
 input bool     Verbose           = true;           // Verbose Logging
 
 // --- GLOBALS ---
@@ -175,24 +180,24 @@ int OnInit()
    g_symbol = _Symbol;
    
    // Setup Trade Lib
-   g_trade.SetExpertMagicNumber(123456);
+   g_trade.SetExpertMagicNumber(ExpertMagicNumber);
    g_trade.SetDeviationInPoints((ulong)MaxSlippage);
    g_trade.SetTypeFilling(ORDER_FILLING_IOC);
    g_trade.SetAsyncMode(true);
    
-   Executor = new CExecutionUnit(&RiskGuard, 123456);
+   Executor = new CExecutionUnit(&RiskGuard, ExpertMagicNumber);
    
    // FORENSIC LOGGING
-   Print(">>> [FORENSIC] STEP 1: RX BRIDGE INIT (Subscriber)...");
-   if(!g_interop.Init(false)) { // Subscriber
+   Print(">>> [FORENSIC] STEP 1: RX BRIDGE INIT (Subscriber)... Port: ", ZmqPort_SUB);
+   if(!g_interop.Init(false, ZmqPort_SUB)) { // Subscriber
       Print("<<< [FORENSIC] FAILURE: RX Bridge Init returned false. Check Journal for ZMQ Error.");
       return(INIT_FAILED);
    }
    Print(">>> [FORENSIC] STEP 1: RX OK.");
    
    // Init TX (Publisher)
-   Print(">>> [FORENSIC] STEP 2: TX BRIDGE INIT (Publisher/PUSH)...");
-   if(!g_tx.Init(true)) { // Publisher
+   Print(">>> [FORENSIC] STEP 2: TX BRIDGE INIT (Publisher/PUSH)... Port: ", ZmqPort_PUB);
+   if(!g_tx.Init(true, ZmqPort_PUB)) { // Publisher
        Print("<<< [FORENSIC] FAILURE: TX Bridge Init returned false. Check Journal for ZMQ Error.");
        return(INIT_FAILED);
    }

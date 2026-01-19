@@ -301,8 +301,8 @@ private:
    bool     m_active;
    
 public:
-   bool Init() {
-      m_active = m_zmq.Init(false);
+   bool Init(int port) {
+      m_active = m_zmq.Init(false, port);
       return m_active;
    }
    
@@ -336,8 +336,8 @@ int OnInit()
    SetIndexBuffer(6, BufferCalc_2, INDICATOR_CALCULATIONS);
    
    // ZMQ
-   if(!Bridge.Init()) {
-      Print("WARNING: Nexus Bridge Failed - Running in OFFLINE mode.");
+   if(!Bridge.Init(InpZMQPort)) {
+      Print("WARNING: Nexus Bridge Failed (Port ", InpZMQPort, ") - Running in OFFLINE mode.");
       // Don't fail - allow indicator to show offline status
    }
    

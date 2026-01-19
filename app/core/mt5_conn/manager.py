@@ -4,6 +4,7 @@ import threading
 import time
 from typing import Any, Callable, Optional, TypeVar
 import anyio
+import os
 
 from app.core.config import settings
 from .utils import mt5, MT5_AVAILABLE, T, obs_engine, tracer
@@ -93,21 +94,52 @@ class MT5Connection:
     def _reconnect_sync(self) -> bool:
         with self._mt5_lock: return self._initialize_mt5()
 
+    def _discover_terminal_path(self) -> Optional[str]:
+        """Attempts to find the MT5 terminal executable in common locations."""
+        if settings.MT5_PATH and os.path.exists(settings.MT5_PATH):
+            return settings.MT5_PATH
+            
+        common_paths = [
+            r"C:\Program Files\MetaTrader 5\terminal64.exe",
+            r"C:\Program Files\LiteFinance MT5 Terminal\terminal64.exe",
+            r"C:\Program Files (x86)\MetaTrader 5\terminal64.exe",
+        ]
+        
+        for path in common_paths:
+            if os.path.exists(path):
+                logger.info(f"📍 Auto-discovered MT5 at: {path}")
+                return path
+        return None
+
     def _initialize_mt5(self) -> bool:
         if not MT5_AVAILABLE: return False
-        params = {"login": int(settings.MT5_LOGIN), "password": settings.MT5_PASSWORD, "server": settings.MT5_SERVER}
-        if settings.MT5_PATH: params["path"] = settings.MT5_PATH
+        
+        path = self._discover_terminal_path()
+        params = {
+            "login": int(settings.MT5_LOGIN) if settings.MT5_LOGIN else None, 
+            "password": settings.MT5_PASSWORD, 
+            "server": settings.MT5_SERVER
+        }
+        if path: params["path"] = path
         params = {k: v for k, v in params.items() if v is not None}
         
-        try: mt5.shutdown()
-        except: pass
+        try: 
+            mt5.shutdown()
+        except: 
+            pass
 
+        logger.info(f"🔄 Initializing MT5 (Server: {settings.MT5_SERVER})...")
         if not mt5.initialize(**params):
-            logger.error(f"MT5 Init Failure: {mt5.last_error()}")
+            err = mt5.last_error()
+            logger.error(f"❌ MT5 Init Failure: {err}")
             return False
 
         account = mt5.account_info()
-        if account: logger.info(f"[STATUS] MT5 OK (Login: {account.login}) | ${account.balance:.2f}")
+        if account: 
+            logger.info(f"✅ MT5 CONNECTED | Account: {account.login} | Balance: ${account.balance:.2f} {account.currency}")
+        else:
+            logger.warning("⚠️ MT5 Started but no account info retrieved. Check login credentials.")
+            
         return True
 
     async def execute(self, func: Callable[..., T], *args, **kwargs) -> T:

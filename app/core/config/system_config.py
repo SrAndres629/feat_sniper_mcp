@@ -20,3 +20,11 @@ class SystemSettings(BaseModel):
     RETRY_BACKOFF_BASE_MS: int = 50
     AUTOML_ENABLED: bool = True
     AUT_EVO_INTERVAL_MINUTES: int = 30
+    AUTOML_CHECK_INTERVAL_MINUTES: int = 60
+    AUTOML_DRIFT_WIN_RATE_THRESHOLD: float = 0.45
+    AUTOML_DRIFT_MIN_TRADES: int = 20
+    AUTOML_TRAIN_SCRIPT_PATH: str = "nexus_training/quick_train.py"
+    WARMUP_PERIOD_SECONDS: int = 60 # 1 Minute Warmup for ZMQ
+    RISK_FACTOR: float = 1.0
+    ACCOUNT_CACHE_TTL: float = 0.5
+    MARKET_DATA_CACHE_TTL: float = 3.0

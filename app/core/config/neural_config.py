@@ -33,3 +33,11 @@ class NeuralSettings(BaseModel):
     MC_DROPOUT_SAMPLES: int = 20
     SPATIAL_BINS: int = 50
     STRUCTURAL_PHASE_MAP: Dict[str, float] = {"RANGE": 0.0, "NORMAL": 0.0, "ACCUMULATION": 0.5, "EXPANSION": 1.0, "MOMENTUM": 0.8}
+    
+    # Training Hyperparameters
+    NEURAL_LEARNING_RATE: float = 0.001
+    NEURAL_WEIGHT_DECAY: float = 1e-4
+    NEURAL_BATCH_SIZE: int = 64
+    NEURAL_EPOCHS: int = 50
+    NEURAL_LOSS_KINETIC_LAMBDA: float = 0.5
+    NEURAL_LOSS_SPATIAL_LAMBDA: float = 0.3

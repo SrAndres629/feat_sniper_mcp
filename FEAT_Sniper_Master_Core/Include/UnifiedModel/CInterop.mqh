@@ -55,7 +55,7 @@ public:
                      CInterop();
                     ~CInterop();
    
-   bool              Init(bool is_publisher);
+   bool              Init(bool is_publisher, int port);
    void              Shutdown();
    bool              Send(string message, bool non_blocking=true);
    string            ReceiveHUD(bool non_blocking=true);
@@ -80,7 +80,7 @@ CInterop::~CInterop()
 //+------------------------------------------------------------------+
 //| Init                                                             |
 //+------------------------------------------------------------------+
-bool CInterop::Init(bool is_publisher)
+bool CInterop::Init(bool is_publisher, int port)
 {
    if(m_connected) Shutdown();
 
@@ -103,19 +103,20 @@ bool CInterop::Init(bool is_publisher)
    uchar endpoint[];
    int rc = 0;
 
+   string addr = StringFormat("tcp://127.0.0.1:%d", port);
+   StringToCharArray(addr, endpoint, 0, WHOLE_ARRAY, CP_UTF8);
+
    if(is_publisher) {
-      StringToCharArray("tcp://127.0.0.1:5555", endpoint, 0, WHOLE_ARRAY, CP_UTF8);
       rc = zmq_connect(m_socket, endpoint);
       if(rc != 0) {
-         Print("<<< [FORENSIC] PUSH CONNECT FAIL (5555). Error: ", zmq_errno());
-         return false;
+          Print("<<< [FORENSIC] PUSH CONNECT FAIL (", port, "). Error: ", zmq_errno());
+          return false;
       }
    } else {
-      StringToCharArray("tcp://127.0.0.1:5556", endpoint, 0, WHOLE_ARRAY, CP_UTF8);
       rc = zmq_connect(m_socket, endpoint);
       
       if(rc != 0) {
-         Print("<<< [FORENSIC] SUB CONNECT FAIL (5556). Error: ", zmq_errno());
+         Print("<<< [FORENSIC] SUB CONNECT FAIL (", port, "). Error: ", zmq_errno());
          return false;
       }
       

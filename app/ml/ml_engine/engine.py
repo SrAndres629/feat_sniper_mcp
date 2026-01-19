@@ -107,9 +107,23 @@ class MLEngine:
             "prediction": "WAIT", "why": reason, "execute_trade": False
         }
     
-    # Backward Compatibility
+    async def reload_weights(self):
+        """Clears the model cache to force a reload from disk on next inference."""
+        logger.info("♻️ MLEngine: Reloading weights for all symbols...")
+        # Clear model cache
+        self.models.clear()
+        self.sequence_buffers.clear()
+        # Optionally perform explicit reload for already hydrated symbols
+        logger.info("✅ MLEngine: Model weights flushed. Will reload on demand.")
+
+    def get_status(self): 
+        return {"v": "2.0", "symbols_registered": list(self.models.keys()), "anomaly_fitted": True}
+
+    # Backward Compatibility & Sentinel Support
     def hydrate_hurst(self, s, p): self.hydrate(s, p, [])
     def hydrate_sequences(self, s, f): self.hydrate(s, [], f)
     async def ensemble_predict_async(self, s, c): return await self.predict_async(s, c)
     async def record_trade_result(self, t, p, s, c): self.replay.record_trade_result(t, p, s, c)
-    def get_status(self): return {"v": "2.0", "symbols_registered": list(self.models.keys()), "anomaly_fitted": True} # Mock status
+    async def check_loop_jitter(self):
+         """Mock method for JitterSentinel health check compatibility."""
+         pass

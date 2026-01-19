@@ -4,6 +4,7 @@ import numpy as np
 from typing import Dict, Any, List
 import MetaTrader5 as mt5
 from app.core.mt5_conn import mt5_conn
+from app.core.config import settings
 
 logger = logging.getLogger("MT5_Bridge.Services.Analytics")
 
@@ -40,7 +41,7 @@ class AnalyticsEngine:
         # Sharpe Ratio (Simulated daily returns)
         avg_ret = np.mean(profits)
         std_ret = np.std(profits)
-        sharpe = (avg_ret / std_ret) * np.sqrt(252) if std_ret > 0 else 0
+        sharpe = (avg_ret / std_ret) * np.sqrt(settings.ANALYTICS_TRADING_DAYS) if std_ret > 0 else 0
 
         return {
             "status": "success",
@@ -52,10 +53,11 @@ class AnalyticsEngine:
         }
 
     @staticmethod
-    async def run_monte_carlo(current_results: List[float], iterations: int = 1000) -> Dict[str, Any]:
+    async def run_monte_carlo(current_results: List[float], iterations: int = None) -> Dict[str, Any]:
         """
         Simulates strategy outcomes by shuffling returns.
         """
+        if iterations is None: iterations = settings.JOURNAL_MONTE_CARLO_ITERATIONS
         if len(current_results) < 5:
             return {"error": "Not enough data for Monte Carlo"}
 

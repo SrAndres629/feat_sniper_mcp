@@ -3,6 +3,7 @@ import pandas as pd
 from typing import Dict, Any
 from .vectors import MomentumVector
 from .features import compute_acceleration_features
+from app.core.config import settings
 
 logger = logging.getLogger("feat.acceleration")
 
@@ -10,17 +11,12 @@ class AccelerationEngine:
     def __init__(self, config: Dict[str, Any] = None):
         print("[Physics] Sigma Monitor ON (Velocity/Acceleration vectors)")
         self.config = config or {
-            "atr_w": 14,
-            "vol_w": 20,
-            "score_th": 0.70,
-            "sigma_th": 3.0, # Alert threshold for sigma
-            "accel_th": 1.5, # Newtonian threshold
-            "weights": {
-                "w1": 0.4, # Displacement
-                "w2": 0.3, # Volume Z-Score
-                "w3": 0.2, # FVG Presence
-                "w4": 0.1  # Velocity
-            }
+            "atr_w": settings.ACCEL_ATR_WINDOW,
+            "vol_w": settings.ACCEL_VOL_WINDOW,
+            "score_th": settings.ACCEL_SCORE_THRESHOLD,
+            "sigma_th": settings.ACCEL_SIGMA_THRESHOLD,
+            "accel_th": settings.ACCEL_NEWTON_THRESHOLD,
+            "weights": settings.ACCEL_WEIGHTS
         }
         self.momentum_v = MomentumVector(threshold=self.config["accel_th"])
 

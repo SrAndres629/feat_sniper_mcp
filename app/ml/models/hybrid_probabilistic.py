@@ -153,13 +153,14 @@ class HybridProbabilistic(nn.Module):
         )
         
         self.head_volatility = nn.Linear(fusion_dim, 1) # Regime
-        self.head_confidence = nn.Linear(fusion_dim, 1) # Probability
+        self.head_confidence = nn.Linear(fusion_dim, 1) # Probability (p_win)
+        self.head_alpha = nn.Linear(fusion_dim, 1) # Excess Return prediction
         
         self.dropout_rate = dropout
         
         # Metadata
         self.metadata = {
-            "version": "4.0.0-DOCTORAL",
+            "version": "4.1.0-DOCTORAL",
             "arch": "Residual-TCN-BiLSTM-PhysicsGated",
             "physics_integration": "Active Gating (Multiplicative)"
         }
@@ -206,5 +207,6 @@ class HybridProbabilistic(nn.Module):
         return {
             "logits": self.head_direction(final_fusion),
             "volatility": torch.sigmoid(self.head_volatility(final_fusion)),
-            "confidence": torch.sigmoid(self.head_confidence(final_fusion))
+            "p_win": torch.sigmoid(self.head_confidence(final_fusion)),
+            "alpha": self.head_alpha(final_fusion)
         }

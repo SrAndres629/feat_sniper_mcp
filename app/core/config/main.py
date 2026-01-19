@@ -6,8 +6,9 @@ from .trading_config import TradingSettings
 from .neural_config import NeuralSettings
 from .risk_config import RiskSettings
 from .system_config import SystemSettings
+from .physics_logic_config import PhysicsLogicSettings
 
-class Settings(BaseSettings, TradingSettings, NeuralSettings, RiskSettings, SystemSettings):
+class Settings(BaseSettings, TradingSettings, NeuralSettings, RiskSettings, SystemSettings, PhysicsLogicSettings):
     """
     Master Configuration (Hybrid Architecture).
     Aggregates all specialized config modules while maintaining a flat API for backward compatibility.

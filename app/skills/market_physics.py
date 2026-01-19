@@ -93,9 +93,15 @@ class MarketPhysics:
         Ingesta de Ticks con cálculo de microestructura.
         """
         try:
-            # 1. Extraction
-            vol = float(data.get('tick_volume', 0.0) or data.get('real_volume', 0.0))
-            price = float(data.get('bid', 0.0) or data.get('close', 0.0))
+            # 1. Extraction with robust null handling
+            tick_vol = data.get('tick_volume')
+            real_vol = data.get('real_volume')
+            vol = float(tick_vol if tick_vol is not None else (real_vol if real_vol is not None else 0.0))
+            
+            bid = data.get('bid')
+            close = data.get('close')
+            price = float(bid if bid is not None else (close if close is not None else 0.0))
+            
             ts = force_timestamp if force_timestamp else datetime.now().timestamp()
             
             # Guard against zero volume/price artifacts

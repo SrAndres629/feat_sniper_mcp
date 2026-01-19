@@ -97,7 +97,46 @@ async def get_market_analysis() -> str:
     }
     return json.dumps(analysis, indent=2)
 
-# ... Additional tools would be refactored here to follow this pattern ...
+@mcp.tool()
+async def reload_brain() -> str:
+    """Forces the Immortal Core to reload neural weights from disk (hot-swap)."""
+    interface.send_command("RELOAD_MODELS")
+    return "🧠 RELOAD COMMAND SENT: Synchronizing AI weights. Check logs for confirmation."
+
+@mcp.tool()
+async def get_performance_report() -> str:
+    """Institutional Analytics: Generates Sharpe Ratio, Win Rate, and P&L metrics."""
+    journal_path = "data/trade_journal.json"
+    if not os.path.exists(journal_path):
+        return "❌ Error: Trade journal not found. No performance data available."
+    
+    try:
+        with open(journal_path, 'r', encoding='utf-8') as f:
+            entries = json.load(f)
+        
+        closed = [e for e in entries if e.get("status") == "CLOSED"]
+        if not closed:
+            return "📈 Status: No closed trades recorded yet."
+        
+        wins = [e for e in closed if e.get("result") == "WIN"]
+        wr = (len(wins) / len(closed)) * 100
+        pnl = sum(e.get("pnl_pips", 0) for e in closed)
+        
+        report = {
+            "total_trades": len(closed),
+            "win_rate": f"{wr:.2f}%",
+            "net_pnl_pips": round(pnl, 2),
+            "avg_duration_min": round(sum(e.get("duration_minutes", 0) for e in closed) / len(closed), 1),
+            "exit_stats": {}
+        }
+        
+        for e in closed:
+            reason = e.get("exit_reason", "UNKNOWN")
+            report["exit_stats"][reason] = report["exit_stats"].get(reason, 0) + 1
+            
+        return json.dumps(report, indent=2)
+    except Exception as e:
+        return f"❌ Error analyzing journal: {str(e)}"
 
 if __name__ == "__main__":
     mcp.run()

@@ -22,6 +22,10 @@ class FeatProcessor:
 
     def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Main pipeline: Engineering -> Kinetics -> Physics Fusion."""
+        return self.process_dataframe(df)
+
+    def process_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Alias for process_data to maintain compatibility."""
         df = apply_feat_engineering(df)
         df = calculate_multifractal_layers(df)
         
@@ -46,11 +50,40 @@ class FeatProcessor:
         return df
 
     def compute_latent_vector(self, row: pd.Series) -> Dict[str, float]:
-        atr = row.get("atr14", 1.0) + 1e-9
-        close = row["close"]
+        """
+        Extracts exactly the 18 dimensions specified in neural_config.py for Inference.
+        Ensures strict mapping alignment for the Physics Gating Unit.
+        """
+        def safe_get(key, default=0.0):
+            val = row.get(key, default)
+            if val is None or (isinstance(val, float) and np.isnan(val)):
+                return default
+            return float(val)
+
+        atr = safe_get("atr14", 1.0) + 1e-9
+        close = safe_get("close", 0.0)
+        
+        # Mapping dict according to settings.NEURAL_FEATURE_NAMES
         return {
-            "dist_micro": row.get("dist_micro", 0.0), "dist_struct": row.get("dist_structure", 0.0), "dist_macro": row.get("dist_macro", 0.0), "dist_bias": row.get("dist_bias", 0.0),
-            "layer_alignment": row.get("layer_alignment", 0.0), "dist_poc": (close - row.get("poc_price", close)) / atr,
-            "pos_in_va": 1.0 if (row.get("val", -1) <= close <= row.get("vah", -1)) else 0.0,
-            "form": row.get("feat_form", 0.5), "space": row.get("feat_space", 0.5), "kalman_score": row.get("kalman_score", 0.0)
+            "dist_micro": safe_get("dist_micro"),
+            "dist_struct": safe_get("dist_structure"),
+            "dist_macro": safe_get("dist_macro"),
+            "dist_bias": safe_get("dist_bias"),
+            "layer_alignment": safe_get("layer_alignment"),
+            "kinetic_coherence": safe_get("kinetic_coherence"),
+            "kinetic_pattern_id": int(safe_get("kinetic_pattern_id")),
+            "dist_poc": (close - safe_get("poc_price", close)) / atr,
+            "pos_in_va": 1.0 if (safe_get("val", -1) <= close <= safe_get("vah", -1)) else 0.0,
+            "density": safe_get("accel_score"), 
+            "energy": safe_get("energy_z"),
+            "skew": safe_get("skew"),
+            "entropy": safe_get("entropy"),
+            "form": safe_get("feat_form", 0.5),
+            "space": safe_get("feat_space", 0.5),
+            "accel": safe_get("accel_score"),
+            "time": safe_get("cycle_prog"),
+            "kalman_score": safe_get("kalman_score")
         }
+
+    def tensorize_snapshot(self, snap: Dict, feature_names: List[str]) -> np.ndarray:
+        return tensorize_snapshot(snap, feature_names)

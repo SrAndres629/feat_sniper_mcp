@@ -99,8 +99,15 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
     model = HybridProbabilistic(input_dim=input_dim, hidden_dim=64, num_classes=3).to(device)
     
     # 3. Loss & Optimizer
-    criterion = ConvergentSingularityLoss(kinetic_lambda=0.5, spatial_lambda=0.3).to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+    criterion = ConvergentSingularityLoss(
+        kinetic_lambda=settings.NEURAL_LOSS_KINETIC_LAMBDA, 
+        spatial_lambda=settings.NEURAL_LOSS_SPATIAL_LAMBDA
+    ).to(device)
+    optimizer = optim.AdamW(
+        model.parameters(), 
+        lr=settings.NEURAL_LEARNING_RATE, 
+        weight_decay=settings.NEURAL_WEIGHT_DECAY
+    )
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=5)
     
     # 4. Training Loop
@@ -338,7 +345,8 @@ if __name__ == "__main__":
             temp_path = "data/temp_real_train.npz"
             np.savez(temp_path, X=X, y=y, physics=phys, static_features=feats)
             
-            train_hybrid_model(args.symbol, temp_path, epochs=args.epochs, batch_size=64)
+            epochs = args.epochs if args.epochs > 0 else settings.NEURAL_EPOCHS
+            train_hybrid_model(args.symbol, temp_path, epochs=epochs, batch_size=settings.NEURAL_BATCH_SIZE)
             
             # Clean up
             if os.path.exists(temp_path):

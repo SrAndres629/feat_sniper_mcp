@@ -46,12 +46,22 @@ class ConvergenceEngine:
             
         # [PHASE 2] Fusion Logic (Bayesian Weighted)
         # Simplified for high-speed SNIPER path
+        # Normalize neural_alpha to [0.5, 1.5] for current lot sizing logic
+        effective_alpha = max(0.5, min(1.5, neural_alpha))
+        
+        # Bayesian likelihood fusion
+        # base_prob is boosted by kinetic coherence if in consensus
         base_prob = p_win * (1.0 + (kinetic_coherence * 0.2))
-        final_score = min(1.0, base_prob * neural_alpha)
+        
+        # Convergence Score: Weighted balance of Probability and Expectancy (Alpha)
+        # Score is centered around 0.5
+        final_score = float(np.clip(base_prob * (effective_alpha / 1.0), 0.0, 1.0))
         
         # [PHASE 3] Directionality
         direction = "BUY" if p_win > 0.5 else "SELL"
         if final_score < self.settings.CONVERGENCE_MIN_SCORE:
+            # Check if reversal conviction is high (Score very low near 0, but usually p_win < 0.5)
+            # For the sniper path, we only trade high-conviction
             direction = "WAIT"
             
         return ConvergenceSignal(
