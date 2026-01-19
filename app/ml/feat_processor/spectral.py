@@ -1,7 +1,7 @@
 
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr, linregress
 from typing import Dict, Any, List
 from nexus_core.physics_engine.spectral.deca_core import DecaCoreEngine
 from nexus_core.physics_engine.spectral.config import ORDERED_SUBLAYERS
@@ -87,8 +87,17 @@ class SpectralTensorBuilder:
         # energy_burst: Raw high-freq kinetic energy
         energy_burst = q_metrics['energy_burst_z']
         
-        # spectral_divergence: Gap between raw price and wavelet trend (Normalized by Axis)
-        spectral_divergence = (price_raw - price_wav) / (sc10 + 1e-9)
+        # spectral_divergence: Slope Divergence (Tactical Judas Swing Detection)
+        # We compare slope of Micro (SC1) vs Macro (SC10) over last 5 periods
+        def get_slope(series):
+            y = series.tail(5).values
+            x = np.arange(len(y))
+            slope, _, _, _, _ = linregress(x, y)
+            return slope
+
+        micro_slope = get_slope(hybrid_matrix["SC_1_NOISE"])
+        macro_slope = get_slope(hybrid_matrix["SC_10_AXIS"])
+        spectral_divergence = micro_slope - macro_slope
 
         return {
             "domino_alignment": float(domino_score),
