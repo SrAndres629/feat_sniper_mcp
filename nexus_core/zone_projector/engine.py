@@ -44,7 +44,7 @@ class ZoneProjector:
         if ms < (atr * 1.2 if not pd.isna(atr) else 0.001): return {"found": False}
         return {"found": True, "direction": "BULLISH" if mc["close"] > mc["open"] else "BEARISH", "high": float(mc["high"]), "low": float(mc["low"]), "size": float(ms), "atr_multiple": float(ms/atr) if atr > 0 else 0}
 
-    def calculate_retracement_zones(self, ih, il, d, vs, cp) -> List[ProjectedZone]:
+    def calculate_retracement_zones(self, ih, il, d, vs, cp, atr: float = 0.0) -> List[ProjectedZone]:
         zones, ir = [], ih - il
         levels = FIB_LEVELS["aggressive"] if vs == VolatilityState.HIGH else FIB_LEVELS["deep"] if vs == VolatilityState.LOW else FIB_LEVELS["normal"]
         pb = settings.ZONE_PROB_BASE_HIGH_VOL if vs == VolatilityState.HIGH else \
@@ -52,18 +52,29 @@ class ZoneProjector:
              settings.ZONE_PROB_BASE_NORMAL
         for i, fib in enumerate(levels):
             zm = ih - (ir * fib) if d == "BULLISH" else il + (ir * fib)
-            zh, zl = zm + ir*0.02, zm - ir*0.02
+            
+            # [PHASE 13] Dynamic Clamping (Trap Hunter Rule)
+            # Offset = min(2% of impulse, 0.75x ATR) to avoid unrealistic zone sizes
+            offset = ir * 0.02
+            if atr > 0: offset = min(offset, atr * 0.75)
+            
+            zh, zl = zm + offset, zm - offset
             act = ("BUY" if zl < cp else "WAIT") if d == "BULLISH" else ("SELL" if zh > cp else "WAIT")
             zones.append(ProjectedZone(ZoneType.RETRACEMENT, zh, zl, max(0.3, pb - i*0.1), abs(cp - zm)*settings.ZONE_DIST_MULTIPLIER, 1.0, vs in [VolatilityState.HIGH, VolatilityState.EXTREME], f"Fib {fib*100:.1f}%", act))
         return zones
 
-    def calculate_expansion_targets(self, ih, il, d, vs, cp) -> List[ProjectedZone]:
+    def calculate_expansion_targets(self, ih, il, d, vs, cp, atr: float = 0.0) -> List[ProjectedZone]:
         zones, ir = [], ih - il
         levels = EXTENSION_LEVELS["aggressive"] if vs in [VolatilityState.HIGH, VolatilityState.EXTREME] else EXTENSION_LEVELS["conservative"] if vs == VolatilityState.LOW else EXTENSION_LEVELS["standard"]
         pb = 0.7 if vs in [VolatilityState.HIGH, VolatilityState.EXTREME] else 0.5 if vs == VolatilityState.LOW else 0.6
         for i, ext in enumerate(levels):
             t = il + (ir * ext) if d == "BULLISH" else ih - (ir * ext)
-            zh, zl = t + ir*0.01, t - ir*0.01
+            
+            # [PHASE 13] Target Clamping
+            offset = ir * 0.01
+            if atr > 0: offset = min(offset, atr * 0.5) # Targets are tighter
+            
+            zh, zl = t + offset, t - offset
             act = ("TAKE_PROFIT" if cp < t else "WAIT") if d == "BULLISH" else ("TAKE_PROFIT" if cp > t else "WAIT")
             zones.append(ProjectedZone(ZoneType.TARGET, zh, zl, max(0.2, pb - i*0.15), abs(cp - t)*10, 1.0, vs in [VolatilityState.HIGH, VolatilityState.EXTREME], f"Fib {ext*100:.1f}% Target", act))
         return zones
@@ -86,13 +97,20 @@ class ZoneProjector:
         vs, vf = self.get_volatility_state(df)
         in_kz, kz_n = self.get_current_killzone()
         imp = self.identify_last_impulse(df)
+        
+        # Calculate context ATR for clamping
+        atr = 0.0
+        if len(df) >= 14:
+            tr = np.maximum(df["high"]-df["low"], np.maximum(abs(df["high"]-df["close"].shift(1)), abs(df["low"]-df["close"].shift(1))))
+            atr = float(tr.rolling(14).mean().iloc[-1])
+
         az, structure, reasoning = [], "RANGING", []
         
         if imp["found"]:
             structure = imp["direction"]
             reasoning.append(f"Last impulse: {structure} ({imp['atr_multiple']:.1f}x ATR)")
-            az.extend(self.calculate_retracement_zones(imp["high"], imp["low"], structure, vs, cp))
-            az.extend(self.calculate_expansion_targets(imp["high"], imp["low"], structure, vs, cp))
+            az.extend(self.calculate_retracement_zones(imp["high"], imp["low"], structure, vs, cp, atr))
+            az.extend(self.calculate_expansion_targets(imp["high"], imp["low"], structure, vs, cp, atr))
         else: reasoning.append("No clear impulse detected")
         
         az.extend(self.get_structure_zones(df, cp))

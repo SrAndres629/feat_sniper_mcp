@@ -20,8 +20,8 @@ class PhysicsLogicSettings(BaseModel):
     MTF_THRESHOLD_SNIPER: float = 0.85
     MTF_THRESHOLD_SIGNAL: float = 0.65
     MTF_WEIGHTS: Dict[str, float] = {
-        "W1": 0.05, "D1": 0.10, "H4": 0.20, "H1": 0.20,
-        "M30": 0.10, "M15": 0.15, "M5": 0.10, "M1": 0.10
+        "W1": 0.0, "D1": 0.0, "H4": 0.10, "H1": 0.20,
+        "M30": 0.0, "M15": 0.0, "M5": 0.30, "M1": 0.40
     }
     MTF_ATR_PROXY_MULTIPLIER: float = 0.001
     MTF_SL_ATR_MULTIPLIER: float = 10.0
