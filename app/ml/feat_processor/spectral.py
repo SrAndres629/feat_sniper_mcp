@@ -26,7 +26,10 @@ class SpectralTensorBuilder:
         
         # 1. QUANTUM PRISM: BINOCULAR PRE-PROCESSING
         # Canal B: Wavelet Price (Pure Trend/Inertia)
-        wavelet_close = self.prism.denoise_trend(raw_close)
+        # Optimization: We only need the latest denoised value for the snapshot
+        # but the hybrid matrix needs a bit of history for the EMAs.
+        # We'll compute a smaller window of wavelet prices (e.g. last 100) instead of full history.
+        wavelet_series = self.prism.denoise_trend(raw_close.iloc[-100:], full_history=True)
         q_metrics = self.prism.get_quantum_tensors(raw_close)
         
         # 2. MATRIX COMPUTATION: HYBRID FUSION
@@ -34,8 +37,8 @@ class SpectralTensorBuilder:
         raw_matrix = self.engine.compute_spectral_matrix(df)
         if raw_matrix.empty: return {}
         
-        df_wav = df.copy()
-        df_wav["close"] = wavelet_close
+        df_wav = df.iloc[-100:].copy()
+        df_wav["close"] = wavelet_series
         wav_matrix = self.engine.compute_spectral_matrix(df_wav)
         
         # Fusion: Micro (Raw) + Macro (Wavelet)
@@ -46,7 +49,7 @@ class SpectralTensorBuilder:
             
         snapshot = self.engine.get_layer_state(hybrid_matrix)
         price_raw = raw_close.iloc[-1]
-        price_wav = wavelet_close.iloc[-1]
+        price_wav = wavelet_series.iloc[-1]
         
         # 3. F - FORMA: DOMINO ALIGNMENT
         values = [snapshot[sc_id] for sc_id in ORDERED_SUBLAYERS]
