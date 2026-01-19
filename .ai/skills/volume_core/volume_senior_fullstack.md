@@ -22,7 +22,9 @@ Tú eres el guardán de la Subasta. Para ti, el precio es solo publicidad; el vo
 3. **Tensor Vision**: Consultas `subskill_volume_tensor.md` para convertir perfiles en vectores para la IA.
 
 ## Inter-Departmental Protocols (CDCP)
-- **Neural Dept**: Provides fixed-size Volume Tensors for CNN1D heads.
+- **Physics Dept**: Syncs `SC10_AXIS` with `KDE_POC` to calculate the Hybrid Bias.
+- **Neural Dept**: Provides High-Fidelity 1D Volume Tensors and Auction Shape Labels.
+- **Synergy Protocol**: Mandatory validation of `elastic_gap` against `Value Area` boundaries.
 - **Physics Dept**: Cross-references "Energy Bursts" with "Volume Value Areas."
 - **QA Dept**: Validates that KDE peaks align with raw POC ticks within 0.01% error.
 

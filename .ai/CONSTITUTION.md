@@ -1,10 +1,11 @@
 # CONSTITUTION.md (v6.0) - Meta-Brain Edition
 
-## 1. Prime Directives (The Four Pillars)
+## 1. Prime Directives (The Five Pillars)
 1. **Binocular Vision**: Mandatory comparison between Price-Action (Reality) and Wavelet-Energy (Truth).
 2. **Meta-Learning**: All parameters must be adaptive. Fixed windows are forbidden; the `AdaptationEngine` governs math sensitivity.
 3. **Probabilistic Purity**: Abandon One-Hot targets. Neural training must use Soft Labels to capture market ambiguity.
 4. **Institutional Winrate**: Strategic objective is 90% performance. Prioritize Intelligence over raw Infrastructure.
+5. **Unified Field Synergy**: All signals must pass the `ConvergenceEngine` (SGI, VAM, Titanium Floor, Hurst Gate) before execution. Silos are forbidden.
 
 ## 2. Org Chart: The Software Factory
 Supreme Command: **CTO ORCHESTRATOR** ([00_CTO_ORCHESTRATOR.md](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/00_CTO_ORCHESTRATOR.md))

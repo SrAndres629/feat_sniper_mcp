@@ -283,6 +283,89 @@ def get_math_engine_stats():
     return {
         "engine": "Numba/JIT",
         "precision": "float64",
-        "accelerated_funcs": ["fast_bin_indices", "bin_volume_fast", "z_score", "kalman_filter"],
-        "version": "1.1.0"
+        "accelerated_funcs": ["fast_bin_indices", "bin_volume_fast", "z_score", "kalman_filter", "kde_jit", "vwema"],
+        "version": "1.2.0"
     }
+
+@njit(cache=True)
+def calculate_vwema(prices: np.ndarray, volumes: np.ndarray, period: int) -> np.ndarray:
+    """
+    Volume-Weighted Exponential Moving Average (VW-EMA).
+    
+    Unlike traditional EMA (time-weighted), VW-EMA weights each bar by its volume.
+    This makes the moving average 'smart to money' - high-volume zones pull the average more.
+    
+    Formula:
+        weight[i] = volume[i] * alpha * (1 - alpha)^(n - i)
+        vwema = sum(price * weight) / sum(weight)
+    
+    Args:
+        prices: Array of close prices.
+        volumes: Array of tick volumes.
+        period: Lookback period for smoothing.
+    
+    Returns:
+        Array of VW-EMA values (same length as input).
+    """
+    n = len(prices)
+    vwema = np.empty(n, dtype=np.float64)
+    
+    if n == 0:
+        return vwema
+    
+    # Alpha for EMA decay
+    alpha = 2.0 / (period + 1.0)
+    
+    # First value is just the price
+    vwema[0] = prices[0]
+    weighted_sum = prices[0] * volumes[0]
+    weight_total = volumes[0]
+    
+    for i in range(1, n):
+        # Decay previous weights
+        weight_total = weight_total * (1.0 - alpha) + volumes[i]
+        weighted_sum = weighted_sum * (1.0 - alpha) + prices[i] * volumes[i]
+        
+        if weight_total > 1e-9:
+            vwema[i] = weighted_sum / weight_total
+        else:
+            vwema[i] = prices[i]
+    
+    return vwema
+
+@njit(cache=True)
+def calculate_confluence_density(price: float, poc: float, ema: float, sigma: float = 1.0) -> float:
+    """
+    Confluence Density (Gaussian Fusion of EMA + PVP).
+    
+    Combines the probability curves of Volume (PVP) and Trend (EMA) supports.
+    If both are close to current price, the density is HIGH -> Titanium Support.
+    
+    Formula:
+        Density = N(price; poc, sigma) + N(price; ema, sigma)
+        where N is the Gaussian probability density function.
+    
+    Args:
+        price: Current market price.
+        poc: Point of Control (Volume Mass Center).
+        ema: Operative EMA value.
+        sigma: Volatility/Spread parameter (default 1.0, should be ATR-based).
+    
+    Returns:
+        Float in range [0, 2]: 0 = No support, 2 = Perfect Titanium overlap.
+    """
+    inv_sqrt_2pi = 0.3989422804014327  # 1 / sqrt(2 * pi)
+    
+    # Gaussian for Volume (PVP)
+    z_poc = (price - poc) / (sigma + 1e-9)
+    density_poc = inv_sqrt_2pi * np.exp(-0.5 * z_poc * z_poc) / sigma
+    
+    # Gaussian for Trend (EMA)
+    z_ema = (price - ema) / (sigma + 1e-9)
+    density_ema = inv_sqrt_2pi * np.exp(-0.5 * z_ema * z_ema) / sigma
+    
+    # Normalize to [0, 2] where 2 = both PVP and EMA at price
+    max_density = inv_sqrt_2pi / sigma  # Maximum possible density for one source
+    total_density = (density_poc + density_ema) / max_density
+    
+    return min(total_density, 2.0)

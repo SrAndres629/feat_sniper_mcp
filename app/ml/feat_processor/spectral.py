@@ -8,6 +8,7 @@ from nexus_core.physics_engine.spectral.config import ORDERED_SUBLAYERS
 from nexus_core.physics_engine.spectral.wavelet_filter import WaveletPrism
 from app.skills.volume_profile import volume_profile
 from nexus_core.adaptation_engine import adaptation_engine
+from nexus_core.convergence_engine import convergence_engine
 
 class SpectralTensorBuilder:
     """
@@ -117,10 +118,35 @@ class SpectralTensorBuilder:
 
         # 7. VOLUME VISION (Operation Liquid Density)
         # Adaptive Resolution: 64 in stable, 96 in dead markets for precision
-        vol_profile = volume_profile.get_profile(df.tail(vol_res), resolution=vol_res)
+        pvp_profile = volume_profile.get_profile(df.tail(vol_res), resolution=vol_res)
         # profile_tensor is normalized 1D (size 64)
-        vol_tensor = vol_profile.get("profile_tensor", np.zeros(64))
-        vol_shape = vol_profile.get("shape", "Neutral")
+        vol_tensor = pvp_profile.get("profile_tensor", np.zeros(64))
+        vol_shape = pvp_profile.get("shape", "Neutral")
+        poc = pvp_profile.get("poc", price_raw)
+
+        # 8. HYBRID SYNERGY (Operation Gravity Binding)
+        # Goal: Verify if Price Energy (Spectral) has Auction Support (Volume)
+        
+        # SGI: Spectral Gravity Index
+        # Uses SC4 (Sniper) to SC6 (Base) as the operative ribbon
+        sgi_score = convergence_engine.calculate_sgi(poc, snapshot)
+        
+        # VAM: Volume-Adjusted Momentum
+        # Using Price Change * Kurtosis (Density)
+        price_change = price_raw - raw_close.iloc[-5] if len(raw_close) > 5 else 0.0
+        kurt = pvp_profile.get("kurtosis", 1.0)
+        vam_purity = convergence_engine.calculate_vam(price_change, kurt)
+        
+        # SVC: Structure-Volume Confluence
+        # Is the price in a 'Solid' zone (High Kurtosis + Near POC)?
+        is_dense = kurt > 3.0
+        is_at_poc = abs(price_raw - poc) < (abs(raw_close.iloc[-1] - raw_close.iloc[-2]) + 1e-9)
+        svc_score = 1.0 if (is_dense and is_at_poc) else 0.0
+
+        # Auction-Physics Divergence (APD):
+        # Distance between current price and Auction Value, normalized by volatility
+        va_range = (pvp_profile['vah'] - pvp_profile['val']) + 1e-9
+        apd = (price_raw - poc) / va_range
 
         return {
             "domino_alignment": float(domino_score),
@@ -134,7 +160,11 @@ class SpectralTensorBuilder:
             "volume_profile_tensor": vol_tensor.tolist() if isinstance(vol_tensor, np.ndarray) else vol_tensor,
             "volume_shape_label": vol_shape,
             "vol_scalar": float(adaptive_config["vol_scalar"]),
-            "wavelet_level": int(adaptive_config["wavelet_level"])
+            "wavelet_level": int(adaptive_config["wavelet_level"]),
+            "sgi_gravity": float(sgi_score),
+            "vam_purity": float(vam_purity),
+            "svc_confluence": float(svc_score),
+            "auction_physics_divergence": float(apd)
         }
 
 # For backward compatibility with previous verification scripts
