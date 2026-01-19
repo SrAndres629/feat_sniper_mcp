@@ -115,7 +115,27 @@ class StructureEngine:
         w = self.config["weights"]
         t_score = 0.5 # Placeholder for Liquidity Time
         
-        raw_feat = (w["F"] * f_score + w["E"] * e_score + w["A"] * a_score + w["T"] * t_score)
+        # [FEAT UPDATE] Calculate Space Quality (E) using EMA Layers
+        # We need to access the computed EMA layers from somewhere. 
+        # Ideally, `FourLayerEMA` should be run and its metrics available.
+        # For now, we'll re-compute locally or assume 'dist_operative' was computed by KineticEngine and passed.
+        # Let's check `df` columns. If 'dist_structure' exists (from KineticEngine), use it.
+        # KineticEngine maps 'structure' to 'operative'.
+        
+        space_quality = 0.5
+        if "dist_structure" in df.columns:
+            # Optimal Space is when Price pulls back to Structure (dist ~ 0)
+            # But we want to reward "Empty Space" for momentum OR "Touch" for entry?
+            # User says: "Espacio Operable: Es la distancia... Cuando toca la Capa 2, llena el espacio."
+            # So, for Entry, Space Quality is High when Distance is Low (Pullback).
+            # But for Momentum, Space is High when Distance is growing.
+            # Let's define Space Quality as "Safe Entry Zone".
+            d_struct = df["dist_structure"].abs()
+            # Reward being close to Structure (0.5 to 2.0 ATR)
+            # 1.0 = Perfect Touch. 0.0 = Far Away (Trap).
+            space_quality = 1.0 / (1.0 + d_struct)
+            
+        raw_feat = (w["F"] * f_score + w["E"] * space_quality + w["A"] * a_score + w["T"] * t_score)
         raw_feat += df["confluence_score"] * 0.2
         
         # 5. Trap Penalty

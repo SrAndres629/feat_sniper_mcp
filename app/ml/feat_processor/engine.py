@@ -14,69 +14,66 @@ from nexus_core.features import feat_features
 
 logger = logging.getLogger("FeatProcessor.Engine")
 
+from nexus_core.kinetic_engine import kinetic_engine
+from app.ml.feat_processor.alpha_tensor import AlphaTensorOrchestrator
+# We use AlphaTensorOrchestrator logic to ensure training matches live logic exactly.
+
 class FeatProcessor:
     def __init__(self, output_dir: str = "data/processed"):
         self.output_dir = output_dir
         os.makedirs(os.path.join(output_dir, "ohlcv_parquet"), exist_ok=True)
         os.makedirs(os.path.join(output_dir, "ticks_jsonl"), exist_ok=True)
+        self.alpha = AlphaTensorOrchestrator() # Use the Master Logic
 
     def process_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """Main pipeline: Engineering -> Kinetics -> Physics Fusion."""
         return self.process_dataframe(df)
 
     def process_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Alias for process_data to maintain compatibility."""
-        # [PHASE 13 - DOCTORAL STRUCTURE INTEGRATION]
-        # Full Institutional Stack (SMC/ICT Architecture)
-        from nexus_core.structure_engine import (
-            identify_fractals, detect_structural_shifts, 
-            detect_imbalances, detect_liquidity_pools, detect_order_blocks
-        )
-        df = identify_fractals(df)
-        df = detect_structural_shifts(df)
-        df = detect_imbalances(df)
-        df = detect_liquidity_pools(df)
-        df = detect_order_blocks(df)
+        """
+        [PHASE 14 - UNIFIED PHYSICS PIPELINE]
+        Now delegates to AlphaTensorOrchestrator to ensure Training == Live Execution.
+        """
+        # We calculate the full Alpha Tensor payload which includes Structure, Chronos, and Physics.
+        # But for 'df' enrichment we need to flatten it back to columns.
         
+        # 1. Run Standard Feature Engineering (Legacy Support + Indicators)
         df = apply_feat_engineering(df)
-        df = calculate_multifractal_layers(df)
         
-        # [LEVEL 35] ZERO-LAG TRACKING
-        close_prices = df["close"].to_numpy()
-        df["kalman_price"] = calculate_kalman_filter(close_prices)
-        df["kalman_deviation"] = (df["close"] - df["kalman_price"]) / (df["kalman_price"] + 1e-9)
-        df["kalman_score"] = np.abs(df["kalman_deviation"]) * 1000.0
+        # 2. Run The Alpha Core (Physics, Structure, Time)
+        # Note: AlphaTensorOrchestrator returns a dict of arrays. We need to assign them to DF.
+        # Ideally, we should use AlphaTensorOrchestrator's internal components directly or map payload back.
         
-        # [LEVEL 41] INSTITUTIONAL PVP
-        pvp = feat_features._compute_pvp_metrics(df)
-        df["poc_price"] = pvp.get("poc_price", df["close"].mean())
-        df["vah"], df["val"] = pvp.get("vah", df["high"].max()), pvp.get("val", df["low"].min())
-        df["energy_score"] = pvp.get("total_volume", 0.0)
+        # Mapping payload back is safest to guarantee 1:1 match.
+        payload = self.alpha.process_dataframe(df)
         
-        # [LEVEL 50 - DOCTORAL TOPOLOGY]
-        atr = (df["high"] - df["low"]).rolling(14).mean().ffill() + 1e-9
+        # Assign Physics Tensors
+        df["physics_force"] = payload.get("physics_force", np.zeros(len(df)))
+        df["physics_energy"] = payload.get("physics_energy", np.zeros(len(df)))
+        df["physics_entropy"] = payload.get("physics_entropy", np.zeros(len(df)))
+        df["physics_viscosity"] = payload.get("physics_viscosity", np.zeros(len(df)))
         
-        # Normalization of Hierarchical Distances (Distance from Price to Level)
-        df["dist_swing_h"] = (df["close"] - df["swing_h"]) / atr
-        df["dist_swing_l"] = (df["close"] - df["swing_l"]) / atr
-        df["dist_internal_h"] = (df["close"] - df["internal_h"]) / atr
-        df["dist_internal_l"] = (df["close"] - df["internal_l"]) / atr
-
-        # [PHASE 13 - INTENT CLASSIFICATION]
-        df["is_protected_h"] = (df["major_h"]) & (df["bos_bear"].rolling(50).any())
-        df["is_protected_l"] = (df["major_l"]) & (df["bos_bull"].rolling(50).any())
+        # Assign Temporal
+        df["temporal_sin"] = payload.get("temporal_sin", np.zeros(len(df)))
+        df["temporal_cos"] = payload.get("temporal_cos", np.zeros(len(df)))
+        df["killzone_intensity"] = payload.get("killzone_intensity", np.zeros(len(df)))
+        df["session_weight"] = payload.get("session_weight", np.zeros(len(df)))
         
-        # Space & Form
-        df["feat_form"] = (df["high"] - df["low"]) / atr
-        vwap = (df["volume"] * (df["high"] + df["low"] + df["close"]) / 3).cumsum() / (df["volume"].cumsum() + 1e-9)
-        df["feat_space"] = (df["close"] - vwap) / atr
+        # Assign Structural
+        df["feat_index"] = payload.get("structural_feat_index", np.zeros(len(df))) * 100.0
+        df["confluence_score"] = payload.get("confluence_tensor", np.zeros(len(df))) * 5.0
+        
+        # Assign Meta
+        df["trap_score"] = payload.get("trap_score", np.zeros(len(df)))
+        
+        # [Residual Legacy for Visualization if needed]
+        df["feat_form"] = (df["high"] - df["low"]) / ((df["high"] - df["low"]).rolling(14).mean() + 1e-9)
         
         return df
 
     def compute_latent_vector(self, row: pd.Series) -> Dict[str, float]:
         """
-        Extracts exactly the 18 dimensions specified in neural_config.py for Inference.
-        Ensures strict mapping alignment for the Physics Gating Unit.
+        Extracts exactly the 12 Physics-Supremacy dimensions specified in neural_config.py.
         """
         def safe_get(key, default=0.0):
             val = row.get(key, default)
@@ -84,30 +81,20 @@ class FeatProcessor:
                 return default
             return float(val)
 
-        atr = safe_get("atr14", 1.0) + 1e-9
-        close = safe_get("close", 0.0)
-        
-        # Mapping dict according to settings.NEURAL_FEATURE_NAMES
-        # [v5.0] SATURATED TOPOLOGIC VECTOR WITH TRAP AWARENESS
+        # Mapping dict according to settings.NEURAL_FEATURE_NAMES (New Constitution)
         return {
-            "dist_micro": safe_get("dist_internal_h"), # Internal Structure
-            "dist_struct": safe_get("dist_swing_h"),   # External Structure
-            "dist_macro": safe_get("dist_swing_l"),    # Anchor Points
-            "dist_bias": safe_get("dist_poc"),         # Gravity Bias
-            "layer_alignment": safe_get("layer_alignment"),
-            "kinetic_coherence": safe_get("kinetic_coherence"),
-            "kinetic_pattern_id": int(safe_get("kinetic_pattern_id")),
-            "dist_poc": safe_get("dist_poc"),
-            "pos_in_va": 1.0 if (safe_get("val", -1) <= close <= safe_get("vah", -1)) else 0.0,
-            "ofi_z": safe_get("ofi_z"),
-            "energy": safe_get("energy_z"),
-            "skew": safe_get("skew"),
-            "entropy": safe_get("entropy"),
-            "form": safe_get("feat_form", 0.5),
-            "space": safe_get("feat_space", 0.5),
-            "accel": safe_get("accel_score"),
-            "range_pos": safe_get("range_pos"),
-            "trap_score": safe_get("trap_score")  # [PREDATORY AWARENESS]
+            "temporal_sin": safe_get("temporal_sin"),
+            "temporal_cos": safe_get("temporal_cos"),
+            "killzone_intensity": safe_get("killzone_intensity"),
+            "session_weight": safe_get("session_weight"),
+            "structural_feat_index": safe_get("feat_index") / 100.0,
+            "confluence_tensor": safe_get("confluence_score") / 5.0,
+            "physics_force": safe_get("physics_force"),
+            "physics_energy": safe_get("physics_energy"),
+            "physics_entropy": safe_get("physics_entropy"),
+            "physics_viscosity": safe_get("physics_viscosity"),
+            "volatility_context": safe_get("volatility_context", 1.0), # Computed in process if mapped, or recomputed here
+            "trap_score": safe_get("trap_score")
         }
 
     def tensorize_snapshot(self, snap: Dict, feature_names: List[str]) -> np.ndarray:

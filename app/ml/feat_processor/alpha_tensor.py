@@ -5,14 +5,13 @@ from nexus_core.structure_engine.engine import StructureEngine
 from app.ml.feat_processor.vectorized_tensor import VectorizedChronosProcessor
 from app.ml.feat_processor.macro import MacroTensorFactory
 
+from nexus_core.kinetic_engine import kinetic_engine
+
 class AlphaTensorOrchestrator:
     """
     [DOCTORAL ALPHA CORE]
     The ultimate feature factory for Probabilistic Neural Networks.
-    Orchestrates the 'Division of Structure' and 'Chronos Core'.
-    
-    Philosophy: The Trading Regime (Scalp/Day/Swing) is an emergent property
-    of Structural Depth (Z-score) and Liquidity Intensity.
+    Orchestrates the 'Division of Structure', 'Chronos Core', and 'Physics Core'.
     """
     
     def __init__(self):
@@ -28,51 +27,69 @@ class AlphaTensorOrchestrator:
         if df.empty: return {}
 
         # 1. TEMPORAL & LIQUIDITY VECTORIZATION
-        # (Sin/Cos Time, Gaussian KillZones, Session Weights)
         df = self.chronos.process(df)
         
         # 2. STRUCTURAL TOPOLOGY (Vectorized SMC)
-        # (BOS Strength, Order Blocks, Breakers, FEAT Index)
         struct_res = self.structure.compute_feat_index(df)
         df = pd.concat([df, struct_res], axis=1)
 
-        # 3. PROBABILISTIC REGIME GATING (Doctoral Logic)
-        # We define P(Mode) based on the structural displacement and volatility
+        # 3. PHYSICS CORE (Vectorized Newton/Thermodynamics)
+        physics_res = kinetic_engine.compute_vectorized_physics(df)
+        df = pd.concat([df, physics_res], axis=1)
+
+        # 4. PROBABILISTIC REGIME GATING (Physics-Driven Heuristic Head)
+        # This simulates the "Neural Output" for the Risk Engine using fundamental laws.
+        # In the future, this is replaced by the actual Model Inference.
+        
         atr = (df["high"] - df["low"]).rolling(14).mean().ffill()
         
-        # P(Scalp): High Frequency, Near-field structural breaks (Small bars relative to ATR)
-        df["p_scalp"] = (df["feat_index"] / 100.0) * (df["killzone_intensity"])
+        # P(Scalp): High Force (F=ma) + High Entropy (Volatility) + Killzone
+        # Logic: Scalping needs violence (Force) and Opportunity (Entropy/Killzone)
+        raw_scalp = (df["feat_force"] * df["killzone_intensity"] * df["physics_entropy"])
+        df["p_scalp"] = raw_scalp.clip(0, 1)
         
-        # P(DayTrade): Mid-range structure + Session alignment
-        df["p_daytrade"] = (df["confluence_score"] / 5.0) * (df["session_weight"] / 1.5)
+        # P(DayTrade): Sustained Energy + Structural Confluence - Viscosity
+        # Logic: Day trading needs clean moves (Low Viscosity) and Structure
+        raw_day = (df["physics_energy"] * df["confluence_score"] * (1 - df["physics_viscosity"]))
+        df["p_daytrade"] = raw_day.clip(0, 1)
         
-        # P(Swing): Deep structural anchors (High Z-Score displacement)
+        # P(Swing): Massive Structural Displacement + Low Entropy (Order) + Macro Alignment
+        # Logic: Swing needs Order (Low Entropy) and major Structural/Macro shifts
         if "struct_displacement_z" in df.columns:
-            df["p_swing"] = (df["struct_displacement_z"].abs() / 3.0).clip(0, 1)
+            # Low Entropy favored for Swing Entry (Accumulation)
+            entropy_factor = 1.0 - df["physics_entropy"]
+            raw_swing = (df["struct_displacement_z"].abs() * entropy_factor)
+            df["p_swing"] = raw_swing.clip(0, 1)
         else:
-            df["p_swing"] = 0.1 # Default low probability
+            df["p_swing"] = 0.1
             
-        # 4. NEURAL NORMALIZATION (Manifold Invariance)
-        # We normalize all structural levels by ATR to ensure the network is 'Price Blind'
-        # but 'Volatility Aware'.
-        
+        # Normalize Probabilities (Softmax-ish)
+        total_p = df["p_scalp"] + df["p_daytrade"] + df["p_swing"] + 1e-9
+        df["p_scalp"] /= total_p
+        df["p_daytrade"] /= total_p
+        df["p_swing"] /= total_p
+            
         # 5. ASSEMBLE TENSOR PAYLOAD (Neural Ready)
+        # Flattened for direct ingestion by MLEngine based on NEURAL_FEATURE_NAMES
         payload = {
-            # --- TEMPORAL LAYER ---
-            "temporal_sin_cos": df[["time_sin", "time_cos"]].values.astype(np.float32),
+            "temporal_sin": df["time_sin"].values.astype(np.float32),
+            "temporal_cos": df["time_cos"].values.astype(np.float32),
             "killzone_intensity": df["killzone_intensity"].values.astype(np.float32),
-            "session_context": df[[f"day_{i}" for i in range(7)] + ["session_weight"]].values.astype(np.float32),
+            "session_weight": df["session_weight"].values.astype(np.float32),
             
-            # --- STRUCTURAL LAYER ---
             "structural_feat_index": df["feat_index"].values.astype(np.float32) / 100.0,
             "confluence_tensor": df["confluence_score"].values.astype(np.float32) / 5.0,
             
-            # --- REGIME PROBABILITY (The Gating) ---
-            "regime_probability": df[["p_scalp", "p_daytrade", "p_swing"]].values.astype(np.float32),
+            "physics_force": df["feat_force"].values.astype(np.float32),
+            "physics_energy": df["physics_energy"].values.astype(np.float32),
+            "physics_entropy": df["physics_entropy"].values.astype(np.float32),
+            "physics_viscosity": df["physics_viscosity"].values.astype(np.float32),
             
-            # --- ADAPTIVE TARGETS (Projected Volatility) ---
-            # Distance to Projected TP/SL in ATR units
-            "volatility_context": (df["close"] / (atr + 1e-9)).values.astype(np.float32)
+            "volatility_context": (df["close"] / (atr + 1e-9)).values.astype(np.float32),
+            "trap_score": df.get("trap_score", pd.Series(0, index=df.index)).values.astype(np.float32),
+            
+            # --- META (Not Input) ---
+            "regime_probability": df[["p_scalp", "p_daytrade", "p_swing"]].values.astype(np.float32)
         }
         
         return payload

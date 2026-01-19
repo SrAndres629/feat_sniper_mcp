@@ -18,16 +18,16 @@ class NeuralSettings(BaseModel):
     LSTM_SEQ_LEN: int = 32
     LSTM_HIDDEN_DIM: int = 64
     LSTM_NUM_LAYERS: int = 2
-    NEURAL_INPUT_DIM: int = 18
+    NEURAL_INPUT_DIM: int = 12
     NEURAL_HIDDEN_DIM: int = 128
     NEURAL_TCN_CHANNELS: int = 64
     NEURAL_NUM_CLASSES: int = 3
     NEURAL_OUTPUT_HEADS: Tuple[str, ...] = ("logits", "p_win", "volatility", "alpha")
     NEURAL_FEATURE_NAMES: Tuple[str, ...] = (
-        "dist_micro", "dist_struct", "dist_macro", "dist_bias", 
-        "layer_alignment", "kinetic_coherence", "kinetic_pattern_id",
-        "dist_poc", "pos_in_va", "ofi_z", "energy", "skew", "entropy",
-        "form", "space", "accel", "range_pos", "trap_score"
+        "temporal_sin", "temporal_cos", "killzone_intensity", "session_weight",
+        "structural_feat_index", "confluence_tensor", 
+        "physics_force", "physics_energy", "physics_entropy", "physics_viscosity",
+        "volatility_context", "trap_score"
     )
     ALPHA_CONFIDENCE_THRESHOLD: float = 0.60
     MC_DROPOUT_SAMPLES: int = 20

@@ -232,10 +232,9 @@ def load_real_data(symbol: str, data_path: str = None, seq_len=60):
 
     # [TOPOLOGICAL NORMALIZATION]
     # Ensure all dist_* columns are correctly ATR-normalized (should be done by processor)
-    seq_cols = [
-        'dist_micro', 'dist_struct', 'dist_macro', 'dist_bias',
-        'volume_z_score', 'ofi_z', 'energy_z', 'accel_score'
-    ]
+    # [TOPOLOGICAL NORMALIZATION]
+    # Ensure all dist_* columns are correctly ATR-normalized (should be done by processor)
+    seq_cols = list(settings.NEURAL_FEATURE_NAMES)
     
     # Validate columns
     for c in seq_cols:

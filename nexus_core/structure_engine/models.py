@@ -27,6 +27,11 @@ class StructuralConfidence:
     mae_confidence: float = 0.0       # 0.0-1.0: MAE pattern valid probability
     layer_alignment: float = 0.0      # 0.0-1.0: EMA layers aligned probability
     
+    # [FEAT TENSORS]
+    space_quality: float = 0.0        # E - Empty Space to Operative Layer
+    time_sync_score: float = 0.0      # T - Fractal Time Alignment (M5/H4)
+    kinetic_elasticity: float = 0.0   # A - Acceleration / Elasticity State
+    
     overall_form_score: float = 0.0   # Weighted combination
     reasoning: List[str] = field(default_factory=list)
     
@@ -37,6 +42,9 @@ class StructuralConfidence:
             "zone_confidence": round(self.zone_confidence, 3),
             "mae_confidence": round(self.mae_confidence, 3),
             "layer_alignment": round(self.layer_alignment, 3),
+            "space_quality": round(self.space_quality, 3),
+            "time_sync_score": round(self.time_sync_score, 3),
+            "kinetic_elasticity": round(self.kinetic_elasticity, 3),
             "overall_form_score": round(self.overall_form_score, 3),
             "reasoning": self.reasoning
         }

@@ -88,6 +88,135 @@ class KineticValidator:
             
         return {"state": "MONITORING", "progress": candles_passed, "feat_force": 0.0}
 
+class SpectralMechanics:
+    """
+    [LEVEL 51] SPECTRAL TENSOR ENCODING
+    Translates visual 'Color Gradients' into Neural Tensors.
+    """
+    def __init__(self):
+        # 🟥 GRUPO 1: MICRO-INTENCIÓN
+        self.sub_1 = [1, 2, 3]
+        self.sub_2 = [6, 7, 8, 9]
+        self.sub_3 = [12, 13, 14]
+        
+        # 🟨 GRUPO 2: OPERATIVA / AGUA
+        self.sub_4 = [16, 24, 32]
+        self.sub_5 = [48, 64, 96]
+        self.sub_6 = [128, 160, 192, 224]
+        
+        # 🟩 GRUPO 3: MACRO / MURO
+        self.sub_7 = [256, 320, 384]
+        self.sub_8 = [448, 512, 640]
+        self.sub_9 = [768, 896, 1024, 1280]
+        
+        # ⬛ GRUPO 4: SESGO / ROCA
+        self.sub_10 = [2048]
+
+    def compute_group_integrity(self, emas: List[float]) -> float:
+        """
+        Calculates Gradient Integrity.
+        +1.0: Perfect Bullish (Fast > Slow)
+        -1.0: Perfect Bearish (Fast < Slow)
+        0.0: Disordered (Choppy)
+        """
+        if len(emas) < 2: return 0.0
+        
+        bull_pairs = 0
+        bear_pairs = 0
+        total_pairs = len(emas) - 1
+        
+        for i in range(total_pairs):
+            if emas[i] > emas[i+1]:
+                bull_pairs += 1
+            elif emas[i] < emas[i+1]:
+                bear_pairs += 1
+                
+        # Normalize
+        if bull_pairs == total_pairs: return 1.0
+        if bear_pairs == total_pairs: return -1.0
+        
+        # Partial Score
+        return (bull_pairs - bear_pairs) / total_pairs
+
+    def compute_chromatic_divergence(self, emas: List[float], atr: float) -> float:
+        """
+        Calculates the width of the spectral band (Chromatic Divergence).
+        """
+        if not emas: return 0.0
+        width = max(emas) - min(emas)
+        return width / (atr + 1e-9)
+
+    def analyze_spectrum(self, close_series: pd.Series, atr: float = 1.0) -> Dict[str, float]:
+        """
+        Computes the Integrity Tensor for all 10 layers.
+        """
+        metrics = {}
+        
+        # Helper to get EMA values (last point)
+        def get_emas(periods):
+            vals = []
+            for p in periods:
+                vals.append(close_series.ewm(span=p, adjust=False).mean().iloc[-1])
+            return vals
+
+        # 1. MICRO INTEGRITY (Sub 1, 2, 3)
+        s1 = get_emas(self.sub_1)
+        s2 = get_emas(self.sub_2)
+        s3 = get_emas(self.sub_3)
+        
+        int_s1 = self.compute_group_integrity(s1)
+        int_s2 = self.compute_group_integrity(s2)
+        int_s3 = self.compute_group_integrity(s3)
+        
+        metrics["integrity_sub1"] = int_s1
+        metrics["integrity_sub2"] = int_s2
+        metrics["integrity_sub3"] = int_s3
+        
+        # Global Micro Integrity
+        metrics["integrity_micro"] = (int_s1 * 0.5) + (int_s2 * 0.3) + (int_s3 * 0.2)
+        div_m = self.compute_chromatic_divergence(s1 + s2 + s3, atr)
+        metrics["micro_spectrum"] = metrics["integrity_micro"] * div_m
+        
+        # 2. OPERATIVE INTEGRITY (Sub 4, 5, 6)
+        s4 = get_emas(self.sub_4)
+        s5 = get_emas(self.sub_5)
+        s6 = get_emas(self.sub_6)
+        
+        int_s4 = self.compute_group_integrity(s4)
+        int_s5 = self.compute_group_integrity(s5)
+        int_s6 = self.compute_group_integrity(s6)
+        
+        metrics["integrity_sub4"] = int_s4
+        metrics["integrity_sub5"] = int_s5
+        metrics["integrity_sub6"] = int_s6
+        
+        metrics["integrity_structure"] = (int_s4 * 0.4 + int_s5 * 0.4 + int_s6 * 0.2)
+        div_o = self.compute_chromatic_divergence(s4 + s5 + s6, atr)
+        metrics["operative_spectrum"] = metrics["integrity_structure"] * div_o
+                                          
+        # 3. MACRO INTEGRITY (Sub 7, 8, 9)
+        s7 = get_emas(self.sub_7)
+        s8 = get_emas(self.sub_8)
+        s9 = get_emas(self.sub_9)
+        
+        int_s7 = self.compute_group_integrity(s7)
+        int_s8 = self.compute_group_integrity(s8)
+        int_s9 = self.compute_group_integrity(s9)
+        
+        metrics["integrity_sub7"] = int_s7
+        metrics["integrity_sub8"] = int_s8
+        metrics["integrity_sub9"] = int_s9
+
+        metrics["integrity_macro"] = (int_s7 + int_s8 + int_s9) / 3.0
+        div_M = self.compute_chromatic_divergence(s7 + s8 + s9, atr)
+        metrics["macro_spectrum"] = metrics["integrity_macro"] * div_M
+
+        # 4. BIAS (Sub 10)
+        s10 = get_emas(self.sub_10)
+        metrics["bias_level"] = s10[0]
+                                      
+        return metrics
+
 class KineticEngine:
     """
     [LEVEL 48] MULTIFRACTAL KINETIC ENGINE
@@ -109,6 +238,7 @@ class KineticEngine:
         
         # [DOCTORAL]
         self.validator = KineticValidator()
+        self.spectral = SpectralMechanics()
 
     def compute_kinetic_state(self, df: pd.DataFrame) -> Dict[str, float]:
         """
@@ -136,6 +266,8 @@ class KineticEngine:
         # --- 1. CLOUD METRICS (Micro, Structure, Macro) ---
         for layer_name, periods in self.layers.items():
             ema_values = []
+            
+
             
             # Compute all EMAs for this layer
             # [OPTIMIZATION] We need last 3 points for Acceleration (2nd Derivative)
@@ -282,6 +414,44 @@ class KineticEngine:
             metrics["rvol"] = 0.0
         
         # --- 3. INTER-LAYER RELATIONSHIPS (The "Change in Relation") ---
+        # [ELASTICITY PROTOCOL]
+        # 1. Fractal Alignment Index (-1.0 to 1.0)
+        # Measures how ordered the layers are.
+        # +1 = Perfect Bullish Stack (Micro > Struct > Macro)
+        # -1 = Perfect Bearish Stack (Micro < Struct < Macro)
+        # 0 = Chaos / Entanglement
+        
+        c_micro = centroids["micro"]
+        c_struct = centroids["structure"]
+        c_macro = centroids["macro"]
+        
+        # Bullish Score
+        bull_score = 0.0
+        if c_micro > c_struct: bull_score += 0.5
+        if c_struct > c_macro: bull_score += 0.5
+        
+        # Bearish Score
+        bear_score = 0.0
+        if c_micro < c_struct: bear_score += 0.5
+        if c_struct < c_macro: bear_score += 0.5
+        
+        metrics["fractal_alignment_index"] = bull_score - bear_score
+        
+        # 2. Compression Ratio (0.0 to 1.0)
+        # 1.0 = Max Compression (Layers are touching/flat) -> Potential Energy High
+        # 0.0 = Max Expansion (Layers far apart) -> Kinetic Energy High
+        
+        # Width of the ribbon
+        ribbon_width = max(c_micro, c_struct, c_macro) - min(c_micro, c_struct, c_macro)
+        normalized_width = ribbon_width / (atr + 1e-9)
+        
+        # We use a Sigmoid-like decay. Historic width ~ 5-10 ATR is expanded. < 1 ATR is compressed.
+        # This formula yields high values when width is small.
+        metrics["compression_ratio"] = 1.0 / (1.0 + (normalized_width / 2.0))
+        
+        # 3. Elastic Strain (Hooke's Law)
+        # Distance of Price from Macro Centroid (The Mean)
+        metrics["elastic_strain"] = (price - c_macro) / (atr + 1e-9)
         
         # A. Micro vs Structure (Intent vs Reality)
         metrics["delta_micro_struct"] = (centroids["micro"] - centroids["structure"]) / atr
@@ -299,6 +469,10 @@ class KineticEngine:
         metrics["centroid_micro"] = centroids["micro"]
         metrics["centroid_struct"] = centroids["structure"]
         metrics["centroid_macro"] = centroids["macro"]
+        # [SPECTRAL INTEGRATION]
+        # Calculate Color Gradient Integrity
+        spec_metrics = self.spectral.analyze_spectrum(df["close"], atr=atr)
+        metrics.update(spec_metrics)
         metrics["bias_level"] = bias_val
 
         return metrics
