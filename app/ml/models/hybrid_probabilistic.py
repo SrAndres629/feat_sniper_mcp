@@ -72,37 +72,39 @@ class TemporalBlock(nn.Module):
         res = x if self.downsample is None else self.downsample(x)
         return self.relu(out + res) # Residual Addition
 
-class PhysicsGatingUnit(nn.Module):
+class MicrostructureGatingUnit(nn.Module):
     """
-    [DOCTORAL INNOVATION]
-    Modulates Neural Features based on Microstructure Entropy.
-    
-    Formula:
-        Gate = Sigmoid( W_p * Physics_Tensor + b_p )
-        Output = Neural_Features * Gate
-        
-    If Physics indicates high risk (e.g., Vacuum), the Gate closes (approaches 0),
-    suppressing the Neural Signal and defaulting to uncertainty.
+    [PHASE 13 - DOCTORAL EVOLUTION]
+    Replaces simple gating with Cross-Attention between Neural context and Physics state.
+    Allows the model to 'attend' to specific physical risks (e.g. illiquidity) 
+    before committing to a prediction.
     """
     def __init__(self, feature_dim, physics_dim=4):
-        super(PhysicsGatingUnit, self).__init__()
-        # Physics Tensor: [OFI_Z, Illiquidity, Impact_Pressure, Kinetic_En]
-        self.gate_fc = nn.Linear(physics_dim, feature_dim)
+        super(MicrostructureGatingUnit, self).__init__()
+        self.query = nn.Linear(feature_dim, feature_dim)
+        self.key = nn.Linear(physics_dim, feature_dim)
+        self.value = nn.Linear(physics_dim, feature_dim)
+        self.scale = feature_dim ** 0.5
         self.ln = nn.LayerNorm(feature_dim)
         
     def forward(self, neural_features, physics_tensor):
-        # neural_features: (Batch, Hidden)
-        # physics_tensor: (Batch, Physics_Dim)
+        if physics_tensor is None: return neural_features
         
-        if physics_tensor is None:
-            return neural_features # Open gate if no physics data
-            
-        gate_signal = torch.sigmoid(self.gate_fc(physics_tensor))
-        return self.ln(neural_features * gate_signal)
+        # Cross-Attention: Neural Query, Physics Key/Value
+        q = self.query(neural_features).unsqueeze(1) # (B, 1, D)
+        k = self.key(physics_tensor).unsqueeze(1)    # (B, 1, D)
+        v = self.value(physics_tensor).unsqueeze(1)  # (B, 1, D)
+        
+        attn = torch.bmm(q, k.transpose(1, 2)) / self.scale
+        attn_weights = F.softmax(attn, dim=-1)
+        
+        gated_context = torch.bmm(attn_weights, v).squeeze(1)
+        return self.ln(neural_features + gated_context) # Residual gating
 
 class HybridProbabilistic(nn.Module):
     """
-    [v4.0-DOCTORAL] The 'Cortex' of the System.
+    [v5.0-DOCTORAL IMPACT] The 'Immortal Cortex'.
+    Upgraded with Aleatoric Uncertainty and Cross-Attention Gating.
     """
     def __init__(self, input_dim=None, hidden_dim=128, num_classes=3, dropout=0.2):
         super(HybridProbabilistic, self).__init__()
@@ -111,14 +113,14 @@ class HybridProbabilistic(nn.Module):
         self.tcn_channels = settings.NEURAL_TCN_CHANNELS
         self.hidden_dim = hidden_dim
         
-        # 1. TCN Encoder (Temporal Features)
+        # 1. TCN Encoder (Temporal Stability)
         self.tcn = nn.Sequential(
             TemporalBlock(self.input_dim, self.tcn_channels, 3, 1, 1, 2, dropout),
             TemporalBlock(self.tcn_channels, self.tcn_channels, 3, 1, 2, 4, dropout),
             TemporalBlock(self.tcn_channels, self.tcn_channels, 3, 1, 4, 8, dropout)
         )
         
-        # 2. Bi-LSTM (Sequence Modeling)
+        # 2. Bi-LSTM (State Persistence)
         self.lstm = nn.LSTM(
             input_size=self.tcn_channels,
             hidden_size=hidden_dim,
@@ -127,50 +129,42 @@ class HybridProbabilistic(nn.Module):
             bidirectional=True,
             dropout=dropout
         )
-        # LSTM output is 2 * hidden_dim
         
-        # 3. Attention Mechanism (Weighted Importance)
+        # 3. Attention Mechanism
         self.attention = nn.Linear(hidden_dim * 2, 1)
         
-        # 4. Latent Encoders (Microstructure)
-        # We integrate the FEAT Encoder for spatial/form metrics
+        # 4. Latent Encoders
         from app.ml.models.feat_encoder import FeatEncoder
         self.feat_encoder = FeatEncoder(output_dim=32)
         
-        # 5. Physics Gating Unit
-        # Fuses the LSTM Context with Hard Physics Metrics
-        self.physics_gate = PhysicsGatingUnit(feature_dim=hidden_dim*2, physics_dim=4)
+        # 5. [v5.0] Microstructure Gating Unit (Cross-Attention)
+        self.physics_gate = MicrostructureGatingUnit(feature_dim=hidden_dim*2, physics_dim=4)
         
-        # 6. Heads
-        fusion_dim = (hidden_dim * 2) + 32  # LSTM_Gated + Latent_State
+        # 6. Heads with Aleatoric Uncertainty
+        fusion_dim = (hidden_dim * 2) + 32
         
+        # Directional Head
         self.head_direction = nn.Sequential(
             nn.Linear(fusion_dim, 64),
-            nn.ReLU(),
+            nn.LeakyReLU(0.1),
             nn.LayerNorm(64),
-            nn.Dropout(dropout),
             nn.Linear(64, num_classes)
         )
         
-        self.head_volatility = nn.Linear(fusion_dim, 1) # Regime
-        self.head_confidence = nn.Linear(fusion_dim, 1) # Probability (p_win)
-        self.head_alpha = nn.Linear(fusion_dim, 1) # Excess Return prediction
+        # [v5.0] Probability and Uncertainty Heads
+        self.head_p_win = nn.Linear(fusion_dim, 1)
+        self.head_log_var = nn.Linear(fusion_dim, 1) # Aleatoric Uncertainty (Neural Fear)
+        self.head_alpha = nn.Linear(fusion_dim, 1)
         
         self.dropout_rate = dropout
         
-        # Metadata
         self.metadata = {
-            "version": "4.1.0-DOCTORAL",
-            "arch": "Residual-TCN-BiLSTM-PhysicsGated",
-            "physics_integration": "Active Gating (Multiplicative)"
+            "version": "5.0.0-DOCTORAL-UNIFORM",
+            "arch": "Bayesian-TCN-BiLSTM-CrossPhysics",
+            "uncertainty": "Aleatoric (Log-Variance)"
         }
 
     def forward(self, x, feat_input=None, physics_tensor=None, force_dropout=False):
-        """
-        x: (Batch, Seq, Features)
-        feat_input: Dict from FeatEncoder
-        physics_tensor: (Batch, 4) [OFI, Illiq, Impact, Kinetic]
-        """
         # 1. TCN
         x_tcn = x.permute(0, 2, 1) # (N, C, L)
         x_tcn = self.tcn(x_tcn)
@@ -178,24 +172,22 @@ class HybridProbabilistic(nn.Module):
         
         # 2. LSTM
         x_lstm = x_tcn.permute(0, 2, 1) # (N, L, C)
-        lstm_out, _ = self.lstm(x_lstm) # (N, L, 2*H)
+        lstm_out, _ = self.lstm(x_lstm)
         
         # 3. Attention
         attn_weights = F.softmax(self.attention(lstm_out), dim=1)
-        context = (lstm_out * attn_weights).sum(dim=1) # (N, 2*H)
+        context = (lstm_out * attn_weights).sum(dim=1)
         
-        # 4. Physics Gating (The "Doctoral" Step)
-        # Modulate the context vector based on physical risk
-        if physics_tensor is not None:
-            context = self.physics_gate(context, physics_tensor)
+        # 4. [v5.0] Cross-Attention Physics Gating
+        context = self.physics_gate(context, physics_tensor)
             
         # 5. Latent Fusion
         if feat_input is not None:
              z_feat = self.feat_encoder(
-                feat_input["form"], 
-                feat_input["space"], 
-                feat_input["accel"], 
-                feat_input["time"],
+                feat_input["form"] if "form" in feat_input else torch.zeros(x.size(0), 4).to(x.device), 
+                feat_input["space"] if "space" in feat_input else torch.zeros(x.size(0), 3).to(x.device), 
+                feat_input["accel"] if "accel" in feat_input else torch.zeros(x.size(0), 3).to(x.device), 
+                feat_input["time"] if "time" in feat_input else torch.zeros(x.size(0), 4).to(x.device),
                 feat_input.get("kinetic")
             )
         else:
@@ -204,9 +196,14 @@ class HybridProbabilistic(nn.Module):
         final_fusion = torch.cat([context, z_feat], dim=1)
         
         # 6. Outputs
+        p_win = torch.sigmoid(self.head_p_win(final_fusion))
+        log_var = self.head_log_var(final_fusion) # Log-variance for stability
+        uncertainty = torch.exp(log_var)          # Real Uncertainty [Epistemic proxy]
+        
         return {
             "logits": self.head_direction(final_fusion),
-            "volatility": torch.sigmoid(self.head_volatility(final_fusion)),
-            "p_win": torch.sigmoid(self.head_confidence(final_fusion)),
+            "p_win": p_win,
+            "uncertainty": uncertainty,
+            "log_var": log_var,
             "alpha": self.head_alpha(final_fusion)
         }

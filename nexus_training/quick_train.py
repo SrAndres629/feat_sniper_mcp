@@ -56,21 +56,24 @@ def quick_train_brain(symbol="XAUUSD"):
         "form": [], "space": [], "accel": [], "time": [], "kinetic": []
     }
     
-    # Labeling Logic: Future Return in next 5 bars
-    for i in range(seq_len, len(df) - 5):
-        # Time-series Sequence (LSTM/TCN)
+    # [v5.0 - DOCTORAL] Triple Barrier Labeling Logic
+    # 0: SELL (Hits SL first or extreme down), 1: HOLD (Horizontal/No hit), 2: BUY (Hits TP first)
+    horizon = 20 # Max bars to wait
+    tp_mult = 1.5 
+    sl_mult = 1.0
+    
+    for i in range(seq_len, len(df) - horizon):
+        # Build Sequence
         seq_window = df.iloc[i-seq_len:i][feat_cols].values
         X_list.append(torch.tensor(seq_window, dtype=torch.float32))
         
-        # Latest State (Latent Encoder)
+        # Latent Metrics
         row = df.iloc[i]
         metrics = feat_processor.compute_latent_vector(row)
-        
-        # Grouping exactly as app/ml/ml_engine/inference.py:45
         feat_inputs_list["form"].append([metrics["skew"], metrics["entropy"], metrics["form"], 0.0])
         feat_inputs_list["space"].append([metrics["dist_poc"], metrics["pos_in_va"], metrics["space"]])
-        feat_inputs_list["accel"].append([metrics["energy"], metrics["accel"], metrics["kalman_score"]])
-        feat_inputs_list["time"].append([metrics["dist_micro"], metrics["dist_struct"], metrics["dist_macro"], metrics["time"]])
+        feat_inputs_list["accel"].append([metrics["energy"], metrics.get("accel", 0.0), metrics.get("kalman_score", 0.0)])
+        feat_inputs_list["time"].append([metrics.get("dist_micro", 0.0), metrics.get("dist_struct", 0.0), metrics.get("dist_macro", 0.0), metrics["time"]])
         feat_inputs_list["kinetic"].append([
             metrics["kinetic_pattern_id"], 
             metrics["kinetic_coherence"], 
@@ -78,39 +81,42 @@ def quick_train_brain(symbol="XAUUSD"):
             metrics["layer_alignment"]
         ])
         
-        # Target: 0:SELL, 1:HOLD, 2:BUY
-        future_ret = (df.iloc[i+5]['close'] - df.iloc[i]['close']) / df.iloc[i]['close']
-        if future_ret > 0.0015: label = 2
-        elif future_ret < -0.0015: label = 0
-        else: label = 1
+        # TRIPLE BARRIER LOGIC
+        price_start = df.iloc[i]['close']
+        atr = df.iloc[i].get('atr_accel', price_start * 0.001)
+        up_barrier = price_start + (atr * tp_mult)
+        dn_barrier = price_start - (atr * sl_mult)
+        
+        label = 1 # Default HOLD
+        for j in range(1, horizon):
+            curr_p = df.iloc[i+j]['close']
+            if curr_p >= up_barrier:
+                label = 2
+                break
+            elif curr_p <= dn_barrier:
+                label = 0
+                break
         y_list.append(label)
         
     X_tensor = torch.stack(X_list)
     Y_tensor = torch.tensor(y_list, dtype=torch.long)
-    
-    # Stack sub-features
     F_inputs = {k: torch.tensor(v, dtype=torch.float32) for k, v in feat_inputs_list.items()}
     
-    # 4. Initialize Model
+    # 4. Initialize Model v5.0
     model = HybridProbabilistic(
         input_dim=len(feat_cols),
         hidden_dim=settings.NEURAL_HIDDEN_DIM,
         num_classes=3
     )
     
-    # 5. Training Loop
-    optimizer = torch.optim.AdamW(
-        model.parameters(), 
-        lr=settings.NEURAL_LEARNING_RATE, 
-        weight_decay=settings.NEURAL_WEIGHT_DECAY
-    )
-    criterion = torch.nn.CrossEntropyLoss()
+    # 5. Training Loop with Uncertainty Loss
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5)
+    criterion = torch.nn.CrossEntropyLoss(reduction='none') # For weighting
     
-    logger.info("🚀 Initiating Neural Convergence Loop...")
+    logger.info("🚀 Initiating Bayesian Neural Convergence Loop...")
     model.train()
-    
-    batch_size = settings.NEURAL_BATCH_SIZE
-    epochs = settings.NEURAL_EPOCHS
+    batch_size = 64
+    epochs = 20
     
     for epoch in range(epochs):
         epoch_loss = 0
@@ -122,17 +128,22 @@ def quick_train_brain(symbol="XAUUSD"):
             optimizer.zero_grad()
             out = model(batch_X, feat_input=batch_F)
             
-            # Loss Components
-            loss_dir = criterion(out["logits"], batch_Y)
-            # Confidence calibration: Should target 1.0 for the correct class, 0.5 otherwise?
-            # Simpler: MSE between p_win and 1.0 for trades, 0.5 for holds
-            target_p = torch.where(batch_Y != 1, 0.8, 0.5) # Soft targets
-            loss_conf = torch.mean((out["p_win"].squeeze() - target_p)**2)
+            # [v5.0] ALEATORIC LOSS (Uncertainty Weighting)
+            # Loss = (1 / 2*exp(log_var)) * Base_Loss + 0.5 * log_var
+            base_loss = criterion(out["logits"], batch_Y)
+            log_var = out["log_var"].squeeze()
             
-            loss = loss_dir + 0.5 * loss_conf
-            loss.backward()
+            # Weighting the loss by predicted uncertainty
+            weighted_loss = torch.mean(torch.exp(-log_var) * base_loss + 0.5 * log_var)
+            
+            # Auxiliary Confidence Loss (MSE between p_win and reality)
+            reality_p = (batch_Y != 1).float()
+            conf_loss = F.mse_loss(out["p_win"].squeeze(), reality_p)
+            
+            total_loss = weighted_loss + 0.2 * conf_loss
+            total_loss.backward()
             optimizer.step()
-            epoch_loss += loss.item()
+            epoch_loss += total_loss.item()
             
         if epoch % 5 == 0:
             logger.info(f"Epoch {epoch}/{epochs} | Loss: {epoch_loss/(len(X_tensor)/batch_size):.4f}")
