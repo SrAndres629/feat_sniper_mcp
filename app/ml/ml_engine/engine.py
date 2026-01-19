@@ -87,11 +87,25 @@ class MLEngine:
                 self.seq_len_map.get(symbol, 32)
             )
             
+            # [PHASE 13 - PHYSICS VETO & HUMILITY]
+            # 1. Epistemic Gating (Rule 6: Epistemic Humility)
+            if res["uncertainty"] > settings.CONVERGENCE_MAX_UNCERTAINTY:
+                logger.warning(f"⚠️ HIGH UNCERTAINTY on {symbol} ({res['uncertainty']:.2f}). Trade Vetoed.")
+                return self._neutral(symbol, "HIGH_UNCERTAINTY")
+
+            # 2. Physics Validation (Rule 1: Physics Veto)
             if PHYSICS_AVAILABLE:
                 regime = market_physics.ingest_tick({"close": features.get("close"), "tick_volume": features.get("volume")})
-                if regime and res["p_win"] > 0.6 and not regime.is_accelerating:
-                     res["p_win"] -= 0.1
-                     res["why"] = "Physics Penalty"
+                # Check for Directional Divergence
+                # (Neural says Long, but Logic/Structure says Down)
+                is_long = res["directional_score"] > 0.6
+                is_short = res["directional_score"] < 0.4
+                
+                # Simple Physics Veto Logic: If Energy is too low, or regime is toxic
+                if regime and res["p_win"] > 0.6:
+                    if not regime.is_accelerating and regime.velocity < 2.0:
+                         logger.info(f"🛡️ PHYSICS VETO: Insufficient Momentum on {symbol}.")
+                         return self._neutral(symbol, "PHYSICS_MOMENTUM_VETO")
             
             res["symbol"] = symbol
             return res

@@ -41,3 +41,5 @@
 - [Skill Factory (Auto-Evolution)](file:///.ai/skills/skill_factory.md)
 - [Cortex Architect (Neural Memory)](file:///.ai/skills/cortex_architect.md)
 - [Verificator Sentinel (Integrity)](file:///.ai/skills/verificator_sentinel.md)
+- [Structure Philosopher (SMC)](file:///.ai/skills/structure_philosopher.md)
+- [Manifold Mathematician (Topology)](file:///.ai/skills/manifold_mathematician.md)

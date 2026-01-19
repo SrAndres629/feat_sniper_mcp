@@ -178,185 +178,158 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
 
     logger.info("✅ Training Complete.")
 
-def load_real_data(symbol: str, db_path: str = "data/market_data.db", seq_len=60, limit=50000):
+def load_real_data(symbol: str, data_path: str = None, seq_len=60):
     """
-    [LEVEL 50] Ingests Real Market Data from SQLite for The Great Retraining.
-    Performs on-the-fly Tensorization and Feature Extraction.
+    [v5.0 - SMC DOCTORAL] Ingests and Hydrates data with full Institutional Structure.
+    Supports Parquet (preferred) or SQLite.
     """
-    import sqlite3
-    
-    if not os.path.exists(db_path):
-        logger.error(f"❌ Database not found: {db_path}")
-        return None, None, None, None
+    if data_path and data_path.endswith(".parquet"):
+        logger.info(f"📂 Loading Parquet Data: {data_path}")
+        df = pd.read_parquet(data_path)
+        # Ensure timestamp index
+        if 'time' in df.columns:
+            df['time'] = pd.to_datetime(df['time'])
+            df.set_index('time', inplace=True)
+    else:
+        # Fallback to DB (Legacy)
+        import sqlite3
+        db_path = "data/market_data.db"
+        if not os.path.exists(db_path):
+            logger.error(f"❌ Database not found: {db_path}")
+            return None, None, None, None
+        conn = sqlite3.connect(db_path)
+        query = f"SELECT * FROM market_data WHERE symbol = '{symbol}' ORDER BY tick_time ASC"
+        df = pd.read_sql_query(query, conn)
+        conn.close()
+        if 'tick_time' in df.columns:
+            df['tick_time'] = pd.to_datetime(df['tick_time'])
+            df.set_index('tick_time', inplace=True)
 
-    logger.info(f"🔌 Connecting to {db_path} for {symbol}...")
-    
-    conn = sqlite3.connect(db_path)
-    # Fetch only labeled data
-    query = f"""
-        SELECT * FROM market_data 
-        WHERE symbol = '{symbol}' 
-        AND label IS NOT NULL 
-        ORDER BY tick_time ASC
-    """
-    df = pd.read_sql_query(query, conn)
-    conn.close()
-    
     if df.empty:
-        logger.error("❌ No labeled data found in DB. Run DataCollector first.")
+        logger.error("❌ No data found.")
         return None, None, None, None
-        
-    # [ROBUSTNESS] Ensure DatetimeIndex for Feat/Structure Engines
-    if 'tick_time' in df.columns:
-        df['tick_time'] = pd.to_datetime(df['tick_time'], format='ISO8601', errors='coerce')
-        df = df.dropna(subset=['tick_time']) # Drop invalid dates
-        df = df.set_index('tick_time').sort_index()
-        # [CRITICAL] Drop duplicate indices to avoid 'Ambiguous Truth Value' in feature engineering
-        df = df[~df.index.duplicated(keep='first')]
 
-    logger.info(f"✅ Loaded {len(df)} labeled samples. Regenerating Features via Sensor Fusion...")
+    # [v5.0] DEEP STRUCTURAL HYDRATION
+    # We must call the Structure Engine and FeatProcessor singletons to fill the NEW columns
+    from app.ml.feat_processor.engine import FeatProcessor
+    processor = FeatProcessor()
     
-    # [LEVEL 50] RE-HYDRATE FEATURES
-    # We use the latest FeatProcessor to ensure the data matches current logic exactly.
-    # This fills: layer_alignment, kinetic_pattern_id, dist_micro, etc.
-    from app.ml.feat_processor import feat_processor
+    logger.info("🧪 Hydrating Structural Narrative (SMC Stack)...")
+    df = processor.process_dataframe(df)
     
-    # Ensure DF has specific columns expected by feat_processor (lowercase)
-    # DB columns are usually correct.
-    # feat_processor expects 'close', 'high', 'low', 'volume'
-    
-    # Run the full pipeline
-    try:
-        df = feat_processor.apply_feat_engineering(df)
-        logger.info("✅ Feature Engineering Complete.")
-    except Exception as e:
-        import traceback
-        logger.error(f"⚠️ Feature Engineering Failed: {e}")
-        logger.error(traceback.format_exc())
-        # Fallback to existing columns
-    
-    # [FEATURE ENGINEERING]
-    # 1. Normalize/Preprocess
-    # Log Returns for Stationarity check (already in FeatProcessor)
-    # Vol Norm handled by FeatProcessor (volume_z_score)
-    
-    # 2. Select Sequence Features (Dynamic TCN Channels)
-    # [LEVEL 64 UPDATE] Using Z-SCORE features for Neural Vision 2.0
-    # [PHYSICS v3.0] Adding Force and Efficiency metrics
+    # [LABELING] Apply Triple Barrier if labels are missing
+    if 'label' not in df.columns:
+        from nexus_training.labeling import label_dataset_triple_barrier
+        logger.info("🏷️ Labeling data with Triple Barrier protocol...")
+        prices = df['close'].values
+        # Label every bar (sliding window target)
+        indices = np.arange(len(df))
+        # pt/sl roughly 2*ATR
+        atr = (df["high"] - df["low"]).rolling(14).mean().iloc[-1]
+        df['label'] = label_dataset_triple_barrier(prices, indices, pt=atr*2/prices[-1], sl=atr*2/prices[-1], h=100)
+        # Map -1,0,1 to 0,1,2 (Classes)
+        df['label'] = df['label'].map({-1.0: 0, 0.0: 1, 1.0: 2})
+
+    # [TOPOLOGICAL NORMALIZATION]
+    # Ensure all dist_* columns are correctly ATR-normalized (should be done by processor)
     seq_cols = [
-        'log_ret', 'volume_z_score', 'price_z_score', 
-        'dist_micro', 'dist_struct', 'dist_macro',
-        'physics_force', 'flow_efficiency'
+        'dist_micro', 'dist_struct', 'dist_macro', 'dist_bias',
+        'volume_z_score', 'ofi_z', 'energy_z', 'accel_score'
     ]
-
     
-    # If columns missing (e.g. from KineticEngine), fill 0
+    # Validate columns
     for c in seq_cols:
-        if c not in df.columns: 
-            # Fallback for older db snapshots
-            if c == 'volume_z_score': df[c] = (df['volume'] - df['volume'].rolling(50).mean()) / (df['volume'].rolling(50).std() + 1e-9)
-            elif c == 'price_z_score': df[c] = (df['close'] - df['close'].rolling(50).mean()) / (df['close'].rolling(50).std() + 1e-9)
-            else: df[c] = 0.0
+        if c not in df.columns: df[c] = 0.0
     
-    # Fill Nans (Critical for training)
     df[seq_cols] = df[seq_cols].fillna(0.0)
 
-            
-    # 3. Create Sliding Windows (X) and Targets (y)
-    sequences = []
-    labels = []
-    physics_vals = []
-    
-    # Static Features Bags
+    sequences, labels, physics_vals = [], [], []
     static_feats = {
         "form": [], "space": [], "accel": [], "time": [], "kinetic": []
     }
     
+    # Pre-calculate data for loop speed
     data_values = df[seq_cols].values
     label_values = df['label'].values
     
-    # Kinetic Columns existing in DF (from FeatProcessor)
-    # micro_compression, micro_slope, layer_alignment, bias_slope
-    
+    logger.info(f"🌀 Generating {len(df)-seq_len} sliding windows...")
     for i in range(seq_len, len(df)):
-        # X: Window [i-seq_len : i]
-        seq = data_values[i-seq_len : i] # (60, Channels)
+        sequences.append(data_values[i-seq_len : i])
+        labels.append(int(label_values[i]))
+        physics_vals.append(0.0) # To be used for Physics-Aware loss if needed
         
-        # y: Target at i
-        target = int(label_values[i])
-        
-        sequences.append(seq)
-        labels.append(target)
-        physics_vals.append(0.0)
-        
-        # Static Features (Current State at i)
         row = df.iloc[i]
         
-        # Kinetic Tensor Construction
-        # Uses regenerated accurate features
-        k_vec = [
-            row.get('micro_compression', 0), 
-            row.get('micro_slope', 0), 
-            row.get('layer_alignment', 0), # Now populated!
-            row.get('bias_slope', 0)
-        ]
-        static_feats["kinetic"].append(k_vec)
-        
-        # Context placeholders (Expanded for Sniper Mode H4 Context)
-        # Form Vector: [Entropy, H4_Bias_Dist, 0, 0]
-        static_feats["form"].append([
-            row.get('entropy_proxy', 0), 
-            row.get('dist_bias', 0), # <--- [SNIPER] Inject H4 Context (Bias Distance)
-            0, 0
+        # [v5.0] SATURATING STATIC BAGS WITH TOPOLOGY
+        # 1. Kinetic: Structural Stability & Gaps
+        static_feats["kinetic"].append([
+            row.get('struct_age', 0), 
+            row.get('fvg_bull', 0) - row.get('fvg_bear', 0),
+            row.get('layer_alignment', 0),
+            row.get('is_inducement', 0)
         ])
-        static_feats["space"].append([row.get('dist_poc_norm',0), 0,0])
-        static_feats["accel"].append([row.get('energy_z_score',0), 0,0])
-        static_feats["time"].append([0,0,0,0])
+        
+        # 2. Form: Range Maturity & Premium/Discount
+        static_feats["form"].append([
+            row.get('range_pos', 0.5), # 0.0 to 1.0
+            row.get('in_discount', 0),
+            row.get('in_premium', 0),
+            row.get('feat_form', 0)
+        ])
+        
+        # 3. Space: Liquidity Gravity
+        static_feats["space"].append([
+            row.get('is_eqh', 0) or row.get('is_eql', 0),
+            row.get('test_count', 0),
+            row.get('is_mitigated', 0)
+        ])
+        
+        # 4. Accel: Order Flow Aggression (OFI)
+        static_feats["accel"].append([
+            row.get('ofi_z', 0),
+            row.get('energy_z', 0),
+            row.get('accel_score', 0)
+        ])
+        
+        # 5. Time: Session Weights
+        static_feats["time"].append([
+            row.get('session_weight', 0),
+            1.0 if row.get('session_type') == 'NY_OPEN' else 0,
+            1.0 if row.get('session_type') == 'LONDON' else 0,
+            0
+        ])
 
-    # Convert to Arrays
-    X = np.array(sequences) # (N, 60, C)
+    X = np.array(sequences) 
     y = np.array(labels)
     phys = np.array(physics_vals)
     
     for k in static_feats:
         static_feats[k] = np.array(static_feats[k])
         
-    # [CRITICAL] Transpose X for TCN: (N, L, C) -> (N, C, L) if model expects C first?
-    # Model HybridProbabilistic permutes internally: x.permute(0, 2, 1). 
-    # So we provide (N, Seq, Chan). Matches 'sequences' shape.
-    
     return X, y, phys, static_feats
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--symbol", type=str, default="SYNTHETIC_TEST")
-    parser.add_argument("--real", action="store_true", help="Use Real DB Data")
-    parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--symbol", type=str, default="XAUUSD")
+    parser.add_argument("--data_path", type=str, default=None, help="Path to Parquet data")
+    parser.add_argument("--real", action="store_true", help="Use Real Data Pipeline")
+    parser.add_argument("--epochs", type=int, default=settings.NEURAL_EPOCHS)
     args = parser.parse_args()
     
-    if args.real:
+    if args.real or args.data_path:
         print(f"🧬 INITIATING GREAT RETRAINING PROTOCOL FOR {args.symbol}...")
-        X, y, phys, feats = load_real_data(args.symbol, limit=None)
+        X, y, phys, feats = load_real_data(args.symbol, data_path=args.data_path)
         
         if X is not None:
-            # Save temporary npz to reuse existing function or modify train function?
-            # Existing train_hybrid_model loads from path. Let's patch it or save temp.
             temp_path = "data/temp_real_train.npz"
             np.savez(temp_path, X=X, y=y, physics=phys, static_features=feats)
             
-            epochs = args.epochs if args.epochs > 0 else settings.NEURAL_EPOCHS
-            train_hybrid_model(args.symbol, temp_path, epochs=epochs, batch_size=settings.NEURAL_BATCH_SIZE)
+            train_hybrid_model(args.symbol, temp_path, epochs=args.epochs, batch_size=settings.NEURAL_BATCH_SIZE)
             
-            # Clean up
             if os.path.exists(temp_path):
                os.remove(temp_path)
             print("🚀 RETRAINING COMPLETE. SYSTEM UPGRADED.")
     else:
-        # Legacy Smoke Test
-        fake_data = "data/synthetic_convergence.npz"
-        if os.path.exists(fake_data):
-            print("🧪 RUNNING CONVERGENCE PIPELINE SMOKE TEST...")
-            train_hybrid_model("SYNTHETIC_TEST", fake_data, epochs=5, batch_size=32)
-        else:
-            print("⚠️ Synthetic data not found. Run generate_synthetic_convergence.py first.")
+        print("🧪 RUNNING CONVERGENCE PIPELINE SMOKE TEST...")
+        # ...

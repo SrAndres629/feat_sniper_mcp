@@ -50,26 +50,34 @@ class InferenceEngine:
             "kinetic": torch.tensor([[metrics["kinetic_pattern_id"], metrics["kinetic_coherence"], metrics["dist_bias"], metrics["layer_alignment"]]], dtype=torch.float32).to(self.device)
         }
         
-        # MC Dropout Sampling
+        # MC Dropout Sampling (Bayesian Fusion v5.0)
         model.train() 
-        p_win_arr, alpha_arr, logits_arr, vol_arr = [], [], [], []
+        p_win_arr, alpha_arr, logits_arr, aleatoric_arr = [], [], [], []
         
         with torch.no_grad():
             for _ in range(settings.MC_DROPOUT_SAMPLES):
                 outputs = model(x, feat_input=feat_input, force_dropout=True)
                 p_win_arr.append(outputs["p_win"].item())
                 alpha_arr.append(outputs["alpha"].item())
-                vol_arr.append(outputs["volatility"].item())
+                # Capture the model's self-predicted uncertainty
+                aleatoric_arr.append(outputs["uncertainty"].item())
+                
                 probs = torch.softmax(outputs["logits"], dim=-1)[0]
                 logits_arr.append((probs[2].item() - probs[0].item() + 1.0) / 2.0)
                 
         model.eval()
+        
+        # Calculate Hierarchical Uncertainty
+        epistemic_unc = float(np.std(p_win_arr)) # Uncertainty due to model parameters
+        aleatoric_unc = float(np.mean(aleatoric_arr)) # Uncertainty due to market noise
+        total_uncertainty = (epistemic_unc + aleatoric_unc) / 2.0
         
         return {
             "p_win": float(np.mean(p_win_arr)),
             "win_confidence": float(np.mean(p_win_arr)),
             "alpha_multiplier": float(np.mean(alpha_arr)),
             "directional_score": float(np.mean(logits_arr)),
-            "volatility_regime": float(np.mean(vol_arr)),
-            "uncertainty": float(np.std(p_win_arr))
+            "uncertainty": total_uncertainty,
+            "epistemic_unc": epistemic_unc,
+            "aleatoric_unc": aleatoric_unc
         }

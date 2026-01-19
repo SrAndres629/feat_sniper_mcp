@@ -26,6 +26,18 @@ class FeatProcessor:
 
     def process_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Alias for process_data to maintain compatibility."""
+        # [PHASE 13 - DOCTORAL STRUCTURE INTEGRATION]
+        # Full Institutional Stack (SMC/ICT Architecture)
+        from nexus_core.structure_engine import (
+            identify_fractals, detect_structural_shifts, 
+            detect_imbalances, detect_liquidity_pools, detect_order_blocks
+        )
+        df = identify_fractals(df)
+        df = detect_structural_shifts(df)
+        df = detect_imbalances(df)
+        df = detect_liquidity_pools(df)
+        df = detect_order_blocks(df)
+        
         df = apply_feat_engineering(df)
         df = calculate_multifractal_layers(df)
         
@@ -41,11 +53,23 @@ class FeatProcessor:
         df["vah"], df["val"] = pvp.get("vah", df["high"].max()), pvp.get("val", df["low"].min())
         df["energy_score"] = pvp.get("total_volume", 0.0)
         
-        # Physics & Form
-        atr14 = (df["high"] - df["low"]).rolling(14).mean().fillna(df["close"]*0.001) + 1e-9
-        df["feat_form"] = (df["high"] - df["low"]) / atr14
-        vwap = (df["volume"] * (df["high"] + df["low"] + df["close"]) / 3).cumsum() / df["volume"].cumsum()
-        df["feat_space"] = np.abs(df["close"] - vwap) / atr14
+        # [LEVEL 50 - DOCTORAL TOPOLOGY]
+        atr = (df["high"] - df["low"]).rolling(14).mean().ffill() + 1e-9
+        
+        # Normalization of Hierarchical Distances (Distance from Price to Level)
+        df["dist_swing_h"] = (df["close"] - df["swing_h"]) / atr
+        df["dist_swing_l"] = (df["close"] - df["swing_l"]) / atr
+        df["dist_internal_h"] = (df["close"] - df["internal_h"]) / atr
+        df["dist_internal_l"] = (df["close"] - df["internal_l"]) / atr
+
+        # [PHASE 13 - INTENT CLASSIFICATION]
+        df["is_protected_h"] = (df["major_h"]) & (df["bos_bear"].rolling(50).any())
+        df["is_protected_l"] = (df["major_l"]) & (df["bos_bull"].rolling(50).any())
+        
+        # Space & Form
+        df["feat_form"] = (df["high"] - df["low"]) / atr
+        vwap = (df["volume"] * (df["high"] + df["low"] + df["close"]) / 3).cumsum() / (df["volume"].cumsum() + 1e-9)
+        df["feat_space"] = (df["close"] - vwap) / atr
         
         return df
 
@@ -64,25 +88,26 @@ class FeatProcessor:
         close = safe_get("close", 0.0)
         
         # Mapping dict according to settings.NEURAL_FEATURE_NAMES
+        # [v5.0] SATURATED TOPOLOGIC VECTOR WITH TRAP AWARENESS
         return {
-            "dist_micro": safe_get("dist_micro"),
-            "dist_struct": safe_get("dist_structure"),
-            "dist_macro": safe_get("dist_macro"),
-            "dist_bias": safe_get("dist_bias"),
+            "dist_micro": safe_get("dist_internal_h"), # Internal Structure
+            "dist_struct": safe_get("dist_swing_h"),   # External Structure
+            "dist_macro": safe_get("dist_swing_l"),    # Anchor Points
+            "dist_bias": safe_get("dist_poc"),         # Gravity Bias
             "layer_alignment": safe_get("layer_alignment"),
             "kinetic_coherence": safe_get("kinetic_coherence"),
             "kinetic_pattern_id": int(safe_get("kinetic_pattern_id")),
-            "dist_poc": (close - safe_get("poc_price", close)) / atr,
+            "dist_poc": safe_get("dist_poc"),
             "pos_in_va": 1.0 if (safe_get("val", -1) <= close <= safe_get("vah", -1)) else 0.0,
-            "density": safe_get("accel_score"), 
+            "ofi_z": safe_get("ofi_z"),
             "energy": safe_get("energy_z"),
             "skew": safe_get("skew"),
             "entropy": safe_get("entropy"),
             "form": safe_get("feat_form", 0.5),
             "space": safe_get("feat_space", 0.5),
             "accel": safe_get("accel_score"),
-            "time": safe_get("cycle_prog"),
-            "kalman_score": safe_get("kalman_score")
+            "range_pos": safe_get("range_pos"),
+            "trap_score": safe_get("trap_score")  # [PREDATORY AWARENESS]
         }
 
     def tensorize_snapshot(self, snap: Dict, feature_names: List[str]) -> np.ndarray:
