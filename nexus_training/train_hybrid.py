@@ -379,6 +379,18 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=64)
     args = parser.parse_args()
+
+    # [D.A.L.C. INTEGRATION]
+    print("\n🕵️ INVOKING D.A.L.C. AUDITOR...")
+    import subprocess
+    audit_result = subprocess.run(["python", "tests/dalc_sanity_check.py"])
+    
+    if audit_result.returncode != 0:
+        print("🛑 TRAINING ABORTED BY D.A.L.C. (Logic Errors Detected).")
+        print("Check the logs above to fix the Silent Killers.")
+        sys.exit(1)
+        
+    print("✅ AUDIT PASSED. IGNITING TRAINING ENGINE.\n")
     
     if args.real:
         if pre_flight_guard(args.symbol, real=True):

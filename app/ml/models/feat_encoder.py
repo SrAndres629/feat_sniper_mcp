@@ -76,7 +76,8 @@ class FeatEncoder(nn.Module):
         # Kinetic Handling
         if kinetic is not None:
             # Split ID and Float metrics
-            p_id = kinetic[:, 0].long() # (Batch,)
+            # [FIX] Force clamping to avoid IndexError: index out of range in self.pattern_embedding
+            p_id = torch.clamp(kinetic[:, 0].long(), 0, self.dims["num_patterns"] - 1)
             metrics = kinetic[:, 1:]    # (Batch, 3)
             
             p_emb = self.pattern_embedding(p_id) # (Batch, 4)

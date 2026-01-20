@@ -388,7 +388,9 @@ class KineticEngine:
             window = self.adaptation_engine.get_absorption_window(vol_scalar)
             
             abs_result = self.validator.check_absorption_state(df, limit_pct=limit_pct, window=window)
-            state_map = {"NEUTRAL": 0.0, "IMPULSE": 1.0, "MONITORING": 2.0, "CONFIRMED": 3.0, "FAILED": -1.0}
+            # [FIX] Remap states to non-negative integers for Neural Embedding (0-5)
+            # 0:NEUTRAL, 1:IMPULSE, 2:MONITORING, 3:CONFIRMED, 4:FAILED, 5:RESERVED
+            state_map = {"NEUTRAL": 0.0, "IMPULSE": 1.0, "MONITORING": 2.0, "CONFIRMED": 3.0, "FAILED": 4.0}
             
             metrics["absorption_state"] = state_map.get(abs_result["state"], 0.0)
             metrics["absorption_progress"] = float(abs_result["progress"])
@@ -633,7 +635,7 @@ class KineticEngine:
         # 4. Meta Labels
         res["physics_force"] = res["feat_force"] # Aliasing
         
-        return res
+        return res.fillna(0.0)
 
 
 # Singleton

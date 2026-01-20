@@ -128,4 +128,5 @@ def apply_feat_engineering(df: pd.DataFrame) -> pd.DataFrame:
         df["minutes_to_event"] = 1.0
     
     # Cleanup NaN to prevent Neural Crash
-    return df.fillna(0).infer_objects(copy=False)
+    with pd.option_context('future.no_silent_downcasting', True):
+        return df.fillna(0).infer_objects(copy=False)
