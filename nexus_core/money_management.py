@@ -25,9 +25,10 @@ class MoneyManager:
         if self.total_balance < self.PHASE_1_LIMIT:
             # PHASE 1: SURVIVAL & SNOWBALL ($20 -> $100)
             # Goal: Grow fast out of the danger zone.
+            # User Directive: Accept up to $5 loss on $20 (25% risk) for Titanium Sniper entries.
             self.vault_rate = 0.0      # Reinvest 100% of profits
-            self.max_risk_pct = 0.05   # Allow up to 5% risk on Titanium signals
-            self.phase_name = "SURVIVAL (Aggressive)"
+            self.max_risk_pct = 0.25   # Allow up to 25% risk on Titanium signals
+            self.phase_name = "SURVIVAL (Aggressive Sniper)"
             
         elif self.total_balance < self.PHASE_2_LIMIT:
             # PHASE 2: CONSOLIDATION ($100 -> $500)
@@ -64,10 +65,6 @@ class MoneyManager:
                            pip_value: float = 10.0, base_risk_pct: float = None) -> float:
         """
         Dynamic Lot Sizing: Snowball Aggressor Logic.
-        
-        Args:
-            stop_loss_pips: Distance to SL.
-            confidence_score: Titanium Density (0.0 - 1.0).
         """
         if stop_loss_pips <= 0: return 0.01
         
@@ -76,13 +73,6 @@ class MoneyManager:
             base_risk_pct = self.max_risk_pct
 
         # AGGRESSOR LOGIC:
-        # If confidence > 90% (Titanium Floor), we go FULL Phase Risk.
-        # If confidence is lower, we scale down quadratically.
-        
-        # Example in Phase 1 (Max 5%):
-        # Conf 0.95 -> Risk 4.5% (Aggressive)
-        # Conf 0.60 -> Risk 1.8% (Conservative)
-        
         dynamic_risk_pct = base_risk_pct * (confidence_score ** 2)
         
         # Safety Clamp: Never exceed the phase limit
@@ -92,6 +82,30 @@ class MoneyManager:
         lot_size = risk_amount / (stop_loss_pips * pip_value)
         
         return round(max(0.01, lot_size), 2)
+        
+    def calculate_twin_lots(self, stop_loss_pips: int, confidence_score: float,
+                            pip_value: float = 10.0) -> tuple[float, float]:
+        """
+        Calculates Lot Sizes for Twin Trading (Split Entry).
+        Returns: (leg1_lot, leg2_lot)
+        """
+        # 1. Calculate Total Affordable Lot Size for this setup
+        total_lot = self.calculate_lot_size(stop_loss_pips, confidence_score, pip_value)
+        
+        # 2. Check if we have enough volume to split (Min 0.02 total needed)
+        if total_lot < 0.02:
+            return (total_lot, 0.0) # Cannot split, return single leg
+            
+        # 3. Split Logic (50/50)
+        # We round down to nearest 0.01 to stay safe
+        leg_vol = round(total_lot / 2, 2)
+        
+        # Ensure leg volume is at least 0.01
+        if leg_vol < 0.01:
+            # Fallback (shouldn't happen given check #2 but good for safety)
+            return (total_lot, 0.0)
+            
+        return (leg_vol, leg_vol)
 
     def get_fund_status(self) -> dict:
         return {

@@ -6,6 +6,11 @@
 3. **Probabilistic Purity**: Abandon One-Hot targets. Neural training must use Soft Labels to capture market ambiguity.
 4. **Institutional Winrate**: Strategic objective is 90% performance. Prioritize Intelligence over raw Infrastructure.
 5. **Unified Field Synergy**: All signals must pass the `ConvergenceEngine` (SGI, VAM, Titanium Floor, Hurst Gate) before execution. Silos are forbidden.
+6. **Snowball Aggression**: For micro-accounts (<$100), prioritize geometric growth over safety. Use Probability-Leverage scaling (Confidence² * Risk).
+7. **Twin Sniper Evolution**: When Titanium Floor is detected and Margin allows, execute Twin Trading (Cash Flow + Wealth Runner).
+8. **Directorial Laws**: Swing Trades are for BUY ONLY. Sell Swings are forbidden. Macro Entries must be validated by Micro Structure (Fractal Validation).
+7. **Twin Sniper Evolution**: When Titanium Floor is detected and Margin allows, execute Twin Trading (Cash Flow + Wealth Runner).
+8. **Directorial Laws**: Swing Trades are for BUY ONLY. Sell Swings are forbidden. Macro Entries must be validated by Micro Structure (Fractal Validation).
 
 ## 2. Org Chart: The Software Factory
 Supreme Command: **CTO ORCHESTRATOR** ([00_CTO_ORCHESTRATOR.md](file:///c:/Users/acord/OneDrive/Desktop/Bot/feat_sniper_mcp/.ai/skills/00_CTO_ORCHESTRATOR.md))

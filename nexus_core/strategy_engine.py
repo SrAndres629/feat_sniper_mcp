@@ -1,0 +1,164 @@
+"""
+FEAT SNIPER: STRATEGY ENGINE (THE TACTICIAN)
+============================================
+Orchestrates trade execution logic, shifting between Scalp, Day, and Swing modes
+based on Neural Probabilities, Macro Context, and Capital Availability.
+"""
+
+from dataclasses import dataclass
+from typing import List, Optional
+from enum import Enum
+import numpy as np
+
+class StrategyMode(Enum):
+    SCALP = "SCALP"
+    DAY = "DAY"
+    SWING = "SWING"
+
+@dataclass
+class TradeLeg:
+    direction: str # "BUY" or "SELL"
+    volume: float
+    stop_loss_price: float
+    take_profit_price: float
+    strategy_type: StrategyMode
+    intent: str # "Cash Flow" or "Wealth Run"
+
+class StrategyEngine:
+    def __init__(self, risk_manager):
+        self.risk_manager = risk_manager
+        
+        # User Directives
+        self.SWING_BUY_ONLY = True
+        self.ALLOW_TWIN_TRADING = True # Split positions on high probability
+        
+        # Adaptive Thresholds
+        self.PROMOTION_THRESHOLD = 0.80 # Probability to promote Scalp -> Swing
+        
+    def analyze_strategic_intent(self, 
+                                 market_price: float,
+                                 neural_probs: dict, 
+                                 macro_context: dict,
+                                 titanium_level: bool) -> List[TradeLeg]:
+        """
+        Decides HOW to trade. Returns a list of TradeLegs (1 or 2).
+        
+        Args:
+            neural_probs: {'scalp': 0.9, 'day': 0.3, 'swing': 0.1}
+            macro_context: {'zone': 'H4_Demand', 'trend': 'Bullish'}
+            titanium_level: True if Titanium Floor detected.
+        """
+        
+        # 1. Determine Bias
+        # Example logic: If Titanium Floor (PVP+EMA), direction is determined by physics/trend
+        # For this Engine, we assume the Signal Provider (ConvergenceEngine) gave us a direction.
+        # Let's assume 'direction' comes from context for now.
+        direction = macro_context.get('direction', 'BUY') 
+        
+        # 2. Enforce "Swing = Buy Only" Rule
+        # If we are selling, we CANNOT do Swing. Max leverage is DayTrade.
+        allowed_strategies = [StrategyMode.SCALP, StrategyMode.DAY]
+        if direction == "BUY":
+            allowed_strategies.append(StrategyMode.SWING)
+            
+        # 3. Probability Analysis
+        p_scalp = neural_probs.get('scalp', 0.0)
+        p_day = neural_probs.get('day', 0.0)
+        p_swing = neural_probs.get('swing', 0.0)
+        
+        # 4. Twin Trading Decision (Titanium + High Conf)
+        # If we have a Titanium Floor AND High Scalp Prob, we try a Twin Trade.
+        legs = []
+        
+        if titanium_level and p_scalp > 0.85:
+            # TWIN TRADING: 1 Scalp (Cash) + 1 Runner (Wealth)
+            
+            # Volume Calculation
+            # Dynamic: Twin Trading Split (50/50)
+            sl_pips_est = 20
+            
+            # Use the new specialized Twin Lot Calculator from MoneyManager
+            lot_1, lot_2 = self.risk_manager.calculate_twin_lots(
+                sl_pips_est, titanium_level * 1.0
+            )
+            
+            # Only execute Twin Trade if we got 2 valid lots
+            if lot_2 > 0:
+                # Leg A: The Scalper (Guaranteed Cash)
+                legs.append(TradeLeg(
+                    direction=direction,
+                    volume=lot_1, 
+                    stop_loss_price=0.0, 
+                    take_profit_price=0.0, 
+                    strategy_type=StrategyMode.SCALP,
+                    intent="CASH_FLOW (Twin Engine A)"
+                ))
+                
+                # Leg B: The Runner (Wealth)
+                # FRACTAL & BIAS CHECK:
+                # 1. Swing Bias: MUST BE BUY
+                # 2. Fractal: (Placeholder) M5 must confirm H4
+                
+                if direction == "BUY":
+                    runner_mode = StrategyMode.SWING
+                else:
+                    # If Sell, we downgrade to Day Runner because Sell Swings are forbidden
+                    runner_mode = StrategyMode.DAY 
+                    
+                legs.append(TradeLeg(
+                    direction=direction,
+                    volume=lot_2,
+                    stop_loss_price=0.0,
+                    take_profit_price=0.0, 
+                    strategy_type=runner_mode,
+                    intent="WEALTH_RUN (Twin Engine B)"
+                ))
+            else:
+                # Fallback to Single Shot if not enough equity for Twin
+                legs.append(TradeLeg(
+                    direction=direction,
+                    volume=lot_1,
+                    stop_loss_price=0.0,
+                    take_profit_price=0.0,
+                    strategy_type=StrategyMode.SCALP,
+                    intent="SINGLE_SHOT (Low Equity)"
+                ))
+            
+        else:
+            # SINGLE ENTRY (Standard)
+            best_strat = StrategyMode.SCALP
+            # Promotion logic
+            if p_swing > p_scalp and StrategyMode.SWING in allowed_strategies:
+                best_strat = StrategyMode.SWING
+            elif p_day > p_scalp:
+                best_strat = StrategyMode.DAY
+            
+            # Calculate Volume (Standard Confidence)
+            confidence = 0.95 if titanium_level else p_scalp 
+            lot = self.risk_manager.calculate_lot_size(20, confidence)
+                
+            legs.append(TradeLeg(
+                direction=direction,
+                volume=lot,
+                stop_loss_price=0.0,
+                take_profit_price=0.0,
+                strategy_type=best_strat,
+                intent="SINGLE_SHOT"
+            ))
+            
+        return legs
+
+    def optimize_targets(self, active_trades: List[TradeLeg], fresh_probs: dict):
+        """
+        Called dynamically during trade life.
+        Can promote a Scalp to a Runner if Probabilities shift.
+        """
+        for trade in active_trades:
+            if trade.strategy_type == StrategyMode.SCALP:
+                if fresh_probs['swing'] > self.PROMOTION_THRESHOLD and trade.direction == "BUY":
+                    # PROMOTION!
+                    trade.strategy_type = StrategyMode.SWING
+                    trade.intent = "PROMOTED_RUNNER"
+                    # Signal Executor to remove TP
+                    return True # Signal change occurred
+        return False
