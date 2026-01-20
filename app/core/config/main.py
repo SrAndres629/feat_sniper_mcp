@@ -1,6 +1,7 @@
+from __future__ import annotations
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import computed_field, Field
-from typing import Tuple, Dict, Optional, Literal
+from typing import Tuple, Dict, Literal
 from .constants import ExecutionMode
 from .trading_config import TradingSettings
 from .neural_config import NeuralSettings

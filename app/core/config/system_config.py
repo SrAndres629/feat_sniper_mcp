@@ -1,5 +1,6 @@
+from __future__ import annotations
 from pydantic import BaseModel
-from typing import Optional
+from typing import Any
 
 class SystemSettings(BaseModel):
     ZMQ_PORT: int = 5555
@@ -10,8 +11,10 @@ class SystemSettings(BaseModel):
     LOG_LEVEL: str = "INFO"
     DATA_DIR: str = "data"
     MODELS_DIR: str = "models"
-    N8N_API_KEY: Optional[str] = None
-    N8N_WEBHOOK_URL: Optional[str] = None
+    SUPABASE_URL: str | None = None
+    SUPABASE_KEY: str | None = None
+    N8N_API_KEY: str | None = None
+    N8N_WEBHOOK_URL: str | None = None
     N8N_URL: str = "http://localhost:5678"
     ENABLE_PROMETHEUS_METRICS: bool = True
     LATENCY_P99_THRESHOLD_MS: int = 200

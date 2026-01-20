@@ -19,8 +19,24 @@ def detect_structural_shifts(df: pd.DataFrame) -> pd.DataFrame:
     df["internal_l"] = df["low"].where(df["minor_l"]).ffill()
 
     # 2. VECTORIZED SESSION MAPPING (No .map bottleneck)
-    # We use index attributes for speed
-    hours = df.index.hour
+    # [FIX] Handle RangeIndex vs DatetimeIndex
+    if hasattr(df.index, 'hour'):
+        hours = df.index.hour
+    elif 'time' in df.columns:
+        # Check if 'time' is already datetime or needs conversion
+        if pd.api.types.is_datetime64_any_dtype(df['time']):
+            hours = df['time'].dt.hour
+        else:
+            # Assume unix ms or string, try safe conversion
+            try:
+                hours = pd.to_datetime(df['time'], unit='ms').dt.hour
+            except:
+                try:
+                     hours = pd.to_datetime(df['time']).dt.hour
+                except:
+                     hours = pd.Series(0, index=df.index) # Fallback
+    else:
+        hours = pd.Series(0, index=df.index) # Fallback to ASIA (0)
     # Simplified mapping for vectorization:
     # 3-11: LONDON, 13-20: NY, Else: ASIA
     df["session_type"] = "ASIA"
@@ -49,8 +65,8 @@ def detect_structural_shifts(df: pd.DataFrame) -> pd.DataFrame:
     raw_bos_bear = (df["close"] < df["swing_l"].shift(1)) & (df["close"].shift(1) >= df["swing_l"].shift(1))
     
     # Validation: Institutional Force (Trending POC)
-    df["bos_bull"] = raw_bos_bull & (df["close"] > df["rolling_poc"])
-    df["bos_bear"] = raw_bos_bear & (df["close"] < df["rolling_poc"])
+    df["bos_bull"] = (raw_bos_bull & (df["close"] > df["rolling_poc"])).fillna(False).astype(bool)
+    df["bos_bear"] = (raw_bos_bear & (df["close"] < df["rolling_poc"])).fillna(False).astype(bool)
 
     # 5. INTERNAL CHOCH (Change of Character)
     # CHoCH is the first sign of reversal: price breaking the last internal structural point

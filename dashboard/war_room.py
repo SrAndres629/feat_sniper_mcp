@@ -425,19 +425,48 @@ def render_cortex_diagnostics(state):
         kl_div = metrics.get("kl_divergence", 0.0)
         decay = metrics.get("alpha_decay", 0.0)
         
-        if brier > 0.3 or drift > 0.25 or kl_div > 0.5:
-            st.error(f"🚨 NEURAL IRREGULARITY: Brier={brier:.3f}, KL={kl_div:.3f}")
+        if brier > 0.25:
+            st.error(f"🚨 CORTEX IMMATURE: Weights are uncalibrated (Brier={brier:.3f}). 'Training Wheels' Active.")
+        elif drift > 0.25 or kl_div > 0.5:
+            st.warning(f"⚠️ NEURAL DRIFT DETECTED: Brier={brier:.3f}, KL={kl_div:.3f}")
         else:
-            st.caption(f"✅ Neural Alignment: Stable (KL Div: {kl_div:.3f})")
+            st.success(f"✅ Neural Alignment: Stable (KL Div: {kl_div:.3f})")
 
     # 2. Key PhD Metrics
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Brier Score", f"{brier:.4f}", delta=None, help="Reliability of probabilities (0=Perfect)")
-    m2.metric("Neural Drift", f"{drift*100:.1f}%", delta=None, help="Confidence/Winrate deviation")
-    m3.metric("KL Divergence", f"{kl_div:.3f}", delta=None, help="Shift in prediction distribution (Dataset Shift)")
-    m4.metric("Alpha Decay", f"{decay*100:.1f}%", delta=f"{decay*100:.1f}%", help="Growth rate of Alpha (PnL Slope stability)")
+    m1.metric("Brier (Brain Health)", f"{brier:.4f}", delta=None, help="Reliability of probabilities (0=Perfect, >0.25=Lobotomized)")
+    m2.metric("Dataset Drift", f"{drift*100:.1f}%", delta=None, help="Confidence/Winrate deviation")
+    m3.metric("KL Divergence", f"{kl_div:.3f}", delta=None, help="Shift in prediction distribution")
+    m4.metric("Alpha Power", f"{decay*100:.1f}%", delta=f"{decay*100:.1f}%", help="Growth rate stability")
 
     st.divider()
+    
+    # 45-DIM TENSOR HEATMAP (SENSOR AUDIT)
+    st.markdown("### 📊 45-Dimensional Sensory Tensor (Live Sensor Audit)")
+    spatial_data = state.get("spatial_map", [])
+    if spatial_data:
+        # Convert flat 45-dim tensor to a visible grid (9x5)
+        tensor_array = np.array(spatial_data).flatten()
+        if len(tensor_array) >= 45:
+            grid = tensor_array[:45].reshape(9, 5)
+            fig_sensors = px.imshow(
+                grid,
+                labels=dict(x="Feature Index", y="Channel", color="Activation"),
+                color_continuous_scale='Turbo',
+                text_auto=".2f"
+            )
+            fig_sensors.update_layout(
+                height=350,
+                coloraxis_showscale=True,
+                margin=dict(l=0, r=0, t=30, b=0),
+                title="Input Signal Scale (Check for scale contamination/dead sensors)"
+            )
+            st.plotly_chart(fig_sensors, use_container_width=True)
+            st.caption("Dimensions: 0-3 (Account), 4-7 (Micro), 8-11 (Neural), 12-15 (Physics), 16-19 (Sent), 20 (Frac), 21-44 (Multi-TF Physics)")
+        else:
+            st.info(f"Tensor data mismatch: Expected 45, got {len(tensor_array)}")
+    else:
+        st.info("Gathering 45-dimensional sensory stream...")
 
     # 2. Entropy & Microstructure (The "Market Sobriety" Check)
     st.markdown("### 📊 Market Microstructure (Shannon Entropy)")

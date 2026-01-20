@@ -144,6 +144,8 @@ class StrategicPolicyAgent:
         
         # Experience buffer for training
         self.experience_buffer = []
+        self.experience_log_path = "data/experiences.jsonl"
+        os.makedirs("data", exist_ok=True)
         
         # Load pretrained if available
         if model_path and os.path.exists(model_path):
@@ -205,17 +207,26 @@ class StrategicPolicyAgent:
                           next_state: StateVector,
                           done: bool):
         """
-        Stores transition for offline training.
+        Stores transition for offline training and persists to disk.
         """
-        self.experience_buffer.append({
+        exp = {
             "state": state.to_tensor().tolist(),
             "action": action.value,
-            "reward": reward,
+            "reward": float(reward),
             "next_state": next_state.to_tensor().tolist(),
             "done": done,
-        })
+            "timestamp": datetime.now().isoformat()
+        }
+        self.experience_buffer.append(exp)
         
-        # Limit buffer size
+        # Persistent Logging (Append to JSONL)
+        try:
+            with open(self.experience_log_path, 'a') as f:
+                f.write(json.dumps(exp) + "\n")
+        except Exception as e:
+            logger.error(f"Failed to log experience to disk: {e}")
+        
+        # Limit RAM buffer size
         if len(self.experience_buffer) > 10000:
             self.experience_buffer.pop(0)
     
@@ -264,6 +275,14 @@ class StrategicPolicyAgent:
         
         self.network.eval()
         logger.info("✅ Pre-training complete. Agent is now aligned with Legacy Rules.")
+        
+        # Record training session for dashboard
+        from nexus_core.neural_health import neural_health
+        neural_health.record_training_session(
+            session_type="PRETRAIN",
+            samples=len(states),
+            epochs=epochs
+        )
 
     def get_decision_report(self, state: StateVector) -> dict:
         """

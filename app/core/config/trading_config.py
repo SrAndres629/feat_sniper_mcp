@@ -1,12 +1,13 @@
+from __future__ import annotations
 from pydantic import BaseModel
-from typing import Optional
+from typing import Any
 
 class TradingSettings(BaseModel):
     SYMBOL: str = "XAUUSD"
-    MT5_LOGIN: Optional[int] = None
-    MT5_PASSWORD: Optional[str] = None
-    MT5_SERVER: Optional[str] = None
-    MT5_PATH: Optional[str] = None
+    MT5_LOGIN: int | None = None
+    MT5_PASSWORD: str | None = None
+    MT5_SERVER: str | None = None
+    MT5_PATH: str | None = None
     MT5_MAGIC_NUMBER: int = 123456
     MT5_ORDER_COMMENT: str = "FEAT_AI_Sniper_V2"
     TRADING_MODE: str = "SHADOW"

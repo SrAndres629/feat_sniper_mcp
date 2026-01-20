@@ -51,12 +51,53 @@ class MCPInterface:
             json.dump(commands, f)
         return True
 
+from app.core.mt5_conn.manager import MT5Connection
+
 interface = MCPInterface()
+
+async def passive_mt5_monitor():
+    """Background task for Standalone Mode."""
+    logger.info("🛡️ PASSIVE MONITOR: Initializing Read-Only MT5 Link...")
+    conn = MT5Connection()
+    if await conn.startup():
+        logger.info("✅ PASSIVE MONITOR: Connected. Polling market data...")
+        while True:
+            try:
+                # Update State for Tools
+                info = await conn.get_account_info()
+                state = {
+                    "status": "PASSIVE_MODE",
+                    "symbol": settings.SYMBOL if hasattr(settings, 'SYMBOL') else "XAUUSD",
+                    "account": {
+                        "balance": info.get("balance", 0.0),
+                        "equity": info.get("equity", 0.0),
+                        "pnl": round(info.get("equity", 0.0) - info.get("balance", 0.0), 2)
+                    },
+                    "note": "Trading Engine OFFLINE. Tools are in Observation Mode."
+                }
+                # Write to disk so tools can read it
+                with open(interface.state_file, 'w') as f:
+                    json.dump(state, f, indent=2)
+            except Exception as e:
+                logger.error(f"Monitor Loop Error: {e}")
+            
+            await asyncio.sleep(5)
+    else:
+        logger.error("❌ PASSIVE MONITOR: MT5 Connection Failed.")
 
 @asynccontextmanager
 async def mcp_lifespan(server: FastMCP):
     logger.info("📡 MCP Interface: Online (Diplomatic Layer Active)")
-    yield
+    
+    # [STANDALONE MODE CHECK]
+    if os.environ.get("FEAT_MCP_STANDALONE") == "1":
+        logger.warning("⚠️ RUNNING IN STANDALONE MODE - NO TRADING ENGINE")
+        task = asyncio.create_task(passive_mt5_monitor())
+        yield
+        task.cancel()
+    else:
+        yield
+        
     logger.info("👋 MCP Interface: Shutdown.")
 
 # --- TOOLS (REFACTORED FOR DECOUPLED OPS) ---

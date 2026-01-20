@@ -29,6 +29,7 @@ logger = logging.getLogger("NexusDaemon")
 
 class ImmortalDaemon:
     def __init__(self):
+        self._enforce_singleton()
         self.mcp_process = None
         self.dashboard_process = None
         self.running = True
@@ -38,6 +39,18 @@ class ImmortalDaemon:
         self.simulation_process = None
         self.api_process = None
         self.cmd_file = "data/app_commands.json"
+
+    def _enforce_singleton(self):
+        """Highlander Protocol: There can be only one."""
+        import socket
+        try:
+            self.lock_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # Bind to a specific port to act as a mutex
+            self.lock_socket.bind(('127.0.0.1', 64123))
+            logger.info("🔒 Highlander Protocol: Singleton Lock Acquired (Port 64123)")
+        except socket.error:
+            print("⛔ FATAL: Another instance of FEAT Daemon is already running. Terminating.")
+            sys.exit(1)
 
     async def run_engine(self):
         """Launches the primary Trading Engine as a persistent task."""

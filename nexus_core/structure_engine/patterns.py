@@ -14,7 +14,7 @@ class MAE_Pattern_Recognizer:
 
     def detect_mae_pattern(self, df: pd.DataFrame) -> Dict[str, Any]:
         if len(df) < 15:
-            return {"phase": "WARMUP", "status": "RANGING"}
+            return {"phase": "WARMUP", "status": "RANGING", "is_expansion": False, "direction": 0}
 
         atr = (df["high"] - df["low"]).rolling(14).mean().iloc[-1]
         body = df["close"].iloc[-1] - df["open"].iloc[-1]

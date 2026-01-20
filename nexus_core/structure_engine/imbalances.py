@@ -11,63 +11,56 @@ def detect_imbalances(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
 
     # Bullish FVG: Low of candle i+1 is higher than High of candle i-1
-    # GAP = Low[i+1] - High[i-1]
     df["fvg_bull"] = (df["low"].shift(-1) > df["high"].shift(1))
     df["fvg_bull_top"] = df["low"].shift(-1)
     df["fvg_bull_bottom"] = df["high"].shift(1)
     
     # Bearish FVG: High of candle i+1 is lower than Low of candle i-1
-    # GAP = Low[i-1] - High[i+1]
     df["fvg_bear"] = (df["high"].shift(-1) < df["low"].shift(1))
     df["fvg_bear_top"] = df["low"].shift(1)
     df["fvg_bear_bottom"] = df["high"].shift(-1)
     
     # [DOCTORAL REFINEMENT] Freshness Tracking
-    # An FVG is "Fresh" if price has not returned continuously to fill it.
     df["fvg_mitigated"] = False
-    
-    # 1. Track Bullish FVGs (Supports)
-    # If price drops BELOW the FVG Top (gap fill), it's mitigated.
-    # Note: Vectorizing this fully is complex, using an iterative approach for precision on recent bars.
-    
-    # 3. Inversion FVG Logic (The Flip)
-    # If a Bullish FVG is closed below, it becomes Bearish Inversion (Resistance)
-    # If a Bearish FVG is closed above, it becomes Bullish Inversion (Support)
     
     df["inversion_bull"] = False # Was Bear FVG, broken up -> Support
     df["inversion_bear"] = False # Was Bull FVG, broken down -> Resistance
     
     # Define Indices for Iteration (Using Integer Locations for Safety)
-    # df.index can be Datetime, so we avoid idx+1 logic
-    
-    # Get boolean mask and find integer locations
     bull_mask = df["fvg_bull"].values
     bear_mask = df["fvg_bear"].values
     
-    # Integer indices where FVG is True
     bull_ilocs = np.where(bull_mask)[0]
     bear_ilocs = np.where(bear_mask)[0]
 
-    close_values = df["close"].values
+    # [OPTIMIZATION] Pure Numpy Access for Speed & Safety
+    # Pre-fetch columns as numpy arrays to avoid 'Lengths must match' errors
+    bull_top_values = df["fvg_bull_top"].values
+    bull_bottom_values = df["fvg_bull_bottom"].values
+    
+    bear_top_values = df["fvg_bear_top"].values
+    bear_bottom_values = df["fvg_bear_bottom"].values
+    
+    inversion_bull_col_idx = df.columns.get_loc("inversion_bull")
+    inversion_bear_col_idx = df.columns.get_loc("inversion_bear")
+    
+    # [CRITICAL FIX] Define closes explicitly
+    closes = df["close"].values
 
     # Check Bull FVGs -> Potential Bear Inversion
-    # We iterate, but we need to reference the original DataFrame for setting values or use iat
-    # To enable safe slicing, we use iloc logic
-    
     for i in bull_ilocs:
-        # Avoid out of bounds
         if i >= len(df) - 1: continue
             
-        top = df.at[df.index[i], "fvg_bull_top"]
-        bottom = df.at[df.index[i], "fvg_bull_bottom"]
+        # Safe Scalar Access via Numpy
+        bottom = bull_bottom_values[i]
         
         # Look forward using slice
-        # subset_close = close_values[i+1:]
-        # Violation: Close < Bottom
+        future_closes = closes[i+1:]
         
-        # We need to find the INDEX of the violation to mark the inversion
-        # Let's find relative index
-        future_closes = close_values[i+1:]
+        # [DEFENSE] Prevent Empty Slice Comp
+        if len(future_closes) == 0: continue
+        
+        # Numpy Compare (Array vs Scalar) - Guaranteed Safe
         violations = future_closes < bottom
         
         if violations.any():
@@ -75,17 +68,20 @@ def detect_imbalances(df: pd.DataFrame) -> pd.DataFrame:
             rel_idx = np.argmax(violations)
             abs_iloc = i + 1 + rel_idx
             
-            # Set Inversion Flag at that specific candle
-            df.iat[abs_iloc, df.columns.get_loc("inversion_bear")] = True
+            # Set Inversion Flag at that specific candle using iat (safe integer access)
+            df.iat[abs_iloc, inversion_bear_col_idx] = True
 
     # Check Bear FVGs -> Potential Bull Inversion
     for i in bear_ilocs:
         if i >= len(df) - 1: continue
             
-        top = df.at[df.index[i], "fvg_bear_top"]
-        bottom = df.at[df.index[i], "fvg_bear_bottom"]
+        top = bear_top_values[i] # Safe Scalar
         
-        future_closes = close_values[i+1:]
+        future_closes = closes[i+1:]
+        
+        # [DEFENSE] Prevent Empty Slice Comp
+        if len(future_closes) == 0: continue
+        
         violations = future_closes > top
         
         if violations.any():
@@ -93,7 +89,7 @@ def detect_imbalances(df: pd.DataFrame) -> pd.DataFrame:
             abs_iloc = i + 1 + rel_idx
             
             # Set Inversion Flag
-            df.iat[abs_iloc, df.columns.get_loc("inversion_bull")] = True
+            df.iat[abs_iloc, inversion_bull_col_idx] = True
 
     # Zone Identification (Consolidated Imbalance Score)
     df["imbalance_score"] = 0.0

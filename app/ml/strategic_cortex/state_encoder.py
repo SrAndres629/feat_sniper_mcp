@@ -164,14 +164,18 @@ class StateEncoder:
         liq_above = float(sentiment.get("liquidity_above", 0.0))
         liq_below = float(sentiment.get("liquidity_below", 0.0))
         
-        # Temporal Physics encoding
+        # Temporal Physics encoding (RIGOROUS NORMALIZATION)
         temp_phys = []
         target_tfs = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]
         tpd = temporal_physics_dict or {}
         for tf in target_tfs:
-            temp_phys.append(tpd.get(f"{tf}_direction", 0.0))
-            temp_phys.append(tpd.get(f"{tf}_energy", 0.0))
-            temp_phys.append(tpd.get(f"{tf}_accel", 0.0))
+            # Direction is already [-1, 1]
+            temp_phys.append(np.clip(tpd.get(f"{tf}_direction", 0.0), -1.0, 1.0))
+            # Energy: Needs clamping to avoid hubris
+            energy = tpd.get(f"{tf}_energy", 0.0)
+            temp_phys.append(np.clip(energy, 0.0, 3.0) / 3.0) # Scale [0, 3] -> [0, 1]
+            # Accel: Already tanh normalized in features.py [-1, 1]
+            temp_phys.append(np.clip(tpd.get(f"{tf}_accel", 0.0), -1.0, 1.0))
         temp_phys_array = np.array(temp_phys, dtype=np.float32)
         
         return StateVector(

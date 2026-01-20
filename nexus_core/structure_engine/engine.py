@@ -61,10 +61,18 @@ class StructureEngine:
         w_liq = 0.6
         
         # Vectorized Presence Flags
-        has_ob = (df.get("ob_bull", False) | df.get("ob_bear", False)).astype(float)
-        has_fvg = (df.get("fvg_bull", False) | df.get("fvg_bear", False)).astype(float)
-        has_breaker = (df.get("breaker_bull", False) | df.get("breaker_bear", False)).astype(float)
-        has_liq = (df.get("is_eqh", False) | df.get("is_eql", False)).astype(float)
+        # [FIX] Arithmetic Logic (Safe for Float/NaN)
+        # We sum the columns (fillna 0) and check if > 0.
+        def _any(c1, c2):
+            # Ensure we default to a Series of 0.0 if column missing
+            v1 = df[c1].fillna(0) if c1 in df.columns else pd.Series(0.0, index=df.index)
+            v2 = df[c2].fillna(0) if c2 in df.columns else pd.Series(0, index=df.index)
+            return ((v1 + v2) > 0).astype(float)
+            
+        has_ob = _any("ob_bull", "ob_bear")
+        has_fvg = _any("fvg_bull", "fvg_bear")
+        has_breaker = _any("breaker_bull", "breaker_bear")
+        has_liq = _any("is_eqh", "is_eql")
         
         # Mitigation Decay
         ob_weight = np.where(df.get("is_mitigated", False), w_ob * 0.5, w_ob)
@@ -75,7 +83,9 @@ class StructureEngine:
         
         # Temporal Alignment
         if "major_h" in df.columns:
-            alignment = (df["major_h"] | df["major_l"]).rolling(50).max().fillna(0)
+            # [FIX] Arithmetic Logic
+            align_val = (df["major_h"].fillna(0) + df["major_l"].fillna(0))
+            alignment = (align_val > 0).astype(float).rolling(50).max().fillna(0)
             score = score * (1.0 + (alignment * 0.5))
             
         df["confluence_score"] = score.round(2)
@@ -97,13 +107,28 @@ class StructureEngine:
         df = detect_consolidation_zones(df)
         df = self.calculate_confluence_score(df)
         
+        
+        # [FIX] Helper for Safe Boolean Series Retrieval
+        def _get_bool(col_name):
+            if col_name in df.columns:
+                return df[col_name].fillna(False).astype(bool)
+            return pd.Series(False, index=df.index)
+
         # 1. Structural Force (Vectorized)
         f_score = df.get("bos_strength", pd.Series(0.0, index=df.index)).fillna(0.0)
-        f_score += np.where(df.get("choch_bull", False) | df.get("choch_bear", False), 0.5, 0.0)
+        
+        # [FIX] Arithmetic Logic for CHoCH
+        c_bull = _get_bool("choch_bull").astype(int)
+        c_bear = _get_bool("choch_bear").astype(int)
+        f_score += np.where((c_bull + c_bear) > 0, 0.5, 0.0)
         
         # 2. Institutional Efficiency (E-Score)
-        ob_presence = np.where(df.get("ob_bull", False) | df.get("ob_bear", False), 1.0, 0.0)
-        fvg_presence = np.where(df.get("fvg_bull", False) | df.get("fvg_bear", False), 1.0, 0.2)
+        # Safe bitwise OR on Series
+        has_ob = _get_bool("ob_bull") | _get_bool("ob_bear")
+        has_fvg = _get_bool("fvg_bull") | _get_bool("fvg_bear")
+        
+        ob_presence = np.where(has_ob, 1.0, 0.0)
+        fvg_presence = np.where(has_fvg, 1.0, 0.2)
         e_score = fvg_presence + ob_presence
         
         # 3. ATR-Normalized Range (A-Score)
@@ -117,13 +142,18 @@ class StructureEngine:
         # [CHRONOS] Session-based T-Score (Liquidity Time)
         times = df.index
         # Get hour in UTC (or adjusted for exchange time)
-        hours = times.hour
+        if hasattr(times, 'hour'):
+             hours = times.hour
+        else:
+             # Fallback if index not datetime (should be fixed by vectorized_tensor but defensive here)
+             hours = pd.Series(0, index=df.index)
         
         # Scoring: London (7-11 UTC) and NY (12-16 UTC) are 1.0. Asian (23-06 UTC) is 0.5. Weekend/Dead is 0.0.
         t_score = pd.Series(0.2, index=df.index) # Base
-        # Overwrite with sessions
-        t_score[((hours >= 7) & (hours <= 11)) | ((hours >= 12) & (hours <= 16))] = 1.0 # High Liquidity
-        t_score[((hours >= 0) & (hours <= 6))] = 0.5 # Asian
+        
+        if hasattr(times, 'hour'):
+            t_score[((hours >= 7) & (hours <= 11)) | ((hours >= 12) & (hours <= 16))] = 1.0 # High Liquidity
+            t_score[((hours >= 0) & (hours <= 6))] = 0.5 # Asian
         
         # [FEAT UPDATE] Calculate Space Quality (E) using EMA Layers
         # Optimal Space is when Price pulls back to Structure (dist ~ 0)

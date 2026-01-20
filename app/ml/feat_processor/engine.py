@@ -34,6 +34,17 @@ class FeatProcessor:
         [PHASE 14 - UNIFIED PHYSICS PIPELINE]
         Now delegates to AlphaTensorOrchestrator to ensure Training == Live Execution.
         """
+        if df.empty: return pd.DataFrame() # Consistent Empty DF return
+
+        # --- [FIX] SANITIZE DATA INTEGRITY ---
+        # 1. Reset index to remove duplicates (Fixes 'cannot reindex' error)
+        df = df.reset_index(drop=True)
+        
+        # 2. Ensure we have a clean numerical index for vector operations
+        if not isinstance(df.index, pd.RangeIndex):
+            df.index = pd.RangeIndex(start=0, stop=len(df), step=1)
+        # -------------------------------------
+
         # We calculate the full Alpha Tensor payload which includes Structure, Chronos, and Physics.
         # But for 'df' enrichment we need to flatten it back to columns.
         
@@ -60,10 +71,11 @@ class FeatProcessor:
         df["session_weight"] = payload.get("session_weight", np.zeros(len(df)))
         
         # Assign Structural
-        df["feat_index"] = payload.get("structural_feat_index", np.zeros(len(df))) * 100.0
-        df["confluence_score"] = payload.get("confluence_tensor", np.zeros(len(df))) * 5.0
+        df["structural_feat_index"] = payload.get("structural_feat_index", np.zeros(len(df)))
+        df["confluence_tensor"] = payload.get("confluence_tensor", np.zeros(len(df)))
         
         # Assign Meta
+        df["volatility_context"] = payload.get("volatility_context", np.ones(len(df)))
         df["trap_score"] = payload.get("trap_score", np.zeros(len(df)))
         
         # [Residual Legacy for Visualization if needed]

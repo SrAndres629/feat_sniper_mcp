@@ -13,6 +13,16 @@ def apply_feat_engineering(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     
     # [LEVEL 50] STATIONARY LOG-DYNAMICS
+    # [FIX] Robust Volume Column Handing (MT5 Standard)
+    if "volume" not in df.columns:
+        if "tick_volume" in df.columns:
+            df["volume"] = df["tick_volume"]
+        elif "real_volume" in df.columns:
+             df["volume"] = df["real_volume"]
+        else:
+             # Fallback if no volume data (Crypto/Forex gaps)
+             df["volume"] = 1.0 
+
     df["log_ret"] = np.log(df["close"] / df["close"].shift(1)).fillna(0)
     
     # [PHASE 13 - INSTITUTIONAL PROXY]
@@ -21,11 +31,11 @@ def apply_feat_engineering(df: pd.DataFrame) -> pd.DataFrame:
     df["bar_spread"] = df["high"] - df["low"]
     df["body_size"] = (df["close"] - df["open"]).abs()
     df["ofi_proxy"] = (df["close"] - df["open"]) * df["volume"] / (df["bar_spread"] + 1e-9)
-    df["ofi_z"] = (df["ofi_proxy"] - df["ofi_proxy"].rolling(20).mean()) / (df["ofi_proxy"].rolling(20).std() + 1e-9)
+    df["ofi_z"] = (df["ofi_proxy"] - df["ofi_proxy"].rolling(20, min_periods=1).mean()) / (df["ofi_proxy"].rolling(20, min_periods=1).std() + 1e-9)
 
     # Z-Score Normalization (Global Stationary Signals)
-    df["price_z_score"] = (df["close"] - df["close"].rolling(50).mean()) / (df["close"].rolling(50).std() + 1e-9)
-    df["volume_z_score"] = (df["volume"] - df["volume"].rolling(50).mean()) / (df["volume"].rolling(50).std() + 1e-9)
+    df["price_z_score"] = (df["close"] - df["close"].rolling(50, min_periods=1).mean()) / (df["close"].rolling(50, min_periods=1).std() + 1e-9)
+    df["volume_z_score"] = (df["volume"] - df["volume"].rolling(50, min_periods=1).mean()) / (df["volume"].rolling(50, min_periods=1).std() + 1e-9)
     
     # External Engines
     df = structure_engine.detect_structural_shifts(df)
@@ -72,12 +82,12 @@ def apply_feat_engineering(df: pd.DataFrame) -> pd.DataFrame:
     df["space_intensity"] = (df["confluence_score"] / 5.0).clip(upper=1.0)
     
     # Statistical Metrics for Inference
-    roll = df["close"].rolling(window=20)
+    roll = df["close"].rolling(window=20, min_periods=1)
     df["skew"] = roll.skew().fillna(0)
     df["kurtosis"] = roll.kurt().fillna(0)
     
     # [v5.0] LOCAL ENTROPY (Market Chaos Tracking)
-    df["entropy"] = df["log_ret"].rolling(20).apply(lambda x: -np.sum(np.abs(x)*np.log(np.abs(x)+1e-9))).fillna(0)
+    df["entropy"] = df["log_ret"].rolling(20, min_periods=1).apply(lambda x: -np.sum(np.abs(x)*np.log(np.abs(x)+1e-9))).fillna(0)
     
     # Physics Metrics
     df["energy_z"] = df["volume_z_score"]

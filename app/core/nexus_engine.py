@@ -44,7 +44,6 @@ class NexusEngine:
         self.trade_manager = None
         self.structure_engine = None
         self.market_physics = None
-        self.mtf_engine = None
         self.chronos_engine = None
         self.strategy_engine = None
         
@@ -63,7 +62,6 @@ class NexusEngine:
             from nexus_core.structure_engine import structure_engine
             from app.skills import market
             from app.skills.calendar import chronos_engine
-            from nexus_core.mtf_engine import mtf_engine
             from app.sentinels.jitter import JitterSentinel
             from app.sentinels.drift import DriftSentinel
             from app.ml.automl.orchestrator import automl_orchestrator
@@ -80,7 +78,6 @@ class NexusEngine:
             self.risk_engine = RiskEngine
             self.structure_engine = structure_engine
             self.ml_engine = MLEngine()
-            self.mtf_engine = mtf_engine
             self.chronos_engine = chronos_engine
             self.market = market
             self.trade_manager = TradeManager(zmq_bridge)
@@ -204,16 +201,11 @@ class NexusEngine:
                     report = self.structure_engine.get_structural_report(candles["M1"])
                     self.context_cache["in_zone"] = (report['zones']['distance_to_zone'] < (price * settings.ZONE_PROXIMITY_FACTOR))
                     
-                # Fractal Coherence Logic
+                # Fractal Coherence Logic (DEPRECATED: Using defaults)
                 alignment_map = {}
                 coherence_score = 0.5
-                if self.mtf_engine:
-                    # Diagnose across all timeframes
-                    fractal_report = self.mtf_engine.diagnose_market_fractals(candles)
-                    alignment_map = fractal_report.get("alignment_map", {})
-                    coherence_score = fractal_report.get("coherence", 0.5)
-                    self.context_cache["alignment_map"] = alignment_map
-                    self.context_cache["fractal_coherence"] = coherence_score
+                self.context_cache["alignment_map"] = alignment_map
+                self.context_cache["fractal_coherence"] = coherence_score
 
                 # 4. Temporal Physics (Inter-Temporal Synthesis)
                 temporal_physics = feat_features.extract_temporal_physics(candles)
@@ -226,6 +218,20 @@ class NexusEngine:
                 input_vec = [latent_vector.get(name, 0.0) for name in feature_names]
                 
                 prediction = await self.ml_engine.predict_hybrid(input_vec, symbol)
+                
+                # --- [PHASE 10: PROTOCOL IRON CLAD - TRAINING WHEELS] ---
+                # Fetch brain health metrics
+                health = neural_health.get_health_metrics()
+                brier = health.get("brier_score", 0.5)
+                # Note: 'training_epochs' would ideally be tracked in neural_health or settings
+                is_immature = brier > 0.25 # If score > 0.25, brain is just guessing
+                
+                if is_immature:
+                    logger.warning(f"⚠️ CORTEX IMMATURE (Brier: {brier:.3f}): Forcing 'Protocol IRON CLAD'.")
+                    # Tighten Veto: Only trades with EXTREME neural confidence (Avoid random walk)
+                    if prediction.get("p_win", 0.0) < 0.90:
+                        logger.info("🛡️ IRON CLAD: Vetoed due to immature brain confidence.")
+                        return 
                 
                 # Strategy Convergence (Institutional Logic)
                 from nexus_core.convergence_engine import convergence_engine
@@ -265,6 +271,13 @@ class NexusEngine:
                     
                     # 6. Execution decision
                     if cv.score > settings.ALPHA_CONFIDENCE_THRESHOLD and not cv.vetoes and legs:
+                        # Final Safety Sweep: Force Volume if Immature
+                        health = neural_health.get_health_metrics()
+                        if health.get("brier_score", 0.5) > 0.25:
+                            for leg in legs:
+                                leg.volume = 0.01 # Hard Floor
+                                leg.intent = "TRAINING_WHEELS (Calibration Required)"
+                        
                         for leg in legs:
                             await self._execute_strategic_leg(symbol, leg, price, last_row, prediction, latent_vector)
 

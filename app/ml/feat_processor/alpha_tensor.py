@@ -26,6 +26,15 @@ class AlphaTensorOrchestrator:
         """
         if df.empty: return {}
 
+        # [CRITICAL DEFENSE] Ensure Unique Index
+        # Duplicate timestamps cause critical failures in pd.concat/reindex
+        if not df.index.is_unique:
+             df = df[~df.index.duplicated(keep='last')]
+        
+        # Ensure Monotonic
+        if not df.index.is_monotonic_increasing:
+             df = df.sort_index()
+
         # 1. TEMPORAL & LIQUIDITY VECTORIZATION
         df = self.chronos.process(df)
         
@@ -45,13 +54,31 @@ class AlphaTensorOrchestrator:
         
         # P(Scalp): High Force (F=ma) + High Entropy (Volatility) + Killzone
         # Logic: Scalping needs violence (Force) and Opportunity (Entropy/Killzone)
-        raw_scalp = (df["feat_force"] * df["killzone_intensity"] * df["physics_entropy"])
-        df["p_scalp"] = raw_scalp.clip(0, 1)
+        
+        # [CRITICAL ALIGNMENT] Ensure variables share same index before math
+        # [NUCLEAR OPTION] Force Flattened Numpy Arrays to bypass Pandas Checks
+        force = np.array(df["feat_force"].values).flatten()
+        killzone = np.array(df["killzone_intensity"].values).flatten()
+        entropy = np.array(df["physics_entropy"].values).flatten()
+        
+        # Ensure shapes match (min length)
+        min_len = min(len(force), len(killzone), len(entropy))
+        raw_scalp = force[:min_len] * killzone[:min_len] * entropy[:min_len]
+        
+        df["p_scalp"] = 0.0
+        df.iloc[:min_len, df.columns.get_loc("p_scalp")] = np.clip(raw_scalp, 0, 1)
         
         # P(DayTrade): Sustained Energy + Structural Confluence - Viscosity
         # Logic: Day trading needs clean moves (Low Viscosity) and Structure
-        raw_day = (df["physics_energy"] * df["confluence_score"] * (1 - df["physics_viscosity"]))
-        df["p_daytrade"] = raw_day.clip(0, 1)
+        energy = np.array(df["physics_energy"].values).flatten()
+        confluence = np.array(df["confluence_score"].values).flatten()
+        viscosity = np.array(df["physics_viscosity"].values).flatten()
+        
+        min_len_day = min(len(energy), len(confluence), len(viscosity))
+        raw_day = energy[:min_len_day] * confluence[:min_len_day] * (1.0 - viscosity[:min_len_day])
+        
+        df["p_daytrade"] = 0.0
+        df.iloc[:min_len_day, df.columns.get_loc("p_daytrade")] = np.clip(raw_day, 0, 1)
         
         # P(Swing): Massive Structural Displacement + Low Entropy (Order) + Macro Alignment
         # Logic: Swing needs Order (Low Entropy) and major Structural/Macro shifts

@@ -26,8 +26,24 @@ class VectorizedChronosProcessor:
         df = df.copy()
         
         # 0. Prep Time Indices
+        # [FIX] Robust index handling: ensure we have a DatetimeIndex
+        if not isinstance(df.index, pd.DatetimeIndex):
+            if 'time' in df.columns:
+                df.index = pd.to_datetime(df['time'])
+            else:
+                # Fallback: if no time column, we cannot calculate temporal features
+                # but we must prevent the crash. We'll use a dummy UTC index starting now.
+                df.index = pd.date_range(start=pd.Timestamp.now(tz='UTC'), periods=len(df), freq='min')
+
         if df.index.tz is None:
             df.index = df.index.tz_localize('UTC')
+            
+        # [CRITICAL FIX] Deduplicate Index
+        # Timestamp collisions cause downstream crashes (pd.concat/reindex)
+        df = df[~df.index.duplicated(keep='last')]
+        
+        # [DEFENSE] Sort index just in case
+        df = df.sort_index()
             
         # 1. CYCLICAL ENCODING (Doctoral Standard)
         # We use NY time for cycle centers to match Institutional clocks

@@ -84,11 +84,20 @@ class ShannonEntropyAnalyzer:
             Normalized entropy score [0.0 - 1.0].
             Higher = more random/noisy market.
         """
-        if len(prices) < self.window + 1:
-            return 0.5  # Neutral if insufficient data
+        # [FIX] Dynamic Warmup: mitigate "hardcoded" feel by allowing calculation on fewer bars
+        # Requirement: At least 10 bars to have statistical significance
+        min_warmup = 10
+        if len(prices) < min_warmup:
+            return 0.5  # Neutral if truly insufficient data
         
-        # Calculate returns
-        returns = np.diff(prices[-self.window-1:]) / prices[-self.window-1:-1]
+        # Use available data up to self.window
+        # If we have 20 bars, we use 20. If we have 100, we use 50 (self.window).
+        lookback = min(len(prices)-1, self.window)
+        
+        # Calculate returns on the dynamic window
+        # [-lookback-1:] gets us lookback+1 prices to compute 'lookback' returns
+        subset = prices[-lookback-1:]
+        returns = np.diff(subset) / subset[:-1]
         
         # Compute histogram
         counts = _calculate_bins(returns, self.num_bins)

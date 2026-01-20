@@ -1,3 +1,4 @@
+from __future__ import annotations
 import sys
 import os
 import asyncio
@@ -10,6 +11,7 @@ import time
 import json
 import argparse
 from datetime import datetime
+from typing import Dict, List, Optional, Any
 
 # Add root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -24,6 +26,7 @@ from app.ml.strategic_cortex import policy_agent, state_encoder, StrategicAction
 from nexus_core.neural_health import neural_health
 from app.ml.rlaif_critic import rlaif_critic
 from nexus_core.microstructure import micro_scanner
+from app.ml.data_collector import data_collector
 
 logging.basicConfig(level=logging.WARN, format='%(message)s')
 logger = logging.getLogger("WAR_SIM")
@@ -84,6 +87,37 @@ class BattlefieldSimulator:
             'volume': np.random.randint(50, 500, n_rows),
             'tick_volume': np.random.randint(50, 500, n_rows)
         })
+        return df
+
+    def get_real_data_batch(self, n_rows=1000) -> Optional[pd.DataFrame]:
+        """Fetches a random synchronized chunk of real market data from the DB."""
+        try:
+            with data_collector.db.get_connection() as conn:
+                # Synchronize M1 data for training
+                # We pick a random starting point in the database
+                total_rows = conn.execute("SELECT COUNT(*) FROM market_data WHERE timeframe = 'M1'").fetchone()[0]
+                if total_rows < n_rows + 50:
+                    return None
+                    
+                offset = random.randint(0, total_rows - n_rows - 50)
+                q = """
+                    SELECT open, high, low, close, volume as tick_volume
+                    FROM market_data 
+                    WHERE timeframe = 'M1' 
+                    ORDER BY tick_time ASC 
+                    LIMIT :limit OFFSET :offset
+                """
+                rows = conn.execute(q, {"limit": n_rows, "offset": offset}).fetchall()
+                if not rows: return None
+                
+                df = pd.DataFrame(rows, columns=['open', 'high', 'low', 'close', 'tick_volume'])
+                # Mock missing columns for the simulation loop
+                df['mock_long_pct'] = 50 + np.sin(np.linspace(0, 10, len(df))) * 20
+                df['mock_short_pct'] = 100 - df['mock_long_pct']
+                return df
+        except Exception as e:
+            logger.error(f"Error loading real data: {e}")
+            return None
         
         # [HERD RADAR] Stochastic Herd Model (PhD Logic)
         # Features: 1) Momentum Lag, 2) Contrarian Persistence (averaging down), 3) Random Noise
@@ -199,9 +233,15 @@ class BattlefieldSimulator:
         logger.info(f"\n⚔️ INICIANDO GIMNASIO RL: {episodes} episodios de entrenamiento ⚔️")
         
         for ep in range(episodes):
-            df = self.generate_synthetic_data(n_rows=500)
+            # Try to use REAL DATA if available, fallback to synthetic
+            df = self.get_real_data_batch(n_rows=500)
+            is_real = True
+            if df is None:
+                df = self.generate_synthetic_data(n_rows=500)
+                is_real = False
             
-            logger.info(f"\n--- EPISODIO {ep+1}/{episodes} START ---")
+            source_tag = "REAL" if is_real else "SYNTHETIC"
+            logger.info(f"\n--- EPISODIO {ep+1}/{episodes} START ({source_tag}) ---")
             
             self.balance = 20.0
             
@@ -316,7 +356,8 @@ class BattlefieldSimulator:
             self.write_status(ep + 1, episodes, self.balance, running=True)
 
         self.write_status(episodes, episodes, self.balance, running=False)
-        logger.info("\n🏆 WARFARE TRAINING COMPLETE.")
+        policy_agent.save_weights("models/strategic_policy.pth")
+        logger.info("\n🏆 WARFARE TRAINING COMPLETE. Weights saved to models/strategic_policy.pth")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="FEAT Sniper Battlefield Simulator")

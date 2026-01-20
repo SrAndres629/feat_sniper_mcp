@@ -262,7 +262,10 @@ class KineticEngine:
         if pd.isna(atr) or atr == 0: atr = price * 0.001
         atr = float(atr) # Ensure scalar
 
-        metrics = {}
+        # [FIX] Minimum periods = 1 to preserve length during training initialization
+        def _roll_mean(s, w): return s.rolling(window=w, min_periods=1).mean()
+        def _roll_std(s, w): return s.rolling(window=w, min_periods=1).std()
+
         centroids = {}
         slopes = {}
 
@@ -583,6 +586,48 @@ class KineticEngine:
             "control_layer_structure": 1.0 if control == "STRUCTURE" else 0.0,
             "control_layer_macro": 1.0 if control == "MACRO" else 0.0
         }
+
+    def compute_vectorized_physics(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        [DOCTORAL CORE] Vectorized physics calculation for training/analysis.
+        Preserves 1:1 length mapping with input.
+        """
+        res = pd.DataFrame(index=df.index)
+        close = df["close"]
+        high_low = df["high"] - df["low"]
+        atr = high_low.rolling(14, min_periods=1).mean()
+        
+        # 1. EMAs for all 3 Layers (Micro, Structure, Macro)
+        # Using centroids as proxy for Force/Energy calculations
+        c_micro = close.ewm(span=self.layers["micro"][0], adjust=False).mean()
+        c_struct = close.ewm(span=self.layers["structure"][0], adjust=False).mean()
+        c_macro = close.ewm(span=self.layers["macro"][0], adjust=False).mean()
+        
+        # 2. Physics Fields
+        # Force = Acceleration * Mass (RVOL)
+        # Accel = Current Close - Centroid
+        if "volume" in df.columns:
+            rvol = df["volume"] / (df["volume"].rolling(20, min_periods=1).mean() + 1e-9)
+        else:
+            rvol = pd.Series(1.0, index=df.index)
+            
+        res["feat_force"] = (abs(close - c_micro) / (atr + 1e-9)) * rvol
+        res["physics_energy"] = (abs(close - c_macro) / (atr + 1e-9)) * rvol
+        
+        # 3. Thermodynamics
+        # Entropy = Market Noise (Z-Score variance)
+        res["physics_entropy"] = (close.rolling(10, min_periods=1).std() / (atr + 1e-9)).clip(0, 1)
+        
+        # Viscosity = Resistance (Wick Ratio / Low Body Eff)
+        body = (df["close"] - df["open"]).abs()
+        range_s = (df["high"] - df["low"]) + 1e-9
+        res["physics_viscosity"] = (1.0 - (body / range_s)).clip(0, 1)
+        
+        # 4. Meta Labels
+        res["physics_force"] = res["feat_force"] # Aliasing
+        
+        return res
+
 
 # Singleton
 kinetic_engine = KineticEngine()

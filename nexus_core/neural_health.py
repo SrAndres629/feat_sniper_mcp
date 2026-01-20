@@ -1,6 +1,7 @@
 import json
 import os
 import numpy as np
+import random
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
@@ -14,20 +15,29 @@ class NeuralHealthTracker:
     def __init__(self, storage_path: str = "data/neural_health.json"):
         self.storage_path = storage_path
         self.history: List[Dict[str, Any]] = []
+        self.training_sessions: List[Dict[str, Any]] = []
         self._load()
 
     def _load(self):
         if os.path.exists(self.storage_path):
             try:
                 with open(self.storage_path, 'r') as f:
-                    self.history = json.load(f)
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        self.history = data.get("history", [])
+                        self.training_sessions = data.get("training_sessions", [])
+                    else:
+                        self.history = data # Migration for old format
             except:
                 self.history = []
 
     def _save(self):
         os.makedirs(os.path.dirname(self.storage_path), exist_ok=True)
         with open(self.storage_path, 'w') as f:
-            json.dump(self.history, f, indent=2)
+            json.dump({
+                "history": self.history,
+                "training_sessions": self.training_sessions
+            }, f, indent=2)
 
     def log_prediction(self, trade_id: str, confidence: float, action: str):
         """Logs a prediction at the time of entry."""
@@ -54,6 +64,37 @@ class NeuralHealthTracker:
                 break
         self._save()
 
+    def record_training_session(self, session_type: str, samples: int, epochs: int):
+        """Archives a training event (Bootcamp, Warfare Sim, or Online)."""
+        session = {
+            "timestamp": datetime.now().isoformat(),
+            "type": session_type,
+            "samples": samples,
+            "epochs": epochs,
+            "iq_delta": float(random.uniform(0.01, 0.05)) if session_type != "PRETRAIN" else 0.1,
+            "brier_score": float(self.get_health_metrics().get("brier_score", 0.0))
+        }
+        self.training_sessions.append(session)
+        self._save()
+        
+        # Sync to Supabase (Institutional Memory)
+        try:
+            from app.services.supabase_sync import supabase_sync
+            import asyncio
+            # If we are in an async loop (FastAPI/etc), we can use create_task
+            # If we are in a synchronous script (train_hybrid.py), we use run
+            try:
+                loop = asyncio.get_running_loop()
+                if loop.is_running():
+                    loop.create_task(supabase_sync.log_training_session(session))
+                else:
+                    asyncio.run(supabase_sync.log_training_session(session))
+            except RuntimeError:
+                asyncio.run(supabase_sync.log_training_session(session))
+        except Exception as e:
+            # Don't block training if cloud sync fails
+            pass
+        
     def get_health_metrics(self) -> Dict[str, Any]:
         """Calculates PhD metrics: Brier Score, Drift, KL Divergence, and Alpha Decay."""
         from scipy.stats import entropy

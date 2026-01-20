@@ -56,6 +56,40 @@ class SniperDataset(Dataset):
                self.form[idx], self.space[idx], self.accel[idx], self.time[idx], \
                self.kinetic[idx], self.spatial_maps[idx]
 
+def pre_flight_guard(symbol: str, data_path: str = None, real: bool = False):
+    """
+    [PHASE 11] Institutional Pre-Flight Guard.
+    Verifies data integrity and resource availability before ignition.
+    """
+    logger.info("🛡️ Running Pre-Flight Guard...")
+    
+    # 1. Check Directories
+    os.makedirs(settings.MODELS_DIR, exist_ok=True)
+    os.makedirs("data", exist_ok=True)
+    
+    # 2. Check Data
+    if real:
+        db_path = "data/market_data.db"
+        if not os.path.exists(db_path):
+            logger.error(f"❌ FATAL: Database not found at {db_path}. Run download_history.py first.")
+            return False
+            
+        import sqlite3
+        conn = sqlite3.connect(db_path)
+        count = conn.execute(f"SELECT COUNT(*) FROM market_data WHERE symbol = '{symbol}'").fetchone()[0]
+        conn.close()
+        
+        if count < 1000:
+            logger.error(f"❌ FATAL: Insufficient data for {symbol} (Found {count} rows, Need 1000+).")
+            return False
+        logger.info(f"✅ Database check passed ({count} records found).")
+    
+    # 3. Check Hardware
+    device = "CUDA" if torch.cuda.is_available() else "CPU"
+    logger.info(f"✅ Hardware check passed (Running on {device}).")
+    
+    return True
+
 def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
     """
     [LEVEL 50] Training Loop for HybridProbabilistic.
@@ -112,6 +146,8 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
     
     # 4. Training Loop
     best_loss = float('inf')
+    early_stop_patience = 8
+    epochs_no_improve = 0
     
     model.train()
     for epoch in range(epochs):
@@ -141,7 +177,20 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
             optimizer.zero_grad()
             
             # Forward
-            outputs = model(seq, feat_input=feat_input) 
+            # [v5.0] We pass the physics_val as the 4D Physics Tensor for Gating
+            # Note: SniperDataset 'physics' is FloatTensor(N) or (N, D). 
+            # In train_hybrid.py, it's currently initialized as np.zeros(len(df)).
+            # We need it to be (Batch, 4): Force, Energy, Entropy, Viscosity
+            
+            # Reconstruction of Physics Tensor from the latent feat_input bags for the model
+            p_tensor = torch.stack([
+                feat_input["accel"][:, 1], # energy_z
+                feat_input["accel"][:, 2], # accel_score
+                feat_input["kinetic"][:, 0], # struct_age proxy for entropy
+                feat_input["kinetic"][:, 2]  # layer_alignment proxy for viscosity
+            ], dim=1)
+
+            outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor) 
             logits = outputs["logits"] # (Batch, 3)
             
             # Loss (Singularity Aware)
@@ -175,8 +224,25 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
                 "config": {"input_dim": input_dim, "hidden_dim": 64}
             }, save_path)
             logger.info(f"💾 Model checkpoint saved to {save_path}")
+            epochs_no_improve = 0
+        else:
+            epochs_no_improve += 1
+            if epochs_no_improve >= early_stop_patience:
+                logger.info(f"🛑 Early stopping triggered at epoch {epoch+1}. Convergence reached.")
+                break
 
     logger.info("✅ Training Complete.")
+    
+    # Record Training Milestone
+    try:
+        from nexus_core.neural_health import neural_health
+        neural_health.record_training_session(
+            session_type="HYBRID_FOUNDATION",
+            samples=len(dataset),
+            epochs=epochs
+        )
+    except:
+        pass
 
 def load_real_data(symbol: str, data_path: str = None, seq_len=60):
     """
@@ -230,10 +296,7 @@ def load_real_data(symbol: str, data_path: str = None, seq_len=60):
         # Map -1,0,1 to 0,1,2 (Classes)
         df['label'] = df['label'].map({-1.0: 0, 0.0: 1, 1.0: 2})
 
-    # [TOPOLOGICAL NORMALIZATION]
-    # Ensure all dist_* columns are correctly ATR-normalized (should be done by processor)
-    # [TOPOLOGICAL NORMALIZATION]
-    # Ensure all dist_* columns are correctly ATR-normalized (should be done by processor)
+    # [v5.0] UNIFIED DOCTORAL FEATURE NAMES
     seq_cols = list(settings.NEURAL_FEATURE_NAMES)
     
     # Validate columns
@@ -314,9 +377,14 @@ if __name__ == "__main__":
     parser.add_argument("--data_path", type=str, default=None, help="Path to Parquet data")
     parser.add_argument("--real", action="store_true", help="Use Real Data Pipeline")
     parser.add_argument("--epochs", type=int, default=settings.NEURAL_EPOCHS)
+    parser.add_argument("--batch_size", type=int, default=settings.NEURAL_BATCH_SIZE)
     args = parser.parse_args()
     
     if args.real or args.data_path:
+        if not pre_flight_guard(args.symbol, real=args.real):
+            print("❌ PRE-FLIGHT GUARD FAILED. Aborting training.")
+            sys.exit(1)
+            
         print(f"🧬 INITIATING GREAT RETRAINING PROTOCOL FOR {args.symbol}...")
         X, y, phys, feats = load_real_data(args.symbol, data_path=args.data_path)
         
@@ -324,7 +392,7 @@ if __name__ == "__main__":
             temp_path = "data/temp_real_train.npz"
             np.savez(temp_path, X=X, y=y, physics=phys, static_features=feats)
             
-            train_hybrid_model(args.symbol, temp_path, epochs=args.epochs, batch_size=settings.NEURAL_BATCH_SIZE)
+            train_hybrid_model(args.symbol, temp_path, epochs=args.epochs, batch_size=args.batch_size)
             
             if os.path.exists(temp_path):
                os.remove(temp_path)

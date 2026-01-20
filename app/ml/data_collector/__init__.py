@@ -1,6 +1,7 @@
 from .engine import DataCollector
 from .constants import DB_PATH, TIMEFRAMES, TIMEFRAME_MAP, SystemState
 from .cvd import fetch_tick_data, compute_real_cvd, fetch_historical_ticks
+from .labeler import OracleLabeler
 
 data_collector = DataCollector()
 
@@ -22,5 +23,6 @@ async def flush_pending():
 __all__ = [
     "data_collector", "collect_sample", "collect_ticks", "get_collection_stats", "flush_pending",
     "fetch_tick_data", "compute_real_cvd", "fetch_historical_ticks",
+    "OracleLabeler",
     "SystemState", "TIMEFRAMES", "TIMEFRAME_MAP"
 ]

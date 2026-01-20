@@ -1,5 +1,6 @@
+from __future__ import annotations
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from supabase import create_client, Client
 from app.core.config import settings
 
@@ -16,10 +17,10 @@ class SupabaseSync:
     Attributes:
         _client: Supabase client instance.
     """
-    _client: Optional[Client] = None
+    _client: Client | None = None
 
     @property
-    def client(self) -> Optional[Client]:
+    def client(self) -> Client | None:
         """Provides access to the raw Supabase client."""
         return self._client
 
@@ -184,6 +185,31 @@ class SupabaseSync:
         await anyio.to_thread.run_sync(
             lambda: self._client.table("neural_signals").insert(payload).execute()
         )
+
+    @resilient(max_retries=3)
+    async def log_training_session(self, session_data: Dict[str, Any]) -> None:
+        """
+        [PHASE 10] Archives a complete Neural Evolution Session to the cloud.
+        Stores IQ deltas, Brier scores, and sample counts.
+        """
+        if not self._client:
+            return
+
+        payload = {
+            "timestamp": session_data.get("timestamp"),
+            "session_type": session_data.get("type", "WARFARE"),
+            "samples_seen": session_data.get("samples", 0),
+            "epochs": session_data.get("epochs", 0),
+            "iq_delta": float(session_data.get("iq_delta", 0.0)),
+            "brier_score": float(session_data.get("brier_score", 0.0)),
+            "metadata": session_data
+        }
+        
+        import anyio
+        await anyio.to_thread.run_sync(
+            lambda: self._client.table("neural_training_history").insert(payload).execute()
+        )
+        logger.info(f"🧠 Neural Evolution Session Synced: {payload['session_type']} (+{payload['iq_delta']*100:.1f} IQ)")
 
 # Instancia global
 supabase_sync = SupabaseSync()

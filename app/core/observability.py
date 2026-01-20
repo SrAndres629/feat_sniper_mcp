@@ -1,10 +1,11 @@
+from __future__ import annotations
 import time
 import asyncio
 import logging
 import functools
 import os
 from enum import Enum
-from typing import Optional, Callable, Any, Dict
+from typing import Callable, Any, Dict
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
 from opentelemetry import trace
 from opentelemetry.sdk.resources import SERVICE_NAME, Resource
@@ -144,7 +145,7 @@ class ObservabilityEngine:
     """
     Controlador maestro de telemetra y mtricas institucionales.
     """
-    _instance = None
+    _instance: 'ObservabilityEngine' | None = None
     
     def __init__(self):
         self.start_time = time.time()
