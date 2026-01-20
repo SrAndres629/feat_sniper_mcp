@@ -15,6 +15,11 @@ from app.ml.ml_engine import ml_engine
 from app.services.risk import risk_engine
 from nexus_core.acceleration import acceleration_engine
 
+# Strategic Cortex Hardware
+from app.ml.strategic_cortex import policy_agent, state_encoder, StrategicAction
+from app.ml.rlaif_critic import rlaif_critic
+from nexus_core.microstructure import micro_scanner
+
 logging.basicConfig(level=logging.WARN, format='%(message)s')
 logger = logging.getLogger("WAR_SIM")
 logger.setLevel(logging.INFO)
@@ -27,9 +32,10 @@ class BattlefieldSimulator:
     """
     def __init__(self, symbol="XAUUSD"):
         self.symbol = symbol
-        self.balance = 10000.0
+        self.balance = 20.0 # Small Account Survival Trial
         self.positions = []
         self.history = []
+        self.training_steps = 0
 
     def generate_synthetic_data(self, n_rows=200):
         """Generates a volatile market scenario (Pump & Dump)"""
@@ -70,76 +76,82 @@ class BattlefieldSimulator:
         
         return df
 
-    async def run_simulation(self):
-        logger.info("⚔️ INICIANDO SIMULACRO DE COMBATE [DRY RUN] ⚔️")
-        df = self.generate_synthetic_data()
+    async def run_simulation(self, episodes=5):
+        logger.info(f"⚔️ INICIANDO GIMNASIO RL: {episodes} episodios de entrenamiento ⚔️")
         
-        # Pre-process features
-        features = feat_processor.process_dataframe(df)
-        
-        logger.info("\n--- [SIMULACIÓN START] ---")
-        
-        for i in range(50, len(df)):
-            row = df.iloc[i]
-            feat_row = features.iloc[i]
+        for ep in range(episodes):
+            df = self.generate_synthetic_data(n_rows=500)
+            features = feat_processor.process_dataframe(df)
             
-            # 1. Physics Check
-            acc_data = acceleration_engine.calculate_momentum_vector(df.iloc[i-5:i+1])
-            is_accelerating = acc_data.get("is_valid", False)
+            logger.info(f"\n--- EPISODIO {ep+1}/{episodes} START ---")
             
-            # 2. ML Prediction (Mocking hydrating sequence)
-            # In real loop, we append to deque. Here we just mock result for speed if model not trained
-            # But let's try to actually call the engine if possible
-            # ml_engine.hydrate(self.symbol, [row['close']], [feat_row.to_dict()])
+            # Reset account for Episode
+            self.balance = 20.0
             
-            # Simulate ML output heavily influenced by Physics for this test
-            # If accelerating, ML should learn to buy.
-            
-            ml_pred = await ml_engine.predict_async(self.symbol, {
-                **feat_row.to_dict(), 
-                "close": row['close'], 
-                "volume": row['volume'],
-                "atr": row['atr'],
-                "avg_atr": row['avg_atr']
-            })
-            
-            p_win = ml_pred.get("p_win", 0.5)
-            
-            # 3. Decision Logic
-            action = "HOLD"
-            if is_accelerating and p_win > 0.6:
-                action = "BUY"
-            elif p_win < 0.4:
-                action = "SELL"
+            for i in range(50, len(df)):
+                row = df.iloc[i]
+                feat_row = features.iloc[i]
                 
-            # DEBUG: Why no trades?
-            if i % 25 == 0:
-                 logger.info(f"[{row['time']}] ... Escaneando ... (Price: {row['close']:.2f}) | Conf: {p_win:.3f} | Accel: {is_accelerating}")
-
-            # 4. Risk Gate
-            if action != "HOLD":
+                # 1. Physics & Microstructure (Simulated)
+                prices = df['close'].iloc[i-50:i+1].values
+                # Simulate some ticks for Microscanner
+                mock_ticks = [
+                    {'bid': row['close']-0.1, 'ask': row['close']+0.1, 'bid_vol': 100, 'ask_vol': 50}
+                    for _ in range(20)
+                ]
+                micro_state = micro_scanner.process_tick_batch(mock_ticks, prices)
+                
+                # 2. Strategic Cortex Decision
+                neural_probs = {'scalp': 0.75, 'day': 0.5, 'swing': 0.2} # Mock
+                
+                state_vec = state_encoder.encode(
+                    account_state={"balance": self.balance, "phase_name": "SURVIVAL"},
+                    microstructure=micro_scanner.get_dict(),
+                    neural_probs=neural_probs,
+                    physics_state={"titanium": "NEUTRAL", "feat_composite": 50.0}
+                )
+                
+                # Agent makes a decision
+                action, prob, value = policy_agent.select_action(state_vec)
+                
+                # 3. Simulate Outcome & Get Reward
+                # (Simple model: if we buy/twin and price goes up in 10 bars, positive)
+                future_price = df['close'].iloc[min(i+10, len(df)-1)]
+                price_change_pct = (future_price - row['close']) / row['close']
+                
+                pnl = 0.0
+                if action != StrategicAction.HOLD:
+                    pnl = price_change_pct * 10.0 # Leveraged effect for P&L
+                
+                # RLAIF Critic gives the reward
+                trade_result = {"profit": pnl, "type": action.name}
                 context = {
-                    "close": row['close'], 
-                    "atr": row['atr'], 
-                    "avg_atr": row['avg_atr'],
-                    "symbol": self.symbol,
-                    "bid": row['close']
+                    "feat_score": feat_row.get('L1_Mean', 50.0),
+                    "entropy": micro_state.entropy_score,
+                    "drawdown_pct": max(0, 20.0 - self.balance) / 20.0
                 }
-                # Use Mock Cb
-                allowed, regime = await risk_engine.check_trading_veto(self.symbol, context, 1.0)
                 
-                if allowed:
-                    logger.info(f"[{row['time']}] 🚀 ORDEN EJECUTADA: {action} @ {row['close']:.2f} | Conf: {p_win:.2f} | Phys: {acc_data['acceleration']:.4f}")
-                    self.history.append({"time": row['time'], "action": action, "price": row['close'], "result": "OPEN"})
-                else:
-                    logger.info(f"[{row['time']}] 🛡️ RISK VETO: {regime}")
+                reward = rlaif_critic.critique_trade(trade_result, context)
+                
+                # RECORD EXPERIENCE
+                policy_agent.record_experience(state_vec, action.value, reward, value, prob)
+                
+                self.balance += pnl
+                
+                # 4. Training (Every N steps)
+                self.training_steps += 1
+                if self.training_steps % 64 == 0:
+                    logger.info("🧠 CORTEX: Updating Policy Network from Experience Buffer...")
+                    # policy_agent.update() # Placeholder for actual PPO step logic if implemented
+                
+                if self.balance < 5: # Ruin check
+                    logger.warning(f"💀 ACCOUNT BLOWN @ Step {i} | Restarting Episode...")
+                    break
             
-            # Log periodic heartbeat
-            if i % 25 == 0:
-                logger.info(f"[{row['time']}] ... Escaneando ... (Price: {row['close']:.2f})")
+            logger.info(f"EPISODE {ep+1} COMPLETE. Final Balance: ${self.balance:.2f}")
 
-        logger.info("\n--- [SIMULACIÓN COMPLETE] ---")
-        logger.info(f"Trades Generated: {len(self.history)}")
+        logger.info("\n🏆 WARFARE TRAINING COMPLETE.")
+
         
 if __name__ == "__main__":
     sim = BattlefieldSimulator()

@@ -139,3 +139,20 @@ FROM
     market_data
 WHERE
     label IS NOT NULL;
+
+-- 6. TICK-LEVEL MICROSTRUCTURE (For high-frequency training)
+CREATE TABLE IF NOT EXISTS tick_data (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tick_time TIMESTAMP NOT NULL,
+    symbol TEXT NOT NULL,
+    bid REAL,
+    ask REAL,
+    bid_vol REAL,
+    ask_vol REAL,
+    ofi REAL,
+    entropy REAL,
+    hurst REAL,
+    cvd REAL
+);
+
+CREATE INDEX IF NOT EXISTS idx_tick_lookup ON tick_data (symbol, tick_time DESC);

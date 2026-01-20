@@ -33,31 +33,40 @@ class RLAIFCritic:
         reason = "Neutral"
         
         # 1. Outcome vs Process Matrix (The Compass)
+        # Formula: Reward = (Profit * 1.0) - (Loss * 2.5) - (DD_Penalty) + (Entropy_Avoidance)
+        
+        # A. Base PnL Reward (Asymmetric)
         if pnl > 0:
-            if feat_score > 60:
-                reward = 1.0
-                reason = "✅ EXCELLENT: Good Process + Good Outcome"
-            else:
-                reward = -0.2 # Reduced punishment if lucky, but still not encouraging
-                reason = "⚠️ LUCK: Bad Process + Good Outcome"
+            reward = 1.0 # Standard Win
+            reason = "✅ WIN: Profit Secured"
         else:
-             if feat_score > 60:
-                 reward = 0.2
-                 reason = "🛡️ STOIC: Good Process + Bad Outcome (Market Noise)"
-             else:
-                 reward = -1.0
-                 reason = "❌ FAILURE: Bad Process + Bad Outcome"
+            reward = -2.5 # Heavy Penalty for Loss (Survival Mode)
+            reason = "❌ LOSS: Capital Erosion"
 
-        # 2. [LEVEL 30] Meta-Consistency Bonus/Penalty
-        # Did we trade against Physics?
-        if acceleration < 0.2 and abs(pnl) > 0:
-             reward -= 0.3
-             reason += " [PHYSICS VIOLATION]"
+        # B. Drawdown Protection (The $20 Shield)
+        # Penalize if this trade caused or deepened a drawdown
+        drawdown_pct = context.get("drawdown_pct", 0.0) 
+        if drawdown_pct > 0.05: # If Drawdown > 5%
+            dd_penalty = drawdown_pct * 10
+            reward -= dd_penalty
+            reason += f" [DD PENALTY -{dd_penalty:.2f}]"
+
+        # C. Entropy Avoidance Bonus (The Discipline)
+        # If we stayed out (HOLD) during High Entropy, huge reward.
+        # This requires knowing if action was HOLD. 
+        # For now, if we Traded in High Entropy, we punish.
+        entropy_score = context.get("entropy", 0.0)
+        if entropy_score > 0.6:
+            reward -= 1.0
+            reason += " [HIGH ENTROPY VIOLATION]"
+        elif entropy_score < 0.4 and pnl > 0:
+             reward += 0.5
+             reason += " [LOW ENTROPY SNIPE]"
              
-        # Did we trade against Regime? (Assume context has 'trend_aligned')
-        if not context.get("trend_aligned", True):
-             reward -= 0.5
-             reason += " [TREND VIOLATION]"
+        # D. Process Consistency
+        if feat_score > 60 and pnl > 0:
+             reward += 0.2
+             reason += " + [GOOD PROCESS]"
 
         # Clamp Reward
         reward = max(-1.0, min(1.0, reward))

@@ -45,6 +45,10 @@ class MarketSnapshot:
     titanium_floor: bool
     neural_probs: dict
     recommendation: str
+    microstructure: dict = None # Added for Strategic Cortex
+
+# Microstructure Imports
+from nexus_core.microstructure import micro_scanner
 
 class NexusEngine:
     """
@@ -75,6 +79,7 @@ class NexusEngine:
         self.state = EngineState.SENSING
         
         # Get Fractal Diagnosis (Multi-Timeframe Alignment)
+        # In PROD, this fetches real data from the exchange
         fractal_result = diagnose_market_fractals(mock_mode=self.demo_mode)
         
         logger.info(f"🌀 Fractal Coherence: {fractal_result['coherence_score']*100:.1f}% | Bias: {fractal_result['dominant_bias']}")
@@ -88,14 +93,23 @@ class NexusEngine:
         """
         self.state = EngineState.PERCEIVING
         
-        # In production, this would call ConvergenceEngine and SpectralTensorBuilder
-        # For now, we mock based on fractal coherence
+        # 1. Get Real Microstructure State (via Scanner)
+        micro_state_obj = micro_scanner.get_dict()
+        
+        # Fallback mock for demo visualization if scanner has no tick history yet
+        if self.demo_mode and micro_state_obj['entropy_score'] == 0.5:
+             micro_state_obj = {
+                "entropy_score": 0.35 if fractal_data['coherence_score'] > 0.6 else 0.75,
+                "ofi_z_score": 1.5 if fractal_data['dominant_bias'] == 'BULLISH' else -0.5,
+                "hurst": 0.65
+             }
+
         coherence = fractal_data['coherence_score']
         
-        # Mock Titanium Floor Detection (High coherence = Titanium)
+        # Titanium Floor Detection (Simulated for now, would use ConvergenceEngine)
         titanium = coherence > 0.70
         
-        # Mock Neural Probabilities
+        # Mock Neural Probabilities (Mapping from fractal diagnosis)
         if fractal_data['dominant_bias'] == 'BULLISH':
             neural_probs = {'scalp': 0.85, 'day': 0.60, 'swing': 0.40}
         elif fractal_data['dominant_bias'] == 'BEARISH':
@@ -104,12 +118,13 @@ class NexusEngine:
             neural_probs = {'scalp': 0.50, 'day': 0.40, 'swing': 0.20}
             
         snapshot = MarketSnapshot(
-            price=2050.0,  # Mock price
+            price=2050.0,  # Simulation Price
             fractal_coherence=coherence,
             dominant_bias=fractal_data['dominant_bias'],
             titanium_floor=titanium,
             neural_probs=neural_probs,
-            recommendation=fractal_data['recommendation']
+            recommendation=fractal_data['recommendation'],
+            microstructure=micro_state_obj
         )
         
         if titanium:
@@ -120,21 +135,27 @@ class NexusEngine:
     def decide(self, snapshot: MarketSnapshot) -> bool:
         """
         PHASE 3: DECIDE
-        Should we trade? Gate based on Coherence and Titanium.
+        Should we trade? Gate based on Coherence, Titanium and Noise.
         """
         self.state = EngineState.DECIDING
         
-        # Gate 1: Minimum Coherence
+        # Gate 1: Entropy Check (Noise Filter)
+        # If entropy is too high, market is "drunk" - avoid trading.
+        if snapshot.microstructure.get('entropy_score', 0.5) > 0.8:
+            logger.warning(f"❌ TRADE BLOCKED: Market is DRUNK (High Entropy: {snapshot.microstructure['entropy_score']:.2f})")
+            return False
+            
+        # Gate 2: Minimum Coherence
         if snapshot.fractal_coherence < self.min_coherence_for_trade:
             logger.warning(f"❌ TRADE BLOCKED: Low Coherence ({snapshot.fractal_coherence*100:.1f}% < 50%)")
             return False
         
-        # Gate 2: Titanium Floor Required for Entry
+        # Gate 3: Titanium Floor Required for Entry
         if not snapshot.titanium_floor:
             logger.warning("❌ TRADE BLOCKED: No Titanium Floor detected.")
             return False
         
-        # Gate 3: Neutral Bias = No Trade
+        # Gate 4: Neutral Bias = No Trade
         if snapshot.dominant_bias == 'NEUTRAL':
             logger.warning("❌ TRADE BLOCKED: Market is NEUTRAL (No clear direction).")
             return False
@@ -151,9 +172,6 @@ class NexusEngine:
         
         direction = "BUY" if snapshot.dominant_bias == "BULLISH" else "SELL"
         
-        # If High Coherence -> Twin Trading
-        # If Medium Coherence -> Single Standard
-        
         if snapshot.recommendation == 'TWIN_AGGRESSIVE':
             logger.info("♟️ STRATEGY: TWIN SNIPER (Cash Flow + Wealth Runner)")
         else:
@@ -163,7 +181,8 @@ class NexusEngine:
             market_price=snapshot.price,
             neural_probs=snapshot.neural_probs,
             macro_context={'direction': direction},
-            titanium_level=snapshot.titanium_floor
+            titanium_level=snapshot.titanium_floor,
+            microstructure_state=snapshot.microstructure
         )
         
         for i, leg in enumerate(legs):
@@ -194,6 +213,7 @@ class NexusEngine:
         """
         self.state = EngineState.MANAGING
         
+        # StrategyEngine has optimize_targets (inherited from previous implementation)
         promoted = self.strategy_engine.optimize_targets(
             active_trades=self.active_trades,
             fresh_probs=snapshot.neural_probs

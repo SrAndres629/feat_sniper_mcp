@@ -24,6 +24,8 @@ class TradeLeg:
     strategy_type: StrategyMode
     intent: str # "Cash Flow" or "Wealth Run"
 
+from app.ml.strategic_cortex import policy_agent, state_encoder, StrategicAction
+
 class StrategyEngine:
     def __init__(self, risk_manager):
         self.risk_manager = risk_manager
@@ -39,15 +41,49 @@ class StrategyEngine:
                                  market_price: float,
                                  neural_probs: dict, 
                                  macro_context: dict,
-                                 titanium_level: bool) -> List[TradeLeg]:
+                                 titanium_level: bool,
+                                 microstructure_state: Optional[dict] = None) -> List[TradeLeg]:
         """
         Decides HOW to trade. Returns a list of TradeLegs (1 or 2).
         
         Args:
             neural_probs: {'scalp': 0.9, 'day': 0.3, 'swing': 0.1}
-            macro_context: {'zone': 'H4_Demand', 'trend': 'Bullish'}
+            macro_context: {'zone': 'H4_Demand', 'trend': 'Bullish', 'direction': 'BUY'}
             titanium_level: True if Titanium Floor detected.
+            microstructure_state: {entropy, ofi_z, hurst} (Optional for backward compat)
         """
+        
+        # --- STRATEGIC CORTEX (Shadow Mode) ---
+        ai_decision = "N/A"
+        if microstructure_state:
+            # 1. Encode State
+            # We construct the physics state from available inputs
+            physics_state = {
+                "feat_composite": 50.0, # Placeholder or need input
+                "titanium": "TITANIUM_SUPPORT" if titanium_level else "NEUTRAL",
+                "acceleration": 0.0,
+                "hurst_gate": True
+            }
+            
+            # Create State Vector
+            state_vec = state_encoder.encode(
+                account_state=self.risk_manager.get_fund_status(),
+                microstructure=microstructure_state,
+                neural_probs=neural_probs,
+                physics_state=physics_state
+            )
+            
+            # 2. Consult Policy Network
+            action, prob, val = policy_agent.select_action(state_vec)
+            ai_decision = f"{action.name} ({prob:.1%})"
+            
+            # 3. Log Shadow Decision
+            print(f"🧠 CORTEX THOUGHTS: {ai_decision} | Value: {val:.2f} | Entropy: {microstructure_state.get('entropy_score',0):.2f}")
+            
+            # In FUTURE, we will override 'legs' generation here based on 'action'
+        
+        
+        # --- LEGACY LOGIC (Determininstic) ---
         
         # 1. Determine Bias
         # Example logic: If Titanium Floor (PVP+EMA), direction is determined by physics/trend
