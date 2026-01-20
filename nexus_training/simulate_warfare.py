@@ -5,6 +5,8 @@ import logging
 import pandas as pd
 import numpy as np
 import torch
+import random
+import time
 from datetime import datetime
 
 # Add root to path
@@ -161,9 +163,23 @@ class BattlefieldSimulator:
                 
                 action, prob, value = policy_agent.select_action(state_vec)
                 
-                # Simulate price movement
+                # [IRON FORGE] ADVERSARIAL GYM
+                # 1. Latency Simulation (The Brain vs The Wire)
+                # In real life, 200ms lag kills the perfect entry.
+                latency = random.uniform(0.05, 0.300) # 50ms to 300ms
+                time.sleep(latency) 
+                
+                # 2. Slippage / Spread Stretcher (The Broker vs You)
+                # Broker widens spread or slips you on high vol
+                tick_size = 0.01
+                slippage_ticks = random.choice([-1, 0, 1, 2]) # Biased slightly against
+                slippage = slippage_ticks * tick_size
+                
+                execution_price = row['close'] + slippage if action != StrategicAction.HOLD else row['close']
+                
+                # Simulate price movement from EXECUTION PRICE (not theoretical close)
                 future_price = df['close'].iloc[min(i+10, len(df)-1)]
-                price_change_pct = (future_price - row['close']) / row['close']
+                price_change_pct = (future_price - execution_price) / execution_price
                 
                 # Simple PnL: Action scaling
                 pnl = 0.0
@@ -176,8 +192,13 @@ class BattlefieldSimulator:
                 reward = rlaif_critic.critique_trade(trade_result, {
                     "feat_score": 50.0, 
                     "entropy": micro_state.entropy_score,
-                    "drawdown_pct": max(0, 20.0 - self.balance) / 20.0
+                    "drawdown_pct": max(0, 20.0 - self.balance) / 20.0,
+                    "slippage_paid": slippage # Feed this pain to the critic if possible
                 })
+                
+                # [ADVERSARIAL] Penalty for High Entropy Entries
+                if micro_state.entropy_score > 0.6 and action != StrategicAction.HOLD:
+                    reward -= 2.0 # Explicit punishment for gambling in noise
                 
                 # Record (Simplified storage)
                 policy_agent.record_experience(state_vec, action, reward, state_vec, False)

@@ -21,7 +21,7 @@ Transforming market chaos into mathematical certainty. The FEAT Software Factory
 
 ### 🚩 ACTIVE PROTOCOLS (Phase 5)
 1. **Adaptive Meta-Controller**: Dynamic scaling of math windows via `AdaptationEngine` to eliminate fixed-parameter bias.
-2. **Soft Labeling Protocol**: Using `labeling.py` to generate probabilistic targets, preventing neural mode collapse in fuzzy zones.
+2. **Soft Labeling Protocol**: Using `app/ml/data_collector/labeler.py` to generate probabilistic targets, preventing neural mode collapse in fuzzy zones.
 3. **Volume Shape Vision**: Leveraging the `Volume Core` KDE engine to inject 1D shape tensors (P/b/D) into the attention heads.
 ### 4. Operation Liquid Density (Volume Core)
 - Implement **KDE (Kernel Density Estimation)** to replace fixed volume bins.
