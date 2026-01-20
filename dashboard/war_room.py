@@ -282,6 +282,43 @@ def render_neural_tab(state):
             st.plotly_chart(fig_map, use_container_width=True)
         else:
             st.info("Gathering spatial tensors...")
+    
+    # HERD RADAR: Retail Sentiment Display
+    st.divider()
+    st.subheader("🐑 HERD RADAR (Contrarian Indicator)")
+    
+    sentiment = state.get("sentiment", {})
+    if sentiment:
+        hc1, hc2, hc3, hc4 = st.columns(4)
+        
+        long_pct = sentiment.get("long_pct", 50)
+        short_pct = sentiment.get("short_pct", 50)
+        liquidity_bias = sentiment.get("liquidity_bias", "NEUTRAL")
+        liquidity_dir = sentiment.get("liquidity_direction", "BALANCED")
+        
+        # Display sentiment bars
+        hc1.metric("🟢 Retail Long", f"{long_pct:.0f}%")
+        hc2.metric("🔴 Retail Short", f"{short_pct:.0f}%")
+        
+        # Liquidity interpretation
+        if liquidity_bias == "BULLISH":
+            hc3.success(f"📈 {liquidity_bias}")
+        elif liquidity_bias == "BEARISH":
+            hc3.error(f"📉 {liquidity_bias}")
+        else:
+            hc3.info(f"⚖️ {liquidity_bias}")
+        
+        hc4.metric("🎯 Liquidity Pool", liquidity_dir)
+        
+        # Interpretation helper
+        if long_pct < 40:
+            st.info("📊 Retail is mostly SHORT → Smart Money likely targets stops ABOVE → Bullish Bias")
+        elif long_pct > 60:
+            st.info("📊 Retail is mostly LONG → Smart Money likely targets stops BELOW → Bearish Bias")
+        else:
+            st.caption("📊 Sentiment is balanced - no clear contrarian edge")
+    else:
+        st.caption("Waiting for MyFxBook sentiment data...")
 
 def render_war_room_tab(state):
     st.subheader("Operational Management")

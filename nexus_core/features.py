@@ -10,6 +10,7 @@ from typing import Dict, Any
 from nexus_core.math_engine import fast_bin_indices, bin_volume_fast, calculate_weighted_kde
 from nexus_core.structure_engine import structure_engine
 from nexus_core.acceleration import acceleration_engine
+from nexus_core.herd_radar import herd_radar
 
 class FEATFeatures:
     def __init__(self):
@@ -190,6 +191,21 @@ class FEATFeatures:
         energy_tensor = np.array(energy_map.get("energy_tensor", []))
         energy_score = np.mean(np.abs(energy_tensor)) if len(energy_tensor) > 0 else 0.0
         
+        # 4. HERD RADAR: Retail Sentiment (Contrarian Liquidity)
+        # -------------------------------------------------------
+        # Fetch retail sentiment to identify liquidity pools
+        sentiment_features = {
+            "contrarian_score": 0.0,
+            "liquidity_above": 0.0,
+            "liquidity_below": 0.0,
+        }
+        try:
+            sentiment = herd_radar.get_sentiment("XAUUSD")  # TODO: Make symbol dynamic
+            if sentiment:
+                sentiment_features = sentiment.to_neural_dict()
+        except Exception:
+            pass  # Graceful fallback to neutral
+        
         return {
             "z_score_poc": pvp_metrics.get("z_score_poc", 0),
             "cvd_imbalance": energy_map.get("ofi_signal", 0.0), # Real OFI Flow
@@ -204,8 +220,14 @@ class FEATFeatures:
             
             "accel_trigger": accel_results.get("accel_flag", 0),
             "accel_score": accel_results.get("accel_score", 0),
-            "accel_type": accel_results.get("accel_type", "normal")
+            "accel_type": accel_results.get("accel_type", "normal"),
+            
+            # HERD RADAR: Contrarian Liquidity Features
+            "contrarian_score": sentiment_features.get("contrarian_score", 0.0),
+            "liquidity_above": sentiment_features.get("liquidity_above", 0.0),
+            "liquidity_below": sentiment_features.get("liquidity_below", 0.0),
         }
+
 
     def _compute_pvp_metrics(self, df: pd.DataFrame) -> Dict[str, float]:
         """
