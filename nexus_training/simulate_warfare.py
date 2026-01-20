@@ -21,6 +21,7 @@ from nexus_core.acceleration import acceleration_engine
 
 # Strategic Cortex Hardware
 from app.ml.strategic_cortex import policy_agent, state_encoder, StrategicAction
+from nexus_core.neural_health import neural_health
 from app.ml.rlaif_critic import rlaif_critic
 from nexus_core.microstructure import micro_scanner
 
@@ -84,27 +85,37 @@ class BattlefieldSimulator:
             'tick_volume': np.random.randint(50, 500, n_rows)
         })
         
-        # [HERD RADAR] Mock Sentiment Generation
-        # Logic: Retail accumulates against the trend
-        # Phase 1: Balanced (50/50)
-        # Phase 2 (Pump): Retail goes Short (Short % increases)
-        # Phase 3: Extreme Short
-        # Phase 4 (Dump): Retail goes Long (catching a falling knife)
+        # [HERD RADAR] Stochastic Herd Model (PhD Logic)
+        # Features: 1) Momentum Lag, 2) Contrarian Persistence (averaging down), 3) Random Noise
         
         sent_long = np.zeros(n_rows)
-        sent_short = np.zeros(n_rows)
+        # Initial state (balanced)
+        current_long = 50.0
         
-        # P1: Range (Balanced)
-        sent_long[:n] = 50 + np.random.normal(0, 5, n)
-        # P2: Pump (Retail goes Short)
-        sent_long[n:2*n] = np.linspace(50, 30, n) + np.random.normal(0, 2, n)
-        # P3: Top (Retail heavily Short)
-        sent_long[2*n:3*n] = 25 + np.random.normal(0, 5, n)
-        # P4: Dump (Retail buys the dip/falling knife)
-        sent_long[3*n:] = np.linspace(25, 75, n + remainder) + np.random.normal(0, 5, n + remainder)
-        
-        df['mock_long_pct'] = np.clip(sent_long, 5, 95)
-        df['mock_short_pct'] = 100 - df['mock_long_pct']
+        for i in range(1, n_rows):
+            # Calculate price velocity (lagged)
+            # If price went UP last 5 periods, retail starts selling (contrarian)
+            # but with a LAG.
+            window = 10
+            if i > window:
+                price_change = (prices[i] - prices[i-window]) / prices[i-window]
+                
+                # Deterministic drift: Price UP -> Retail sells (long goes DOWN)
+                # We model "averaging down": Retail sells into rallies (contrarian)
+                drift = -price_change * 1000.0 
+                
+                # Persistence: Retail holds bias longer even if price turns
+                persistence = 0.95
+                
+                # Noise: Emotional volatility
+                stochastic_noise = np.random.normal(0, 1.5)
+                
+                current_long = (current_long * persistence) + (drift * (1 - persistence)) + stochastic_noise
+            
+            sent_long[i] = np.clip(current_long, 10, 90)
+            
+        df['mock_long_pct'] = sent_long
+        df['mock_short_pct'] = 100 - sent_long
         
         # Calculate ATR for volatility guard
         df['high_low'] = df['high'] - df['low']
@@ -211,6 +222,11 @@ class BattlefieldSimulator:
                 
                 action, prob, value = policy_agent.select_action(state_vec)
                 
+                # [NEURAL HEALTH] Track prediction for drift analysis
+                sim_trade_id = f"SIM-{ep}-{i}"
+                if action != StrategicAction.HOLD:
+                    neural_health.log_prediction(sim_trade_id, prob, action.name)
+                
                 # [IRON FORGE] ADVERSARIAL GYM
                 # 1. Latency Simulation (The Brain vs The Wire)
                 # In real life, 200ms lag kills the perfect entry.
@@ -275,6 +291,10 @@ class BattlefieldSimulator:
                 policy_agent.record_experience(state_vec, action, reward, state_vec, False)
                 
                 self.balance += pnl
+                
+                # [NEURAL HEALTH] Resolve trade result
+                if action != StrategicAction.HOLD:
+                    neural_health.resolve_prediction(sim_trade_id, pnl)
                 
                 if self.balance < 5:
                     logger.warning(f"💀 RUIN @ Step {i}")

@@ -17,9 +17,13 @@ This is LAGGING data but useful for:
 import requests
 import logging
 import re
-from typing import Dict, Optional
-from dataclasses import dataclass
+import json
+import os
+import time
+from typing import Dict, Optional, List
+from dataclasses import dataclass, asdict
 from bs4 import BeautifulSoup
+from datetime import datetime
 
 logger = logging.getLogger("HerdRadar")
 
@@ -95,9 +99,10 @@ class SentimentScraper:
         "Accept-Language": "en-US,en;q=0.9",
     }
     
-    def __init__(self):
+    def __init__(self, archive_path: str = "data/sentiment_archive.json"):
         self._cache: Dict[str, RetailSentiment] = {}
         self._last_fetch = None
+        self.archive_path = archive_path
     
     def get_sentiment(self, symbol: str) -> Optional[RetailSentiment]:
         """
@@ -205,6 +210,9 @@ class SentimentScraper:
             # Cache it
             self._cache[symbol] = sentiment
             
+            # Archive for Phase 8 (Authentic Learning)
+            self._archive_sentiment(sentiment)
+            
             logger.info(f"📊 HERD RADAR: {symbol} | L:{long_pct:.0f}% S:{short_pct:.0f}% | Liquidity: {liquidity_direction}")
             
             return sentiment
@@ -242,6 +250,29 @@ class SentimentScraper:
             return float(clean) if clean else 0.0
         except ValueError:
             return 0.0
+
+    def _archive_sentiment(self, sentiment: RetailSentiment):
+        """Archives sentiment data to JSON for historical training."""
+        os.makedirs(os.path.dirname(self.archive_path), exist_ok=True)
+        
+        archive = []
+        if os.path.exists(self.archive_path):
+            try:
+                with open(self.archive_path, 'r') as f:
+                    archive = json.load(f)
+            except:
+                pass
+        
+        entry = asdict(sentiment)
+        entry["timestamp"] = datetime.now().isoformat()
+        
+        # Keep last 10,000 snapshots to avoid file bloat
+        archive.append(entry)
+        if len(archive) > 10000:
+            archive = archive[-10000:]
+            
+        with open(self.archive_path, 'w') as f:
+            json.dump(archive, f, indent=2)
 
 
 # Singleton instance

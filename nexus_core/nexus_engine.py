@@ -21,6 +21,7 @@ from enum import Enum
 # Core Imports
 from nexus_core.money_management import risk_officer
 from nexus_core.strategy_engine import StrategyEngine, TradeLeg, StrategyMode
+from nexus_core.neural_health import neural_health
 
 # Diagnosis Imports
 from tools.fractal_diagnosis import diagnose_market_fractals
@@ -232,6 +233,15 @@ class NexusEngine:
         
         for i, leg in enumerate(legs):
             logger.info(f"   Leg {i+1}: {leg.direction} | {leg.strategy_type.value} | Vol: {leg.volume} | {leg.intent}")
+            
+            # Log for Neural Health Monitoring (Drift Detection)
+            # Use the max probability as the "Confidence" score
+            confidence = max(snapshot.neural_probs.values()) if snapshot.neural_probs else 0.5
+            neural_health.log_prediction(
+                trade_id=f"T-{int(time.time())}-{i}", 
+                confidence=confidence, 
+                action=leg.strategy_type.value
+            )
             
         return legs
     

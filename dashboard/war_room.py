@@ -12,6 +12,7 @@ import sys
 # Add root directory to path to reach app module
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app.core.config import settings
+from nexus_core.neural_health import neural_health
 
 # [LEVEL 64] C2 COMMAND & CONTROL DASHBOARD
 # Architecture: Isolated UI -> Shared State -> Core Node
@@ -400,6 +401,61 @@ def render_training_arena():
         else:
             st.info("Connecting to API...")
 
+def render_neural_health_tab():
+    """PhD Level Neural Health Monitoring."""
+    st.subheader("🛡️ NEURAL HEALTH GUARDIAN")
+    
+    metrics = neural_health.get_health_metrics()
+    
+    # 1. Status Badge
+    status = metrics.get("status", "UNKNOWN")
+    if status == "HEALTHY":
+        st.success(f"✅ SYSTEM {status}")
+    elif status == "DETERIORATING":
+        st.warning(f"⚠️ SYSTEM {status}")
+    else:
+        st.error(f"🚨 SYSTEM {status}")
+        
+    # 2. Key PhD Metrics
+    c1, c2, c3 = st.columns(3)
+    
+    # Brier Score (lower is better, 0.0 to 1.0)
+    brier = metrics.get("brier_score", 0.0)
+    c1.metric("Brier Score", f"{brier:.4f}", help="Precision of probabilities. Lower is better (PhD Standard).")
+    
+    # Drift Score (|Conf - Winrate|)
+    drift = metrics.get("drift_score", 0.0)
+    c2.metric("Neural Drift", f"{drift*100:.1f}%", help="Difference between Model Confidence and Actual Performance.")
+    
+    # Sample Size
+    c3.metric("Sample Size", metrics.get("sample_size", 0))
+    
+    st.divider()
+    
+    # 3. Calibration Chart (Actual vs Expected)
+    st.markdown("### Confidence Calibration")
+    
+    # Mock some historical data for the chart if empty, else use history
+    history = neural_health.history
+    if len(history) > 5:
+        df_health = pd.DataFrame(history)
+        df_closed = df_health[df_health['status'] == 'CLOSED']
+        
+        # Plot Confidence vs Outcome
+        fig = px.scatter(
+            df_closed, x="confidence", y="outcome", 
+            color="outcome", 
+            title="Prediction Calibration (1=Win, 0=Loss)",
+            labels={"confidence": "Neural Confidence", "outcome": "Real Outcome"}
+        )
+        # Add ideal calibration line
+        fig.add_shape(type="line", x0=0, y0=0, x1=1, y1=1, line=dict(color="Gray", dash="dash"))
+        
+        fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.info("Waiting for more trade completions to generate Calibration Curve...")
+
 def render_analytics_tab():
     """Analytics Tab - Display historical performance metrics."""
     st.subheader("📊 Performance Analytics")
@@ -478,7 +534,7 @@ render_sidebar(state)
 
 st.title("FEAT NEXUS // COMMAND & CONTROL")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📡 LIVE OPS", "🧠 NEURAL", "⚔️ WAR ROOM", "🎓 TRAINING", "📊 ANALYTICS"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📡 LIVE OPS", "🧠 NEURAL", "🛡️ NEURAL HEALTH", "⚔️ WAR ROOM", "🎓 TRAINING", "📊 ANALYTICS"])
 
 with tab1:
     render_live_ops(state)
@@ -487,12 +543,15 @@ with tab2:
     render_neural_tab(state)
 
 with tab3:
-    render_war_room_tab(state)
+    render_neural_health_tab()
 
 with tab4:
-    render_training_arena()
+    render_war_room_tab(state)
 
 with tab5:
+    render_training_arena()
+
+with tab6:
     render_analytics_tab()
 
 # Auto-refresh logic
