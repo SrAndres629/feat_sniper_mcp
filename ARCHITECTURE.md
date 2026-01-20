@@ -62,7 +62,15 @@ When asked to "audit" or "analyze" files:
 | `forexfactory_provider.py` | Real ForexFactory scraper  | ✅ Reference |
 | `risk_modulator.py`        | Event proximity → risk     |   ⚡ Quick   |
 
+### `nexus_core/herd_radar.py` - Retail Sentiment (NEW)
+| File            | Purpose                                | Analyze? |
+| :-------------- | :------------------------------------- | :------: |
+| `herd_radar.py` | MyFxBook scraper, contrarian liquidity |  ✅ DEEP  |
+
+**Provides**: `contrarian_score`, `liquidity_above`, `liquidity_below` for neural network.
+
 ### `nexus_core/structure_engine/` - Price Structure
+
 | File            | Purpose                        |  Analyze?   |
 | :-------------- | :----------------------------- | :---------: |
 | `engine.py`     | FEAT Index calculation         |   ✅ DEEP    |
