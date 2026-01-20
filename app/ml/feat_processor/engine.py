@@ -58,25 +58,44 @@ class FeatProcessor:
         # Mapping payload back is safest to guarantee 1:1 match.
         payload = self.alpha.process_dataframe(df)
         
-        # Assign Physics Tensors
-        df["physics_force"] = payload.get("physics_force", np.zeros(len(df)))
-        df["physics_energy"] = payload.get("physics_energy", np.zeros(len(df)))
-        df["physics_entropy"] = payload.get("physics_entropy", np.zeros(len(df)))
-        df["physics_viscosity"] = payload.get("physics_viscosity", np.zeros(len(df)))
+        # [CRITICAL] Safe Broadcast Helper - Handles scalar/array length mismatch
+        def safe_assign(col_name, default_val=0.0):
+            val = payload.get(col_name, default_val)
+            
+            # If scalar or single element, broadcast to full column
+            if np.isscalar(val) or (isinstance(val, np.ndarray) and val.size == 1):
+                return np.full(len(df), float(val) if np.isscalar(val) else float(val.item()))
+            
+            # If array, ensure length matches
+            if isinstance(val, (list, np.ndarray, pd.Series)):
+                arr = np.array(val).flatten()
+                if len(arr) != len(df):
+                    # Resize to match (emergency padding/truncation)
+                    arr = np.resize(arr, len(df))
+                return arr
+            
+            # Fallback
+            return np.full(len(df), float(default_val))
+        
+        # Assign Physics Tensors (Broadcast-Safe)
+        df["physics_force"] = safe_assign("physics_force", 0.0)
+        df["physics_energy"] = safe_assign("physics_energy", 0.0)
+        df["physics_entropy"] = safe_assign("physics_entropy", 0.0)
+        df["physics_viscosity"] = safe_assign("physics_viscosity", 0.0)
         
         # Assign Temporal
-        df["temporal_sin"] = payload.get("temporal_sin", np.zeros(len(df)))
-        df["temporal_cos"] = payload.get("temporal_cos", np.zeros(len(df)))
-        df["killzone_intensity"] = payload.get("killzone_intensity", np.zeros(len(df)))
-        df["session_weight"] = payload.get("session_weight", np.zeros(len(df)))
+        df["temporal_sin"] = safe_assign("temporal_sin", 0.0)
+        df["temporal_cos"] = safe_assign("temporal_cos", 0.0)
+        df["killzone_intensity"] = safe_assign("killzone_intensity", 0.0)
+        df["session_weight"] = safe_assign("session_weight", 0.0)
         
         # Assign Structural
-        df["structural_feat_index"] = payload.get("structural_feat_index", np.zeros(len(df)))
-        df["confluence_tensor"] = payload.get("confluence_tensor", np.zeros(len(df)))
+        df["structural_feat_index"] = safe_assign("structural_feat_index", 0.0)
+        df["confluence_tensor"] = safe_assign("confluence_tensor", 0.0)
         
         # Assign Meta
-        df["volatility_context"] = payload.get("volatility_context", np.ones(len(df)))
-        df["trap_score"] = payload.get("trap_score", np.zeros(len(df)))
+        df["volatility_context"] = safe_assign("volatility_context", 1.0)
+        df["trap_score"] = safe_assign("trap_score", 0.0)
         
         # [Residual Legacy for Visualization if needed]
         df["feat_form"] = (df["high"] - df["low"]) / ((df["high"] - df["low"]).rolling(14).mean() + 1e-9)

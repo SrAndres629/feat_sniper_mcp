@@ -68,18 +68,46 @@ def quick_train_brain(symbol="XAUUSD"):
         seq_window = df.iloc[i-seq_len:i][feat_cols].values
         X_list.append(torch.tensor(seq_window, dtype=torch.float32))
         
-        # Latent Metrics
+        # Latent Metrics - Updated to match current Physics-Supremacy schema
         row = df.iloc[i]
         metrics = feat_processor.compute_latent_vector(row)
-        feat_inputs_list["form"].append([metrics["skew"], metrics["entropy"], metrics["form"], 0.0])
-        feat_inputs_list["space"].append([metrics["dist_poc"], metrics["pos_in_va"], metrics["space"]])
-        feat_inputs_list["accel"].append([metrics["energy"], metrics.get("accel", 0.0), metrics.get("kalman_score", 0.0)])
-        feat_inputs_list["time"].append([metrics.get("dist_micro", 0.0), metrics.get("dist_struct", 0.0), metrics.get("dist_macro", 0.0), metrics["time"]])
+        
+        # Form Gate: [physics_entropy, physics_viscosity, structural_feat_index, 0.0]
+        feat_inputs_list["form"].append([
+            metrics.get("physics_entropy", 0.0), 
+            metrics.get("physics_viscosity", 0.0), 
+            metrics.get("structural_feat_index", 0.0), 
+            0.0
+        ])
+        
+        # Space Gate: [confluence_tensor, killzone_intensity, session_weight]
+        feat_inputs_list["space"].append([
+            metrics.get("confluence_tensor", 0.0), 
+            metrics.get("killzone_intensity", 0.0), 
+            metrics.get("session_weight", 0.0)
+        ])
+        
+        # Accel Gate: [physics_energy, physics_force, volatility_context]
+        feat_inputs_list["accel"].append([
+            metrics.get("physics_energy", 0.0), 
+            metrics.get("physics_force", 0.0), 
+            metrics.get("volatility_context", 1.0)
+        ])
+        
+        # Time Gate: [temporal_sin, temporal_cos, killzone, session_weight]
+        feat_inputs_list["time"].append([
+            metrics.get("temporal_sin", 0.0), 
+            metrics.get("temporal_cos", 0.0), 
+            metrics.get("killzone_intensity", 0.0), 
+            metrics.get("session_weight", 0.0)
+        ])
+        
+        # Kinetic Gate: [trap_score, structural_feat_index, physics_force, physics_viscosity]
         feat_inputs_list["kinetic"].append([
-            metrics["kinetic_pattern_id"], 
-            metrics["kinetic_coherence"], 
-            metrics["dist_bias"], 
-            metrics["layer_alignment"]
+            metrics.get("trap_score", 0.0), 
+            metrics.get("structural_feat_index", 0.0), 
+            metrics.get("physics_force", 0.0), 
+            metrics.get("physics_viscosity", 0.0)
         ])
         
         # TRIPLE BARRIER LOGIC

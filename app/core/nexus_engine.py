@@ -199,7 +199,10 @@ class NexusEngine:
                 
                 if self.structure_engine:
                     report = self.structure_engine.get_structural_report(candles["M1"])
-                    self.context_cache["in_zone"] = (report['zones']['distance_to_zone'] < (price * settings.ZONE_PROXIMITY_FACTOR))
+                    # Safe access - 'zones' key may not exist in new structure
+                    zones_data = report.get('zones', {})
+                    distance = zones_data.get('distance_to_zone', float('inf'))
+                    self.context_cache["in_zone"] = (distance < (price * settings.ZONE_PROXIMITY_FACTOR))
                     
                 # Fractal Coherence Logic (DEPRECATED: Using defaults)
                 alignment_map = {}

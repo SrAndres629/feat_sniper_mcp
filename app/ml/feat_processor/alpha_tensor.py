@@ -38,13 +38,33 @@ class AlphaTensorOrchestrator:
         # 1. TEMPORAL & LIQUIDITY VECTORIZATION
         df = self.chronos.process(df)
         
+        # [CRITICAL] Force clean index after chronos
+        df = df.reset_index(drop=True)
+        
         # 2. STRUCTURAL TOPOLOGY (Vectorized SMC)
         struct_res = self.structure.compute_feat_index(df)
-        df = pd.concat([df, struct_res], axis=1)
+        
+        # [CRITICAL] Ensure struct_res has same length as df before concat
+        struct_res = struct_res.reset_index(drop=True)
+        if len(struct_res) != len(df):
+            # Truncate to shorter length to force alignment
+            min_len = min(len(struct_res), len(df))
+            struct_res = struct_res.iloc[:min_len]
+            df = df.iloc[:min_len]
+        
+        # Merge columns directly instead of concat (safer)
+        for col in struct_res.columns:
+            if col not in df.columns:
+                df[col] = struct_res[col].values
 
         # 3. PHYSICS CORE (Vectorized Newton/Thermodynamics)
         physics_res = kinetic_engine.compute_vectorized_physics(df)
-        df = pd.concat([df, physics_res], axis=1)
+        physics_res = physics_res.reset_index(drop=True)
+        
+        # Merge physics columns directly
+        for col in physics_res.columns:
+            if col not in df.columns:
+                df[col] = physics_res[col].values
 
         # 4. PROBABILISTIC REGIME GATING (Physics-Driven Heuristic Head)
         # This simulates the "Neural Output" for the Risk Engine using fundamental laws.
@@ -83,18 +103,29 @@ class AlphaTensorOrchestrator:
         # P(Swing): Massive Structural Displacement + Low Entropy (Order) + Macro Alignment
         # Logic: Swing needs Order (Low Entropy) and major Structural/Macro shifts
         if "struct_displacement_z" in df.columns:
-            # Low Entropy favored for Swing Entry (Accumulation)
-            entropy_factor = 1.0 - df["physics_entropy"]
-            raw_swing = (df["struct_displacement_z"].abs() * entropy_factor)
-            df["p_swing"] = raw_swing.clip(0, 1)
+            # [NUCLEAR OPTION] Pure Numpy to bypass Pandas alignment
+            struct_disp = np.array(df["struct_displacement_z"].values).flatten()
+            phys_entropy = np.array(df["physics_entropy"].values).flatten()
+            
+            entropy_factor = 1.0 - phys_entropy
+            raw_swing = np.abs(struct_disp) * entropy_factor
+            
+            df["p_swing"] = 0.0
+            min_len_swing = min(len(raw_swing), len(df))
+            df.iloc[:min_len_swing, df.columns.get_loc("p_swing")] = np.clip(raw_swing[:min_len_swing], 0, 1)
         else:
             df["p_swing"] = 0.1
             
-        # Normalize Probabilities (Softmax-ish)
-        total_p = df["p_scalp"] + df["p_daytrade"] + df["p_swing"] + 1e-9
-        df["p_scalp"] /= total_p
-        df["p_daytrade"] /= total_p
-        df["p_swing"] /= total_p
+        # Normalize Probabilities (Softmax-ish) - Use .values for safety
+        p_scalp = np.array(df["p_scalp"].values).flatten()
+        p_daytrade = np.array(df["p_daytrade"].values).flatten()
+        p_swing = np.array(df["p_swing"].values).flatten()
+        
+        total_p = p_scalp + p_daytrade + p_swing + 1e-9
+        
+        df["p_scalp"] = p_scalp / total_p
+        df["p_daytrade"] = p_daytrade / total_p
+        df["p_swing"] = p_swing / total_p
             
         # 5. ASSEMBLE TENSOR PAYLOAD (Neural Ready)
         # Flattened for direct ingestion by MLEngine based on NEURAL_FEATURE_NAMES

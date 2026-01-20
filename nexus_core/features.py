@@ -252,9 +252,17 @@ class FEATFeatures:
             results[f"{tf}_direction"] = 1.0 if price > ema10 else -1.0
             
             # 2. Energy (Relative Volume / Volatility)
-            vol = df['volume'].iloc[-1]
-            avg_vol = df['volume'].rolling(20).mean().iloc[-1] + 1e-9
-            energy = np.clip(vol / avg_vol, 0.0, 5.0) / 5.0 # Normalized [0, 1]
+            # Forex doesn't have volume - use ATR as proxy
+            if 'volume' in df.columns:
+                vol = df['volume'].iloc[-1]
+                avg_vol = df['volume'].rolling(20).mean().iloc[-1] + 1e-9
+                energy = np.clip(vol / avg_vol, 0.0, 5.0) / 5.0
+            else:
+                # Fallback: Use ATR-based volatility
+                atr = (df['high'] - df['low']).rolling(14).mean().iloc[-1]
+                avg_atr = (df['high'] - df['low']).rolling(50).mean().iloc[-1] + 1e-9
+                energy = np.clip(atr / avg_atr, 0.0, 3.0) / 3.0
+            
             results[f"{tf}_energy"] = float(energy)
             
             # 3. Acceleration (RSI Slope / Price Change Velocity)
@@ -270,6 +278,10 @@ class FEATFeatures:
         Helper: Computes simplified Volume Profile metrics for scalar features.
         """
         if len(df) < 20:
+            return {"z_score_poc": 0.0, "skew": 0.0}
+        
+        # Forex doesn't have volume - return defaults
+        if 'volume' not in df.columns:
             return {"z_score_poc": 0.0, "skew": 0.0}
             
         prices = df['close'].to_numpy()
