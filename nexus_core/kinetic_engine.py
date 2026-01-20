@@ -610,9 +610,10 @@ class KineticEngine:
             rvol = df["volume"] / (df["volume"].rolling(20, min_periods=1).mean() + 1e-9)
         else:
             rvol = pd.Series(1.0, index=df.index)
-            
-        res["feat_force"] = (abs(close - c_micro) / (atr + 1e-9)) * rvol
-        res["physics_energy"] = (abs(close - c_macro) / (atr + 1e-9)) * rvol
+        
+        # [CRITICAL SAFETY] Clip to prevent neural saturation during flash crashes
+        res["feat_force"] = ((abs(close - c_micro) / (atr + 1e-9)) * rvol).clip(0, 5.0)
+        res["physics_energy"] = ((abs(close - c_macro) / (atr + 1e-9)) * rvol).clip(0, 5.0)
         
         # 3. Thermodynamics
         # Entropy = Market Noise (Z-Score variance)
