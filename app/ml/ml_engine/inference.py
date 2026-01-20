@@ -40,23 +40,30 @@ class InferenceEngine:
         latest_state = sequence[-1]
         metrics = feat_processor.compute_latent_vector(pd.Series(latest_state))
         
-        # [v4.1] Tensor Grouping for FeatEncoder
-        # Mapping aligned with 18D latent structure
+        # [v5.0-DOCTORAL] Standardized Latent Inputs
         feat_input = {
-            "form": torch.tensor([[metrics["skew"], metrics["entropy"], metrics["form"], 0.0]], dtype=torch.float32).to(self.device),
-            "space": torch.tensor([[metrics["dist_poc"], metrics["pos_in_va"], metrics["space"]]], dtype=torch.float32).to(self.device),
-            "accel": torch.tensor([[metrics["energy"], metrics["accel"], metrics["kalman_score"]]], dtype=torch.float32).to(self.device),
-            "time": torch.tensor([[metrics["dist_micro"], metrics["dist_struct"], metrics["dist_macro"], metrics["time"]]], dtype=torch.float32).to(self.device),
-            "kinetic": torch.tensor([[metrics["kinetic_pattern_id"], metrics["kinetic_coherence"], metrics["dist_bias"], metrics["layer_alignment"]]], dtype=torch.float32).to(self.device)
+            "form": torch.tensor([[metrics["physics_entropy"], metrics["physics_viscosity"], metrics["structural_feat_index"], 0.0]], dtype=torch.float32).to(self.device),
+            "space": torch.tensor([[metrics["confluence_tensor"], 0.0, 0.0]], dtype=torch.float32).to(self.device), # Adjusted for 3D Space
+            "accel": torch.tensor([[metrics["physics_energy"], metrics["physics_force"], metrics["volatility_context"]]], dtype=torch.float32).to(self.device),
+            "time": torch.tensor([[metrics["temporal_sin"], metrics["temporal_cos"], metrics["killzone_intensity"], metrics["session_weight"]]], dtype=torch.float32).to(self.device),
+            "kinetic": torch.tensor([[metrics["trap_score"], metrics["structural_feat_index"], metrics["physics_force"], metrics["physics_viscosity"]]], dtype=torch.float32).to(self.device)
         }
         
+        # [PHASE 13] Physics Tensor for Reconstruction Gating (Cross-Attention)
+        p_tensor = torch.stack([
+            feat_input["accel"][:, 0], # energy
+            feat_input["accel"][:, 1], # force
+            feat_input["form"][:, 0],  # entropy
+            feat_input["form"][:, 1]   # viscosity
+        ], dim=1)
+
         # MC Dropout Sampling (Bayesian Fusion v5.0)
         model.train() 
         p_win_arr, alpha_arr, logits_arr, aleatoric_arr = [], [], [], []
         
         with torch.no_grad():
             for _ in range(settings.MC_DROPOUT_SAMPLES):
-                outputs = model(x, feat_input=feat_input, force_dropout=True)
+                outputs = model(x, feat_input=feat_input, physics_tensor=p_tensor, force_dropout=True)
                 p_win_arr.append(outputs["p_win"].item())
                 alpha_arr.append(outputs["alpha"].item())
                 # Capture the model's self-predicted uncertainty

@@ -156,8 +156,9 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
         progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} [Train]")
         for seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map in progress:
             
-            # [FIX 1] TCN Transpose: (Batch, Len, Chan) -> (Batch, Chan, Len)
-            seq = seq.transpose(1, 2).to(device)
+            # [REVERT] The model (HybridProbabilistic) already performs .permute(0, 2, 1) internally.
+            # Passing (Batch, Length, Channels) ensures the model's TCN sees (Batch, Channels, Length).
+            seq = seq.to(device)
             
             label = label.to(device)
             f_map = f_map.to(device)
@@ -215,7 +216,7 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
         
         with torch.no_grad():
             for seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map in val_loader:
-                seq = seq.transpose(1, 2).to(device) # TCN Fix
+                seq = seq.to(device) # No transpose needed here
                 label = label.to(device)
                 f_map = f_map.to(device)
                 

@@ -112,38 +112,27 @@ def calculate_multifractal_layers(df: pd.DataFrame) -> pd.DataFrame:
     violation_bull = (df["close"].shift(-1) < limit_bull) | (df["close"].shift(-2) < limit_bull) | (df["close"].shift(-3) < limit_bull)
     violation_bear = (df["close"].shift(-1) > limit_bear) | (df["close"].shift(-2) > limit_bear) | (df["close"].shift(-3) > limit_bear)
     
-    # One-Hot Encoding Initialization
-    df["kinetic_state_neutral"] = 1.0
-    df["kinetic_state_impulse"] = 0.0
-    df["kinetic_state_confirmed"] = 0.0
-    df["kinetic_state_failed"] = 0.0
+    # [NEURAL HYGIENE] Labeling Targets (Explicitly marked as Targets to avoid leakage)
+    df["target_kinetic_state_neutral"] = 1.0
+    df["target_kinetic_state_impulse"] = 0.0
+    df["target_kinetic_state_confirmed"] = 0.0
+    df["target_kinetic_state_failed"] = 0.0
     
     # CONFIRMED STATE (Impulse + No Violation)
-    # We mark the IMPULSE candle as "CONFIRMED" retrospectively (for training labelling)
     mask_confirmed_bull = is_impulse_bull & ~violation_bull
     mask_confirmed_bear = is_impulse_bear & ~violation_bear
     
-    df.loc[mask_confirmed_bull | mask_confirmed_bear, "kinetic_state_confirmed"] = 1.0
-    df.loc[mask_confirmed_bull | mask_confirmed_bear, "kinetic_state_neutral"] = 0.0
+    df.loc[mask_confirmed_bull | mask_confirmed_bear, "target_kinetic_state_confirmed"] = 1.0
+    df.loc[mask_confirmed_bull | mask_confirmed_bear, "target_kinetic_state_neutral"] = 0.0
     
     # FAILED STATE
     mask_failed_bull = is_impulse_bull & violation_bull
     mask_failed_bear = is_impulse_bear & violation_bear
     
-    df.loc[mask_failed_bull | mask_failed_bear, "kinetic_state_failed"] = 1.0
-    df.loc[mask_failed_bull | mask_failed_bear, "kinetic_state_neutral"] = 0.0
+    df.loc[mask_failed_bull | mask_failed_bear, "target_kinetic_state_failed"] = 1.0
+    df.loc[mask_failed_bull | mask_failed_bear, "target_kinetic_state_neutral"] = 0.0
     
-    # IMPULSE STATE (Simulated)
-    # In live trading, an impulse starts as "IMPULSE" then moves to MONITORING/CONFIRMED.
-    # For training, if we want to show "Fresh Impulse", we can check if T+1 hasn't happened yet? 
-    # But batch processing sees all. 
-    # Let's imply 'IMPULSE' is the trigger event. 
-    # We set IMPULSE flag on the candle itself as well? 
-    # User requested [NEUTRAL, IMPULSE, CONFIRMED, FAILED].
-    # Effectively CONFIRMED and FAILED are subsets of IMPULSE in hindsight.
-    # We'll mark the candle as IMPULSE as well if it qualifies as one.
-    
-    df.loc[is_impulse_bull | is_impulse_bear, "kinetic_state_impulse"] = 1.0
+    df.loc[is_impulse_bull | is_impulse_bear, "target_kinetic_state_impulse"] = 1.0
     
     # Note: A candle can be IMPULSE=1 AND MEANWHILE CONFIRMED=1 (Retroactive). 
     # Or IMPULSE=1 and FAILED=1.

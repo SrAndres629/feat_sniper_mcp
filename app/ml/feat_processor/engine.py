@@ -112,19 +112,19 @@ class FeatProcessor:
                 return default
             return float(val)
 
-        # Mapping dict according to settings.NEURAL_FEATURE_NAMES (New Constitution)
+        # Mapping dict according to standardized column names in process_dataframe
         return {
             "temporal_sin": safe_get("temporal_sin"),
             "temporal_cos": safe_get("temporal_cos"),
             "killzone_intensity": safe_get("killzone_intensity"),
             "session_weight": safe_get("session_weight"),
-            "structural_feat_index": safe_get("feat_index") / 100.0,
-            "confluence_tensor": safe_get("confluence_score") / 5.0,
+            "structural_feat_index": safe_get("structural_feat_index"),
+            "confluence_tensor": safe_get("confluence_tensor"),
             "physics_force": safe_get("physics_force"),
             "physics_energy": safe_get("physics_energy"),
             "physics_entropy": safe_get("physics_entropy"),
             "physics_viscosity": safe_get("physics_viscosity"),
-            "volatility_context": safe_get("volatility_context", 1.0), # Computed in process if mapped, or recomputed here
+            "volatility_context": safe_get("volatility_context", 1.0),
             "trap_score": safe_get("trap_score")
         }
 
