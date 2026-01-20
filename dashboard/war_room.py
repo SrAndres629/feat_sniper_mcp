@@ -238,6 +238,124 @@ def render_war_room_tab(state):
             except: 
                 st.code("Logs currently unavailable.", language="text")
 
+def render_training_arena():
+    """Training Arena Tab - Control simulation training from UI."""
+    st.subheader("🎓 Training Arena")
+    st.markdown("Control neural network training simulations directly from the dashboard.")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### Simulation Configuration")
+        episodes = st.number_input("Episodes", min_value=5, max_value=1000, value=50, step=5)
+        st.caption("More episodes = Better training, but takes longer.")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("🚀 Start Simulation", use_container_width=True):
+                send_command("START_SIMULATION", {"episodes": episodes})
+                st.success(f"Simulation started with {episodes} episodes!")
+        with c2:
+            if st.button("🛑 Stop Simulation", use_container_width=True):
+                send_command("STOP_SIMULATION")
+                st.warning("Stop command sent.")
+    
+    with col2:
+        st.markdown("### Simulation Status")
+        status_file = "data/simulation_status.json"
+        if os.path.exists(status_file):
+            try:
+                with open(status_file, 'r') as f:
+                    sim_status = json.load(f)
+                
+                current_ep = sim_status.get("current_episode", 0)
+                total_ep = sim_status.get("total_episodes", 1)
+                balance = sim_status.get("current_balance", 20.0)
+                running = sim_status.get("running", False)
+                
+                if running:
+                    st.info(f"🏃 Running: Episode {current_ep}/{total_ep}")
+                    st.progress(current_ep / total_ep)
+                else:
+                    st.success("✅ Simulation Complete" if current_ep > 0 else "⏸️ Idle")
+                
+                st.metric("Last Balance", f"${balance:.2f}")
+            except:
+                st.info("No simulation data yet.")
+        else:
+            st.info("No simulation has been run yet.")
+
+def render_analytics_tab():
+    """Analytics Tab - Display historical performance metrics."""
+    st.subheader("📊 Performance Analytics")
+    
+    journal_path = "data/trade_journal.json"
+    
+    if not os.path.exists(journal_path):
+        st.warning("No trade journal found. Run simulations or live trades to generate data.")
+        return
+    
+    try:
+        with open(journal_path, 'r', encoding='utf-8') as f:
+            entries = json.load(f)
+        
+        closed = [e for e in entries if e.get("status") == "CLOSED"]
+        
+        if not closed:
+            st.info("No closed trades yet. Data will appear after trades close.")
+            return
+        
+        # Calculate Metrics
+        wins = [e for e in closed if e.get("result") == "WIN"]
+        losses = [e for e in closed if e.get("result") == "LOSS"]
+        
+        win_rate = (len(wins) / len(closed)) * 100 if closed else 0
+        total_pnl = sum(e.get("pnl_pips", 0) for e in closed)
+        avg_win = sum(e.get("pnl_pips", 0) for e in wins) / len(wins) if wins else 0
+        avg_loss = abs(sum(e.get("pnl_pips", 0) for e in losses) / len(losses)) if losses else 1
+        profit_factor = avg_win / avg_loss if avg_loss > 0 else 0
+        
+        # Display Metrics
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Win Rate", f"{win_rate:.1f}%")
+        c2.metric("Total PnL (pips)", f"{total_pnl:.1f}")
+        c3.metric("Profit Factor", f"{profit_factor:.2f}")
+        c4.metric("Total Trades", len(closed))
+        
+        st.divider()
+        
+        # Equity Curve
+        st.markdown("### Equity Curve")
+        if closed:
+            equity = [20.0]  # Starting balance
+            for e in closed:
+                equity.append(equity[-1] + e.get("pnl_pips", 0) * 0.1)  # Simplified conversion
+            
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(y=equity, mode='lines', name='Equity', line=dict(color='#00ffcc')))
+            fig.update_layout(
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                font={'color': "white"},
+                height=300
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Exit Reason Breakdown
+        st.markdown("### Exit Reasons")
+        exit_stats = {}
+        for e in closed:
+            reason = e.get("exit_reason", "UNKNOWN")
+            exit_stats[reason] = exit_stats.get(reason, 0) + 1
+        
+        if exit_stats:
+            fig_pie = px.pie(names=list(exit_stats.keys()), values=list(exit_stats.values()))
+            fig_pie.update_layout(paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+            st.plotly_chart(fig_pie, use_container_width=True)
+            
+    except Exception as e:
+        st.error(f"Error loading analytics: {e}")
+
 # --- 4. MAIN APP LOOP ---
 
 state = load_live_state()
@@ -245,7 +363,7 @@ render_sidebar(state)
 
 st.title("FEAT NEXUS // COMMAND & CONTROL")
 
-tab1, tab2, tab3 = st.tabs(["📡 LIVE OPERATIONS", "🧠 NEURAL CORTEX", "⚔️ WAR ROOM"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📡 LIVE OPS", "🧠 NEURAL", "⚔️ WAR ROOM", "🎓 TRAINING", "📊 ANALYTICS"])
 
 with tab1:
     render_live_ops(state)
@@ -255,6 +373,12 @@ with tab2:
 
 with tab3:
     render_war_room_tab(state)
+
+with tab4:
+    render_training_arena()
+
+with tab5:
+    render_analytics_tab()
 
 # Auto-refresh logic
 st.empty()

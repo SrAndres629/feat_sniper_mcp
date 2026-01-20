@@ -7,6 +7,8 @@ import numpy as np
 import torch
 import random
 import time
+import json
+import argparse
 from datetime import datetime
 
 # Add root to path
@@ -38,6 +40,20 @@ class BattlefieldSimulator:
         self.positions = []
         self.history = []
         self.training_steps = 0
+        self.status_file = "data/simulation_status.json"
+        os.makedirs("data", exist_ok=True)
+
+    def write_status(self, current_ep: int, total_ep: int, balance: float, running: bool = True):
+        """Writes simulation status to file for dashboard display."""
+        status = {
+            "current_episode": current_ep,
+            "total_episodes": total_ep,
+            "current_balance": balance,
+            "running": running,
+            "timestamp": datetime.now().isoformat()
+        }
+        with open(self.status_file, 'w') as f:
+            json.dump(status, f)
 
     def generate_synthetic_data(self, n_rows=200):
         """Generates a volatile market scenario (Pump & Dump)"""
@@ -210,9 +226,15 @@ class BattlefieldSimulator:
                     break
             
             logger.info(f"EPISODE {ep+1} DONE. Balance: ${self.balance:.2f}")
+            self.write_status(ep + 1, episodes, self.balance, running=True)
 
+        self.write_status(episodes, episodes, self.balance, running=False)
         logger.info("\n🏆 WARFARE TRAINING COMPLETE.")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="FEAT Sniper Battlefield Simulator")
+    parser.add_argument("--episodes", type=int, default=5, help="Number of training episodes")
+    args = parser.parse_args()
+    
     sim = BattlefieldSimulator()
-    asyncio.run(sim.run_simulation())
+    asyncio.run(sim.run_simulation(episodes=args.episodes))

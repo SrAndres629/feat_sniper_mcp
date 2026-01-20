@@ -5,6 +5,7 @@ import os
 import time
 import logging
 import signal
+import json
 from datetime import datetime
 
 # Import the Engine
@@ -34,6 +35,8 @@ class ImmortalDaemon:
         self.venv_python = os.path.join(".venv", "Scripts", "python.exe")
         if not os.path.exists(self.venv_python):
             self.venv_python = sys.executable
+        self.simulation_process = None
+        self.cmd_file = "data/app_commands.json"
 
     async def run_engine(self):
         """Launches the primary Trading Engine as a persistent task."""
@@ -107,6 +110,63 @@ class ImmortalDaemon:
         except Exception as e:
             logger.debug(f"Zombie hunt had minor friction: {e}")
 
+    async def process_commands(self):
+        """Processes commands from the dashboard command queue."""
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        sim_script = os.path.join(script_dir, "nexus_training", "simulate_warfare.py")
+        
+        while self.running:
+            if os.path.exists(self.cmd_file):
+                try:
+                    with open(self.cmd_file, 'r') as f:
+                        commands = json.load(f)
+                    
+                    # Clear the file after reading
+                    with open(self.cmd_file, 'w') as f:
+                        json.dump([], f)
+                    
+                    for cmd in commands:
+                        action = cmd.get("action")
+                        params = cmd.get("params", {})
+                        
+                        if action == "START_SIMULATION":
+                            if self.simulation_process and self.simulation_process.poll() is None:
+                                logger.warning("⚠️ Simulation already running.")
+                            else:
+                                episodes = params.get("episodes", 5)
+                                logger.info(f"🎓 Starting Simulation with {episodes} episodes...")
+                                env = self.setup_env()
+                                self.simulation_process = subprocess.Popen(
+                                    [self.venv_python, sim_script, "--episodes", str(episodes)],
+                                    env=env,
+                                    cwd=script_dir
+                                )
+                        
+                        elif action == "STOP_SIMULATION":
+                            if self.simulation_process and self.simulation_process.poll() is None:
+                                logger.info("🛑 Stopping Simulation...")
+                                self.simulation_process.terminate()
+                                self.simulation_process = None
+                            else:
+                                logger.info("⚠️ No simulation running to stop.")
+                        
+                        elif action == "SET_RISK_FACTOR":
+                            logger.info(f"📈 Risk Factor set to {params.get('value', 1.0)}")
+                            # Future: Pass to engine
+                        
+                        elif action == "PANIC_CLOSE_ALL":
+                            logger.warning("🚨 PANIC CLOSE ALL TRIGGERED")
+                            # Future: Close all positions via engine
+                        
+                        elif action == "RELOAD_MODELS":
+                            logger.info("🧠 Reloading Neural Weights...")
+                            # Future: Hot-reload models
+                
+                except Exception as e:
+                    logger.error(f"Error processing commands: {e}")
+            
+            await asyncio.sleep(2)  # Check for commands every 2 seconds
+
     async def main_loop(self):
         logger.info(f"⚔️ NEXUS DAEMON v{DAEMON_VERSION} INITIALIZED ⚔️")
         
@@ -117,6 +177,8 @@ class ImmortalDaemon:
         engine_task = asyncio.create_task(self.run_engine())
         # Launch Supervision
         supervision_task = asyncio.create_task(self.supervise_children())
+        # Launch Command Processor
+        command_task = asyncio.create_task(self.process_commands())
         
         try:
             while self.running:
