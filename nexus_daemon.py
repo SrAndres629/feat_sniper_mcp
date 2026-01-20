@@ -36,6 +36,7 @@ class ImmortalDaemon:
         if not os.path.exists(self.venv_python):
             self.venv_python = sys.executable
         self.simulation_process = None
+        self.api_process = None
         self.cmd_file = "data/app_commands.json"
 
     async def run_engine(self):
@@ -60,8 +61,21 @@ class ImmortalDaemon:
         
         mcp_script = os.path.join(script_dir, "mcp_server.py")
         dashboard_script = os.path.join(script_dir, "dashboard", "war_room.py")
+        api_module = "app.api.server:app"
 
         while self.running:
+            # 0. FastAPI Server (Mission Control API)
+            if not self.api_process or self.api_process.poll() is not None:
+                if self.api_process and self.api_process.poll() is not None:
+                    logger.warning("🛠️ API Server died. Restarting...")
+                
+                logger.info("🚀 Launching Mission Control API (FastAPI) on port 8000")
+                self.api_process = subprocess.Popen(
+                    [self.venv_python, "-m", "uvicorn", api_module, "--host", "0.0.0.0", "--port", "8000"],
+                    env=env,
+                    cwd=script_dir
+                )
+
             # 1. MCP Interface
             if not self.mcp_process or self.mcp_process.poll() is not None:
                 if self.mcp_process and self.mcp_process.poll() is not None:

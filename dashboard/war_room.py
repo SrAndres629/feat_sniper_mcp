@@ -74,7 +74,7 @@ st.markdown("""
 
 # --- 2. DATA BRIDGING ---
 STATE_FILE = settings.DASHBOARD_LIVE_STATE_PATH
-CMD_FILE = settings.DASHBOARD_COMMAND_PATH
+API_BASE_URL = "http://localhost:8000"
 
 def load_live_state():
     if not os.path.exists(STATE_FILE): return None
@@ -83,7 +83,47 @@ def load_live_state():
             return json.load(f)
     except: return None
 
+def api_call(method: str, endpoint: str, data: dict = None) -> dict:
+    """Make API call to the Mission Control backend."""
+    import requests
+    url = f"{API_BASE_URL}{endpoint}"
+    try:
+        if method == "GET":
+            response = requests.get(url, timeout=5)
+        else:
+            response = requests.post(url, json=data or {}, timeout=5)
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error(f"API Error: {response.status_code} - {response.text}")
+            return {}
+    except requests.exceptions.ConnectionError:
+        st.warning("⚠️ API Server not connected. Using fallback mode.")
+        return {}
+    except Exception as e:
+        st.error(f"API Error: {e}")
+        return {}
+
 def send_command(action, params=None):
+    """Send command via API (with file-based fallback)."""
+    endpoint_map = {
+        "START_SIMULATION": ("/api/simulation/start", "POST"),
+        "STOP_SIMULATION": ("/api/simulation/stop", "POST"),
+        "SET_RISK_FACTOR": ("/api/risk/update", "POST"),
+        "PANIC_CLOSE_ALL": ("/api/emergency/close-all", "POST"),
+        "RELOAD_MODELS": ("/api/models/reload", "POST"),
+    }
+    
+    if action in endpoint_map:
+        endpoint, method = endpoint_map[action]
+        result = api_call(method, endpoint, params)
+        if result.get("success"):
+            st.toast(f"✅ {result.get('message', action)}", icon="⚔️")
+        return result
+    
+    # Fallback to file-based for unknown commands
+    CMD_FILE = settings.DASHBOARD_COMMAND_PATH
     commands = []
     if os.path.exists(CMD_FILE):
         try:
@@ -262,28 +302,28 @@ def render_training_arena():
     
     with col2:
         st.markdown("### Simulation Status")
-        status_file = "data/simulation_status.json"
-        if os.path.exists(status_file):
-            try:
-                with open(status_file, 'r') as f:
-                    sim_status = json.load(f)
-                
-                current_ep = sim_status.get("current_episode", 0)
-                total_ep = sim_status.get("total_episodes", 1)
-                balance = sim_status.get("current_balance", 20.0)
-                running = sim_status.get("running", False)
-                
-                if running:
-                    st.info(f"🏃 Running: Episode {current_ep}/{total_ep}")
-                    st.progress(current_ep / total_ep)
-                else:
-                    st.success("✅ Simulation Complete" if current_ep > 0 else "⏸️ Idle")
-                
-                st.metric("Last Balance", f"${balance:.2f}")
-            except:
-                st.info("No simulation data yet.")
+        
+        # Fetch status from API
+        sim_status = api_call("GET", "/api/simulation/status")
+        
+        if sim_status:
+            current_ep = sim_status.get("current_episode", 0)
+            total_ep = sim_status.get("total_episodes", 1) or 1
+            balance = sim_status.get("current_balance", 20.0)
+            running = sim_status.get("running", False)
+            elapsed = sim_status.get("elapsed_seconds", 0)
+            remaining = sim_status.get("estimated_remaining_seconds", 0)
+            
+            if running:
+                st.info(f"🏃 Running: Episode {current_ep}/{total_ep}")
+                st.progress(current_ep / total_ep if total_ep > 0 else 0)
+                st.caption(f"⏱️ Elapsed: {elapsed:.0f}s | ETA: {remaining:.0f}s")
+            else:
+                st.success("✅ Simulation Complete" if current_ep > 0 else "⏸️ Idle")
+            
+            st.metric("Last Balance", f"${balance:.2f}")
         else:
-            st.info("No simulation has been run yet.")
+            st.info("Connecting to API...")
 
 def render_analytics_tab():
     """Analytics Tab - Display historical performance metrics."""
