@@ -76,83 +76,122 @@ class BattlefieldSimulator:
         
         return df
 
+    async def run_imitation_bootcamp(self, n_samples=500):
+        """
+        [PHASE 1] COLD START PROTECTION
+        Teaches the Agent the baseline FEAT Sniper rules via Imitation Learning.
+        """
+        logger.info(f"🎓 INICIANDO BOOTCAMP DE IMITACIÓN: {n_samples} muestras...")
+        
+        df = self.generate_synthetic_data(n_rows=n_samples + 100)
+        states = []
+        teacher_actions = []
+        
+        for i in range(50, len(df)):
+            row = df.iloc[i]
+            prices = df['close'].iloc[i-50:i+1].values
+            
+            # 1. State Encoding
+            # We simulate the microstructure for the teacher context
+            micro_state_mock = {
+                "entropy_score": 0.3 if i % 10 < 3 else 0.7, # Alternating focus
+                "ofi_z_score": 1.5 if i % 20 < 10 else -1.5,
+                "hurst": 0.65
+            }
+            
+            state_vec = state_encoder.encode(
+                account_state={"balance": 20.0, "phase_name": "SURVIVAL"},
+                microstructure=micro_state_mock,
+                neural_probs={'scalp': 0.8 if micro_state_mock['entropy_score'] < 0.4 else 0.4},
+                physics_state={"titanium": "TITANIUM_SUPPORT" if i % 30 < 5 else "NEUTRAL", "feat_composite": 75.0 if i % 20 < 10 else 40.0}
+            )
+            
+            # 2. TEACHER LOGIC (Deterministic Legacy Rules)
+            feat_score = (state_vec.feat_composite * 100)
+            entropy = state_vec.entropy_score
+            
+            if feat_score > 80 and entropy < 0.35:
+                action = StrategicAction.TWIN_SNIPER
+            elif feat_score > 60 and entropy < 0.5:
+                action = StrategicAction.STANDARD
+            elif entropy > 0.65:
+                action = StrategicAction.DEFENSIVE
+            else:
+                action = StrategicAction.HOLD
+                
+            states.append(state_vec)
+            teacher_actions.append(action)
+            
+            if len(states) >= n_samples:
+                break
+                
+        # Train Agent to replicate Teacher
+        policy_agent.pretrain(states, teacher_actions, epochs=10)
+        policy_agent.save_weights("models/strategic_policy_bootcamp.pth")
+
     async def run_simulation(self, episodes=5):
-        logger.info(f"⚔️ INICIANDO GIMNASIO RL: {episodes} episodios de entrenamiento ⚔️")
+        # 1. Bootcamp - Pre-training
+        await self.run_imitation_bootcamp(n_samples=500)
+        
+        logger.info(f"\n⚔️ INICIANDO GIMNASIO RL: {episodes} episodios de entrenamiento ⚔️")
         
         for ep in range(episodes):
             df = self.generate_synthetic_data(n_rows=500)
-            features = feat_processor.process_dataframe(df)
             
             logger.info(f"\n--- EPISODIO {ep+1}/{episodes} START ---")
             
-            # Reset account for Episode
             self.balance = 20.0
             
             for i in range(50, len(df)):
                 row = df.iloc[i]
-                feat_row = features.iloc[i]
                 
-                # 1. Physics & Microstructure (Simulated)
                 prices = df['close'].iloc[i-50:i+1].values
-                # Simulate some ticks for Microscanner
                 mock_ticks = [
                     {'bid': row['close']-0.1, 'ask': row['close']+0.1, 'bid_vol': 100, 'ask_vol': 50}
                     for _ in range(20)
                 ]
                 micro_state = micro_scanner.process_tick_batch(mock_ticks, prices)
                 
-                # 2. Strategic Cortex Decision
-                neural_probs = {'scalp': 0.75, 'day': 0.5, 'swing': 0.2} # Mock
-                
                 state_vec = state_encoder.encode(
                     account_state={"balance": self.balance, "phase_name": "SURVIVAL"},
                     microstructure=micro_scanner.get_dict(),
-                    neural_probs=neural_probs,
+                    neural_probs={'scalp': 0.7, 'day': 0.5, 'swing': 0.2},
                     physics_state={"titanium": "NEUTRAL", "feat_composite": 50.0}
                 )
                 
-                # Agent makes a decision
                 action, prob, value = policy_agent.select_action(state_vec)
                 
-                # 3. Simulate Outcome & Get Reward
-                # (Simple model: if we buy/twin and price goes up in 10 bars, positive)
+                # Simulate price movement
                 future_price = df['close'].iloc[min(i+10, len(df)-1)]
                 price_change_pct = (future_price - row['close']) / row['close']
                 
+                # Simple PnL: Action scaling
                 pnl = 0.0
-                if action != StrategicAction.HOLD:
-                    pnl = price_change_pct * 10.0 # Leveraged effect for P&L
+                if action == StrategicAction.TWIN_SNIPER: pnl = price_change_pct * 30.0 # Aggressive
+                elif action == StrategicAction.STANDARD: pnl = price_change_pct * 15.0
+                elif action == StrategicAction.DEFENSIVE: pnl = price_change_pct * 5.0
                 
-                # RLAIF Critic gives the reward
+                # RLAIF Critic
                 trade_result = {"profit": pnl, "type": action.name}
-                context = {
-                    "feat_score": feat_row.get('L1_Mean', 50.0),
+                reward = rlaif_critic.critique_trade(trade_result, {
+                    "feat_score": 50.0, 
                     "entropy": micro_state.entropy_score,
                     "drawdown_pct": max(0, 20.0 - self.balance) / 20.0
-                }
+                })
                 
-                reward = rlaif_critic.critique_trade(trade_result, context)
-                
-                # RECORD EXPERIENCE
-                policy_agent.record_experience(state_vec, action.value, reward, value, prob)
+                # Record (Simplified storage)
+                policy_agent.record_experience(state_vec, action, reward, state_vec, False)
                 
                 self.balance += pnl
                 
-                # 4. Training (Every N steps)
-                self.training_steps += 1
-                if self.training_steps % 64 == 0:
-                    logger.info("🧠 CORTEX: Updating Policy Network from Experience Buffer...")
-                    # policy_agent.update() # Placeholder for actual PPO step logic if implemented
-                
-                if self.balance < 5: # Ruin check
-                    logger.warning(f"💀 ACCOUNT BLOWN @ Step {i} | Restarting Episode...")
+                if self.balance < 5:
+                    logger.warning(f"💀 RUIN @ Step {i}")
                     break
             
-            logger.info(f"EPISODE {ep+1} COMPLETE. Final Balance: ${self.balance:.2f}")
+            logger.info(f"EPISODE {ep+1} DONE. Balance: ${self.balance:.2f}")
 
         logger.info("\n🏆 WARFARE TRAINING COMPLETE.")
 
-        
 if __name__ == "__main__":
     sim = BattlefieldSimulator()
     asyncio.run(sim.run_simulation())

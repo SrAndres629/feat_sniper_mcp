@@ -16,14 +16,15 @@ class KineticValidator:
         force = (body_size / (atr + 1e-9)) * rvol
         return force
 
-    def check_absorption_state(self, df: pd.DataFrame) -> Dict[str, Any]:
+    def check_absorption_state(self, df: pd.DataFrame, limit_pct: float = 0.5, window: int = 3) -> Dict[str, Any]:
         """
         State Machine for Absorption Logic.
+        Now uses dynamic limit_pct and window.
         Returns:
             - state: "NEUTRAL", "IMPULSE", "MONITORING", "CONFIRMED", "FAILED"
-            - progress: (int) candles checked (0-3)
+            - progress: (int) candles checked
         """
-        if len(df) < 5: 
+        if len(df) < window + 2: 
             return {"state": "NEUTRAL", "progress": 0, "feat_force": 0.0}
         
         atr = (df["high"] - df["low"]).rolling(14).mean().iloc[-1]
@@ -34,9 +35,9 @@ class KineticValidator:
         
         active_impulse_idx = None
         
-        # Check T (current) back to T-3
-        for i in range(0, 4): 
-            idx = -(i + 1) # -1, -2, -3, -4
+        # Check T (current) back to T-window
+        for i in range(0, window + 1): 
+            idx = -(i + 1) # -1, -2, -3, ...
             candle = df.iloc[idx]
             
             # Calculate RVOL (Simple Proxy) for historical inspection
@@ -66,7 +67,7 @@ class KineticValidator:
         impulse_candle = df.iloc[active_impulse_idx]
         impulse_body = abs(impulse_candle["close"] - impulse_candle["open"])
         is_bull = impulse_candle["close"] > impulse_candle["open"]
-        limit_level = impulse_candle["low"] + (impulse_body * 0.5) if is_bull else impulse_candle["high"] - (impulse_body * 0.5)
+        limit_level = impulse_candle["low"] + (impulse_body * (1.0 - limit_pct)) if is_bull else impulse_candle["high"] - (impulse_body * (1.0 - limit_pct))
         
         # Candles since impulse
         # idx is like -3. So candles are -2, -1. (2 candles passed)
@@ -83,8 +84,8 @@ class KineticValidator:
                 if fut["close"] > limit_level:
                     return {"state": "FAILED", "progress": candles_passed, "feat_force": 0.0}
                     
-        if candles_passed >= 3:
-            return {"state": "CONFIRMED", "progress": 3, "feat_force": 0.0}
+        if candles_passed >= window:
+            return {"state": "CONFIRMED", "progress": window, "feat_force": 0.0}
             
         return {"state": "MONITORING", "progress": candles_passed, "feat_force": 0.0}
 
@@ -239,6 +240,8 @@ class KineticEngine:
         # [DOCTORAL]
         self.validator = KineticValidator()
         self.spectral = SpectralMechanics()
+        from .adaptation_engine import adaptation_engine
+        self.adaptation_engine = adaptation_engine
 
     def compute_kinetic_state(self, df: pd.DataFrame) -> Dict[str, float]:
         """
@@ -374,7 +377,14 @@ class KineticEngine:
             metrics["wick_ratio"] = wick_ratio
             
             # 3. ABSORPTION TEST (State Machine)
-            abs_result = self.validator.check_absorption_state(df)
+            # Use AdaptationEngine for dynamic thresholds
+            # We calculate vol_scalar based on ATR compared to history (mock history for now)
+            # In a real scenario, we'd pass the actual volatility history.
+            vol_scalar = 1.0 # Default
+            limit_pct = self.adaptation_engine.get_retracement_limit(vol_scalar)
+            window = self.adaptation_engine.get_absorption_window(vol_scalar)
+            
+            abs_result = self.validator.check_absorption_state(df, limit_pct=limit_pct, window=window)
             state_map = {"NEUTRAL": 0.0, "IMPULSE": 1.0, "MONITORING": 2.0, "CONFIRMED": 3.0, "FAILED": -1.0}
             
             metrics["absorption_state"] = state_map.get(abs_result["state"], 0.0)

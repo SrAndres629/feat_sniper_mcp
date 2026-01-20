@@ -230,6 +230,41 @@ class StrategicPolicyAgent:
         self.network.load_state_dict(torch.load(path, map_location=self.device))
         self.network.eval()
     
+    def pretrain(self, states: List[StateVector], target_actions: List[StrategicAction], epochs: int = 5):
+        """
+        Performs Supervised Pre-training (Imitation Learning).
+        Train the network to mimic a 'Teacher' (e.g., the legacy if/else logic).
+        
+        Args:
+            states: List of states captured during teacher execution.
+            target_actions: Actions chosen by the teacher for those states.
+            epochs: Number of training passes.
+        """
+        if not states:
+            return
+            
+        self.network.train()
+        optimizer = torch.optim.Adam(self.network.parameters(), lr=1e-3)
+        criterion = nn.CrossEntropyLoss()
+        
+        state_tensors = torch.stack([torch.from_numpy(s.to_tensor()) for s in states]).to(self.device)
+        action_tensors = torch.tensor([a.value for a in target_actions]).to(self.device)
+        
+        logger.info(f"🎓 PRE-TRAINING: Mimicking Teacher on {len(states)} samples...")
+        
+        for epoch in range(epochs):
+            optimizer.zero_grad()
+            logits, _ = self.network(state_tensors)
+            loss = criterion(logits, action_tensors)
+            loss.backward()
+            optimizer.step()
+            
+            if epoch % 1 == 0:
+                logger.info(f"   Epoch {epoch+1}/{epochs} | Loss: {loss.item():.4f}")
+        
+        self.network.eval()
+        logger.info("✅ Pre-training complete. Agent is now aligned with Legacy Rules.")
+
     def get_decision_report(self, state: StateVector) -> dict:
         """
         Comprehensive decision report for logging/debugging.

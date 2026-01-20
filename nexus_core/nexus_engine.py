@@ -49,6 +49,7 @@ class MarketSnapshot:
 
 # Microstructure Imports
 from nexus_core.microstructure import micro_scanner
+from app.core.mt5_conn.tick_listener import tick_listener
 
 class NexusEngine:
     """
@@ -93,16 +94,19 @@ class NexusEngine:
         """
         self.state = EngineState.PERCEIVING
         
-        # 1. Get Real Microstructure State (via Scanner)
-        micro_state_obj = micro_scanner.get_dict()
+        # 1. Get REAL Microstructure State (via Scanner / Ticker)
+        # Using Zero-Lag Live Scan
+        micro_state_obj = micro_scanner.live_scan()
         
-        # Fallback mock for demo visualization if scanner has no tick history yet
-        if self.demo_mode and micro_state_obj['entropy_score'] == 0.5:
-             micro_state_obj = {
+        # Fallback for display if buffer still warming up
+        if micro_state_obj.entropy_score == 0.5 and self.demo_mode:
+             micro_state_obj_dict = {
                 "entropy_score": 0.35 if fractal_data['coherence_score'] > 0.6 else 0.75,
                 "ofi_z_score": 1.5 if fractal_data['dominant_bias'] == 'BULLISH' else -0.5,
                 "hurst": 0.65
              }
+        else:
+             micro_state_obj_dict = micro_scanner.get_dict()
 
         coherence = fractal_data['coherence_score']
         
@@ -124,7 +128,7 @@ class NexusEngine:
             titanium_floor=titanium,
             neural_probs=neural_probs,
             recommendation=fractal_data['recommendation'],
-            microstructure=micro_state_obj
+            microstructure=micro_state_obj_dict
         )
         
         if titanium:
@@ -252,18 +256,22 @@ class NexusEngine:
         logger.info(f"🔄 NEXUS CYCLE END | Active Trades: {len(self.active_trades)}")
         logger.info("=" * 50)
         
-    def run_loop(self, interval_seconds: int = 60):
+    async def run_loop(self, interval_seconds: int = 60):
         """
         Main execution loop (for live trading).
         """
         logger.info("🏁 NEXUS ENGINE STARTING MAIN LOOP...")
         
+        # Start high-frequency tick ingestion
+        tick_listener.start()
+        
         try:
             while True:
                 self.run_cycle()
-                time.sleep(interval_seconds)
+                await asyncio.sleep(interval_seconds)
         except KeyboardInterrupt:
             logger.info("🛑 NEXUS ENGINE STOPPED BY USER")
+            tick_listener.stop()
 
 # Singleton
 nexus = NexusEngine(demo_mode=True)

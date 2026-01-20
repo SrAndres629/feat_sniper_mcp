@@ -63,18 +63,41 @@ class AdaptationEngine:
             "vol_scalar": vol_scalar
         }
 
+    def get_retracement_limit(self, vol_scalar: float) -> float:
+        """
+        Dynamically calculates the retracement limit based on volatility.
+        - High Vol (Fast/Crash): Exigimos un retroceso profundo (ej. 61.8% -> 0.618) por seguridad.
+        - Low Vol (Trend fuerte): Aceptamos un retroceso corto (ej. 23.6% -> 0.236) para entrar rápido.
+        """
+        # Linear interpolation between 0.236 (at scalar 0.6) and 0.618 (at scalar 1.8)
+        # Simplified: base 0.5 and nudge by scalar
+        if vol_scalar < 0.8: return 0.236
+        if vol_scalar > 1.5: return 0.618
+        return 0.5
+
+    def get_absorption_window(self, vol_scalar: float) -> int:
+        """
+        Dynamically calculates how many candles to monitor for absorption.
+        """
+        if vol_scalar < 0.8: return 2 # Market moves fast, confirm fast
+        if vol_scalar > 1.5: return 5 # Market is slow, allow more time
+        return 3
+
     def get_config_for_regime(self, current_vol: float, history_vol: np.ndarray) -> Dict[str, Any]:
         """
         End-to-end regime detection and parameter generation.
         """
         if len(history_vol) < 20:
-            return self.calculate_adaptive_params(1.0)
+            scalar = 1.0
+        else:
+            p20 = np.percentile(history_vol, 20)
+            p90 = np.percentile(history_vol, 90)
+            scalar = self.get_volatility_scalar(current_vol, p20, p90)
             
-        p20 = np.percentile(history_vol, 20)
-        p90 = np.percentile(history_vol, 90)
-        
-        scalar = self.get_volatility_scalar(current_vol, p20, p90)
-        return self.calculate_adaptive_params(scalar)
+        params = self.calculate_adaptive_params(scalar)
+        params["retracement_limit"] = self.get_retracement_limit(scalar)
+        params["absorption_window"] = self.get_absorption_window(scalar)
+        return params
 
 # Singleton Export
 adaptation_engine = AdaptationEngine()
