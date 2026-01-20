@@ -211,5 +211,64 @@ class SupabaseSync:
         )
         logger.info(f"🧠 Neural Evolution Session Synced: {payload['session_type']} (+{payload['iq_delta']*100:.1f} IQ)")
 
+    @resilient(max_retries=2)
+    async def save_market_history(self, symbol: str, df: pd.DataFrame) -> None:
+        """Saves OHLCV data to the market_history table.
+        
+        Args:
+            symbol: The market symbol.
+            df: DataFrame containing OHLCV data.
+        """
+        if not self._client or df.empty:
+            return
+            
+        # Convert DataFrame to records
+        records = df.to_dict('records')
+        for rec in records:
+            rec['symbol'] = symbol
+            # Ensure time is ISO string if it's a timestamp
+            if 'time' in rec and not isinstance(rec['time'], str):
+                rec['time'] = rec['time'].isoformat() if hasattr(rec['time'], 'isoformat') else str(rec['time'])
+
+        import anyio
+        try:
+            # Using upsert to avoid duplicates if time+symbol is unique
+            await anyio.to_thread.run_sync(
+                lambda: self._client.table("market_history").upsert(records, on_conflict="time,symbol").execute()
+            )
+            logger.info(f"💾 {len(records)} candles saved to market_history for {symbol}")
+        except Exception as e:
+            logger.error(f"Error saving market history for {symbol}: {e}")
+
+    @resilient(max_retries=3)
+    async def get_last_candle_timestamp(self, symbol: str) -> Optional[str]:
+        """Retrieves the timestamp of the last recorded candle for a symbol.
+        
+        Args:
+            symbol: The market symbol (e.g., XAUUSD).
+            
+        Returns:
+            ISO format timestamp string or None.
+        """
+        if not self._client:
+            return None
+            
+        import anyio
+        try:
+            response = await anyio.to_thread.run_sync(
+                lambda: self._client.table("market_history") # Assuming table name is market_history
+                    .select("time")
+                    .eq("symbol", symbol)
+                    .order("time", desc=True)
+                    .limit(1)
+                    .execute()
+            )
+            if response.data and len(response.data) > 0:
+                return response.data[0]["time"]
+        except Exception as e:
+            logger.error(f"Error fetching last timestamp for {symbol}: {e}")
+            
+        return None
+
 # Instancia global
 supabase_sync = SupabaseSync()

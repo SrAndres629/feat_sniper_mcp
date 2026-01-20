@@ -6,7 +6,9 @@ import logging
 import pandas as pd
 import numpy as np
 import torch.nn.functional as F
-from typing import Dict
+from typing import Dict, Optional
+import json
+from datetime import datetime
 
 # Add root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -15,213 +17,168 @@ from app.ml.feat_processor import feat_processor
 from app.ml.models.hybrid_probabilistic import HybridProbabilistic
 from app.core.config import settings
 
+# Setup logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(name)s | %(levelname)s | %(message)s')
 logger = logging.getLogger("QUICK_TRAIN")
 
+async def evaluate_model(model, X, Y, F_in, criterion):
+    """Evaluates the model and returns the average loss."""
+    model.eval()
+    with torch.no_grad():
+        out = model(X, feat_input=F_in)
+        base_loss = criterion(out["logits"], Y)
+        log_var = out["log_var"].squeeze()
+        weighted_loss = torch.mean(torch.exp(-log_var) * base_loss + 0.5 * log_var)
+        
+        reality_p = (Y != 1).float()
+        conf_loss = F.mse_loss(out["p_win"].squeeze(), reality_p)
+        
+        total_loss = weighted_loss + 0.2 * conf_loss
+        return total_loss.item()
 
-def quick_train_brain(symbol="XAUUSD"):
-    logger.info("🧠 STARTING INSTITUTIONAL RE-TRAINING (Using REAL Market Data) 🧠")
+async def quick_train_brain(symbol="XAUUSD"):
+    logger.info(f"🧠 STARTING INSTITUTIONAL EVOLUTION: {symbol} 🧠")
     
-    # 1. Fetch REAL historical data from MT5 (last 1000 bars)
-    try:
-        from app.core.mt5_conn.manager import MT5Connection
-        import MetaTrader5 as mt5
-        
-        logger.info("📊 Fetching real historical data from MT5...")
-        conn = MT5Connection()
-        
-        # Fetch last 1000 M5 bars (real market data)
-        rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M5, 0, 1000)
-        
-        if rates is None or len(rates) == 0:
-            logger.warning("⚠️ MT5 data unavailable. Falling back to synthetic data.")
-            from nexus_training.simulate_warfare import BattlefieldSimulator
-            sim = BattlefieldSimulator(symbol)
-            df_raw = sim.generate_synthetic_data(n_rows=1000)
-        else:
-            # Convert MT5 data to DataFrame
-            df_raw = pd.DataFrame(rates)
-            df_raw['time'] = pd.to_datetime(df_raw['time'], unit='s')
-            logger.info(f"✅ Loaded {len(df_raw)} real bars from MT5 ({df_raw['time'].min()} to {df_raw['time'].max()})")
+    # 1. SMART DELTA SYNC (Real Data Enforcement)
+    from nexus_core.data_collector import smart_sync_data
     
-    except Exception as e:
-        logger.error(f"❌ Error fetching MT5 data: {e}. Using synthetic fallback.")
-        from nexus_training.simulate_warfare import BattlefieldSimulator
-        sim = BattlefieldSimulator(symbol)
-        df_raw = sim.generate_synthetic_data(n_rows=1000)
+    logger.info("🔄 Initiating Smart Delta Sync...")
+    df_raw = await smart_sync_data(symbol)
     
-    # 2. Process through FeatProcessor (Actual Logic, NOT Random)
-    logger.info("🧪 Feature Engineering in progress...")
+    if df_raw is None or len(df_raw) < 200:
+        logger.error("❌ ABORTING: Insufficient REAL data for training. Delta sync returned too few candles.")
+        raise Exception("AutoML Aborted: No Real Data Available or insufficient samples.")
+
+    # 2. Feature Engineering
+    logger.info(f"🧪 Engineering Features for {len(df_raw)} candles...")
     df = feat_processor.process_dataframe(df_raw)
     
-    # [FIX] Populate all 18 Neural Dimensions in a clean DF
-    logger.info("🎨 Re-mapping latent dimensions for Neural Alignment...")
+    # Populate Neural Dimensions
     latent_rows = []
     for idx, row in df.iterrows():
         latent_rows.append(feat_processor.compute_latent_vector(row))
     
-    # Create a fresh DF with only the needed neural features + close (for target labeling)
     new_df = pd.DataFrame(latent_rows)
     new_df['close'] = df['close'].reset_index(drop=True)
     df = new_df.dropna().reset_index(drop=True)
     
     feat_cols = list(settings.NEURAL_FEATURE_NAMES)
-    # Ensure all features are numeric and drop any rows that failed engineering
     df[feat_cols] = df[feat_cols].apply(pd.to_numeric, errors='coerce').fillna(0.0)
     df = df.dropna(subset=feat_cols).reset_index(drop=True)
     
     seq_len = settings.LSTM_SEQ_LEN
+    if len(df) < seq_len + 120: # 100 for val + 20 for horizon
+        logger.error("❌ ABORTING: Dataset too small after feature engineering.")
+        return
+
+    # 3. Build Tensors
+    X_list, y_list = [], []
+    feat_inputs_list = {"form": [], "space": [], "accel": [], "time": [], "kinetic": []}
     
-    logger.info(f"Dataset Size: {len(df)} rows. Features: {len(feat_cols)}")
-    
-    # 3. Build Tensors (Aligned with InferenceEngine)
-    X_list = []
-    y_list = []
-    feat_inputs_list = {
-        "form": [], "space": [], "accel": [], "time": [], "kinetic": []
-    }
-    
-    # [v5.0 - DOCTORAL] Triple Barrier Labeling Logic
-    # 0: SELL (Hits SL first or extreme down), 1: HOLD (Horizontal/No hit), 2: BUY (Hits TP first)
-    horizon = 20 # Max bars to wait
-    tp_mult = 1.5 
-    sl_mult = 1.0
+    horizon = 20
+    tp_mult, sl_mult = 1.5, 1.0
     
     for i in range(seq_len, len(df) - horizon):
-        # Build Sequence
-        seq_window = df.iloc[i-seq_len:i][feat_cols].values
-        X_list.append(torch.tensor(seq_window, dtype=torch.float32))
+        X_list.append(torch.tensor(df.iloc[i-seq_len:i][feat_cols].values, dtype=torch.float32))
         
-        # Latent Metrics - Updated to match current Physics-Supremacy schema
         row = df.iloc[i]
         metrics = feat_processor.compute_latent_vector(row)
         
-        # Form Gate: [physics_entropy, physics_viscosity, structural_feat_index, 0.0]
-        feat_inputs_list["form"].append([
-            metrics.get("physics_entropy", 0.0), 
-            metrics.get("physics_viscosity", 0.0), 
-            metrics.get("structural_feat_index", 0.0), 
-            0.0
-        ])
+        feat_inputs_list["form"].append([metrics.get("physics_entropy", 0.0), metrics.get("physics_viscosity", 0.0), metrics.get("structural_feat_index", 0.0), 0.0])
+        feat_inputs_list["space"].append([metrics.get("confluence_tensor", 0.0), metrics.get("killzone_intensity", 0.0), metrics.get("session_weight", 0.0)])
+        feat_inputs_list["accel"].append([metrics.get("physics_energy", 0.0), metrics.get("physics_force", 0.0), metrics.get("volatility_context", 1.0)])
+        feat_inputs_list["time"].append([metrics.get("temporal_sin", 0.0), metrics.get("temporal_cos", 0.0), metrics.get("killzone_intensity", 0.0), metrics.get("session_weight", 0.0)])
+        feat_inputs_list["kinetic"].append([metrics.get("trap_score", 0.0), metrics.get("structural_feat_index", 0.0), metrics.get("physics_force", 0.0), metrics.get("physics_viscosity", 0.0)])
         
-        # Space Gate: [confluence_tensor, killzone_intensity, session_weight]
-        feat_inputs_list["space"].append([
-            metrics.get("confluence_tensor", 0.0), 
-            metrics.get("killzone_intensity", 0.0), 
-            metrics.get("session_weight", 0.0)
-        ])
-        
-        # Accel Gate: [physics_energy, physics_force, volatility_context]
-        feat_inputs_list["accel"].append([
-            metrics.get("physics_energy", 0.0), 
-            metrics.get("physics_force", 0.0), 
-            metrics.get("volatility_context", 1.0)
-        ])
-        
-        # Time Gate: [temporal_sin, temporal_cos, killzone, session_weight]
-        feat_inputs_list["time"].append([
-            metrics.get("temporal_sin", 0.0), 
-            metrics.get("temporal_cos", 0.0), 
-            metrics.get("killzone_intensity", 0.0), 
-            metrics.get("session_weight", 0.0)
-        ])
-        
-        # Kinetic Gate: [trap_score, structural_feat_index, physics_force, physics_viscosity]
-        feat_inputs_list["kinetic"].append([
-            metrics.get("trap_score", 0.0), 
-            metrics.get("structural_feat_index", 0.0), 
-            metrics.get("physics_force", 0.0), 
-            metrics.get("physics_viscosity", 0.0)
-        ])
-        
-        # TRIPLE BARRIER LOGIC
+        # Triple Barrier
         price_start = df.iloc[i]['close']
         atr = df.iloc[i].get('atr_accel', price_start * 0.001)
-        up_barrier = price_start + (atr * tp_mult)
-        dn_barrier = price_start - (atr * sl_mult)
-        
-        label = 1 # Default HOLD
+        up_b, dn_b = price_start + (atr * tp_mult), price_start - (atr * sl_mult)
+        label = 1
         for j in range(1, horizon):
             curr_p = df.iloc[i+j]['close']
-            if curr_p >= up_barrier:
-                label = 2
-                break
-            elif curr_p <= dn_barrier:
-                label = 0
-                break
+            if curr_p >= up_b: label = 2; break
+            elif curr_p <= dn_b: label = 0; break
         y_list.append(label)
         
-    X_tensor = torch.stack(X_list)
-    Y_tensor = torch.tensor(y_list, dtype=torch.long)
-    F_inputs = {k: torch.tensor(v, dtype=torch.float32) for k, v in feat_inputs_list.items()}
+    X_all = torch.stack(X_list)
+    Y_all = torch.tensor(y_list, dtype=torch.long)
+    F_all = {k: torch.tensor(v, dtype=torch.float32) for k, v in feat_inputs_list.items()}
+
+    # 4. CHALLENGER SPLIT (Recent 100 for Validation)
+    val_size = 100
+    train_size = len(X_all) - val_size
     
-    # 4. Initialize Model v5.0
-    model = HybridProbabilistic(
-        input_dim=len(feat_cols),
-        hidden_dim=settings.NEURAL_HIDDEN_DIM,
-        num_classes=3
-    )
+    X_train, X_val = X_all[:train_size], X_all[train_size:]
+    Y_train, Y_val = Y_all[:train_size], Y_all[train_size:]
+    F_train = {k: v[:train_size] for k, v in F_all.items()}
+    F_val = {k: v[train_size:] for k, v in F_all.items()}
+
+    # 5. CHALLENGER PROTOCOL: Evaluate Existing Model
+    criterion = torch.nn.CrossEntropyLoss(reduction='none')
+    model_path = os.path.join(settings.MODELS_DIR, f"hybrid_prob_{symbol}_v2.pt")
+    old_val_loss = float('inf')
+
+    if os.path.exists(model_path):
+        logger.info("🕵️ Evaluating current Veteran Model on out-of-sample data...")
+        try:
+            checkpoint = torch.load(model_path)
+            old_model = HybridProbabilistic(input_dim=len(feat_cols), hidden_dim=settings.NEURAL_HIDDEN_DIM, num_classes=3)
+            old_model.load_state_dict(checkpoint["state_dict"])
+            old_val_loss = await evaluate_model(old_model, X_val, Y_val, F_val, criterion)
+            logger.info(f"📉 Veteran Model Validation Loss: {old_val_loss:.4f}")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to load old model for comparison: {e}")
+
+    # 6. Train Challenger
+    challenger = HybridProbabilistic(input_dim=len(feat_cols), hidden_dim=settings.NEURAL_HIDDEN_DIM, num_classes=3)
+    if os.path.exists(model_path):
+        challenger.load_state_dict(torch.load(model_path)["state_dict"]) # Warm start
     
-    # 5. Training Loop with Uncertainty Loss
-    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=1e-5)
-    criterion = torch.nn.CrossEntropyLoss(reduction='none') # For weighting
+    optimizer = torch.optim.AdamW(challenger.parameters(), lr=1e-4, weight_decay=1e-5)
     
-    logger.info("🚀 Initiating Bayesian Neural Convergence Loop...")
-    model.train()
-    batch_size = 64
-    epochs = 20
+    logger.info(f"🚀 Training Challenger on {train_size} samples...")
+    challenger.train()
+    batch_size, epochs = 64, 20
     
     for epoch in range(epochs):
         epoch_loss = 0
-        for i in range(0, len(X_tensor), batch_size):
-            batch_X = X_tensor[i:i+batch_size]
-            batch_Y = Y_tensor[i:i+batch_size]
-            batch_F = {k: v[i:i+batch_size] for k, v in F_inputs.items()}
+        for i in range(0, len(X_train), batch_size):
+            b_X, b_Y = X_train[i:i+batch_size], Y_train[i:i+batch_size]
+            b_F = {k: v[i:i+batch_size] for k, v in F_train.items()}
             
             optimizer.zero_grad()
-            out = model(batch_X, feat_input=batch_F)
+            out = challenger(b_X, feat_input=b_F)
+            base_l = criterion(out["logits"], b_Y)
+            l_var = out["log_var"].squeeze()
+            w_loss = torch.mean(torch.exp(-l_var) * base_l + 0.5 * l_var)
+            c_loss = F.mse_loss(out["p_win"].squeeze(), (b_Y != 1).float())
             
-            # [v5.0] ALEATORIC LOSS (Uncertainty Weighting)
-            # Loss = (1 / 2*exp(log_var)) * Base_Loss + 0.5 * log_var
-            base_loss = criterion(out["logits"], batch_Y)
-            log_var = out["log_var"].squeeze()
-            
-            # Weighting the loss by predicted uncertainty
-            weighted_loss = torch.mean(torch.exp(-log_var) * base_loss + 0.5 * log_var)
-            
-            # Auxiliary Confidence Loss (MSE between p_win and reality)
-            reality_p = (batch_Y != 1).float()
-            conf_loss = F.mse_loss(out["p_win"].squeeze(), reality_p)
-            
-            total_loss = weighted_loss + 0.2 * conf_loss
-            total_loss.backward()
+            total_l = w_loss + 0.2 * c_loss
+            total_l.backward()
             optimizer.step()
-            epoch_loss += total_loss.item()
-            
-        if epoch % 5 == 0:
-            logger.info(f"Epoch {epoch}/{epochs} | Loss: {epoch_loss/(len(X_tensor)/batch_size):.4f}")
+            epoch_loss += total_l.item()
 
-    # 6. Weight Persistence
-    os.makedirs(settings.MODELS_DIR, exist_ok=True)
-    path = os.path.join(settings.MODELS_DIR, f"hybrid_prob_{symbol}_v2.pt")
-    
-    torch.save({
-        "state_dict": model.state_dict(),
-        "config": {
-            "seq_len": seq_len,
-            "input_dim": len(feat_cols),
-            "hidden_dim": settings.NEURAL_HIDDEN_DIM
-        },
-        "version": "4.1"
-    }, path)
-    
-    logger.info(f"✅ MISSION ACCOMPLISHED: Model Weight Persistent at {path}")
+    # 7. FINAL EVALUATION: Verify if Challenger is better
+    new_val_loss = await evaluate_model(challenger, X_val, Y_val, F_val, criterion)
+    logger.info(f"📊 Challenger Validation Loss: {new_val_loss:.4f} (v Veteran: {old_val_loss:.4f})")
+
+    if new_val_loss < old_val_loss or old_val_loss == float('inf'):
+        logger.info("✅ CHALLENGER WINS. Promoting and Persisting update...")
+        os.makedirs(settings.MODELS_DIR, exist_ok=True)
+        torch.save({
+            "state_dict": challenger.state_dict(),
+            "config": {"seq_len": seq_len, "input_dim": len(feat_cols), "hidden_dim": settings.NEURAL_HIDDEN_DIM},
+            "version": "5.0_evolution",
+            "val_loss": new_val_loss,
+            "timestamp": datetime.now().isoformat()
+        }, model_path)
+    else:
+        logger.warning("❌ CHALLENGER FAILED to improve validation metrics. Retaining Veteran Model to prevent brain degradation.")
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("--symbol", default="XAUUSD")
-    parser.add_argument("--auto", action="store_true", help="Auto mode for AutoML integration")
     args = parser.parse_args()
-    
-    quick_train_brain(args.symbol)
+    asyncio.run(quick_train_brain(args.symbol))
