@@ -611,9 +611,15 @@ class KineticEngine:
         else:
             rvol = pd.Series(1.0, index=df.index)
         
-        # [CRITICAL SAFETY] Clip to prevent neural saturation during flash crashes
-        res["feat_force"] = ((abs(close - c_micro) / (atr + 1e-9)) * rvol).clip(0, 5.0)
-        res["physics_energy"] = ((abs(close - c_macro) / (atr + 1e-9)) * rvol).clip(0, 5.0)
+        # [CRITICAL SAFETY] Logarithmic scaling to preserve tail information
+        # Instead of hard clipping at 5.0, we use log1p(x) = ln(1+x)
+        # This compresses infinite range to finite output while preserving magnitude info
+        # Example: raw=2.88 → log1p=1.35, raw=50 → log1p=3.93
+        raw_force = (abs(close - c_micro) / (atr + 1e-9)) * rvol
+        raw_energy = (abs(close - c_macro) / (atr + 1e-9)) * rvol
+        
+        res["feat_force"] = np.log1p(raw_force)  # ln(1 + x) for smooth compression
+        res["physics_energy"] = np.log1p(raw_energy)
         
         # 3. Thermodynamics
         # Entropy = Market Noise (Z-Score variance)
