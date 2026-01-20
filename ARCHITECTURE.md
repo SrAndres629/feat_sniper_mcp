@@ -1,301 +1,403 @@
-# FEAT SNIPER NEXUS - ARCHITECTURE MAP
-## Complete System Blueprint for AI Analysis
+# FEAT SNIPER NEXUS - SYSTEM MEMORY
+## Master Context Document for AI Agents
 
-> **Purpose**: This document provides a complete map of the system architecture.
-> AI agents should read this FIRST before analyzing individual files.
-
----
-
-## 📁 REPOSITORY STRUCTURE (Essential Files Only)
-
-### 🔴 CONTEXT KILLERS (EXCLUDE FROM ANALYSIS)
-
-These folders/files consume massive context without providing value:
-
-| Path                      | Size     | Reason to Exclude                         |
-| :------------------------ | :------- | :---------------------------------------- |
-| `.venv/`                  | ~1.6GB   | Python virtual environment (dependencies) |
-| `dashboard/node_modules/` | ~434MB   | Node.js dependencies                      |
-| `__pycache__/`            | Variable | Python bytecode (auto-generated)          |
-| `.git/`                   | Variable | Version control history                   |
-| `.ruff_cache/`            | Variable | Linter cache                              |
-| `.pytest_cache/`          | Variable | Test cache                                |
-| `project_atlas.json`      | 83KB     | Auto-generated project map (JSON noise)   |
-| `tools/compile_log.txt`   | 10KB     | Build output log                          |
-| `*.pyc`, `*.pyo`          | Variable | Compiled Python files                     |
-| `models/*.pt`             | Variable | Neural weight files (binary)              |
-| `data/*.db`               | Variable | SQLite databases (binary)                 |
-| `logs/*.log`              | Variable | Runtime logs                              |
-
-**Add to `.gitignore` or AI exclusion config:**
-```
-.venv/
-node_modules/
-__pycache__/
-.git/
-.ruff_cache/
-.pytest_cache/
-*.pyc
-*.pt
-*.db
-*.log
-project_atlas.json
-```
+> **Purpose**: This is the SINGLE SOURCE OF TRUTH for understanding the project.
+> Any AI (Claude, Gemini, etc.) should read this FIRST before any analysis.
+> This document tells you what exists, where it is, and whether to analyze it.
 
 ---
 
-## 🧠 CORE ARCHITECTURE
+## 🎯 HOW TO USE THIS DOCUMENT
+
+When asked to "audit" or "analyze" files:
+1. Check if the file is in **CORE** (analyze deeply)
+2. Check if it's in **INFRASTRUCTURE** (understand purpose, skip internals)
+3. Check if it's in **BLOAT** (acknowledge existence, never analyze)
+
+---
+
+## 📊 FILE CLASSIFICATION SYSTEM
+
+### 🟢 CORE FILES (~50 files, ~300KB)
+**These ARE the project. Analyze deeply.**
+
+### 🟡 INFRASTRUCTURE FILES (~30 files, ~100KB)
+**These support the project. Know what they do, don't analyze internals.**
+
+### 🔴 BLOAT FILES (~2GB)
+**These are dependencies/cache. Know they exist, NEVER analyze.**
+
+---
+
+# COMPLETE FILE INVENTORY
+
+## 🟢 CORE: TRADING ENGINE (`nexus_core/`)
+
+| File                    | Purpose                                            |  Analyze?   |
+| :---------------------- | :------------------------------------------------- | :---------: |
+| `nexus_engine.py`       | Main trading loop, orchestrates all components     |   ✅ DEEP    |
+| `strategy_engine.py`    | Trade decision logic, TradeLeg creation            |   ✅ DEEP    |
+| `kinetic_engine.py`     | Price physics (momentum, acceleration, absorption) |   ✅ DEEP    |
+| `features.py`           | Feature extraction for ML (16-dim vector)          |   ✅ DEEP    |
+| `math_engine.py`        | Low-level indicators (ATR, EMA, RSI)               | ✅ Reference |
+| `money_management.py`   | Position sizing, RiskOfficer                       |   ✅ DEEP    |
+| `adaptation_engine.py`  | Dynamic parameter adjustment                       | ✅ Reference |
+| `convergence_engine.py` | Multi-signal confluence                            | ✅ Reference |
+| `memory.py`             | Short-term state cache                             |   ⚡ Quick   |
+
+### `nexus_core/microstructure/` - Zero-Lag Tick Analysis
+| File                 | Purpose                          |  Analyze?   |
+| :------------------- | :------------------------------- | :---------: |
+| `scanner.py`         | Real-time microstructure scanner |   ✅ DEEP    |
+| `ticker.py`          | Tick buffer (TickBuffer class)   | ✅ Reference |
+| `hurst.py`           | Hurst exponent calculation       |   ⚡ Quick   |
+| `ofi.py`             | Order Flow Imbalance             |   ⚡ Quick   |
+| `entropy_scanner.py` | Shannon entropy                  |   ⚡ Quick   |
+
+### `nexus_core/fundamental_engine/` - News/Macro Analysis
+| File                       | Purpose                    |  Analyze?   |
+| :------------------------- | :------------------------- | :---------: |
+| `engine.py`                | DEFCON levels, Kill Switch |   ✅ DEEP    |
+| `calendar_client.py`       | Event data interface       | ✅ Reference |
+| `forexfactory_provider.py` | Real ForexFactory scraper  | ✅ Reference |
+| `risk_modulator.py`        | Event proximity → risk     |   ⚡ Quick   |
+
+### `nexus_core/structure_engine/` - Price Structure
+| File            | Purpose                        |  Analyze?   |
+| :-------------- | :----------------------------- | :---------: |
+| `engine.py`     | FEAT Index calculation         |   ✅ DEEP    |
+| `levels.py`     | Support/Resistance detection   | ✅ Reference |
+| `pvp_engine.py` | Volume profile (POC, VAL, VAH) | ✅ Reference |
+
+### `nexus_core/physics_engine/` - Price Physics
+| File               | Purpose                    | Analyze? |
+| :----------------- | :------------------------- | :------: |
+| `gravity_model.py` | Price attraction to levels | ⚡ Quick  |
+
+### `nexus_core/zone_projector/` - Zone Analysis
+| File                | Purpose                    | Analyze? |
+| :------------------ | :------------------------- | :------: |
+| `spatial_engine.py` | Zone projection algorithms | ⚡ Quick  |
+
+---
+
+## 🟢 CORE: NEURAL NETWORK (`app/ml/`)
+
+| File                     | Purpose                        |  Analyze?   |
+| :----------------------- | :----------------------------- | :---------: |
+| `ml_normalization.py`    | ATR-based normalization        |   ✅ DEEP    |
+| `market_regime.py`       | Regime detection (trend/range) | ✅ Reference |
+| `temporal_features.py`   | Time-based features            |   ⚡ Quick   |
+| `fractal_analysis.py`    | Multi-TF fractals              | ✅ Reference |
+| `rlaif_critic.py`        | RLAIF value estimation         | ✅ Reference |
+| `multi_time_learning.py` | MTF learning                   |   ⚡ Quick   |
+
+### `app/ml/strategic_cortex/` - Neural Core
+| File                | Purpose                       |  Analyze?   |
+| :------------------ | :---------------------------- | :---------: |
+| `policy_network.py` | PPO Actor-Critic, StateVector | ✅✅ CRITICAL |
+| `state_encoder.py`  | Raw data → Tensor             |   ✅ DEEP    |
+
+### `app/ml/feat_processor/` - FEAT Chain
+| File            | Purpose              | Analyze? |
+| :-------------- | :------------------- | :------: |
+| `force.py`      | Force score [0-100]  | ⚡ Quick  |
+| `exhaustion.py` | Exhaustion detection | ⚡ Quick  |
+| `absorption.py` | Absorption zones     | ⚡ Quick  |
+| `trend.py`      | Trend strength       | ⚡ Quick  |
+
+### `app/ml/data_collector/` - Data Pipeline
+| File           | Purpose                   |  Analyze?   |
+| :------------- | :------------------------ | :---------: |
+| `labeler.py`   | Training label generation | ✅ Reference |
+| `collector.py` | Data collection           |   ⚡ Quick   |
+
+---
+
+## 🟢 CORE: API & DASHBOARD
+
+### `app/api/` - REST API Layer
+| File         | Purpose                    |  Analyze?   |
+| :----------- | :------------------------- | :---------: |
+| `server.py`  | FastAPI endpoints          |   ✅ DEEP    |
+| `workers.py` | Background task management | ✅ Reference |
+| `models.py`  | Pydantic schemas           |   ⚡ Quick   |
+
+### `dashboard/` - Web UI
+| File          | Purpose             | Analyze? |
+| :------------ | :------------------ | :------: |
+| `war_room.py` | Streamlit dashboard |  ✅ DEEP  |
+
+---
+
+## 🟢 CORE: TRAINING
+
+### `nexus_training/` - Simulation Environment
+| File                  | Purpose                | Analyze? |
+| :-------------------- | :--------------------- | :------: |
+| `simulate_warfare.py` | Adversarial simulation |  ✅ DEEP  |
+
+---
+
+## 🟢 CORE: INFRASTRUCTURE
+
+### `app/core/` - System Infrastructure
+| File                        | Purpose               |  Analyze?   |
+| :-------------------------- | :-------------------- | :---------: |
+| `config.py`                 | Settings loader       | ✅ Reference |
+| `mt5_conn/connection.py`    | MT5 connection pool   | ✅ Reference |
+| `mt5_conn/tick_listener.py` | Real-time tick stream | ✅ Reference |
+
+### Root Files
+| File                     | Purpose            |  Analyze?   |
+| :----------------------- | :----------------- | :---------: |
+| `nexus_daemon.py`        | Process supervisor |   ✅ DEEP    |
+| `mcp_server.py`          | MCP AI interface   | ✅ Reference |
+| `LAUNCH_FEAT_DAEMON.bat` | Entry point        |   ⚡ Quick   |
+
+---
+
+## 🟢 CORE: AI GOVERNANCE
+
+### `.ai/` - AI Instructions
+| File                            | Purpose                    |  Analyze?   |
+| :------------------------------ | :------------------------- | :---------: |
+| `CONSTITUTION.md`               | Core principles            | ✅✅ CRITICAL |
+| `skills/00_CTO_ORCHESTRATOR.md` | Master project overview    |   ✅ DEEP    |
+| `skills/*.md`                   | Department-specific guides | ✅ Reference |
+
+---
+
+## 🟡 INFRASTRUCTURE (Know Purpose, Skip Internals)
+
+### `tools/` - Utility Scripts (~73 files)
+**Purpose**: Diagnostic, verification, and maintenance scripts.
+**When to analyze**: Only if specifically asked about a particular tool.
+
+Key tools to know exist:
+- `verify_*.py` - Various verification scripts
+- `test_*.py` - Test scripts
+- `fractal_diagnosis.py` - Market fractal analysis
+- `force_clean.py` - File cleanup utility
+- `download_history.py` - Historical data download
+
+### `tests/` - Unit Tests (~30 files)
+**Purpose**: Pytest test suites.
+**When to analyze**: Only when debugging test failures.
+
+### `docs/` - Documentation (~13 files)
+**Purpose**: Markdown documentation.
+**When to analyze**: Reference only when asked.
+
+### `n8n_workflows/` - Automation
+**Purpose**: n8n workflow JSON files.
+**When to analyze**: Only for integration questions.
+
+### SQL Files (Root)
+| File                       | Purpose                    |
+| :------------------------- | :------------------------- |
+| `knowledge_schema.sql`     | ChromaDB/Knowledge schema  |
+| `supabase_schema.sql`      | Supabase table definitions |
+| `institutional_schema.sql` | Trading data schema        |
+
+### Docker Files
+| File                 | Purpose               |
+| :------------------- | :-------------------- |
+| `Dockerfile`         | Container build       |
+| `docker-compose.yml` | Service orchestration |
+
+### Requirements Files
+| File                     | Purpose                 |
+| :----------------------- | :---------------------- |
+| `requirements.txt`       | All Python dependencies |
+| `requirements_base.txt`  | Minimal dependencies    |
+| `requirements_heavy.txt` | ML dependencies         |
+
+---
+
+## 🔴 BLOAT (Acknowledge, NEVER Analyze)
+
+### Virtual Environments
+| Path                       | Size    | Contents                                     |
+| :------------------------- | :------ | :------------------------------------------- |
+| `.venv/`                   | ~1.6 GB | Python packages (numpy, torch, pandas, etc.) |
+| `.venv/Lib/site-packages/` | ~1.6 GB | Actual package code                          |
+
+### Node.js Dependencies
+| Path                      | Size     | Contents                       |
+| :------------------------ | :------- | :----------------------------- |
+| `dashboard/node_modules/` | ~434 MB  | Next.js, React, Tailwind, etc. |
+| `dashboard/.next/`        | Variable | Next.js build output           |
+
+### Cache & Build Artifacts
+| Path             | Purpose                      |
+| :--------------- | :--------------------------- |
+| `__pycache__/`   | Python bytecode (everywhere) |
+| `.git/`          | Git version history          |
+| `.ruff_cache/`   | Ruff linter cache            |
+| `.pytest_cache/` | Pytest cache                 |
+| `.mypy_cache/`   | MyPy type checker cache      |
+| `.numba_cache/`  | Numba JIT cache              |
+
+### Binary/Generated Files
+| Pattern              | Purpose                                      |
+| :------------------- | :------------------------------------------- |
+| `*.pt`, `*.pth`      | PyTorch model weights                        |
+| `*.db`, `*.sqlite3`  | SQLite databases                             |
+| `*.log`              | Runtime logs                                 |
+| `*.pyc`, `*.pyo`     | Compiled Python                              |
+| `project_atlas.json` | Auto-generated project map (83KB JSON noise) |
+
+### Runtime Data
+| Path      | Purpose                  |
+| :-------- | :----------------------- |
+| `data/`   | Runtime data (JSON, DBs) |
+| `models/` | Saved neural weights     |
+| `logs/`   | Application logs         |
+
+---
+
+## 🔄 DATA FLOW DIAGRAM
 
 ```
-FEAT SNIPER NEXUS
-├── ENTRY POINT: LAUNCH_FEAT_DAEMON.bat
-│   └── Starts nexus_daemon.py
-│
-├── DAEMON LAYER (nexus_daemon.py)
-│   ├── Launches: FastAPI Server (port 8000)
-│   ├── Launches: MCP Server (mcp_server.py)
-│   └── Launches: Streamlit Dashboard (port 8501)
-│
-├── API LAYER (app/api/)
-│   ├── server.py      → REST endpoints, WebSocket
-│   ├── workers.py     → Background task management
-│   └── models.py      → Pydantic schemas
-│
-├── BRAIN LAYER (nexus_core/)
-│   ├── nexus_engine.py    → Main trading loop
-│   ├── strategy_engine.py → Trade decisions
-│   ├── kinetic_engine.py  → Price physics
-│   └── [11 sub-engines]
-│
-├── NEURAL LAYER (app/ml/)
-│   ├── strategic_cortex/  → PPO Policy Network
-│   ├── feat_processor/    → Feature extraction
-│   └── ml_engine/         → ML orchestration
-│
-└── UI LAYER (dashboard/)
-    └── war_room.py → Streamlit Dashboard
+┌─────────────────────────────────────────────────────────────────┐
+│                        MARKET DATA                              │
+│                     (MT5 Real-time Feed)                        │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  TIER 1: RAW DATA PROCESSING                                   │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │  Tick Listener  │  │  Microstructure │  │  Kinetic        │ │
+│  │  (tick_listener)│→ │  Scanner        │→ │  Engine         │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  TIER 2: FEATURE EXTRACTION                                    │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │  features.py    │  │  FEAT Processor │  │  Adaptation     │ │
+│  │  (16-dim vector)│← │  (F,E,A,T)      │← │  Engine         │ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  TIER 3: NEURAL DECISION                                       │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │  State Encoder  │→ │  Policy Network │→ │  Action Probs   │ │
+│  │  (Tensor build) │  │  (PPO Actor)    │  │  (BUY/SELL/HOLD)│ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  TIER 4: STRATEGY & RISK                                       │
+│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐ │
+│  │  Strategy       │→ │  Money Manager  │→ │  Fundamental    │ │
+│  │  Engine         │  │  (RiskOfficer)  │  │  Engine (DEFCON)│ │
+│  └─────────────────┘  └─────────────────┘  └─────────────────┘ │
+└─────────────────────────────┬───────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  TIER 5: EXECUTION                                             │
+│  ┌─────────────────┐  ┌─────────────────┐                      │
+│  │  NexusEngine    │→ │  MT5 Executor   │→ REAL ORDERS        │
+│  │  (Orchestrator) │  │  (connection.py)│                      │
+│  └─────────────────┘  └─────────────────┘                      │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 📂 DETAILED FILE MAP
+## 📋 QUICK REFERENCE: AUDIT PRIORITIES
 
-### `/nexus_core/` - The Trading Brain
+When told to "audit the system", analyze in this order:
 
-| File                    | Purpose                                | Inputs                 | Outputs                 | Connects To                     |
-| :---------------------- | :------------------------------------- | :--------------------- | :---------------------- | :------------------------------ |
-| `nexus_engine.py`       | Main orchestration loop                | MT5 data, Fractals     | Trade signals           | strategy_engine, kinetic_engine |
-| `strategy_engine.py`    | Trade decision logic                   | Neural probs, Physics  | TradeLeg objects        | money_management, features      |
-| `kinetic_engine.py`     | Price physics (momentum, acceleration) | OHLC DataFrame         | kinetic_metrics dict    | adaptation_engine               |
-| `money_management.py`   | Position sizing, Risk Officer          | Account balance, Phase | Volume, Lot size        | strategy_engine                 |
-| `features.py`           | Feature extraction for ML              | OHLC, OFI              | Feature vector (16-dim) | ml_engine                       |
-| `math_engine.py`        | Low-level math (ATR, EMA, RSI)         | Price arrays           | Indicator values        | All engines                     |
-| `adaptation_engine.py`  | Dynamic parameter adjustment           | ATR, Regime            | Thresholds              | kinetic_engine                  |
-| `convergence_engine.py` | Multi-signal confluence                | Multiple signals       | Unified score           | strategy_engine                 |
-| `memory.py`             | Short-term state storage               | Any                    | Cached values           | nexus_engine                    |
+### Priority 1: Neural Core (MOST IMPORTANT)
+1. `app/ml/strategic_cortex/policy_network.py`
+2. `app/ml/strategic_cortex/state_encoder.py`
+3. `nexus_core/features.py`
 
-### `/nexus_core/microstructure/` - Zero-Lag Tick Analysis
+### Priority 2: Decision Logic
+4. `nexus_core/strategy_engine.py`
+5. `nexus_core/nexus_engine.py`
+6. `nexus_core/money_management.py`
 
-| File                 | Purpose                    | Inputs       | Outputs             |
-| :------------------- | :------------------------- | :----------- | :------------------ |
-| `scanner.py`         | Real-time microstructure   | Tick stream  | MicrostructureState |
-| `ticker.py`          | Tick buffer management     | Raw ticks    | OrderedArrays       |
-| `hurst.py`           | Hurst exponent calculation | Prices       | H value [0,1]       |
-| `ofi.py`             | Order Flow Imbalance       | Tick volumes | OFI z-score         |
-| `entropy_scanner.py` | Shannon entropy            | Prices       | Entropy [0,1]       |
+### Priority 3: Physics & Microstructure
+7. `nexus_core/kinetic_engine.py`
+8. `nexus_core/microstructure/scanner.py`
+9. `nexus_core/structure_engine/engine.py`
 
-### `/nexus_core/fundamental_engine/` - News/Macro Analysis
+### Priority 4: API & Dashboard
+10. `app/api/server.py`
+11. `dashboard/war_room.py`
+12. `nexus_daemon.py`
 
-| File                       | Purpose                   | Inputs           | Outputs                    |
-| :------------------------- | :------------------------ | :--------------- | :------------------------- |
-| `engine.py`                | DEFCON calculator         | Calendar events  | Kill switch, Position mult |
-| `calendar_client.py`       | Event data interface      | Provider config  | EconomicEvent list         |
-| `forexfactory_provider.py` | Real ForexFactory scraper | URL              | Parsed events              |
-| `risk_modulator.py`        | Event proximity risk      | Minutes to event | DEFCON level               |
+### Priority 5: Training
+13. `nexus_training/simulate_warfare.py`
 
-### `/nexus_core/structure_engine/` - Price Structure Analysis
-
-| File            | Purpose                      | Inputs         | Outputs            |
-| :-------------- | :--------------------------- | :------------- | :----------------- |
-| `engine.py`     | FEAT Index calculation       | Features       | FEAT score [0-100] |
-| `levels.py`     | Support/Resistance detection | OHLC           | Level objects      |
-| `pvp_engine.py` | Point of Control, VAL/VAH    | Volume profile | PVP metrics        |
-
-### `/app/ml/` - Machine Learning Layer
-
-| File                   | Purpose                  | Inputs       | Outputs             |
-| :--------------------- | :----------------------- | :----------- | :------------------ |
-| `ml_normalization.py`  | ATR-based normalization  | Raw features | Normalized features |
-| `market_regime.py`     | Regime detection         | Features     | Regime label        |
-| `temporal_features.py` | Time-based features      | Timestamps   | Session flags       |
-| `fractal_analysis.py`  | Multi-timeframe fractals | OHLC per TF  | Coherence score     |
-| `rlaif_critic.py`      | RLAIF value estimation   | State vector | Value score         |
-
-### `/app/ml/strategic_cortex/` - Neural Network Core
-
-| File                | Purpose                 | Inputs          | Outputs                     |
-| :------------------ | :---------------------- | :-------------- | :-------------------------- |
-| `policy_network.py` | PPO Actor-Critic        | State (16-dim)  | Action probs, Value         |
-| `state_encoder.py`  | Raw data → Neural input | Market snapshot | StateVector tensor          |
-| `__init__.py`       | Module exports          | -               | policy_agent, state_encoder |
-
-### `/app/ml/feat_processor/` - FEAT Chain
-
-| File            | Purpose              | Inputs           | Outputs            |
-| :-------------- | :------------------- | :--------------- | :----------------- |
-| `force.py`      | Force score          | Volume, Momentum | Force [0-100]      |
-| `exhaustion.py` | Exhaustion detection | Price extremes   | Exhaustion [0-100] |
-| `absorption.py` | Absorption zones     | Volume clusters  | Absorption [0-100] |
-| `trend.py`      | Trend strength       | EMA slopes       | Trend [0-100]      |
-
-### `/app/core/` - Infrastructure
-
-| File              | Purpose             | Inputs      | Outputs            |
-| :---------------- | :------------------ | :---------- | :----------------- |
-| `config.py`       | Settings loader     | .env file   | Settings object    |
-| `mt5_conn/`       | MT5 connection pool | Credentials | Async MT5 executor |
-| `nexus_engine.py` | Engine wrapper      | Config      | Initialized engine |
-
-### `/app/api/` - REST API Layer
-
-| File         | Purpose                 | Inputs        | Outputs            |
-| :----------- | :---------------------- | :------------ | :----------------- |
-| `server.py`  | FastAPI application     | HTTP requests | JSON responses     |
-| `workers.py` | Background task manager | Commands      | Subprocess control |
-| `models.py`  | Pydantic schemas        | -             | Type definitions   |
-
-### `/dashboard/` - Web UI
-
-| File          | Purpose             | Inputs        | Outputs   |
-| :------------ | :------------------ | :------------ | :-------- |
-| `war_room.py` | Streamlit dashboard | API responses | Visual UI |
-
-### `/nexus_training/` - Training Environment
-
-| File                  | Purpose                | Inputs         | Outputs         |
-| :-------------------- | :--------------------- | :------------- | :-------------- |
-| `simulate_warfare.py` | Adversarial simulation | Episodes count | Trained weights |
-
-### `/.ai/` - AI Governance Documentation
-
-| File                            | Purpose                          |
-| :------------------------------ | :------------------------------- |
-| `skills/00_CTO_ORCHESTRATOR.md` | Master project overview          |
-| `CONSTITUTION.md`               | Core principles and rules        |
-| `skills/*/`                     | Department-specific instructions |
+### Priority 6: Governance
+14. `.ai/CONSTITUTION.md`
+15. `.ai/skills/00_CTO_ORCHESTRATOR.md`
 
 ---
 
-## 🔄 DATA FLOW
+## 🧠 NEURAL NETWORK INPUT (StateVector)
 
-```
-MT5 Market Data
-    │
-    ▼
-┌─────────────────┐
-│  Tick Listener  │ (app/core/mt5_conn/tick_listener.py)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Microstructure │ (nexus_core/microstructure/scanner.py)
-│  Scanner        │ → OFI, Entropy, Hurst
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Kinetic Engine │ (nexus_core/kinetic_engine.py)
-│                 │ → Momentum, Acceleration, Absorption
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Feature        │ (nexus_core/features.py)
-│  Extraction     │ → 16-dim StateVector
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Neural Network │ (app/ml/strategic_cortex/policy_network.py)
-│  (PPO Policy)   │ → Action probabilities
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Strategy       │ (nexus_core/strategy_engine.py)
-│  Engine         │ → TradeLeg objects
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  Money Manager  │ (nexus_core/money_management.py)
-│                 │ → Position size
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│  MT5 Executor   │ (app/core/mt5_conn/)
-│                 │ → REAL ORDERS
-└─────────────────┘
-```
+The PPO Policy Network receives a 16-dimensional input:
 
----
-
-## 🎯 KEY INTEGRATION POINTS
-
-### Neural Network Input (16 dimensions)
 ```python
-StateVector:
-  - balance_normalized     # Account health
-  - phase_survival         # Capital phase (one-hot)
-  - phase_consolidation
-  - phase_institutional
-  - ofi_z_score           # Order flow
-  - entropy_score         # Market noise
-  - hurst_exponent        # Trend persistence
-  - spread_normalized     # Liquidity
-  - feat_composite        # FEAT chain score
-  - scalp_prob            # ML probability
-  - day_prob
-  - swing_prob
-  - titanium_support      # Physics validation
-  - titanium_resistance
-  - acceleration          # Kinetic state
-  - hurst_gate_valid      # Signal gate
-```
-
-### API Endpoints
-```
-GET  /api/status              → System health
-POST /api/simulation/start    → Start training
-POST /api/simulation/stop     → Stop training
-GET  /api/simulation/status   → Progress
-POST /api/emergency/close-all → Panic button
-WS   /ws/logs                 → Real-time logs
+StateVector = [
+    balance_normalized,      # Account health [0,1]
+    phase_survival,          # One-hot: Survival phase
+    phase_consolidation,     # One-hot: Consolidation phase
+    phase_institutional,     # One-hot: Institutional phase
+    ofi_z_score,            # Order Flow Imbalance [-3,3]
+    entropy_score,          # Market noise [0,1]
+    hurst_exponent,         # Trend persistence [0,1]
+    spread_normalized,      # Liquidity [0,1]
+    feat_composite,         # FEAT chain score [0,100]
+    scalp_prob,             # ML probability [0,1]
+    day_prob,               # ML probability [0,1]
+    swing_prob,             # ML probability [0,1]
+    titanium_support,       # Physics validation [0,1]
+    titanium_resistance,    # Physics validation [0,1]
+    acceleration,           # Price acceleration [-1,1]
+    hurst_gate_valid,       # Signal gate [0,1]
+]
 ```
 
 ---
 
-## 📋 FILES AI SHOULD PRIORITIZE
+## 📡 API ENDPOINTS REFERENCE
 
-**Tier 1 (Must Read)**:
-- `nexus_core/nexus_engine.py`
-- `nexus_core/strategy_engine.py`
-- `app/ml/strategic_cortex/policy_network.py`
-- `.ai/CONSTITUTION.md`
+```
+System Control:
+  GET  /api/status                → System health
+  POST /api/emergency/close-all   → Panic button
+  POST /api/risk/update           → Risk factor
 
-**Tier 2 (Important)**:
-- `nexus_core/kinetic_engine.py`
-- `nexus_core/features.py`
-- `app/api/server.py`
-- `dashboard/war_room.py`
+Simulation:
+  POST /api/simulation/start      → Start training
+  POST /api/simulation/stop       → Stop training
+  GET  /api/simulation/status     → Progress
 
-**Tier 3 (Reference)**:
-- `nexus_core/microstructure/*.py`
-- `app/ml/feat_processor/*.py`
-- `nexus_training/simulate_warfare.py`
+Analytics:
+  GET  /api/analytics/performance → Stats
+
+Models:
+  POST /api/models/reload         → Hot-reload weights
+
+Streaming:
+  WS   /ws/logs                   → Real-time logs
+```
 
 ---
 
 > **Last Updated**: 2026-01-20
-> **Version**: 2.0 (MISSION CONTROL Architecture)
+> **Version**: 3.0 (Complete System Memory)
+> **For**: Claude, Gemini, and any AI agent analyzing this project
