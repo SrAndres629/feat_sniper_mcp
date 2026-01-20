@@ -43,7 +43,8 @@ class StrategyEngine:
                                  macro_context: dict,
                                  titanium_level: bool,
                                  microstructure_state: Optional[dict] = None,
-                                 physics_metrics: Optional[dict] = None) -> List[TradeLeg]:
+                                 physics_metrics: Optional[dict] = None,
+                                 temporal_physics: Optional[dict] = None) -> List[TradeLeg]:
         """
         Decides HOW to trade. Returns a list of TradeLegs (1 or 2).
         """
@@ -65,7 +66,9 @@ class StrategyEngine:
                 account_state=self.risk_manager.get_fund_status(),
                 microstructure=microstructure_state,
                 neural_probs=neural_probs,
-                physics_state=physics_input
+                physics_state=physics_input,
+                fractal_coherence=microstructure_state.get('fractal_coherence', 0.5),
+                temporal_physics_dict=temporal_physics
             )
             
             # 2. Consult Policy Network

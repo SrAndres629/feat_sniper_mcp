@@ -13,6 +13,7 @@ from datetime import datetime
 from app.core.config import settings
 from app.core.zmq_bridge import zmq_bridge
 from app.ml.feat_processor import feat_processor
+from nexus_core.features import feat_features
 from app.services.circuit_breaker import circuit_breaker
 from app.services.state_exporter import state_exporter
 from nexus_core.microstructure.scanner import micro_scanner
@@ -45,6 +46,7 @@ class NexusEngine:
         self.market_physics = None
         self.mtf_engine = None
         self.chronos_engine = None
+        self.strategy_engine = None
         
         # Sentinels
         self.jitter_sentinel = None
@@ -82,6 +84,10 @@ class NexusEngine:
             self.chronos_engine = chronos_engine
             self.market = market
             self.trade_manager = TradeManager(zmq_bridge)
+            
+            # 2. Strategy Engine (THE TACTICIAN)
+            from nexus_core.strategy_engine import StrategyEngine
+            self.strategy_engine = StrategyEngine(self.risk_engine)
             
             # Link Circuit Breaker
             circuit_breaker.set_trade_manager(self.trade_manager)
@@ -209,6 +215,9 @@ class NexusEngine:
                     self.context_cache["alignment_map"] = alignment_map
                     self.context_cache["fractal_coherence"] = coherence_score
 
+                # 4. Temporal Physics (Inter-Temporal Synthesis)
+                temporal_physics = feat_features.extract_temporal_physics(candles)
+                
                 if mode == "SCAN": return
 
                 # Neural Logic
@@ -218,7 +227,7 @@ class NexusEngine:
                 
                 prediction = await self.ml_engine.predict_hybrid(input_vec, symbol)
                 
-                # Strategy Convergence
+                # Strategy Convergence (Institutional Logic)
                 from nexus_core.convergence_engine import convergence_engine
                 cv = convergence_engine.evaluate_convergence(
                     neural_alpha=prediction.get("alpha_multiplier", 1.0),
@@ -227,37 +236,72 @@ class NexusEngine:
                     uncertainty=prediction.get("uncertainty", 0.1)
                 )
 
-                # Execution decision
-                if cv.score > settings.ALPHA_CONFIDENCE_THRESHOLD and not cv.vetoes:
-                    await self._execute_trade(symbol, cv.direction, price, last_row, prediction, latent_vector)
+                # 5. Strategic Intelligence (AI Decision)
+                # This uses the PolicyNetwork (Strategic Cortex)
+                if self.strategy_engine:
+                    legs = self.strategy_engine.analyze_strategic_intent(
+                        market_price=price,
+                        neural_probs={
+                            "scalp": prediction.get("buy", 0.0) if cv.direction == "BUY" else prediction.get("sell", 0.0),
+                            "day": prediction.get("p_win", 0.5) * 0.8, # Approximations for now
+                            "swing": prediction.get("p_win", 0.5) * 0.6
+                        },
+                        macro_context={
+                            "direction": cv.direction,
+                            "alignment_map": self.context_cache.get("alignment_map", {})
+                        },
+                        titanium_level=self.context_cache["in_zone"],
+                        microstructure_state={
+                            "ofi_z_score": last_row.get("ofi_z", 0.0),
+                            "entropy_score": last_row.get("entropy", 0.5),
+                            "fractal_coherence": coherence_score
+                        },
+                        physics_metrics={
+                            "feat_force": latent_vector.get("feat_composite", 50.0),
+                            "rvol": last_row.get("rvol", 1.0)
+                        },
+                        temporal_physics=temporal_physics
+                    )
+                    
+                    # 6. Execution decision
+                    if cv.score > settings.ALPHA_CONFIDENCE_THRESHOLD and not cv.vetoes and legs:
+                        for leg in legs:
+                            await self._execute_strategic_leg(symbol, leg, price, last_row, prediction, latent_vector)
 
             except Exception as e:
                 logger.error(f"Vision Protocol Error: {e}", exc_info=True)
 
-    async def _execute_trade(self, symbol, direction, price, row, prediction, features):
-        lot = await self.risk_engine.calculate_dynamic_lot(
-            confidence=prediction.get("p_win", 0.5),
-            volatility=row.get("atr14", 0.0),
-            symbol=symbol,
-            market_data={**prediction, "brain_uncertainty": prediction.get("uncertainty", 0.1)}
-        )
+    async def _execute_strategic_leg(self, symbol, leg, price, row, prediction, features):
+        """Executes a specific strategic leg (Scalp, Day, or Swing)."""
+        if not leg or leg.volume <= 0: return
+
+        res = await self.trade_manager.execute_order(leg.direction, {
+            "symbol": symbol,
+            "volume": leg.volume,
+            "magic": settings.MT5_MAGIC_NUMBER,
+            "comment": f"NEXUS_{leg.strategy_type.value}",
+            "strategy": leg.strategy_type.value,
+            "intent": leg.intent
+        })
         
-        if lot > 0:
-            res = await self.trade_manager.execute_order(direction, {
-                "symbol": symbol,
-                "volume": lot,
-                "magic": settings.MT5_MAGIC_NUMBER,
-                "comment": "NEXUSCORE_V3"
-            })
-            
-            if res.get("status") == "EXECUTED":
-                self.trade_manager.register_position(
-                    ticket=res["ticket"],
-                    entry_price=price,
-                    atr=row.get("atr14", 0.0),
-                    is_buy=(direction == "BUY"),
-                    context={**features, "p_win": prediction.get("p_win", 0.5)}
-                )
+        if res.get("status") == "EXECUTED":
+            self.trade_manager.register_position(
+                ticket=res["ticket"],
+                entry_price=price,
+                atr=row.get("atr14", 0.0),
+                is_buy=(leg.direction == "BUY"),
+                context={
+                    **features, 
+                    "p_win": prediction.get("p_win", 0.5),
+                    "strategy": leg.strategy_type.value,
+                    "intent": leg.intent
+                }
+            )
+            logger.info(f"🚀 {leg.strategy_type.value} EXECUTED: {leg.direction} {leg.volume} lot on {symbol} | Intent: {leg.intent}")
+
+    async def _execute_trade(self, symbol, direction, price, row, prediction, features):
+        # Legacy placeholder - replaced by _execute_strategic_leg
+        pass
 
     async def dashboard_heartbeat(self):
         while self.running:

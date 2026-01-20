@@ -53,8 +53,12 @@ class StateVector:
     liquidity_above: float          # 1.0 if shorts majority
     liquidity_below: float          # 1.0 if longs majority
     
-    # Fractal Mastery (1 dim) - NEW
-    fractal_coherence: float        # [0, 1] Multi-timeframe alignment
+    # Fractal Mastery (1 dim)
+    fractal_coherence: float        # [0, 1] Multi-timeframe alignment summary
+    
+    # Inter-Temporal Physics (24 dims) - THE MAGIC LINK
+    # 8 timeframes * 3 metrics (Direction, Energy, Acceleration)
+    temporal_physics: np.ndarray    # Flat array of 24 physics descriptors
     
     def to_tensor(self) -> np.ndarray:
         """Converts state to numpy array for neural network input."""
@@ -81,12 +85,13 @@ class StateVector:
             self.liquidity_above,
             self.liquidity_below,
             self.fractal_coherence,
+            *self.temporal_physics.tolist(),
         ], dtype=np.float32)
     
     @staticmethod
     def get_state_dim() -> int:
         """Returns the dimensionality of the state vector."""
-        return 21
+        return 45
 
 
 class StateEncoder:
@@ -107,7 +112,8 @@ class StateEncoder:
                neural_probs: Dict[str, float],
                physics_state: Dict[str, Any],
                sentiment_state: Dict[str, Any] = None,
-               fractal_coherence: float = 0.5) -> StateVector:
+               fractal_coherence: float = 0.5,
+               temporal_physics_dict: Dict[str, float] = None) -> StateVector:
         """
         Encodes all trading context into a StateVector.
         
@@ -118,6 +124,7 @@ class StateEncoder:
             physics_state: {titanium, acceleration, hurst_gate, feat_composite}
             sentiment_state: {contrarian_score, long_pct, liquidity_above, liquidity_below}
             fractal_coherence: Score from FractalCoherenceEngine [0, 1]
+            temporal_physics_dict: Map of tf_direction, tf_energy, tf_accel for 8 timeframes
             
         Returns:
             StateVector ready for Policy Network input.
@@ -157,6 +164,16 @@ class StateEncoder:
         liq_above = float(sentiment.get("liquidity_above", 0.0))
         liq_below = float(sentiment.get("liquidity_below", 0.0))
         
+        # Temporal Physics encoding
+        temp_phys = []
+        target_tfs = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]
+        tpd = temporal_physics_dict or {}
+        for tf in target_tfs:
+            temp_phys.append(tpd.get(f"{tf}_direction", 0.0))
+            temp_phys.append(tpd.get(f"{tf}_energy", 0.0))
+            temp_phys.append(tpd.get(f"{tf}_accel", 0.0))
+        temp_phys_array = np.array(temp_phys, dtype=np.float32)
+        
         return StateVector(
             balance_normalized=float(balance_norm),
             phase_survival=float(phase_survival),
@@ -180,7 +197,9 @@ class StateEncoder:
             liquidity_above=float(liq_above),
             liquidity_below=float(liq_below),
             # Fractal Mastery
-            fractal_coherence=float(fractal_coherence)
+            fractal_coherence=float(fractal_coherence),
+            # Inter-Temporal Physics
+            temporal_physics=temp_phys_array
         )
     
     def encode_minimal(self, 

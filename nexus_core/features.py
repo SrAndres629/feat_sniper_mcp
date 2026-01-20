@@ -228,6 +228,42 @@ class FEATFeatures:
             "liquidity_below": sentiment_features.get("liquidity_below", 0.0),
         }
 
+    def extract_temporal_physics(self, candles: Dict[str, pd.DataFrame]) -> Dict[str, float]:
+        """
+        Extracts core physics (Direction, Energy, Acceleration) across 8 timeframes.
+        Returns a flat dictionary for the StateEncoder.
+        """
+        results = {}
+        target_tfs = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]
+        
+        for tf in target_tfs:
+            df = candles.get(tf)
+            if df is None or df.empty or len(df) < 20:
+                # Default neutral physics
+                results[f"{tf}_direction"] = 0.0
+                results[f"{tf}_energy"] = 0.0
+                results[f"{tf}_accel"] = 0.0
+                continue
+            
+            # 1. Direction (SMA alignment)
+            # Use short EMA vs price
+            ema10 = df['close'].ewm(span=10).mean().iloc[-1]
+            price = df['close'].iloc[-1]
+            results[f"{tf}_direction"] = 1.0 if price > ema10 else -1.0
+            
+            # 2. Energy (Relative Volume / Volatility)
+            vol = df['volume'].iloc[-1]
+            avg_vol = df['volume'].rolling(20).mean().iloc[-1] + 1e-9
+            energy = np.clip(vol / avg_vol, 0.0, 5.0) / 5.0 # Normalized [0, 1]
+            results[f"{tf}_energy"] = float(energy)
+            
+            # 3. Acceleration (RSI Slope / Price Change Velocity)
+            # Simple ROC for acceleration
+            roc = (df['close'].iloc[-1] - df['close'].iloc[-5]) / df['close'].iloc[-5] if len(df) > 5 else 0.0
+            results[f"{tf}_accel"] = float(np.tanh(roc * 100)) # Normalized [-1, 1]
+            
+        return results
+
 
     def _compute_pvp_metrics(self, df: pd.DataFrame) -> Dict[str, float]:
         """

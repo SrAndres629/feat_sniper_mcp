@@ -34,8 +34,8 @@ class PolicyNetwork(nn.Module):
     """
     
     def __init__(self, 
-                 state_dim: int = 20,
-                 hidden_dim: int = 64,
+                 state_dim: int = 45,
+                 hidden_dim: int = 128,
                  num_actions: int = 4):
         super().__init__()
         
@@ -135,7 +135,7 @@ class StrategicPolicyAgent:
         # Initialize network
         self.network = PolicyNetwork(
             state_dim=StateVector.get_state_dim(),
-            hidden_dim=64,
+            hidden_dim=128,
             num_actions=get_num_actions(),
         ).to(self.device)
         
