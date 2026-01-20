@@ -15,6 +15,8 @@ from app.core.zmq_bridge import zmq_bridge
 from app.ml.feat_processor import feat_processor
 from app.services.circuit_breaker import circuit_breaker
 from app.services.state_exporter import state_exporter
+from nexus_core.microstructure.scanner import micro_scanner
+from nexus_core.neural_health import neural_health
 
 logger = logging.getLogger("nexus.engine")
 
@@ -174,8 +176,8 @@ class NexusEngine:
                 symbol = data.get('symbol', 'XAUUSD')
                 price = float(data.get('bid', 0) or data.get('close', 0))
                 
-                # Context Awareness (MTF)
-                target_tfs = ["M1", "M5", "H1", "H4"]
+                # Context Awareness (MTF - Fractal Expansion)
+                target_tfs = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]
                 candles = {}
                 for tf in target_tfs:
                     c_res = await self.market.get_candles(symbol, tf, 100)
@@ -195,6 +197,17 @@ class NexusEngine:
                 if self.structure_engine:
                     report = self.structure_engine.get_structural_report(candles["M1"])
                     self.context_cache["in_zone"] = (report['zones']['distance_to_zone'] < (price * settings.ZONE_PROXIMITY_FACTOR))
+                    
+                # Fractal Coherence Logic
+                alignment_map = {}
+                coherence_score = 0.5
+                if self.mtf_engine:
+                    # Diagnose across all timeframes
+                    fractal_report = self.mtf_engine.diagnose_market_fractals(candles)
+                    alignment_map = fractal_report.get("alignment_map", {})
+                    coherence_score = fractal_report.get("coherence", 0.5)
+                    self.context_cache["alignment_map"] = alignment_map
+                    self.context_cache["fractal_coherence"] = coherence_score
 
                 if mode == "SCAN": return
 
@@ -264,6 +277,10 @@ class NexusEngine:
                 # Use self.ml_engine status instead of neural_service
                 latest_neural = self.ml_engine.get_status() if self.ml_engine else {}
                 
+                # Health & Resilience Metrics
+                health_metrics = neural_health.get_health_metrics()
+                micro_state = micro_scanner.get_dict()
+                
                 data = {
                     "account": {
                         "balance": float(acc_info.get("balance", 0)),
@@ -278,6 +295,10 @@ class NexusEngine:
                         "status": "CLOSED" if circuit_breaker.is_ok() else "TRIPPED",
                         "latency": circuit_breaker.get_last_latency()
                     },
+                    "microstructure": micro_state,
+                    "health": health_metrics,
+                    "alignment_map": self.context_cache.get("alignment_map", {}),
+                    "fractal_coherence": self.context_cache.get("fractal_coherence", 0.5),
                     **latest_neural
                 }
                 await state_exporter.export(data)

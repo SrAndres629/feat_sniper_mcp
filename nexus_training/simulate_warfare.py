@@ -102,13 +102,25 @@ class BattlefieldSimulator:
                 
                 # Deterministic drift: Price UP -> Retail sells (long goes DOWN)
                 # We model "averaging down": Retail sells into rallies (contrarian)
-                drift = -price_change * 1000.0 
+                # Phase 8: Volatility-Induced Panic (PhD Logic)
+                # Volatility increases noise and reduces persistence (Panic)
+                current_vol = df['atr'].iloc[i]
+                vol_ratio = current_vol / df['avg_atr'].iloc[i] if df['avg_atr'].iloc[i] > 0 else 1.0
                 
-                # Persistence: Retail holds bias longer even if price turns
-                persistence = 0.95
+                # Persistence drops as volatility rises (Panic / Capitulation)
+                persistence = np.clip(0.95 - (vol_ratio * 0.05), 0.5, 0.98)
                 
-                # Noise: Emotional volatility
-                stochastic_noise = np.random.normal(0, 1.5)
+                # Noise increases with volatility
+                stochastic_noise = np.random.normal(0, 1.5 * vol_ratio)
+                
+                # Drift: Price UP -> Retail sells (contrarian drift)
+                # But during extreme vol, they might "Panic Buy" the top or "Panic Sell" the bottom (Momentum Chase)
+                if vol_ratio > 2.5:
+                    # Panic Momentum: They flip and follow the trend at the worst possible time
+                    drift = price_change * 500.0  
+                else:
+                    # Normal Contrarian bias
+                    drift = -price_change * 1000.0 
                 
                 current_long = (current_long * persistence) + (drift * (1 - persistence)) + stochastic_noise
             

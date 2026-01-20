@@ -47,11 +47,14 @@ class StateVector:
     acceleration: float             # Kinetic acceleration [-1, 1]
     hurst_gate_valid: float         # 1.0 if Hurst allows EMA signals
     
-    # Macro Sentiment (4 dims) - NEW
+    # Macro Sentiment (4 dims)
     contrarian_score: float         # [-1, 1] (Short% - Long%) / 100
     retail_long_pct: float          # [0, 1]
     liquidity_above: float          # 1.0 if shorts majority
     liquidity_below: float          # 1.0 if longs majority
+    
+    # Fractal Mastery (1 dim) - NEW
+    fractal_coherence: float        # [0, 1] Multi-timeframe alignment
     
     def to_tensor(self) -> np.ndarray:
         """Converts state to numpy array for neural network input."""
@@ -77,12 +80,13 @@ class StateVector:
             self.retail_long_pct,
             self.liquidity_above,
             self.liquidity_below,
+            self.fractal_coherence,
         ], dtype=np.float32)
     
     @staticmethod
     def get_state_dim() -> int:
         """Returns the dimensionality of the state vector."""
-        return 20
+        return 21
 
 
 class StateEncoder:
@@ -101,7 +105,9 @@ class StateEncoder:
                account_state: Dict[str, Any],
                microstructure: Dict[str, Any],
                neural_probs: Dict[str, float],
-               physics_state: Dict[str, Any]) -> StateVector:
+               physics_state: Dict[str, Any],
+               sentiment_state: Dict[str, Any] = None,
+               fractal_coherence: float = 0.5) -> StateVector:
         """
         Encodes all trading context into a StateVector.
         
@@ -111,6 +117,7 @@ class StateEncoder:
             neural_probs: {scalp, day, swing}
             physics_state: {titanium, acceleration, hurst_gate, feat_composite}
             sentiment_state: {contrarian_score, long_pct, liquidity_above, liquidity_below}
+            fractal_coherence: Score from FractalCoherenceEngine [0, 1]
             
         Returns:
             StateVector ready for Policy Network input.
@@ -136,11 +143,11 @@ class StateEncoder:
         p_day = np.clip(neural_probs.get("day", 0.0), 0.0, 1.0)
         p_swing = np.clip(neural_probs.get("swing", 0.0), 0.0, 1.0)
         
-        # Physics encoding
+        # Physics encoding (Amplify acceleration as requested for 'preponderante' effect)
         titanium = physics_state.get("titanium", "NEUTRAL")
         ti_support = 1.0 if titanium == "TITANIUM_SUPPORT" else 0.0
         ti_resistance = 1.0 if titanium == "TITANIUM_RESISTANCE" else 0.0
-        accel = np.clip(physics_state.get("acceleration", 0.0), -1.0, 1.0)
+        accel = np.clip(physics_state.get("acceleration", 0.0) * 1.5, -1.0, 1.0) 
         hurst_gate = 1.0 if physics_state.get("hurst_gate", False) else 0.0
         
         # Sentiment encoding (Macro)
@@ -167,6 +174,13 @@ class StateEncoder:
             titanium_resistance=float(ti_resistance),
             acceleration=float(accel),
             hurst_gate_valid=float(hurst_gate),
+            # Macro Sentiment
+            contrarian_score=float(cont_score),
+            retail_long_pct=float(long_pct),
+            liquidity_above=float(liq_above),
+            liquidity_below=float(liq_below),
+            # Fractal Mastery
+            fractal_coherence=float(fractal_coherence)
         )
     
     def encode_minimal(self, 

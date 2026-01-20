@@ -401,60 +401,125 @@ def render_training_arena():
         else:
             st.info("Connecting to API...")
 
-def render_neural_health_tab():
-    """PhD Level Neural Health Monitoring."""
-    st.subheader("🛡️ NEURAL HEALTH GUARDIAN")
+def render_cortex_diagnostics(state):
+    """PhD Level Neural Health & Microstructure Monitoring."""
+    st.subheader("🛡️ CORTEX DIAGNOSTICS")
     
-    metrics = neural_health.get_health_metrics()
+    # 1. Status & Heartbeat
+    metrics = state.get("health", {})
+    status = metrics.get("status", "INITIALIZING")
     
-    # 1. Status Badge
-    status = metrics.get("status", "UNKNOWN")
-    if status == "HEALTHY":
-        st.success(f"✅ SYSTEM {status}")
-    elif status == "DETERIORATING":
-        st.warning(f"⚠️ SYSTEM {status}")
-    else:
-        st.error(f"🚨 SYSTEM {status}")
+    c1, c2 = st.columns([1, 4])
+    with c1:
+        if status == "HEALTHY":
+            st.success(f"✅ {status}")
+        elif status == "DETERIORATING":
+            st.warning(f"⚠️ {status}")
+        else:
+            st.error(f"🚨 {status}")
+    
+    with c2:
+        # Data Drift Alert
+        brier = metrics.get("brier_score", 0.0)
+        drift = metrics.get("drift_score", 0.0)
+        kl_div = metrics.get("kl_divergence", 0.0)
+        decay = metrics.get("alpha_decay", 0.0)
         
+        if brier > 0.3 or drift > 0.25 or kl_div > 0.5:
+            st.error(f"🚨 NEURAL IRREGULARITY: Brier={brier:.3f}, KL={kl_div:.3f}")
+        else:
+            st.caption(f"✅ Neural Alignment: Stable (KL Div: {kl_div:.3f})")
+
     # 2. Key PhD Metrics
-    c1, c2, c3 = st.columns(3)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Brier Score", f"{brier:.4f}", delta=None, help="Reliability of probabilities (0=Perfect)")
+    m2.metric("Neural Drift", f"{drift*100:.1f}%", delta=None, help="Confidence/Winrate deviation")
+    m3.metric("KL Divergence", f"{kl_div:.3f}", delta=None, help="Shift in prediction distribution (Dataset Shift)")
+    m4.metric("Alpha Decay", f"{decay*100:.1f}%", delta=f"{decay*100:.1f}%", help="Growth rate of Alpha (PnL Slope stability)")
+
+    st.divider()
+
+    # 2. Entropy & Microstructure (The "Market Sobriety" Check)
+    st.markdown("### 📊 Market Microstructure (Shannon Entropy)")
+    micro = state.get("microstructure", {})
+    entropy = micro.get("entropy_score", 0.5)
     
-    # Brier Score (lower is better, 0.0 to 1.0)
-    brier = metrics.get("brier_score", 0.0)
-    c1.metric("Brier Score", f"{brier:.4f}", help="Precision of probabilities. Lower is better (PhD Standard).")
+    # Simple Gauge replacement with a progress bar and interpretation
+    entropy_color = "green" if entropy < 0.4 else "orange" if entropy < 0.6 else "red"
+    st.write(f"**Information Entropy**: `{entropy:.4f}`")
+    st.progress(entropy)
     
-    # Drift Score (|Conf - Winrate|)
-    drift = metrics.get("drift_score", 0.0)
-    c2.metric("Neural Drift", f"{drift*100:.1f}%", help="Difference between Model Confidence and Actual Performance.")
+    if entropy > 0.6:
+        st.error(f"🚫 MARKET IS DRUNK (Entropy: {entropy:.2f}). Probability of random walk is high.")
+    elif entropy < 0.4:
+        st.success(f"🎯 MARKET IS FOCUSED (Entropy: {entropy:.2f}). High trend persistence detected.")
+    else:
+        st.warning(f"⚖️ MARKET IS NEUTRAL (Entropy: {entropy:.2f}). Proceed with caution.")
+
+    st.divider()
+
+    # 3. Fractal Coherence Map (M1 to W1)
+    st.markdown("### 🌀 Fractal Coherence Map")
+    alignment = state.get("alignment_map", {})
+    if not alignment:
+        # Fallback to display the hierarchy even if data is missing
+        alignment = {tf: "UNKNOWN" for tf in ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"]}
     
-    # Sample Size
-    c3.metric("Sample Size", metrics.get("sample_size", 0))
+    tfs = ["W1", "D1", "H4", "H1", "M30", "M15", "M5", "M1"]
+    cols = st.columns(len(tfs))
+    for i, tf in enumerate(tfs):
+        bias = alignment.get(tf, "NEUTRAL")
+        color = "🟢" if bias == "BULLISH" else "🔴" if bias == "BEARISH" else "⚪"
+        cols[i].markdown(f"**{tf}**\n\n{color}")
     
     st.divider()
+
+    # 4. Neural Calibration & Learning Curves
+    c_left, c_right = st.columns(2)
     
-    # 3. Calibration Chart (Actual vs Expected)
-    st.markdown("### Confidence Calibration")
-    
-    # Mock some historical data for the chart if empty, else use history
-    history = neural_health.history
-    if len(history) > 5:
-        df_health = pd.DataFrame(history)
-        df_closed = df_health[df_health['status'] == 'CLOSED']
-        
-        # Plot Confidence vs Outcome
-        fig = px.scatter(
-            df_closed, x="confidence", y="outcome", 
-            color="outcome", 
-            title="Prediction Calibration (1=Win, 0=Loss)",
-            labels={"confidence": "Neural Confidence", "outcome": "Real Outcome"}
-        )
-        # Add ideal calibration line
-        fig.add_shape(type="line", x0=0, y0=0, x1=1, y1=1, line=dict(color="Gray", dash="dash"))
-        
-        fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Waiting for more trade completions to generate Calibration Curve...")
+    with c_left:
+        st.markdown("### Confidence Calibration")
+        history = neural_health.history
+        if len(history) > 5:
+            df_closed = pd.DataFrame(history)
+            df_closed = df_closed[df_closed['status'] == 'CLOSED']
+            if not df_closed.empty:
+                fig = px.scatter(df_closed, x="confidence", y="outcome", color="outcome", 
+                               labels={"confidence": "IA Confidence", "outcome": "Win/Loss"})
+                fig.add_shape(type="line", x0=0, y0=0, x1=1, y1=1, line=dict(color="Gray", dash="dash"))
+                fig.update_layout(height=300, margin=dict(l=20, r=20, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Waiting for closed trades...")
+        else:
+            st.info("Calibrating...")
+
+    with c_right:
+        st.markdown("### Alpha Decay (Performance Trend)")
+        history = neural_health.history
+        closed = [e for e in history if e["status"] == "CLOSED"]
+        if len(closed) > 10:
+            pnls = [e.get("pnl", 0.0) for e in closed]
+            cum_pnl = np.cumsum(pnls)
+            
+            fig_decay = go.Figure()
+            # Cumulative PnL
+            fig_decay.add_trace(go.Scatter(x=list(range(len(cum_pnl))), y=cum_pnl, name="Cum PnL", line=dict(color="#00ffcc")))
+            # Trend Line
+            x = np.arange(len(cum_pnl))
+            slope, intercept = np.polyfit(x, cum_pnl, 1)
+            fig_decay.add_trace(go.Scatter(x=list(range(len(cum_pnl))), y=slope*x + intercept, name="Ideal Trend", line=dict(dash='dash', color='gray')))
+            
+            fig_decay.update_layout(height=300, margin=dict(l=20, r=20, t=20, b=20), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+            st.plotly_chart(fig_decay, use_container_width=True)
+            
+            decay = metrics.get("alpha_decay", 0.0)
+            if decay < -0.2:
+                st.error(f"⚠️ PERF DEGRADATION: Alpha is decaying at {decay*100:.1f}%.")
+            else:
+                st.success(f"📈 ALPHA STABLE: Growth rate is intact.")
+        else:
+            st.info("Gathering trading history for Alpha analysis...")
 
 def render_analytics_tab():
     """Analytics Tab - Display historical performance metrics."""
@@ -534,7 +599,7 @@ render_sidebar(state)
 
 st.title("FEAT NEXUS // COMMAND & CONTROL")
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📡 LIVE OPS", "🧠 NEURAL", "🛡️ NEURAL HEALTH", "⚔️ WAR ROOM", "🎓 TRAINING", "📊 ANALYTICS"])
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["📡 LIVE OPS", "🧠 NEURAL", "🛡️ CORTEX DIAGNOSTICS", "⚔️ WAR ROOM", "🎓 TRAINING", "📊 ANALYTICS"])
 
 with tab1:
     render_live_ops(state)
@@ -543,7 +608,7 @@ with tab2:
     render_neural_tab(state)
 
 with tab3:
-    render_neural_health_tab()
+    render_cortex_diagnostics(state)
 
 with tab4:
     render_war_room_tab(state)
