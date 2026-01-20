@@ -28,10 +28,15 @@ class ConvergentSingularityLoss(nn.Module):
         
         # 1. KINETIC PENALTY (Laws of Physics)
         probs = F.softmax(pred, dim=1)
-        prob_dir = probs[:, 2] - probs[:, 0] # Net directional bias
+        prob_dir = probs[:, 2] - probs[:, 0] # Net directional bias [-1, 1]
         
-        # If directional intent is high but acceleration is low -> Penalty
-        kinetic_violation = torch.abs(prob_dir) * (1.0 - physics)
+        # Ensure physics (Acceleration/Energy) is normalized [0, 1] for the penalty
+        # High value = low penalty. Correct for normalized metrics.
+        safe_physics = torch.clamp(physics, 0.0, 1.0)
+        
+        # Penalty is proportional to directional intent when "market fuel" is low
+        # Mean across physics dimensions (Force, Energy, etc)
+        kinetic_violation = torch.abs(prob_dir).unsqueeze(1) * (1.0 - safe_physics)
         
         # 2. SPATIAL PENALTY (Vision Consensus)
         # If the model predicts a BUY but there is an "Energy Wall" (high density) 

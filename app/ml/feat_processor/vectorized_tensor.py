@@ -59,15 +59,15 @@ class VectorizedChronosProcessor:
         h_floats = ny_times.hour + ny_times.minute / 60.0
         centers = [3.0, 9.5, 11.0] # London, NY, London Close
         sigma = 1.0 # 1 Hour width
+        eps = 1e-9
         
         # Vectorized Gaussian Calculation
         intensities = []
         for mu in centers:
             # Handle circular wrap-around (important for 24h cycles)
-            # Distance d = |h - mu|. We want min(d, 24 - d)
             diff = np.abs(h_floats - mu)
             dist = np.minimum(diff, 24 - diff)
-            val = np.exp(-(dist**2) / (2 * sigma**2))
+            val = np.exp(-(dist**2) / (2 * (sigma**2) + eps))
             intensities.append(val)
             
         df['killzone_intensity'] = np.max(intensities, axis=0)
