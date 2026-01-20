@@ -11,9 +11,9 @@ class ConvergentSingularityLoss(nn.Module):
     2.  Kinetic Violation (Acceleration vs Direction)
     3.  Spatial Anomaly (Vision vs Probability)
     """
-    def __init__(self, kinetic_lambda=0.5, spatial_lambda=0.3):
+    def __init__(self, weight=None, kinetic_lambda=0.5, spatial_lambda=0.3):
         super(ConvergentSingularityLoss, self).__init__()
-        self.ce_loss = nn.CrossEntropyLoss()
+        self.ce_loss = nn.CrossEntropyLoss(weight=weight)
         self.k_lambda = kinetic_lambda
         self.s_lambda = spatial_lambda
         
