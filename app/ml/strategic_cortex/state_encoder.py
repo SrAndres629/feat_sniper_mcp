@@ -47,6 +47,12 @@ class StateVector:
     acceleration: float             # Kinetic acceleration [-1, 1]
     hurst_gate_valid: float         # 1.0 if Hurst allows EMA signals
     
+    # Macro Sentiment (4 dims) - NEW
+    contrarian_score: float         # [-1, 1] (Short% - Long%) / 100
+    retail_long_pct: float          # [0, 1]
+    liquidity_above: float          # 1.0 if shorts majority
+    liquidity_below: float          # 1.0 if longs majority
+    
     def to_tensor(self) -> np.ndarray:
         """Converts state to numpy array for neural network input."""
         return np.array([
@@ -66,12 +72,17 @@ class StateVector:
             self.titanium_resistance,
             self.acceleration,
             self.hurst_gate_valid,
+            # Macro Sentiment - NEW
+            self.contrarian_score,
+            self.retail_long_pct,
+            self.liquidity_above,
+            self.liquidity_below,
         ], dtype=np.float32)
     
     @staticmethod
     def get_state_dim() -> int:
         """Returns the dimensionality of the state vector."""
-        return 16
+        return 20
 
 
 class StateEncoder:
@@ -99,6 +110,7 @@ class StateEncoder:
             microstructure: {ofi_z_score, entropy_score, hurst, spread}
             neural_probs: {scalp, day, swing}
             physics_state: {titanium, acceleration, hurst_gate, feat_composite}
+            sentiment_state: {contrarian_score, long_pct, liquidity_above, liquidity_below}
             
         Returns:
             StateVector ready for Policy Network input.
@@ -130,6 +142,13 @@ class StateEncoder:
         ti_resistance = 1.0 if titanium == "TITANIUM_RESISTANCE" else 0.0
         accel = np.clip(physics_state.get("acceleration", 0.0), -1.0, 1.0)
         hurst_gate = 1.0 if physics_state.get("hurst_gate", False) else 0.0
+        
+        # Sentiment encoding (Macro)
+        sentiment = sentiment_state or {}
+        cont_score = np.clip(sentiment.get("contrarian_score", 0.0), -1.0, 1.0)
+        long_pct = np.clip(sentiment.get("long_pct", 50.0) / 100.0, 0.0, 1.0)
+        liq_above = float(sentiment.get("liquidity_above", 0.0))
+        liq_below = float(sentiment.get("liquidity_below", 0.0))
         
         return StateVector(
             balance_normalized=float(balance_norm),

@@ -84,6 +84,28 @@ class BattlefieldSimulator:
             'tick_volume': np.random.randint(50, 500, n_rows)
         })
         
+        # [HERD RADAR] Mock Sentiment Generation
+        # Logic: Retail accumulates against the trend
+        # Phase 1: Balanced (50/50)
+        # Phase 2 (Pump): Retail goes Short (Short % increases)
+        # Phase 3: Extreme Short
+        # Phase 4 (Dump): Retail goes Long (catching a falling knife)
+        
+        sent_long = np.zeros(n_rows)
+        sent_short = np.zeros(n_rows)
+        
+        # P1: Range (Balanced)
+        sent_long[:n] = 50 + np.random.normal(0, 5, n)
+        # P2: Pump (Retail goes Short)
+        sent_long[n:2*n] = np.linspace(50, 30, n) + np.random.normal(0, 2, n)
+        # P3: Top (Retail heavily Short)
+        sent_long[2*n:3*n] = 25 + np.random.normal(0, 5, n)
+        # P4: Dump (Retail buys the dip/falling knife)
+        sent_long[3*n:] = np.linspace(25, 75, n + remainder) + np.random.normal(0, 5, n + remainder)
+        
+        df['mock_long_pct'] = np.clip(sent_long, 5, 95)
+        df['mock_short_pct'] = 100 - df['mock_long_pct']
+        
         # Calculate ATR for volatility guard
         df['high_low'] = df['high'] - df['low']
         df['high_close'] = np.abs(df['high'] - df['close'].shift())
@@ -170,11 +192,21 @@ class BattlefieldSimulator:
                 ]
                 micro_state = micro_scanner.process_tick_batch(mock_ticks, prices)
                 
+                # [HERD RADAR] Inject Mock Sentiment into State
+                mock_sentiment = {
+                    "long_pct": row['mock_long_pct'],
+                    "short_pct": row['mock_short_pct'],
+                    "contrarian_score": (row['mock_short_pct'] - row['mock_long_pct']) / 100.0,
+                    "liquidity_above": 1.0 if row['mock_short_pct'] > 60 else 0.0,
+                    "liquidity_below": 1.0 if row['mock_long_pct'] > 60 else 0.0
+                }
+                
                 state_vec = state_encoder.encode(
                     account_state={"balance": self.balance, "phase_name": "SURVIVAL"},
                     microstructure=micro_scanner.get_dict(),
                     neural_probs={'scalp': 0.7, 'day': 0.5, 'swing': 0.2},
-                    physics_state={"titanium": "NEUTRAL", "feat_composite": 50.0}
+                    physics_state={"titanium": "NEUTRAL", "feat_composite": 50.0},
+                    sentiment_state=mock_sentiment # Pass mock sentiment to encoder
                 )
                 
                 action, prob, value = policy_agent.select_action(state_vec)
@@ -225,6 +257,18 @@ class BattlefieldSimulator:
                     reward -= 5.0  # Massive penalty for news disobedience
                     if i % 50 == 0:
                         logger.warning(f"⚠️ Step {i}: Agent traded during mock NEWS WINDOW! Penalty -5.0")
+                
+                # [CONTRARIAN REWARD] Reward following the liquidity bias
+                if action != StrategicAction.HOLD:
+                    # If we BUY while retail is SHORT (contrarian bullish)
+                    if action in [StrategicAction.TWIN_SNIPER, StrategicAction.STANDARD] and mock_sentiment["contrarian_score"] > 0.2:
+                        reward += 1.5 # Reward for hunting liquidity ABOVE
+                    # If we SELL while retail is LONG (contrarian bearish)
+                    elif action == StrategicAction.DEFENSIVE and mock_sentiment["contrarian_score"] < -0.2:
+                        reward += 1.5 # Reward for hunting liquidity BELOW
+                    # If we follow the herd (BUY while retail is LONG)
+                    elif action in [StrategicAction.TWIN_SNIPER, StrategicAction.STANDARD] and mock_sentiment["contrarian_score"] < -0.4:
+                        reward -= 2.0 # Heavy penalty for herd FOMO
 
                 
                 # Record (Simplified storage)

@@ -34,7 +34,7 @@ class PolicyNetwork(nn.Module):
     """
     
     def __init__(self, 
-                 state_dim: int = 16,
+                 state_dim: int = 20,
                  hidden_dim: int = 64,
                  num_actions: int = 4):
         super().__init__()
