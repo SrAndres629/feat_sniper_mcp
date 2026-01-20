@@ -18,13 +18,37 @@ from app.core.config import settings
 logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(name)s | %(levelname)s | %(message)s')
 logger = logging.getLogger("QUICK_TRAIN")
 
+
 def quick_train_brain(symbol="XAUUSD"):
-    logger.info("🧠 STARTING INSTITUTIONAL RE-TRAINING (Dimensions Alignment Fixed) 🧠")
+    logger.info("🧠 STARTING INSTITUTIONAL RE-TRAINING (Using REAL Market Data) 🧠")
     
-    # 1. Generate Realistic Data using BattlefieldSimulator
-    from nexus_training.simulate_warfare import BattlefieldSimulator
-    sim = BattlefieldSimulator(symbol)
-    df_raw = sim.generate_synthetic_data(n_rows=1000) # More data for stability
+    # 1. Fetch REAL historical data from MT5 (last 1000 bars)
+    try:
+        from app.core.mt5_conn.manager import MT5Connection
+        import MetaTrader5 as mt5
+        
+        logger.info("📊 Fetching real historical data from MT5...")
+        conn = MT5Connection()
+        
+        # Fetch last 1000 M5 bars (real market data)
+        rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_M5, 0, 1000)
+        
+        if rates is None or len(rates) == 0:
+            logger.warning("⚠️ MT5 data unavailable. Falling back to synthetic data.")
+            from nexus_training.simulate_warfare import BattlefieldSimulator
+            sim = BattlefieldSimulator(symbol)
+            df_raw = sim.generate_synthetic_data(n_rows=1000)
+        else:
+            # Convert MT5 data to DataFrame
+            df_raw = pd.DataFrame(rates)
+            df_raw['time'] = pd.to_datetime(df_raw['time'], unit='s')
+            logger.info(f"✅ Loaded {len(df_raw)} real bars from MT5 ({df_raw['time'].min()} to {df_raw['time'].max()})")
+    
+    except Exception as e:
+        logger.error(f"❌ Error fetching MT5 data: {e}. Using synthetic fallback.")
+        from nexus_training.simulate_warfare import BattlefieldSimulator
+        sim = BattlefieldSimulator(symbol)
+        df_raw = sim.generate_synthetic_data(n_rows=1000)
     
     # 2. Process through FeatProcessor (Actual Logic, NOT Random)
     logger.info("🧪 Feature Engineering in progress...")
