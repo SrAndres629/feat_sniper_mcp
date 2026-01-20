@@ -1,0 +1,79 @@
+# GEMINI AI CONTEXT EXCLUSIONS
+# ============================
+# Files and folders that Gemini should NEVER analyze.
+# These consume context without providing value.
+
+# === VIRTUAL ENVIRONMENTS & DEPENDENCIES ===
+.venv/
+node_modules/
+site-packages/
+Lib/
+lib/
+
+# === BUILD & CACHE ===
+__pycache__/
+.git/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+.numba_cache/
+.cache/
+.next/
+dist/
+build/
+*.egg-info/
+
+# === COMPILED & BINARY FILES ===
+*.pyc
+*.pyo
+*.pyd
+*.pt
+*.pth
+*.onnx
+*.h5
+*.pkl
+*.joblib
+*.db
+*.sqlite3
+*.bin
+*.ex5
+*.out
+
+# === LARGE AUTO-GENERATED FILES ===
+project_atlas.json
+tools/compile_log.txt
+*.log
+package-lock.json
+
+# === DATA & MODELS (Runtime) ===
+data/
+models/
+logs/
+chroma_storage/
+
+# === IDE & OS ===
+.vscode/
+.idea/
+.DS_Store
+*.tmp
+
+# === DASHBOARD BLOAT ===
+dashboard/node_modules/
+dashboard/.next/
+dashboard/public/
+
+# === DOCUMENTATION DUPLICATES ===
+# Only analyze .ai/ for governance docs, not these:
+docs/
+README.md
+
+# === WHAT GEMINI SHOULD FOCUS ON ===
+# Priority files (in order):
+# 1. ARCHITECTURE.md (this overview)
+# 2. .ai/CONSTITUTION.md
+# 3. .ai/skills/00_CTO_ORCHESTRATOR.md
+# 4. nexus_core/*.py
+# 5. app/ml/strategic_cortex/*.py
+# 6. app/api/server.py
+# 7. dashboard/war_room.py
+# 8. nexus_training/simulate_warfare.py

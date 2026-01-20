@@ -61,3 +61,10 @@ data/neural_signals.db
 data/live_state.json
 data/vault_state.json
 logs/*.log
+
+# [CRITICAL] AI Context Killers - Auto-generated files
+project_atlas.json
+tools/compile_log.txt
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
