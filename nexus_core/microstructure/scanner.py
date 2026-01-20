@@ -8,6 +8,7 @@ This component 'wires' the raw sensors to the Nexus Engine.
 """
 
 import numpy as np
+import pandas as pd
 from dataclasses import dataclass
 from typing import Dict, Optional, List
 
@@ -82,7 +83,7 @@ class MicrostructureScanner:
         ofi_z = self.ofi_engine.update_and_normalize(ofi)
         
         # 3. Hurst
-        hurst = self.hurst_engine.compute(prices)
+        hurst = self.hurst_engine.calculate(pd.Series(prices))
         
         return self._update_state(entropy, ofi_z, hurst)
 

@@ -113,27 +113,29 @@ class StructureEngine:
 
         # 4. Final Aggregation
         w = self.config["weights"]
-        t_score = 0.5 # Placeholder for Liquidity Time
+        
+        # [CHRONOS] Session-based T-Score (Liquidity Time)
+        times = df.index
+        # Get hour in UTC (or adjusted for exchange time)
+        hours = times.hour
+        
+        # Scoring: London (7-11 UTC) and NY (12-16 UTC) are 1.0. Asian (23-06 UTC) is 0.5. Weekend/Dead is 0.0.
+        t_score = pd.Series(0.2, index=df.index) # Base
+        # Overwrite with sessions
+        t_score[((hours >= 7) & (hours <= 11)) | ((hours >= 12) & (hours <= 16))] = 1.0 # High Liquidity
+        t_score[((hours >= 0) & (hours <= 6))] = 0.5 # Asian
         
         # [FEAT UPDATE] Calculate Space Quality (E) using EMA Layers
-        # We need to access the computed EMA layers from somewhere. 
-        # Ideally, `FourLayerEMA` should be run and its metrics available.
-        # For now, we'll re-compute locally or assume 'dist_operative' was computed by KineticEngine and passed.
-        # Let's check `df` columns. If 'dist_structure' exists (from KineticEngine), use it.
-        # KineticEngine maps 'structure' to 'operative'.
+        # Optimal Space is when Price pulls back to Structure (dist ~ 0)
         
-        space_quality = 0.5
         if "dist_structure" in df.columns:
-            # Optimal Space is when Price pulls back to Structure (dist ~ 0)
-            # But we want to reward "Empty Space" for momentum OR "Touch" for entry?
-            # User says: "Espacio Operable: Es la distancia... Cuando toca la Capa 2, llena el espacio."
-            # So, for Entry, Space Quality is High when Distance is Low (Pullback).
-            # But for Momentum, Space is High when Distance is growing.
-            # Let's define Space Quality as "Safe Entry Zone".
             d_struct = df["dist_structure"].abs()
-            # Reward being close to Structure (0.5 to 2.0 ATR)
-            # 1.0 = Perfect Touch. 0.0 = Far Away (Trap).
+            # Reward being close to Structure (Lower distance = Higher Quality for entry)
+            # Scaling: 1.0 at d=0, decaying as price moves away.
             space_quality = 1.0 / (1.0 + d_struct)
+        else:
+             # If no structure column, space quality is zero (No identifiable floor)
+             space_quality = 0.0
             
         raw_feat = (w["F"] * f_score + w["E"] * space_quality + w["A"] * a_score + w["T"] * t_score)
         raw_feat += df["confluence_score"] * 0.2

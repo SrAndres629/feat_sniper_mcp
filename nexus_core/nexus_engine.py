@@ -24,6 +24,7 @@ from nexus_core.strategy_engine import StrategyEngine, TradeLeg, StrategyMode
 
 # Diagnosis Imports
 from tools.fractal_diagnosis import diagnose_market_fractals
+from nexus_core.kinetic_engine import KineticEngine
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s')
 logger = logging.getLogger("NexusEngine")
@@ -61,6 +62,7 @@ class NexusEngine:
         self.demo_mode = demo_mode
         self.state = EngineState.IDLE
         self.strategy_engine = StrategyEngine(risk_officer)
+        self.kinetic_engine = KineticEngine()
         self.active_trades: List[TradeLeg] = []
         
         # Coherence Gate (From Fractal Diagnosis)
@@ -87,7 +89,7 @@ class NexusEngine:
         
         return fractal_result
     
-    def perceive(self, fractal_data: dict) -> MarketSnapshot:
+    async def perceive(self, fractal_data: dict) -> MarketSnapshot:
         """
         PHASE 2: PERCEIVE
         Calculate Titanium Floor (PVP + EMA + Wavelet confluence).
@@ -110,8 +112,12 @@ class NexusEngine:
 
         coherence = fractal_data['coherence_score']
         
-        # Titanium Floor Detection (Simulated for now, would use ConvergenceEngine)
-        titanium = coherence > 0.70
+        # 2. Physics / Kinetic Computation (Fuerza Real)
+        df_dummy = await self._get_latest_ohlc() 
+        kinetic_metrics = self.kinetic_engine.compute_kinetic_state(df_dummy)
+        
+        # Titanium Floor Detection 
+        titanium = kinetic_metrics.get("absorption_state", 0.0) >= 2.0 # MONITORING or CONFIRMED
         
         # Mock Neural Probabilities (Mapping from fractal diagnosis)
         if fractal_data['dominant_bias'] == 'BULLISH':
@@ -122,7 +128,7 @@ class NexusEngine:
             neural_probs = {'scalp': 0.50, 'day': 0.40, 'swing': 0.20}
             
         snapshot = MarketSnapshot(
-            price=2050.0,  # Simulation Price
+            price=df_dummy['close'].iloc[-1],
             fractal_coherence=coherence,
             dominant_bias=fractal_data['dominant_bias'],
             titanium_floor=titanium,
@@ -130,6 +136,9 @@ class NexusEngine:
             recommendation=fractal_data['recommendation'],
             microstructure=micro_state_obj_dict
         )
+        
+        # Store kinetic metrics for strategy
+        snapshot.physics_data = kinetic_metrics
         
         if titanium:
             logger.info(f"🔥 TITANIUM FLOOR DETECTED | Direction: {snapshot.dominant_bias}")
@@ -184,9 +193,13 @@ class NexusEngine:
         legs = self.strategy_engine.analyze_strategic_intent(
             market_price=snapshot.price,
             neural_probs=snapshot.neural_probs,
-            macro_context={'direction': direction},
+            macro_context={
+                'direction': direction,
+                'alignment_map': snapshot.alignment_map # We need to pass this
+            },
             titanium_level=snapshot.titanium_floor,
-            microstructure_state=snapshot.microstructure
+            microstructure_state=snapshot.microstructure,
+            physics_metrics=getattr(snapshot, 'physics_data', {})
         )
         
         for i, leg in enumerate(legs):
@@ -197,18 +210,62 @@ class NexusEngine:
     def execute(self, legs: List[TradeLeg]):
         """
         PHASE 5: EXECUTE
-        Dispatch orders via MT5 Bridge (or Mock in Demo).
+        Dispatch orders via MT5 Bridge.
         """
         self.state = EngineState.EXECUTING
+        from app.core.mt5_conn import mt5_conn
+        from app.core.mt5_conn.utils import mt5
         
         for leg in legs:
             if self.demo_mode:
                 logger.info(f"📨 [DEMO] ORDER SENT: {leg.direction} {leg.volume} lots @ Market")
             else:
-                # TODO: Integrate with MT5 bridge
-                pass
+                # REAL EXECUTION BRIDGE
+                async def _send():
+                    request = {
+                        "action": mt5.TRADE_ACTION_DEAL,
+                        "symbol": "XAUUSD",
+                        "volume": leg.volume,
+                        "type": mt5.ORDER_TYPE_BUY if leg.direction == "BUY" else mt5.ORDER_TYPE_SELL,
+                        "price": mt5.symbol_info_tick("XAUUSD").ask if leg.direction == "BUY" else mt5.symbol_info_tick("XAUUSD").bid,
+                        "magic": 123456,
+                        "comment": leg.intent,
+                        "type_time": mt5.ORDER_TIME_GTC,
+                        "type_filling": mt5.ORDER_FILLING_IOC,
+                    }
+                    result = await mt5_conn.execute(mt5.order_send, request)
+                    if result and result.retcode == mt5.TRADE_RETCODE_DONE:
+                        logger.info(f"✅ REAL ORDER EXECUTED: {leg.direction} {leg.volume} @ {result.price}")
+                    else:
+                        logger.error(f"❌ EXECUTION FAILED: {result.comment if result else 'Unknown Error'}")
+                
+                import asyncio
+                asyncio.create_task(_send())
                 
             self.active_trades.append(leg)
+
+    async def _get_latest_ohlc(self) -> pd.DataFrame:
+        """Helper to get OHLC data from MT5 for kinetic analysis."""
+        from app.core.mt5_conn import mt5_conn
+        from app.core.mt5_conn.utils import mt5
+        
+        symbol = "XAUUSD" # Default
+        mt5_tf = mt5.TIMEFRAME_M1
+        rates = await mt5_conn.execute(mt5.copy_rates_from_pos, symbol, mt5_tf, 0, 100)
+        
+        if rates is not None and len(rates) > 0:
+            df = pd.DataFrame(rates)
+            df['time'] = pd.to_datetime(df['time'], unit='s')
+            df.set_index('time', inplace=True)
+            return df
+        
+        # Fallback to synthetic ONLY if MT5 fails
+        logger.warning("⚠️ MT5 OHLC Fetch Failed. Using synthetic data for kinetic pulse.")
+        prices = np.linspace(2045, 2050, 100) + np.random.normal(0, 0.5, 100)
+        return pd.DataFrame({
+            'open': prices, 'high': prices + 0.5, 'low': prices - 0.5, 
+            'close': prices, 'volume': np.random.randint(100, 1000, 100)
+        })
             
     def manage(self, snapshot: MarketSnapshot):
         """
@@ -237,7 +294,8 @@ class NexusEngine:
         fractal_data = self.sense()
         
         # 2. PERCEIVE
-        snapshot = self.perceive(fractal_data)
+        snapshot = await self.perceive(fractal_data)
+        snapshot.alignment_map = fractal_data.get('alignment_map', {}) # Pass alignment along
         
         # 3. DECIDE
         should_trade = self.decide(snapshot)

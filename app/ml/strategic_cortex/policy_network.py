@@ -15,7 +15,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 from .action_space import StrategicAction, get_num_actions
 from .state_encoder import StateVector

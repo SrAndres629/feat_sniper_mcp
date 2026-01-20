@@ -192,7 +192,7 @@ class FEATFeatures:
         
         return {
             "z_score_poc": pvp_metrics.get("z_score_poc", 0),
-            "cvd_imbalance": 0.0, # Placeholder until tick_cvd is fully integrated
+            "cvd_imbalance": energy_map.get("ofi_signal", 0.0), # Real OFI Flow
             "energy_score": energy_score,
             "absorption_tension": pvp_metrics.get("skew", 0),
             

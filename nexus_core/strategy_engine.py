@@ -42,27 +42,22 @@ class StrategyEngine:
                                  neural_probs: dict, 
                                  macro_context: dict,
                                  titanium_level: bool,
-                                 microstructure_state: Optional[dict] = None) -> List[TradeLeg]:
+                                 microstructure_state: Optional[dict] = None,
+                                 physics_metrics: Optional[dict] = None) -> List[TradeLeg]:
         """
         Decides HOW to trade. Returns a list of TradeLegs (1 or 2).
-        
-        Args:
-            neural_probs: {'scalp': 0.9, 'day': 0.3, 'swing': 0.1}
-            macro_context: {'zone': 'H4_Demand', 'trend': 'Bullish', 'direction': 'BUY'}
-            titanium_level: True if Titanium Floor detected.
-            microstructure_state: {entropy, ofi_z, hurst} (Optional for backward compat)
         """
         
         # --- STRATEGIC CORTEX (Shadow Mode) ---
         ai_decision = "N/A"
         if microstructure_state:
             # 1. Encode State
-            # We construct the physics state from available inputs
-            physics_state = {
-                "feat_composite": 50.0, # Placeholder or need input
+            # Use real physics metrics if available, otherwise fallback
+            physics_input = {
+                "feat_composite": physics_metrics.get("feat_force", 0.0) if physics_metrics else 0.0,
                 "titanium": "TITANIUM_SUPPORT" if titanium_level else "NEUTRAL",
-                "acceleration": 0.0,
-                "hurst_gate": True
+                "acceleration": physics_metrics.get("rvol", 0.0) if physics_metrics else 0.0,
+                "hurst_gate": microstructure_state.get('hurst', 0.5) > 0.55
             }
             
             # Create State Vector
@@ -70,7 +65,7 @@ class StrategyEngine:
                 account_state=self.risk_manager.get_fund_status(),
                 microstructure=microstructure_state,
                 neural_probs=neural_probs,
-                physics_state=physics_state
+                physics_state=physics_input
             )
             
             # 2. Consult Policy Network
@@ -133,12 +128,18 @@ class StrategyEngine:
                 # Leg B: The Runner (Wealth)
                 # FRACTAL & BIAS CHECK:
                 # 1. Swing Bias: MUST BE BUY
-                # 2. Fractal: (Placeholder) M5 must confirm H4
+                # 2. Fractal: M5 must confirm H4
                 
-                if direction == "BUY":
+                alignment = macro_context.get('alignment_map', {})
+                m5_bias = alignment.get('M5', 'NEUTRAL')
+                h4_bias = alignment.get('H4', 'NEUTRAL')
+                
+                fractal_confirmed = (m5_bias == direction) and (h4_bias == direction)
+                
+                if direction == "BUY" and fractal_confirmed:
                     runner_mode = StrategyMode.SWING
                 else:
-                    # If Sell, we downgrade to Day Runner because Sell Swings are forbidden
+                    # If Sell or no fractal alignment, we downgrade to Day Runner
                     runner_mode = StrategyMode.DAY 
                     
                 legs.append(TradeLeg(
@@ -147,7 +148,7 @@ class StrategyEngine:
                     stop_loss_price=0.0,
                     take_profit_price=0.0, 
                     strategy_type=runner_mode,
-                    intent="WEALTH_RUN (Twin Engine B)"
+                    intent=f"WEALTH_RUN (Twin Engine B) | Confirmed: {fractal_confirmed}"
                 ))
             else:
                 # Fallback to Single Shot if not enough equity for Twin
