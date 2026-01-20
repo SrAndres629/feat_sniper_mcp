@@ -25,6 +25,8 @@ from nexus_core.strategy_engine import StrategyEngine, TradeLeg, StrategyMode
 # Diagnosis Imports
 from tools.fractal_diagnosis import diagnose_market_fractals
 from nexus_core.kinetic_engine import KineticEngine
+from nexus_core.fundamental_engine import FundamentalEngine
+from nexus_core.fundamental_engine.risk_modulator import DEFCON
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s | %(levelname)s | %(message)s')
 logger = logging.getLogger("NexusEngine")
@@ -63,6 +65,13 @@ class NexusEngine:
         self.state = EngineState.IDLE
         self.strategy_engine = StrategyEngine(risk_officer)
         self.kinetic_engine = KineticEngine()
+        
+        # MACRO SENTINEL: News awareness engine
+        # Use real ForexFactory scraper in live mode, mock in demo
+        calendar_provider = "mock" if demo_mode else "forexfactory"
+        self.fundamental_engine = FundamentalEngine(calendar_provider=calendar_provider)
+        self.current_macro_status = None  # Track for dashboard
+        
         self.active_trades: List[TradeLeg] = []
         
         # Coherence Gate (From Fractal Diagnosis)
@@ -73,6 +82,7 @@ class NexusEngine:
         logger.info(f"   Mode: {'DEMO' if demo_mode else 'LIVE'}")
         logger.info(f"   Strategy: Twin Sniper Evolution")
         logger.info(f"   Account Phase: {risk_officer.phase_name}")
+        logger.info(f"   📡 Macro Sentinel: {calendar_provider.upper()} mode")
         
     def sense(self) -> dict:
         """
@@ -152,6 +162,23 @@ class NexusEngine:
         """
         self.state = EngineState.DECIDING
         
+        # Gate 0: MACRO KILL SWITCH (News/DEFCON Check) - HIGHEST PRIORITY
+        macro_status = self.fundamental_engine.check_event_proximity(currencies=["USD", "XAU"])
+        self.current_macro_status = macro_status  # Store for dashboard
+        
+        if macro_status["kill_switch"]:
+            next_event = macro_status.get("next_event")
+            event_name = next_event.event_name if next_event else "Unknown Event"
+            minutes = macro_status.get("minutes_until", 0)
+            logger.warning(f"🚨 DEFCON {macro_status['defcon'].name}: TRADING FROZEN")
+            logger.warning(f"   📅 Event: {event_name} in {minutes:.0f} minutes")
+            logger.warning(f"   ⛔ NO NEW TRADES - Kill Switch Active")
+            return False
+        
+        # Log DEFCON status even when not frozen
+        if macro_status["defcon"] != DEFCON.DEFCON_5:
+            logger.info(f"📡 DEFCON {macro_status['defcon'].name} | Position Mult: {macro_status['position_multiplier']:.1%}")
+        
         # Gate 1: Entropy Check (Noise Filter)
         # If entropy is too high, market is "drunk" - avoid trading.
         if snapshot.microstructure.get('entropy_score', 0.5) > 0.8:
@@ -162,6 +189,7 @@ class NexusEngine:
         if snapshot.fractal_coherence < self.min_coherence_for_trade:
             logger.warning(f"❌ TRADE BLOCKED: Low Coherence ({snapshot.fractal_coherence*100:.1f}% < 50%)")
             return False
+
         
         # Gate 3: Titanium Floor Required for Entry
         if not snapshot.titanium_floor:

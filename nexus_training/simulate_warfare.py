@@ -216,6 +216,17 @@ class BattlefieldSimulator:
                 if micro_state.entropy_score > 0.6 and action != StrategicAction.HOLD:
                     reward -= 2.0 # Explicit punishment for gambling in noise
                 
+                # [MACRO DISCIPLINE] Mock News Window - PEDAGOGICAL PUNISHMENT
+                # Every 60-120 steps, simulate a "news event" window (10 steps long)
+                # If agent trades during this window, MASSIVE penalty (even if trade would profit)
+                mock_news_window = (i % random.randint(60, 120)) < 10
+                if mock_news_window and action != StrategicAction.HOLD:
+                    # Agent tried to trade during "news time" - PUNISH SEVERELY
+                    reward -= 5.0  # Massive penalty for news disobedience
+                    if i % 50 == 0:
+                        logger.warning(f"⚠️ Step {i}: Agent traded during mock NEWS WINDOW! Penalty -5.0")
+
+                
                 # Record (Simplified storage)
                 policy_agent.record_experience(state_vec, action, reward, state_vec, False)
                 

@@ -189,6 +189,44 @@ def render_live_ops(state):
         st.error(f"⚠️ CIRCUIT BREAKER TRIPPED | Latency: {cb.get('latency', 0):.2f}s")
     else:
         st.success("✅ Circuit Breaker: SECURE")
+    
+    # MACRO SENTINEL: News/DEFCON Status
+    macro = state.get("macro_status", {})
+    if macro:
+        defcon = macro.get("defcon_name", "DEFCON_5")
+        minutes_until = macro.get("minutes_until", float("inf"))
+        next_event = macro.get("next_event_name", "None")
+        position_mult = macro.get("position_multiplier", 1.0)
+        kill_switch = macro.get("kill_switch", False)
+        
+        st.divider()
+        st.subheader("📡 MACRO SENTINEL")
+        
+        mc1, mc2, mc3 = st.columns(3)
+        
+        # DEFCON Color Coding
+        if "DEFCON_1" in defcon:
+            mc1.error(f"🚨 {defcon}")
+        elif "DEFCON_2" in defcon:
+            mc1.warning(f"⚠️ {defcon}")
+        elif "DEFCON_3" in defcon:
+            mc1.info(f"📢 {defcon}")
+        else:
+            mc1.success(f"✅ {defcon}")
+        
+        # Next Event
+        if minutes_until != float("inf"):
+            mc2.metric("Next Event", next_event, f"in {minutes_until:.0f}m")
+        else:
+            mc2.metric("Next Event", "None", "Clear horizon")
+        
+        # Position Multiplier
+        mc3.metric("Position Mult", f"{position_mult:.0%}")
+        
+        # Kill Switch Warning
+        if kill_switch:
+            st.error("⛔ KILL SWITCH ACTIVE: NO NEW TRADES ALLOWED")
+
 
 def render_neural_tab(state):
     if not state: return
