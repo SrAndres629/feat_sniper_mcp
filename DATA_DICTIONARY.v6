@@ -1,0 +1,22 @@
+# 📖 DATA_DICTIONARY.v6: Neural Input Definition
+
+| ID | Canal Neural | Tipo | Definición Técnica | Propósito en el Córtex |
+|---|---|---|---|---|
+| **0-4** | **PRICE CORE** | Flow | Log_Ret, Vol_Z, Spread_Z, HiLow_Ratio, SMA_Dist | Visión base del flujo de precio y volatilidad relativa. |
+| **5-8** | **PHYSICS HEAD** | Force | Force, Energy, Entropy, Viscosity | Mide la "masa" institucional y la resistencia del medio (mechas). |
+| **9-11** | **STRUCTURE** | Space | Feat_Index, Confluence, Proximity | Posicionamiento relativo a zonas de alta liquidez (OB/Breakers). |
+| **12-15** | **MICROSTRUCTURE**| Flow | VPIN, OFI_Z, Spread_Vel, Tick_Density | Toxicidad del flujo y presión de compra/venta microscópica. |
+| **16-19** | **MTF ALIGN** | Fractal | M5, M15, H1, H4 Alignment | Sincronía direccional entre capas fractales de tiempo. |
+| **20-23** | **AGGRESSION** | Energy | Buy_Aggr, Sell_Aggr, Delta_Z, Absorption | Mide quién tiene el control del "atake" en el orderflow. |
+
+---
+
+## 🛰️ 6 CAMPOS LATENTES (The Cycle Intelligence)
+Estos campos no son parte del TCN, sino que informan a la **Atención** sobre el contexto del mercado.
+
+1.  **temporal_sin:** Codificación senoidal del ciclo de 24 horas.
+2.  **temporal_cos:** Codificación cosenoidal (fase temporal absoluta).
+3.  **killzone_intensity:** Fuerza de liquidez (1.0 = Londres/NY, 0.3 = Asia).
+4.  **session_weight:** Importancia relativa de la sesión actual en el P&L diario.
+5.  **volatility_context:** ATR relativo para ajustar la sensibilidad de las neuronas.
+6.  **trap_score:** Probabilidad de "Liquidity Trap" basada en el ratio de mechas vs cuerpo.

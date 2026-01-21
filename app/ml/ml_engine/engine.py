@@ -14,6 +14,7 @@ from .fractal import HurstBuffer
 from .loader import ModelLoader
 from .inference import InferenceEngine
 from .rlaif import ExperienceReplay
+from .validators import validate_24ch_integrity, DataIntegrityError  # V6 Circuit Breaker
 
 logger = logging.getLogger("FEAT.MLEngine")
 
@@ -64,6 +65,7 @@ class MLEngine:
             self.sequence_buffers[symbol].append(f)
         logger.info(f"Hydrated {symbol}: Hurst={self.hurst_buffer.get_cached_hurst(symbol)}, Seq={len(self.sequence_buffers[symbol])}")
 
+    @validate_24ch_integrity  # V6 CIRCUIT BREAKER - Enforces 24-channel integrity
     async def predict_async(self, symbol: str, features: Dict[str, Any]) -> Dict[str, Any]:
         try:
             self.hurst_buffer.push(symbol, features.get("close", 0))
