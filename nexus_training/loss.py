@@ -2,75 +2,140 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class ConvergentSingularityLoss(nn.Module):
+class SovereignQuantLoss(nn.Module):
     """
-    [LEVEL 55 - PATCHED] THE NEURO-MATHEMATICAL SINGULARITY LOSS.
-    Corrected for Multi-Dimensional Physics & Negative Loss Prevention.
+    [V6 ELITE QUANT] - THE SOVEREIGN PROTOCOL.
+    Transitions from simple classification to institutional-grade risk/reward modeling.
+    
+    Features:
+    1. Asymmetric Risk: 3.0x penalty for total directional reversals (Buy vs Sell).
+    2. Volatility-Adjusted Gradient: Reduces learning weight during noise (ATR Gating).
+    3. Focal Loss Integration: Forces focus on high-confluence hard examples.
+    4. Killzone Gravity: 2.5x impact during London/NY.
+    5. Drawdown Awareness: Scales with margin pressure.
     """
-    def __init__(self, weight=None, kinetic_lambda=0.5, spatial_lambda=0.3):
-        super(ConvergentSingularityLoss, self).__init__()
-        self.ce_loss = nn.CrossEntropyLoss(weight=weight)
-        self.k_lambda = kinetic_lambda
-        self.s_lambda = spatial_lambda
+    def __init__(self, weight=None, gamma_focal=2.0, k_lambda=0.6, s_lambda=0.4):
+        super(SovereignQuantLoss, self).__init__()
+        self.ce_loss = nn.CrossEntropyLoss(weight=weight, reduction='none')
+        self.gamma_focal = gamma_focal
+        self.k_lambda = k_lambda
+        self.s_lambda = s_lambda
         
-    def forward(self, pred, target, physics_tensor, x_map=None):
+    def forward(self, pred, target, physics_tensor, x_map=None, current_balance=20.0, alpha=1.0):
         """
-        pred: (Batch, 3) [SELL, HOLD, BUY]
-        target: (Batch)
-        physics_tensor: (Batch, 4) -> [Energy, Force, Entropy, Viscosity]
-        x_map: (Batch, 1, 50, 50)
+        physics_tensor: (Batch, 6) -> [Energy, Force, Entropy, Viscosity, Volatility, Intensity]
+        alpha: Curriculum factor (0.0 to 1.0) to scale the intensity of elite penalties.
         """
-        # 1. Base Classification Loss
-        ce = self.ce_loss(pred, target)
-        
-        # 2. EXTRACT PHYSICS DIMENSIONS
-        # We need to extract the specific metrics. 
-        # Index 1 is Force/Thrust (from our Trainer stack)
-        # We clamp it to ensure logic stability.
-        force_raw = physics_tensor[:, 1]  # Range [0, 5.0]
-        entropy = physics_tensor[:, 2]    # Range [0, 1.0]
-        
-        # [FIX 1] NORMALIZE FORCE to [0, 1] for penalty logic
-        # We assume 5.0 is max force. We want 0.0 to 1.0 ratio.
-        force_normalized = torch.clamp(force_raw / 5.0, 0.0, 1.0)
-        
-        # 3. KINETIC PENALTY (Laws of Physics)
+        # 1. BASE CLASSIFICATION with Focal Adjustment
+        ce_raw = self.ce_loss(pred, target)
         probs = F.softmax(pred, dim=1)
-        prob_dir = probs[:, 2] - probs[:, 0] # Bias towards BUY(+1) or SELL(-1)
+        pt = torch.exp(-ce_raw)  # probability of correct class
+        focal_weight = (1 - pt) ** self.gamma_focal
         
-        # Logic: If Directional Conviction is HIGH (abs(prob_dir) -> 1)
-        # BUT Physical Force is LOW (force -> 0), 
-        # THEN Penalize. (You shouldn't move fast without force).
+        # 2. EXTRACT PHYSICS & CONTEXT
+        # [AUDIT] Expected Order: [Energy, Force, Entropy, Viscosity, Volatility, Intensity]
+        force_norm = torch.clamp(physics_tensor[:, 1] / 5.0, 0.0, 1.0)
+        entropy = torch.abs(physics_tensor[:, 2])
+        viscosity = physics_tensor[:, 3]
+        volatility = physics_tensor[:, 4]  # ATR Context
+        intensity = physics_tensor[:, 5]   # Killzone Intensity
         
-        # [FIX 2] ABSOLUTE PROTECTION against Negative Loss
-        # formula: Violation = Conviction * (1 - Force_Strength)
-        # If Force is 1.0 (Max), term becomes 0. No Penalty.
-        # If Force is 0.0 (None), term becomes 1. Max Penalty.
-        kinetic_violation = torch.abs(prob_dir) * (1.0 - force_normalized)
+        # 3. ASYMMETRIC RISK (Force-Aligned) [PHASE 1 REFINEMENT]
+        # "Don't fight the physics."
+        # Physics Force (Index 1) > 0.1 implies Bullish Momentum.
+        # Physics Force (Index 1) < -0.1 implies Bearish Momentum.
+        physics_force = physics_tensor[:, 1]
+        preds_max = torch.argmax(pred, dim=1)
         
-        # Extra: If Entropy is HIGH (Chaos), penalize strong conviction too.
-        entropy_violation = torch.abs(prob_dir) * entropy 
+        # Penalize: Force is UP but Model says SELL (0)
+        fighting_bulls = (physics_force > 0.1) & (preds_max == 0)
+        # Penalize: Force is DOWN but Model says BUY (2)
+        fighting_bears = (physics_force < -0.1) & (preds_max == 2)
         
-        total_kinetic_loss = torch.mean(kinetic_violation + entropy_violation)
+        asymmetry_weight = torch.ones_like(ce_raw)
+        asymmetry_weight[fighting_bulls] *= 3.0
+        asymmetry_weight[fighting_bears] *= 3.0
         
-        # 4. SPATIAL PENALTY (Vision Consensus)
-        spatial_violation_loss = 0.0
+        # Also keep total reversal penalty for non-force days? 
+        # No, "Sovereign" means obeying Physics first.
+        
+        # 4. VOLATILITY-ADJUSTED GRADIENT (ATR Gating)
+        # Higher volatility = Lower learning weight (to ignore news noise)
+        vol_weight = 1.0 / (1.0 + torch.clamp(volatility, 0.0, 5.0))
+        
+        # 5. KILLZONE GRAVITY (2.5x impact)
+        temporal_weight = 1.0 + (intensity * 1.5)
+        
+        # 6. KINETIC & SPATIAL PENALTIES
+        prob_dir = probs[:, 2] - probs[:, 0]
+        # Strong direction with low force or high viscosity = Penalty
+        kinetic_violation = torch.abs(prob_dir) * (1.0 - force_norm) * (1.0 + viscosity)
+
+        # [ZERO-DAY PROTOCOL] 1. Liquidity Trap Detector (The Fakeout)
+        # Condition: High Viscosity (Wicks/Choppiness) + Low Force (No Momentum)
+        # If Model predicts Breakout (Sell=0 or Buy=2) in this zone -> 5.0x Penalty
+        trap_zone = (viscosity > 0.6) & (force_norm < 0.4)
+        breakout_attempt = (torch.argmax(pred, dim=1) != 1) # Trying to trade
+        
+        trap_penalty = torch.zeros_like(ce_raw)
+        # We only penalize if it's a trap zone AND the model tries to trade
+        trap_mask = trap_zone & breakout_attempt
+        trap_penalty[trap_mask] = ce_raw[trap_mask] * 5.0 
+        
+        spatial_loss = torch.zeros_like(ce_raw)
         if x_map is not None:
-            # Spatial Heuristic: Density check
-            # Top half (Resistance) vs Bottom half (Support)
             top_density = torch.sum(x_map[:, :, :25, :], dim=(1,2,3))
             bottom_density = torch.sum(x_map[:, :, 25:, :], dim=(1,2,3))
-            
-            # Normalize densities to 0-1 relative to total energy
-            total_energy = top_density + bottom_density + 1e-9
-            top_ratio = top_density / total_energy
-            bottom_ratio = bottom_density / total_energy
-            
-            # Risk: Buying into Resistance (Top) or Selling into Support (Bot)
-            buy_risk = probs[:, 2] * top_ratio
-            sell_risk = probs[:, 0] * bottom_ratio
-            
-            spatial_violation_loss = torch.mean(buy_risk + sell_risk)
-            
-        # FINAL SUM
-        return ce + (total_kinetic_loss * self.k_lambda) + (spatial_violation_loss * self.s_lambda)
+            total_density = top_density + bottom_density + 1e-9
+            spatial_loss = (probs[:, 2] * (top_density / total_density)) + \
+                          (probs[:, 0] * (bottom_density / total_density))
+
+        # [ZERO-DAY PROTOCOL] 2. Stagnation Penalty (Time-Under-Risk)
+        # Condition: Low Volatility (Dead Market) + Model is In-Trade (Buy/Sell)
+        # "If the market sleeps, YOU sleep."
+        stagnation_mask = (volatility < 0.5) & (breakout_attempt)
+        stagnation_penalty = torch.zeros_like(ce_raw)
+        stagnation_penalty[stagnation_mask] = ce_raw[stagnation_mask] * 2.0
+
+        # [ZERO-DAY PROTOCOL] 3. Entropy Penalty (Indecision)
+        # Penalize lack of conviction. High entropy = Bad.
+        entropy_val = -torch.sum(probs * torch.log(probs + 1e-9), dim=1)
+        # We only punish entropy if it's high (> 1.0 approx for 3 classes)
+        entropy_penalty = torch.clamp(entropy_val - 0.8, 0.0, 5.0)
+
+        # 7. FINANCIAL PRESSURE
+        MARGIN_PER_001 = 8.0
+        if isinstance(current_balance, (float, int)):
+            balance_tensor = torch.tensor(float(current_balance), device=pred.device)
+        else:
+            balance_tensor = current_balance
+        pressure_raw = 20.0 / (balance_tensor - MARGIN_PER_001 + 1e-9)
+        balance_pressure = torch.clamp(pressure_raw, 1.0, 10.0)
+
+        # FINAL COMPOSITION
+        # Focal Loss * Asymmetry * VolatilityGating * Killzone * Drawdown
+        # Alpha scales the severity of the institutional penalties.
+        penalty_composition = focal_weight * asymmetry_weight * vol_weight * temporal_weight * balance_pressure
+        
+        # We blend from standard CE (alpha=0) to full Sovereign context (alpha=1)
+        # Note: pt is focal probability, using focal_weight as multiplier.
+        weighted_ce = ce_raw * (1.0 + (penalty_composition - 1.0) * alpha)
+        
+        # [ELITE QUANT SUMMATION]
+        # Base + Kinetic + Spatial + TRAP PENALTY + STAGNATION + ENTROPY
+        total_loss = torch.mean(
+            weighted_ce + 
+            (kinetic_violation * self.k_lambda * alpha) + 
+            (spatial_loss * self.s_lambda * alpha) + 
+            (trap_penalty * alpha) +
+            (stagnation_penalty * alpha) +
+            (entropy_penalty * alpha)
+        )
+        
+        return total_loss
+
+        # FINAL COMPOSITION
+        weighted_loss = ce_raw * asymmetry_weight * balance_pressure
+        total_loss = torch.mean(weighted_loss + (kinetic_violation * self.k_lambda) + (spatial_loss * self.s_lambda))
+        
+        return total_loss

@@ -29,8 +29,10 @@ def detect_critical_points(df: pd.DataFrame) -> pd.DataFrame:
     # 2. Volume Indecision (High Volume Doji = Absorption/Hinge)
     # [DOCTORAL REFINEMENT] Volume Validation
     # A low volume Doji is noise. A high volume Doji is a battle.
-    vol_ma = df["tick_volume"].rolling(20).mean()
-    is_high_vol = df["tick_volume"] > (vol_ma * 1.5)
+    # [V6 SYNC] Use 'volume' (DB native) instead of 'tick_volume'
+    vol_col = "volume" if "volume" in df.columns else "tick_volume"
+    vol_ma = df[vol_col].rolling(20).mean()
+    is_high_vol = df[vol_col] > (vol_ma * 1.5)
     
     # Critical Point = Tiny Body AND High Volume (Absorption)
     is_critical = is_doji & is_high_vol

@@ -91,9 +91,11 @@ class MLEngine:
             
             # [PHASE 13 - PHYSICS VETO & HUMILITY]
             # 1. Epistemic Gating (Rule 6: Epistemic Humility)
-            if res["uncertainty"] > settings.CONVERGENCE_MAX_UNCERTAINTY:
-                logger.warning(f"⚠️ HIGH UNCERTAINTY on {symbol} ({res['uncertainty']:.2f}). Trade Vetoed.")
-                return self._neutral(symbol, "HIGH_UNCERTAINTY")
+            # SOVEREIGN UPDATE: Uncertainty > 0.7 is now an Iron Veto.
+            epistemic_uncertainty = res["uncertainty"]
+            if epistemic_uncertainty > 0.7:
+                logger.warning(f"🛡️ SOVEREIGN VETO: Uncertainty {epistemic_uncertainty:.2f} > 0.7 on {symbol}. ABORT.")
+                return self._neutral(symbol, "HIGH_UNCERTAINTY_VETO")
 
             # 2. Physics Validation (Rule 1: Physics Veto)
             if PHYSICS_AVAILABLE:

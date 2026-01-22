@@ -5,7 +5,7 @@ from nexus_core.structure_engine.engine import StructureEngine
 from app.ml.feat_processor.vectorized_tensor import VectorizedChronosProcessor
 from app.ml.feat_processor.macro import MacroTensorFactory
 
-from nexus_core.kinetic_engine import kinetic_engine
+from nexus_core.physics_engine.engine import physics_engine
 
 class AlphaTensorOrchestrator:
     """
@@ -58,7 +58,7 @@ class AlphaTensorOrchestrator:
                 df[col] = struct_res[col].values
 
         # 3. PHYSICS CORE (Vectorized Newton/Thermodynamics)
-        physics_res = kinetic_engine.compute_vectorized_physics(df)
+        physics_res = physics_engine.compute_vectorized_physics(df)
         physics_res = physics_res.reset_index(drop=True)
         
         # Merge physics columns directly

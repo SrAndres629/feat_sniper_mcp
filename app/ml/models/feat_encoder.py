@@ -16,7 +16,7 @@ class FeatEncoder(nn.Module):
         self.dims = dims or {
             "form": 4, 
             "space": 3, 
-            "accel": 3, 
+            "accel": 4, # Updated to 4 channels (Energy, Force, Entropy, Viscosity)
             "time": 4, 
             "kinetic_meta": 3,
             "pattern_embed": 4,

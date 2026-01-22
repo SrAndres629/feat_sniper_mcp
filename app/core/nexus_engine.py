@@ -18,6 +18,8 @@ from app.services.circuit_breaker import circuit_breaker
 from app.services.state_exporter import state_exporter
 from nexus_core.microstructure.scanner import micro_scanner
 from nexus_core.neural_health import neural_health
+from nexus_core.kinetic_engine import KineticEngine
+from tools.fractal_diagnosis import diagnose_market_fractals
 
 logger = logging.getLogger("nexus.engine")
 
@@ -50,6 +52,10 @@ class NexusEngine:
         # Sentinels
         self.jitter_sentinel = None
         self.drift_sentinel = None
+        
+        # Logic State
+        self.demo_mode = settings.TRADING_MODE != "LIVE"
+        self.kinetic_engine = KineticEngine()
 
     async def initialize(self):
         """Sequential bootstrap of warfare assets."""
@@ -193,22 +199,34 @@ class NexusEngine:
 
                 if "M1" not in candles: return
 
-                # Structural Mapping
+                # Structural Mapping (M1 Base)
                 processed_df = feat_processor.process_dataframe(candles["M1"])
                 last_row = processed_df.iloc[-1]
+
+                # 3. Fractal Diagnosis (Integrated Sense & Perceive)
+                fractal_result = diagnose_market_fractals(mock_mode=self.demo_mode)
+                coherence_score = fractal_result.get('coherence_score', 0.5)
+                dominant_bias = fractal_result.get('dominant_bias', 'NEUTRAL')
                 
-                if self.structure_engine:
-                    report = self.structure_engine.get_structural_report(candles["M1"])
-                    # Safe access - 'zones' key may not exist in new structure
-                    zones_data = report.get('zones', {})
-                    distance = zones_data.get('distance_to_zone', float('inf'))
-                    self.context_cache["in_zone"] = (distance < (price * settings.ZONE_PROXIMITY_FACTOR))
-                    
-                # Fractal Coherence Logic (DEPRECATED: Using defaults)
-                alignment_map = {}
-                coherence_score = 0.5
-                self.context_cache["alignment_map"] = alignment_map
+                # Kinetic Metrics (Physics Perception)
+                kinetic_metrics = self.kinetic_engine.compute_kinetic_state(candles["M1"])
+                
+                # [v5.1] FUSION TRUTH: Prefer MQL5 "Titanium" sensation if available (Real-time), fallback to Python calc
+                mql_titanium = getattr(regime, 'titanium_tier', 'NEUTRAL')
+                if mql_titanium != 'NEUTRAL':
+                     self.context_cache["titanium_floor"] = (mql_titanium == "TITANIUM_SUPPORT")
+                     self.context_cache["titanium_ceiling"] = (mql_titanium == "TITANIUM_RESISTANCE")
+                else:
+                     # Fallback to Python Kinetic Engine
+                     self.context_cache["titanium_floor"] = kinetic_metrics.get("absorption_state", 0.0) >= 3.0
+                     self.context_cache["titanium_ceiling"] = False
+
+                self.context_cache["alignment_map"] = fractal_result.get('alignment_map', {})
                 self.context_cache["fractal_coherence"] = coherence_score
+                self.context_cache["dominant_bias"] = dominant_bias
+                self.context_cache["physics_data"] = kinetic_metrics
+                # Cache MQL5 FEAT Score for Dashboard/ML
+                self.context_cache["mql_feat_score"] = getattr(regime, 'feat_score', 50.0)
 
                 # 4. Temporal Physics (Inter-Temporal Synthesis)
                 temporal_physics = feat_features.extract_temporal_physics(candles)

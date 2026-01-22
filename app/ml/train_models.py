@@ -110,12 +110,12 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
     # 5. Initialize model
     input_dim = X.shape[1]
     from app.ml.models.hybrid_probabilistic import HybridProbabilistic
-    from app.ml.ml_engine.doctoral_loss import DoctoralLoss
+    from nexus_training.loss import ConvergentSingularityLoss
     
     model = HybridProbabilistic(input_dim=input_dim, hidden_dim=64, num_classes=3).to(device)
     
-    # [MATH SENIOR FULLSTACK] Using Doctoral Loss
-    criterion = DoctoralLoss(num_classes=3, monte_carlo_samples=50, quantile=0.5)
+    # [UNIFIED] Using Convergent Singularity Loss (Balance Aware)
+    criterion = ConvergentSingularityLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
     
     best_acc = 0.0
@@ -135,10 +135,10 @@ def train_lstm(X: np.ndarray, y: np.ndarray, seq_len: int = SEQ_LEN) -> str:
             # Model returns Dict {"logits", "log_var", ...}
             outputs = model(batch_X) 
             
-            # Loss expects Dict targets
-            targets = {"class": batch_y}
-            
-            loss = criterion(outputs, targets)
+            # [UNIFIED] Loss expects physics tensor. Since train_models is simple, 
+            # we pass a dummy physics tensor if not provided.
+            dummy_physics = torch.zeros(batch_X.size(0), 4).to(device)
+            loss = criterion(outputs["logits"], batch_y, dummy_physics, current_balance=20.0)
             loss.backward()
             optimizer.step()
             

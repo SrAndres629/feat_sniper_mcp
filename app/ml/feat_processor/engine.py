@@ -5,8 +5,8 @@ import numpy as np
 from typing import List, Dict, Any
 from app.core.config import settings
 from .utils import process_ticks_to_ohlcv
+from .utils import process_ticks_to_ohlcv
 from .engineering import apply_feat_engineering
-from .kinetics import calculate_multifractal_layers
 from .vision import generate_energy_map
 from .tensor import tensorize_snapshot
 from .io import export_parquet, export_jsonl_gz
@@ -15,7 +15,7 @@ from nexus_core.features import feat_features
 
 logger = logging.getLogger("FeatProcessor.Engine")
 
-from nexus_core.kinetic_engine import kinetic_engine
+from nexus_core.physics_engine.engine import physics_engine
 from nexus_core.structure_engine.engine import structure_engine
 from app.ml.feat_processor.alpha_tensor import AlphaTensorOrchestrator
 # We use AlphaTensorOrchestrator logic to ensure training matches live logic exactly.
@@ -51,7 +51,11 @@ class FeatProcessor:
         df["price_sma_dist"] = (df["close"] - df["close"].rolling(50).mean()) / (df["close"].rolling(50).std() + 1e-9)
 
         # 2. PHYSICS (4 Ch)
-        df = calculate_multifractal_layers(df)
+        physics_res = physics_engine.compute_vectorized_physics(df)
+        for col in physics_res.columns:
+            if col not in df.columns:
+                df[col] = physics_res[col].values
+
         payload = self.alpha.process_dataframe(df)
         
         def safe_assign(col_name, payload_key, default_val=0.0):

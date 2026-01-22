@@ -177,17 +177,20 @@ class StructureEngine:
         # Pattern Metadata (MAE)
         mae = self.mae_recognizer.detect_mae_pattern(df)
         
-        res = pd.DataFrame(index=df.index)
-        res["feat_index"] = (feat_val * 100).round(2)
-        res["trap_score"] = df.get("trap_score", 0.0).round(2)
-        res["confluence_score"] = df["confluence_score"].round(2)
-        res["structure_status"] = mae["status"]
-        res["is_mae_expansion"] = mae["is_expansion"]
+        # [FIX] Integrity Preservation: Assign to DF instead of new object
+        df["feat_index"] = (feat_val * 100).round(2)
+        df["trap_score"] = df.get("trap_score", 0.0).round(2)
+        df["confluence_score"] = df["confluence_score"].round(2)
+        df["structure_status"] = mae["status"]
+        df["is_mae_expansion"] = mae["is_expansion"]
         
         # Meta-tensors for Alpha Orchestrator
-        res["session_weight"] = df.get("session_weight", 1.0)
-        res["struct_displacement_z"] = df.get("struct_displacement_z", 0.0)
-        return res
+        if "session_weight" not in df.columns:
+            df["session_weight"] = 1.0
+        if "struct_displacement_z" not in df.columns:
+            df["struct_displacement_z"] = 0.0
+            
+        return df
 
     def get_structural_report(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Detailed report for the current candle."""
@@ -219,3 +222,6 @@ class StructureEngine:
     def get_structural_score(self, df: pd.DataFrame) -> float:
         res = self.compute_feat_index(df)
         return float(res["feat_index"].iloc[-1])
+
+# Singleton
+structure_engine = StructureEngine()

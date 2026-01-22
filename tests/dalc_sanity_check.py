@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 # Import components to test
 from nexus_core.kinetic_engine import KineticEngine 
 from app.ml.models.hybrid_probabilistic import HybridProbabilistic
-from nexus_training.loss import ConvergentSingularityLoss
+from nexus_training.loss import SovereignQuantLoss
 from app.ml.feat_processor.engine import FeatProcessor
 from app.core.config import settings
 
@@ -78,7 +78,8 @@ class DALC_Auditor:
             self.log_pass(test_name) 
             
         except Exception as e:
-            self.log_fail(test_name, f"Crash during test: {str(e)}")
+            import traceback
+            self.log_fail(test_name, f"Crash during test: {str(e)}\n{traceback.format_exc()}")
 
     # ==========================================
     # 2. MATHEMATICAL LOGIC: The "Infinity" Test
@@ -139,8 +140,8 @@ class DALC_Auditor:
         """
         test_name = "TCN Tensor Dimension Alignment"
         try:
-            # Explicitly align with FeatProcessor output (12 features)
-            input_dim = 12 
+            # Explicitly align with FeatProcessor output (24 features)
+            input_dim = 24 
             logger.info(f"Testing Model with input_dim: {input_dim}")
             
             model = HybridProbabilistic(input_dim=input_dim, hidden_dim=64, num_classes=3)
@@ -155,12 +156,12 @@ class DALC_Auditor:
                 feat_input = {
                     "form": torch.randn(32, 4), 
                     "space": torch.randn(32, 3),
-                    "accel": torch.randn(32, 3), 
+                    "accel": torch.randn(32, 4), # Synchronized with FeatEncoder
                     "time": torch.randn(32, 4),
                     "kinetic": torch.randn(32, 4)
                 }
-                # Physics Tensor (Batch, 4) -> Energy, Force, Entropy, Viscosity
-                p_tensor = torch.randn(32, 4)
+                # Physics Tensor (Batch, 6) -> [Energy, Force, Entropy, Viscosity, Volatility, Intensity]
+                p_tensor = torch.randn(32, 6)
                 
                 # Forward Pass
                 logger.info(f"Input shape: {dummy_input.shape}")

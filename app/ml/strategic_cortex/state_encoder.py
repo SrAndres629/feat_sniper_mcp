@@ -90,8 +90,8 @@ class StateVector:
     
     @staticmethod
     def get_state_dim() -> int:
-        """Returns the dimensionality of the state vector."""
-        return 45
+        """Returns the dimensionality of the state vector (Institutional V6)."""
+        return 24 + 21 # 24 Physics + 21 Meta/Neural
 
 
 class StateEncoder:

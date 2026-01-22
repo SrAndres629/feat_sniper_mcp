@@ -37,8 +37,13 @@ class MarketRegime:
     liquidity_resistance: float # The estimated mass (Inverse ILLIQ)
     ofi_score: float           # Order Flow Imbalance Z-Score
     
-    trend: str
-    timestamp: str
+    # [v5.1] MQL5 Fusion Data
+    feat_score: float = 50.0   # 0-100 Composite Score
+    titanium_tier: str = "NEUTRAL"
+    active_zone: str = "NONE"
+    
+    trend: str = "NEUTRAL"
+    timestamp: str = ""
 
 
 class MarketPhysics:
@@ -91,10 +96,11 @@ class MarketPhysics:
     def ingest_tick(self, data: Dict, force_timestamp: float = None, is_hydration: bool = False) -> Optional[MarketRegime]:
         """
         Ingesta de Ticks con cálculo de microestructura.
+        Supports rich MQL5 data (FEAT V5).
         """
         try:
             # 1. Extraction with robust null handling
-            tick_vol = data.get('tick_volume')
+            tick_vol = data.get('tick_volume', data.get('vol')) # Handle 'vol' alias
             real_vol = data.get('real_volume')
             vol = float(tick_vol if tick_vol is not None else (real_vol if real_vol is not None else 0.0))
             
@@ -138,11 +144,18 @@ class MarketPhysics:
             if len(self.prices) < self.WARMUP_PERIODS:
                 if not is_hydration:
                     # logger.debug(f"Warming up... {len(self.prices)}/{self.WARMUP_PERIODS}")
-                    _warming_up = True
+                    pass
                 return None
 
             # 4. Compute Metrics
-            return self._compute_regime(price, ts)
+            regime = self._compute_regime(price, ts)
+            
+            # 5. Enrich with MQL5 FEAT Data (if available)
+            regime.feat_score = float(data.get('feat_score', 50.0))
+            regime.titanium_tier = str(data.get('titanium', "NEUTRAL"))
+            regime.active_zone = str(data.get('zone', "NONE"))
+            
+            return regime
 
         except Exception as e:
             logger.error(f"Sensory Cortex Failure: {e}")

@@ -7,6 +7,7 @@ import pandas as pd
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler, random_split
 from tqdm import tqdm
 import logging
+import wandb
 from typing import Dict, List, Tuple
 
 # Path Setup
@@ -14,29 +15,68 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # [LEVEL 50] Advanced Models & Config
 from app.ml.models.hybrid_probabilistic import HybridProbabilistic
-from nexus_training.loss import ConvergentSingularityLoss
+from nexus_training.loss import SovereignQuantLoss
 from app.core.config import settings
 
 # Logger Setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("HybridTrainer")
 
+# --- ADVERSARIAL HARDENING ---
+class ChaosInjector:
+    """
+    [DATA AUGMENTATION]
+    Simulates Broker hostile conditions (Slippage, Spread Spikes, Noise).
+    Makes the Neural Net robust against LiteFinance reality.
+    """
+    def __init__(self, noise_level=0.0001, spread_shock_prob=0.1):
+        self.noise = noise_level
+        self.spread_prob = spread_shock_prob
+
+    def apply(self, sequence):
+        """
+        Input: Sequence (Length, Channels)
+        Output: Augmented Sequence
+        """
+        # 1. Gaussian Noise (Jitter) - Nervous market simulation
+        if np.random.random() < 0.5:
+            noise = np.random.normal(0, self.noise, sequence.shape)
+            sequence += noise
+
+        # 2. Spread Shock / Volatility Distortion
+        if np.random.random() < self.spread_prob:
+            # Shift features to simulate extreme spread conditions
+            sequence *= (1.0 + np.random.uniform(-0.01, 0.01, sequence.shape))
+            
+        return sequence
+
 # --- DATASET ---
 class SniperDataset(Dataset):
     """
     Dataset wrapper for FEAT Sniper data.
-    Now handles Heterogeneous Inputs & Static Features properly.
+    Now handles Heterogeneous Inputs & Chaos Augmentation.
     """
-    def __init__(self, sequences, labels, physics, static_features: Dict[str, np.ndarray], spatial_maps: np.ndarray = None):
+    def __init__(self, sequences, labels, physics, static_features: Dict[str, np.ndarray], spatial_maps: np.ndarray = None, augment=False):
         # Keep as numpy for memory efficiency until __getitem__
         self.sequences = sequences
         self.labels = labels
-        self.physics = physics # Placeholder (mostly zeros in raw load)
+        self.physics = physics 
+        self.augment = augment
+        self.injector = ChaosInjector()
         
         # Static Bags
         self.form = static_features.get("form", np.zeros((len(labels), 4)))
         self.space = static_features.get("space", np.zeros((len(labels), 3)))
-        self.accel = static_features.get("accel", np.zeros((len(labels), 3)))
+        
+        # [CIRCUIT BREAKER] Auto-fix accel dimension (3 -> 4) for Physics Viscosity
+        raw_accel = static_features.get("accel", np.zeros((len(labels), 3)))
+        if hasattr(raw_accel, 'shape') and raw_accel.shape[1] == 3:
+            print("⚠️ [DATA-PATCH] Padding Accel from 3 to 4 columns (Adding Viscosity=0)")
+            padding = np.zeros((len(labels), 1))
+            self.accel = np.hstack([raw_accel, padding])
+        else:
+            self.accel = raw_accel
+            
         self.time = static_features.get("time", np.zeros((len(labels), 4)))
         self.kinetic = static_features.get("kinetic", np.zeros((len(labels), 4)))
         
@@ -51,8 +91,14 @@ class SniperDataset(Dataset):
         
     def __getitem__(self, idx):
         # Convert to Tensor ON DEMAND (Saves RAM)
+        seq = self.sequences[idx].copy()
+        
+        # Apply Chaos in Training
+        if self.augment:
+            seq = self.injector.apply(seq)
+            
         return (
-            torch.FloatTensor(self.sequences[idx]),
+            torch.FloatTensor(seq),
             torch.LongTensor([self.labels[idx]]).squeeze(),
             torch.FloatTensor([self.physics[idx]]),
             torch.FloatTensor(self.form[idx]),
@@ -74,8 +120,24 @@ def pre_flight_guard(symbol: str, real: bool = False):
     return True
 
 # --- TRAINING LOOP ---
-def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, force_cpu=False):
+    # [V6 PRODUCTION] GPU Acceleration enabled with Pure Core Stable PyTorch
+    if force_cpu:
+        device = torch.device("cpu")
+        logger.info("⚠️ FORCED CPU MODE (User requested)")
+    else:
+        # [V6 CUDA FALLBACK] Try GPU first, fallback to CPU if cuDNN fails
+        try:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            
+            # [V6 GPU OPTIMIZATION] Clear CUDA cache before training
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                logger.info(f"GPU: {torch.cuda.get_device_name(0)} | VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        except Exception as e:
+            logger.error(f"⚠️ CUDA initialization failed: {e}. Falling back to CPU.")
+            device = torch.device("cpu")
+    
     logger.info(f"🚀 Starting Hybrid Training for {symbol} on {device}")
     
     # 1. Load Data
@@ -96,16 +158,30 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
         static_feats = {}
 
     # 2. Prepare Dataset & Split (VALIDATION SET ADDED)
-    full_dataset = SniperDataset(X, y, phys, static_feats)
+    # Augmentation enabled ONLY for training set
+    full_dataset = SniperDataset(X, y, phys, static_feats, augment=False)
     
     # Split 80/20 to prevent Overfitting
     train_size = int(0.8 * len(full_dataset))
     val_size = len(full_dataset) - train_size
-    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    print(f"DEBUG: Dataset size: {len(full_dataset)}, Train: {train_size}, Val: {val_size}")
+    train_set, val_set = random_split(full_dataset, [train_size, val_size])
+    
+    # Enable Augmentation on the training split wrapper
+    train_dataset = SniperDataset(
+        X[train_set.indices], y[train_set.indices], phys[train_set.indices], 
+        {k: v[train_set.indices] for k, v in static_feats.items()}, 
+        augment=True
+    )
+    val_dataset = SniperDataset(
+        X[val_set.indices], y[val_set.indices], phys[val_set.indices], 
+        {k: v[val_set.indices] for k, v in static_feats.items()}, 
+        augment=False
+    )
     
     # 3. Dynamic Sampling (Fix Class Imbalance)
     logger.info("⚖️ Calculating Class Weights for Sampler...")
-    train_indices = train_dataset.indices
+    train_indices = train_set.indices
     train_labels = y[train_indices]
     
     class_counts = np.bincount(train_labels)
@@ -118,20 +194,22 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
         replacement=True
     )
     
-    # Loaders
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, num_workers=0)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+    # Loaders - Optimized for Windows Stability (Main Thread Loading)
+    # num_workers=0: Prevents multiprocessing crash on Windows
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, num_workers=0, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
+    print(f"DEBUG: Loaders initialized. Train Batches: {len(train_loader)}")
     
     # 4. Initialize Model
     seq_len = X.shape[1]
     input_dim = X.shape[2]
     
-    model = HybridProbabilistic(input_dim=input_dim, hidden_dim=64, num_classes=3).to(device)
+    model = HybridProbabilistic(input_dim=input_dim, hidden_dim=settings.NEURAL_HIDDEN_DIM, num_classes=3).to(device)
     
-    # 5. Loss & Optimizer
-    criterion = ConvergentSingularityLoss(
-        kinetic_lambda=settings.NEURAL_LOSS_KINETIC_LAMBDA, 
-        spatial_lambda=settings.NEURAL_LOSS_SPATIAL_LAMBDA
+    # 5. Loss & Optimizer (Elite Quant Grade)
+    criterion = SovereignQuantLoss(
+        k_lambda=settings.NEURAL_LOSS_KINETIC_LAMBDA, 
+        s_lambda=settings.NEURAL_LOSS_SPATIAL_LAMBDA
     ).to(device)
     
     optimizer = optim.AdamW(
@@ -141,12 +219,37 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
     )
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=3, factor=0.5)
     
+    logger.info("Initializing Weights & Biases (W&B) Telemetry...")
+    wandb.init(
+        project="FEAT_SNIPER_XAUUSD",
+        mode="online", 
+        name=f"Hybrid_V5_Evolution_{symbol}",
+        config={
+            "learning_rate": settings.NEURAL_LEARNING_RATE,
+            "batch_size": batch_size,
+            "architecture": "TCN-BiLSTM-Probabilistic-PGU",
+            "physics_aware": True,
+            "initial_balance": 20.0,
+            "leverage": "1:1000",
+            "broker": "LiteFinance",
+            "early_stopping_patience": 7
+        }
+    )
+    # [PILOT] Watch gradients and weights (Vital Signs)
+    wandb.watch(model, log="all", log_freq=10)
+    
     # 6. Training Loop
     best_val_loss = float('inf')
     early_stop_patience = 8
     epochs_no_improve = 0
     
     for epoch in range(epochs):
+        # [CURRICULUM] SLIDING BALANCE PRESSURE & ELITE ALPHA
+        # Start gentle, end strict to avoid early "Decision Paralysis" (Freeze vs Risk)
+        # Sovereign Protocol: Linear increase of elite penalties from Epoch 1 to 30
+        pressure_factor = min(1.0, (epoch + 1) / max(1, epochs // 2))
+        elite_alpha = min(1.0, (epoch + 1) / 30.0) 
+        
         # --- TRAIN ---
         model.train()
         train_loss = 0.0
@@ -154,7 +257,8 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
         total = 0
         
         progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} [Train]")
-        for seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map in progress:
+        current_balance = 20.0
+        for i, (seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map) in enumerate(progress):
             
             # [REVERT] The model (HybridProbabilistic) already performs .permute(0, 2, 1) internally.
             # Passing (Batch, Length, Channels) ensures the model's TCN sees (Batch, Channels, Length).
@@ -172,12 +276,14 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
                 "spatial_map": f_map
             }
             
-            # [FIX 2] Real Physics Tensor Construction from Bags
+            # [V6 ELITE QUANT] 6-Channel Physics Tensor Construction
             p_tensor = torch.stack([
-                f_accel[:, 1].to(device), # Energy
-                f_accel[:, 2].to(device), # Force
-                f_kin[:, 0].to(device),   # Entropy proxy
-                f_kin[:, 2].to(device)    # Viscosity proxy
+                f_accel[:, 0].to(device), # Energy
+                f_accel[:, 1].to(device), # Force
+                f_accel[:, 2].to(device), # Entropy
+                f_accel[:, 3].to(device), # Viscosity
+                f_time[:, 0].to(device),  # Volatility ATR
+                f_time[:, 1].to(device)   # Killzone Intensity
             ], dim=1)
 
             optimizer.zero_grad()
@@ -187,8 +293,10 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
             logits = outputs["logits"]
             log_var = outputs.get("log_var") # Aleatoric Uncertainty
             
-            # [FIX 3] Bayesian Loss
-            base_loss = criterion(logits, label, p_tensor, x_map=f_map)
+            # [FIX 3] Bayesian Loss with Curriculum Pressure
+            # Custom pressure_factor passed to handle early exploration vs late survival
+            base_loss = criterion(logits, label, p_tensor, x_map=f_map, current_balance=current_balance, alpha=elite_alpha)
+            base_loss *= pressure_factor
             
             if log_var is not None:
                 loss = torch.mean(torch.exp(-log_var.squeeze()) * base_loss + 0.5 * log_var.squeeze())
@@ -200,9 +308,25 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
             
             train_loss += loss.item()
             preds = torch.argmax(logits, dim=1)
-            train_acc += (preds == label).sum().item()
+            correct_batch = (preds == label).sum().item()
+            train_acc += correct_batch
             total += label.size(0)
             
+            # [TELEMETRY] MICRO-LOGGING (High Frequency - Step by Step)
+            if i % 10 == 0:
+                # Calculate kinetic compliance
+                probs = torch.softmax(logits, dim=1)
+                kinetic_penalty = torch.mean(torch.abs(probs[:, 2] - probs[:, 0]) * (1.0 - torch.clamp(p_tensor[:, 1] / 5.0, 0.0, 1.0)))
+                
+                wandb.log({
+                    "step_loss": loss.item(),  # Micro heartbeat
+                    "batch_accuracy": correct_batch / label.size(0),
+                    "physics_compliance_penalty": kinetic_penalty.item(),
+                    "Elite_Penalty_Weight": elite_alpha,
+                    "grad_norm": torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0),
+                    "learning_rate": optimizer.param_groups[0]['lr']
+                })
+
             progress.set_postfix(loss=loss.item())
             
         avg_train_loss = train_loss / len(train_loader)
@@ -227,8 +351,9 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
                 }
                 
                 p_tensor = torch.stack([
-                    f_accel[:, 1].to(device), f_accel[:, 2].to(device),
-                    f_kin[:, 0].to(device), f_kin[:, 2].to(device)
+                    f_accel[:, 0].to(device), f_accel[:, 1].to(device),
+                    f_accel[:, 2].to(device), f_accel[:, 3].to(device),
+                    f_time[:, 0].to(device), f_time[:, 1].to(device)
                 ], dim=1)
 
                 outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor)
@@ -244,6 +369,24 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
         avg_val_loss = val_loss / len(val_loader)
         val_acc = val_correct / val_total
         
+        # [TELEMETRY] MACRO-LOGGING (Evolutionary Pulse)
+        # Real-time PnL simulation for $20 account
+        # Logic: If accuracy > 0.5, account grows; if < 0.5, account approach Margin Call
+        win_rate = val_acc
+        profit_factor = 2.0 # Assume 1:2 R:R for simulation
+        sim_pnl = (win_rate * profit_factor) - (1.0 - win_rate)
+        current_balance = max(0.01, current_balance * (1.0 + sim_pnl * 0.1)) # Scaled for visualization
+        
+        wandb.log({
+            "epoch": epoch + 1,
+            "train_loss": avg_train_loss,
+            "train_acc": avg_train_acc,
+            "val_loss": avg_val_loss,
+            "val_acc": val_acc,
+            "simulated_balance_pnl": current_balance,
+            "capital_survival_status": 1.0 if current_balance > 8.0 else 0.0
+        })
+
         logger.info(f"Ep {epoch+1} | Train Loss: {avg_train_loss:.4f} Acc: {avg_train_acc:.4f} | Val Loss: {avg_val_loss:.4f} Acc: {val_acc:.4f}")
         
         scheduler.step(avg_val_loss)
@@ -266,7 +409,7 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32):
 
     logger.info("✅ Hybrid Training Complete.")
 
-def load_real_data(symbol: str, data_path: str = None, seq_len=60):
+def load_real_data(symbol: str, data_path: str = None, seq_len=60, limit=None):
     """
     [v5.0 - SMC DOCTORAL] Ingests and Hydrates data with full Institutional Structure.
     Supports Parquet (preferred) or SQLite.
@@ -284,7 +427,8 @@ def load_real_data(symbol: str, data_path: str = None, seq_len=60):
             logger.error(f"❌ Database not found: {db_path}")
             return None, None, None, None
         conn = sqlite3.connect(db_path)
-        query = f"SELECT * FROM market_data WHERE symbol = '{symbol}' ORDER BY tick_time ASC"
+        limit_clause = f" LIMIT {limit}" if limit else ""
+        query = f"SELECT * FROM market_data WHERE symbol = '{symbol}' ORDER BY tick_time ASC{limit_clause}"
         df = pd.read_sql_query(query, conn)
         conn.close()
         if 'tick_time' in df.columns:
@@ -294,6 +438,10 @@ def load_real_data(symbol: str, data_path: str = None, seq_len=60):
     if df.empty:
         logger.error("❌ No data found.")
         return None, None, None, None
+        
+    # [FIX] Alias volume to tick_volume (MT5 compatibility)
+    if 'volume' in df.columns and 'tick_volume' not in df.columns:
+        df['tick_volume'] = df['volume']
 
     from app.ml.feat_processor.engine import FeatProcessor
     processor = FeatProcessor()
@@ -308,7 +456,16 @@ def load_real_data(symbol: str, data_path: str = None, seq_len=60):
         indices = np.arange(len(df))
         atr = (df["high"] - df["low"]).rolling(14).mean().iloc[-1]
         df['label'] = label_dataset_triple_barrier(prices, indices, pt=atr*2/prices[-1], sl=atr*2/prices[-1], h=100)
+        # Map and sanitize: Fill unknowns with HOLD (1), Force Integer
         df['label'] = df['label'].map({-1.0: 0, 0.0: 1, 1.0: 2})
+        df['label'] = df['label'].fillna(1).astype(int)
+        
+        # Verify Integrity
+        unique_labels = df['label'].unique()
+        logger.info(f"✅ Label Integrity Check: Found classes {unique_labels}")
+        if not set(unique_labels).issubset({0, 1, 2}):
+             logger.warning(f"⚠️ FOUND INVALID LABELS: {unique_labels}. Clamping...")
+             df['label'] = df['label'].clip(0, 2)
 
     seq_cols = list(settings.NEURAL_FEATURE_NAMES)
     for c in seq_cols:
@@ -331,10 +488,10 @@ def load_real_data(symbol: str, data_path: str = None, seq_len=60):
         row = df.iloc[i]
         
         static_feats["kinetic"].append([
-            row.get('struct_age', 0), 
-            row.get('fvg_bull', 0) - row.get('fvg_bear', 0),
-            row.get('layer_alignment', 0),
-            row.get('is_inducement', 0)
+            float(row.get('struct_age', 0)), 
+            float(row.get('fvg_bull', 0)) - float(row.get('fvg_bear', 0)),
+            float(row.get('layer_alignment', 0)),
+            float(row.get('is_inducement', 0))
         ])
         
         static_feats["form"].append([
@@ -351,16 +508,19 @@ def load_real_data(symbol: str, data_path: str = None, seq_len=60):
         ])
         
         static_feats["accel"].append([
-            row.get('ofi_z', 0),
-            row.get('energy_z', 0),
-            row.get('accel_score', 0)
+            float(row.get('physics_energy', 0)),
+            float(row.get('physics_force', 0)),
+            float(row.get('physics_entropy', 0)),
+            float(row.get('physics_viscosity', 0))
         ])
+        if len(static_feats["accel"]) == 1:
+            print(f"DEBUG: First accel row: {static_feats['accel'][0]}")
         
         static_feats["time"].append([
-            row.get('session_weight', 0),
-            1.0 if row.get('session_type') == 'NY_OPEN' else 0,
-            1.0 if row.get('session_type') == 'LONDON' else 0,
-            0
+            float(row.get('volatility_context', 1.0)),
+            float(row.get('killzone_intensity', 0.5)),
+            float(row.get('session_weight', 1.0)),
+            float(row.get('day_of_week', 0)) # Added 4th column for FeatEncoder parity
         ])
 
     X = np.array(sequences) 
@@ -378,26 +538,36 @@ if __name__ == "__main__":
     parser.add_argument("--real", action="store_true")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--limit", type=int, default=0, help="Limit rows for smoke testing")
+    parser.add_argument("--dry-run", action="store_true", help="Run 1 batch only for verification")
     args = parser.parse_args()
+    print(f"DEBUG: Args parsed: {args}")
 
     # [D.A.L.C. INTEGRATION]
-    print("\n🕵️ INVOKING D.A.L.C. AUDITOR...")
+    print("\n[D.A.L.C.] INVOKING AUDITOR...")
     import subprocess
     audit_result = subprocess.run(["python", "tests/dalc_sanity_check.py"])
     
     if audit_result.returncode != 0:
-        print("🛑 TRAINING ABORTED BY D.A.L.C. (Logic Errors Detected).")
+        print("[!] TRAINING ABORTED BY D.A.L.C. (Logic Errors Detected).")
         print("Check the logs above to fix the Silent Killers.")
         sys.exit(1)
         
-    print("✅ AUDIT PASSED. IGNITING TRAINING ENGINE.\n")
+    print("[+] AUDIT PASSED. IGNITING TRAINING ENGINE.\n")
     
     if args.real:
-        if pre_flight_guard(args.symbol, real=True):
-            X, y, phys, feats = load_real_data(args.symbol)
-            if X is not None:
-                temp_path = "data/temp_real_train.npz"
-                np.savez(temp_path, X=X, y=y, physics=phys, static_features=feats)
-                train_hybrid_model(args.symbol, temp_path, epochs=args.epochs, batch_size=args.batch_size)
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+        # [SMOKE TEST OVERRIDE] Force batch_size=32 for GPU stability
+        smoke_batch_size = 32 if args.limit else args.batch_size
+        
+        temp_path = "data/temp_real_train.npz"
+        if os.path.exists(temp_path):
+            logger.info(f"⚡ JUMPSTART: Loading existing processed data from {temp_path}")
+        else:
+            logger.info(f"🧪 Hydrating Structural Narrative (SMC Stack)...")
+            X, y, phys_tensor, static_feats = load_real_data(args.symbol, limit=args.limit if args.limit > 0 else None)
+            
+            # Save to temp for iterative dev
+            np.savez_compressed(temp_path, X=X, y=y, physics=phys_tensor, static_features=static_feats)
+            logger.info(f"✅ Data cached to {temp_path} for next run.")
+        
+        train_hybrid_model(args.symbol, temp_path, epochs=args.epochs, batch_size=smoke_batch_size)

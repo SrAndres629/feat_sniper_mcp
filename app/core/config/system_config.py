@@ -3,8 +3,10 @@ from pydantic import BaseModel
 from typing import Any
 
 class SystemSettings(BaseModel):
-    ZMQ_PORT: int = 5555
-    ZMQ_PUB_PORT: int = 5556
+    ZMQ_PORT: int = 5556  # SUB/PULL Port (Data Acquisition)
+    ZMQ_PUB_PORT: int = 5555  # PUB Port (Command Distribution)
+    ZMQ_BIND_ADDRESS: str = "0.0.0.0"
+    ZMQ_CONFLATE: bool = True
     API_HOST: str = "127.0.0.1"
     API_PORT: int = 8000
     DEBUG: bool = False

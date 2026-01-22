@@ -101,7 +101,7 @@ class BattlefieldSimulator:
                     
                 offset = random.randint(0, total_rows - n_rows - 50)
                 q = """
-                    SELECT open, high, low, close, volume as tick_volume
+                    SELECT open, high, low, close, volume
                     FROM market_data 
                     WHERE timeframe = 'M1' 
                     ORDER BY tick_time ASC 
@@ -110,7 +110,7 @@ class BattlefieldSimulator:
                 rows = conn.execute(q, {"limit": n_rows, "offset": offset}).fetchall()
                 if not rows: return None
                 
-                df = pd.DataFrame(rows, columns=['open', 'high', 'low', 'close', 'tick_volume'])
+                df = pd.DataFrame(rows, columns=['open', 'high', 'low', 'close', 'volume'])
                 # Mock missing columns for the simulation loop
                 df['mock_long_pct'] = 50 + np.sin(np.linspace(0, 10, len(df))) * 20
                 df['mock_short_pct'] = 100 - df['mock_long_pct']
@@ -264,12 +264,37 @@ class BattlefieldSimulator:
                     "liquidity_below": 1.0 if row['mock_long_pct'] > 60 else 0.0
                 }
                 
+                # [V6 GOD MODE] Generate FULL 24-Channel Array using FeatProcessor
+                # Process the current window to get all institutional features
+                from app.ml.feat_processor import feat_processor
+                
+                # Extract window for processing (last 100 bars for rolling calcs)
+                window_start = max(0, i - 100)
+                df_window = df.iloc[window_start:i+1].copy()
+                
+                # Generate 24 channels
+                df_processed = feat_processor.process_dataframe(df_window)
+                
+                # Extract the LAST row (current bar) features
+                current_row = df_processed.iloc[-1]
+                sim_features = feat_processor.compute_latent_vector(current_row)
+                
+                # Real-time inference from the 65.7% accuracy brain (NOW with 24 channels)
+                prediction = await ml_engine.predict_async(self.symbol, sim_features)
+                
                 state_vec = state_encoder.encode(
                     account_state={"balance": self.balance, "phase_name": "SURVIVAL"},
                     microstructure=micro_scanner.get_dict(),
-                    neural_probs={'scalp': 0.7, 'day': 0.5, 'swing': 0.2},
-                    physics_state={"titanium": "NEUTRAL", "feat_composite": 50.0},
-                    sentiment_state=mock_sentiment # Pass mock sentiment to encoder
+                    neural_probs={
+                        'scalp': prediction.get('p_win', 0.5), # Probability from Phase 1
+                        'day': prediction.get('directional_score', 0.5),
+                        'swing': 0.5
+                    },
+                    physics_state={
+                        "titanium": prediction.get('titanium_zone', "NEUTRAL"), 
+                        "feat_composite": prediction.get('feat_score', 50.0)
+                    },
+                    sentiment_state=mock_sentiment
                 )
                 
                 action, prob, value = policy_agent.select_action(state_vec)
@@ -280,65 +305,41 @@ class BattlefieldSimulator:
                     neural_health.log_prediction(sim_trade_id, prob, action.name)
                 
                 # [IRON FORGE] ADVERSARIAL GYM
-                # 1. Latency Simulation (The Brain vs The Wire)
-                # In real life, 200ms lag kills the perfect entry.
-                latency = random.uniform(0.05, 0.300) # 50ms to 300ms
-                time.sleep(latency) 
+                # 1. News & Liquidity Simulation
+                is_news_window = (i % random.randint(60, 120)) < 15
+                if is_news_window:
+                    slippage = random.uniform(0.02, 0.1) # Aggressive slippage
+                    latency = random.uniform(0.3, 0.8) # Significant lag
+                else:
+                    slippage = random.choice([-1, 0, 1, 2]) * 0.01
+                    latency = random.uniform(0.05, 0.3)
                 
-                # 2. Slippage / Spread Stretcher (The Broker vs You)
-                # Broker widens spread or slips you on high vol
-                tick_size = 0.01
-                slippage_ticks = random.choice([-1, 0, 1, 2]) # Biased slightly against
-                slippage = slippage_ticks * tick_size
+                time.sleep(latency / 10.0) # Scaled for sim speed
                 
                 execution_price = row['close'] + slippage if action != StrategicAction.HOLD else row['close']
                 
-                # Simulate price movement from EXECUTION PRICE (not theoretical close)
-                future_price = df['close'].iloc[min(i+10, len(df)-1)]
+                # 2. Sniper Target Analysis (High R:R)
+                look_ahead = 50 if is_news_window else 15
+                future_price = df['close'].iloc[min(i + look_ahead, len(df)-1)]
                 price_change_pct = (future_price - execution_price) / execution_price
                 
-                # Simple PnL: Action scaling
+                # [ACCOUNT MANAGEMENT] $20 Survival Protocol
                 pnl = 0.0
-                if action == StrategicAction.TWIN_SNIPER: pnl = price_change_pct * 30.0 # Aggressive
-                elif action == StrategicAction.STANDARD: pnl = price_change_pct * 15.0
-                elif action == StrategicAction.DEFENSIVE: pnl = price_change_pct * 5.0
+                if action == StrategicAction.TWIN_SNIPER: pnl = price_change_pct * (self.balance * 15.0) 
+                elif action == StrategicAction.STANDARD: pnl = price_change_pct * (self.balance * 5.0)
+                elif action == StrategicAction.DEFENSIVE: pnl = price_change_pct * (self.balance * 2.0)
                 
-                # RLAIF Critic
+                # RLAIF Critic [SNIPER 1:100 PROTOCOL]
                 trade_result = {"profit": pnl, "type": action.name}
                 reward = rlaif_critic.critique_trade(trade_result, {
-                    "feat_score": 50.0, 
+                    "feat_score": state_vec.feat_composite * 100.0, 
                     "entropy": micro_state.entropy_score,
                     "drawdown_pct": max(0, 20.0 - self.balance) / 20.0,
-                    "slippage_paid": slippage # Feed this pain to the critic if possible
+                    "initial_stop": 0.05, # Tight 5-pip stop for Sniper
+                    "is_news_event": is_news_window,
+                    "timestamp": datetime.now().isoformat()
                 })
-                
-                # [ADVERSARIAL] Penalty for High Entropy Entries
-                if micro_state.entropy_score > 0.6 and action != StrategicAction.HOLD:
-                    reward -= 2.0 # Explicit punishment for gambling in noise
-                
-                # [MACRO DISCIPLINE] Mock News Window - PEDAGOGICAL PUNISHMENT
-                # Every 60-120 steps, simulate a "news event" window (10 steps long)
-                # If agent trades during this window, MASSIVE penalty (even if trade would profit)
-                mock_news_window = (i % random.randint(60, 120)) < 10
-                if mock_news_window and action != StrategicAction.HOLD:
-                    # Agent tried to trade during "news time" - PUNISH SEVERELY
-                    reward -= 5.0  # Massive penalty for news disobedience
-                    if i % 50 == 0:
-                        logger.warning(f"⚠️ Step {i}: Agent traded during mock NEWS WINDOW! Penalty -5.0")
-                
-                # [CONTRARIAN REWARD] Reward following the liquidity bias
-                if action != StrategicAction.HOLD:
-                    # If we BUY while retail is SHORT (contrarian bullish)
-                    if action in [StrategicAction.TWIN_SNIPER, StrategicAction.STANDARD] and mock_sentiment["contrarian_score"] > 0.2:
-                        reward += 1.5 # Reward for hunting liquidity ABOVE
-                    # If we SELL while retail is LONG (contrarian bearish)
-                    elif action == StrategicAction.DEFENSIVE and mock_sentiment["contrarian_score"] < -0.2:
-                        reward += 1.5 # Reward for hunting liquidity BELOW
-                    # If we follow the herd (BUY while retail is LONG)
-                    elif action in [StrategicAction.TWIN_SNIPER, StrategicAction.STANDARD] and mock_sentiment["contrarian_score"] < -0.4:
-                        reward -= 2.0 # Heavy penalty for herd FOMO
 
-                
                 # Record (Simplified storage)
                 policy_agent.record_experience(state_vec, action, reward, state_vec, False)
                 

@@ -33,43 +33,71 @@ class RLAIFCritic:
         reason = "Neutral"
         
         # 1. Outcome vs Process Matrix (The Compass)
-        # Formula: Reward = (Profit * 1.0) - (Loss * 2.5) - (DD_Penalty) + (Entropy_Avoidance)
+        # Formula: Reward = (Profit * (R:R ^ 2)) - (Loss * Asymmetric_Penalty)
         
-        # A. Base PnL Reward (Asymmetric)
+        # A. Base Sniper Reward (Exponential R:R)
+        initial_stop = context.get("initial_stop", 0.05) # 5 pips
+        is_news = context.get("is_news_event", False)
+        
         if pnl > 0:
-            reward = 1.0 # Standard Win
-            reason = "✅ WIN: Profit Secured"
+            risk_reward = pnl / max(0.001, abs(initial_stop))
+            # Exponential Reward: Premiamos mucho más un 1:10 que diez 1:1
+            reward = 2.0 + (risk_reward ** 2) 
+            
+            # [MAESTRÍA EN NOTICIAS] Bonus for surviving and profiting from volatility
+            if is_news:
+                reward *= 2.0
+                reason = f"🚀 LEGENDARY NEWS SURVIVAL: R:R {risk_reward:.1f}x | Reward {reward:.2f}"
+            else:
+                reason = f"🎯 SNIPER WIN: R:R {risk_reward:.1f}x | Reward {reward:.2f}"
         else:
-            reward = -2.5 # Heavy Penalty for Loss (Survival Mode)
-            reason = "❌ LOSS: Capital Erosion"
+            # Penalizamos no solo perder, sino perder por "tonto" (fuera de zona)
+            if feat_score < 70:
+                reward = -15.0 # Increased penalty for rogue trades
+                reason = "❌ ROGUE LOSS: Trading against the FEAT Spectrum!"
+            else:
+                reward = -5.0 if is_news else -2.5
+                reason = f"❌ LOSS: Market violence exceeded SL {'(News Event)' if is_news else ''}"
 
-        # B. Drawdown Protection (The $20 Shield)
-        # Penalize if this trade caused or deepened a drawdown
+        # B. Drawdown Protection (The 'Drawdown Whip')
+        # User Directive: "Castigo exponencial si el balance cae >1.5% en una sesión."
+        # Here we approximate 'session' impact via the current trade's impact on balance.
         drawdown_pct = context.get("drawdown_pct", 0.0) 
-        if drawdown_pct > 0.05: # If Drawdown > 5%
-            dd_penalty = drawdown_pct * 10
+        if drawdown_pct > 0.015: # > 1.5% Drawdown is Toxic
+            # Exponential Penalty: e^(DD * 100)
+            dd_penalty = (drawdown_pct * 1000.0) ** 1.5
             reward -= dd_penalty
-            reason += f" [DD PENALTY -{dd_penalty:.2f}]"
+            reason += f" [IRON WHIP DD -{dd_penalty:.1f}]"
 
-        # C. Entropy Avoidance Bonus (The Discipline)
-        # If we stayed out (HOLD) during High Entropy, huge reward.
-        # This requires knowing if action was HOLD. 
-        # For now, if we Traded in High Entropy, we punish.
+        # C. Entropy (Indecision) Penalty [New Sovereign Spec]
+        # "Si la probabilidad oscila violentamente (0.4-0.6)" -> Punish Indecision
         entropy_score = context.get("entropy", 0.0)
-        if entropy_score > 0.6:
-            reward -= 1.0
-            reason += " [HIGH ENTROPY VIOLATION]"
-        elif entropy_score < 0.4 and pnl > 0:
-             reward += 0.5
-             reason += " [LOW ENTROPY SNIPE]"
-             
-        # D. Process Consistency
-        if feat_score > 60 and pnl > 0:
-             reward += 0.2
-             reason += " + [GOOD PROCESS]"
+        # Using entropy score directly as proxy for indecision width
+        if 0.4 < entropy_score < 0.6:
+            reward -= 2.0 
+            reason += " [INDECISION FRICTION]"
+        elif entropy_score > 0.7:
+             reward -= 5.0 # High penalty for pure chaos
+             reason += " [CHAOS VIOLATION]"
+        elif entropy_score < 0.35 and pnl > 0:
+             reward += 2.0 # Bonus for clear skies
+             reason += " [PRISTINE SNIPE]"
 
-        # Clamp Reward
-        reward = max(-1.0, min(1.0, reward))
+        # D. Inertia Friction (Time-Under-Risk)
+        # "Castigo por cada barra que un trade está abierto sin movimiento"
+        duration = context.get("duration_bars", 0)
+        if duration > 5 and pnl < 0.001: # Stagnant trade
+            friction = (duration - 5) * 0.5
+            reward -= friction
+            reason += f" [STAGNATION -{friction:.1f}]"
+             
+        # D. Process Consistency (FEAT Alignment)
+        if feat_score > 85 and pnl > 0:
+             reward *= 1.5 # Multiplier for high-confidence alignment
+             reason += " x [GOD MODE ALIGNMENT]"
+
+        # Asymmetric Clamping (No lower limit for massive failures, but capped at 100 for wins)
+        reward = min(100.0, reward)
 
         # Log structure (Experience Memory)
         experience = {

@@ -1,10 +1,9 @@
 # Heavy dependencies - CACHED LAYER (rarely changes)
 # These are ~3GB+ combined and should NOT be reinstalled on code changes
 
-# PyTorch CPU-only (much smaller than CUDA version: ~200MB vs 2GB)
-# If you have NVIDIA GPU, change to: --extra-index-url https://download.pytorch.org/whl/cu121
-torch>=2.0.0
-torchvision>=0.15.0
+# PyTorch with CUDA 12.4 support (Optimized for RTX 3060)
+# Install manually with: pip install --index-url https://download.pytorch.org/whl/cu124 torch
+# torch>=2.5.0  # Commented out - install via CUDA index above
 
 # RAG Memory (700MB+)
 chromadb>=0.5.0

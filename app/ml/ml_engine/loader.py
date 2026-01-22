@@ -18,6 +18,7 @@ class ModelLoader:
             from app.ml.models.hybrid_probabilistic import HybridProbabilistic
             
             input_dim = settings.NEURAL_INPUT_DIM
+            logger.info(f"🏗️ Initializing Hybrid Model (Dim: {settings.NEURAL_INPUT_DIM} -> {settings.NEURAL_HIDDEN_DIM})")
             model = HybridProbabilistic(
                 input_dim=input_dim, 
                 hidden_dim=settings.NEURAL_HIDDEN_DIM, 
@@ -26,7 +27,8 @@ class ModelLoader:
             
             if os.path.exists(path):
                 data = torch.load(path, map_location="cpu")
-                model.load_state_dict(data["state_dict"])
+                # [TITANIUM AUDIT] Strict loading required. Abort if dimensions mismatch.
+                model.load_state_dict(data["state_dict"], strict=True)
                 acc = data.get("best_acc", 0.0)
                 logger.info(f"Loaded HybridProbabilistic Model for {symbol} (Acc: {acc:.2f})")
             else:
