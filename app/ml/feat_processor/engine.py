@@ -98,6 +98,14 @@ class FeatProcessor:
 
         # 6. AGGRESSION / DELTA (4 Ch)
         df["buy_aggression"] = np.where(df["close"] > df["open"], df["volume"], 0) / (df["volume"] + 1e-9)
+        
+        # 7. TEMPORAL FRACTAL ENGINE (Module 05) [PHASE 12 INTEGRATION]
+        # =============================================================
+        from nexus_core.temporal_engine.engine import temporal_engine
+        df = temporal_engine.compute_temporal_tensor(df)
+        
+        # 8. MACRO / FINAL CLEANUP
+        # Ensure we don't have infinite values
         df["sell_aggression"] = np.where(df["close"] < df["open"], df["volume"], 0) / (df["volume"] + 1e-9)
         df["delta_vol_z"] = (df["buy_aggression"] - df["sell_aggression"]).rolling(20).mean()
         df["absorption_ratio"] = df["volume"] / (df["high"] - df["low"] + 1e-9)

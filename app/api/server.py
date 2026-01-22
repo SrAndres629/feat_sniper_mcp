@@ -270,10 +270,6 @@ async def get_performance_analytics():
             reason = e.get("exit_reason", "UNKNOWN")
             exit_stats[reason] = exit_stats.get(reason, 0) + 1
         
-        return PerformanceReport(
-            total_trades=len(closed),
-            win_rate=win_rate,
-            profit_factor=profit_factor,
         # [DOCTORAL] Calculate Sharpe Ratio correctly using Daily Returns
         # Technical Debt Removal: Do not treat trade series as time series.
         # 1. Aggregate PnL by Day
@@ -317,7 +313,6 @@ async def get_performance_analytics():
             avg_trade_duration_minutes=sum(e.get("duration_minutes", 0) for e in closed) / len(closed) if closed else 0,
             exit_reasons=exit_stats,
             equity_curve=equity
-        )
         )
         
     except Exception as e:

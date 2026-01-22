@@ -2,8 +2,46 @@ import pandas as pd
 import numpy as np
 from nexus_core.structure_engine import structure_engine
 from nexus_core.acceleration import acceleration_engine
-from app.ml.feat_processor.kinetics import calculate_multifractal_layers
+from nexus_core.acceleration import acceleration_engine
 from app.ml.feat_processor.space import TensorTopologist
+
+def calculate_multifractal_layers(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    [RECONSTRUCTED] Identifies Kinetic State Layers (Expansion, Compression, Acceleration).
+    Returns DataFrame with One-Hot encoded kinetic states.
+    """
+    if df.empty: return df
+    
+    # Calculate Volatility Regime
+    df["tr"] = np.maximum(
+        df["high"] - df["low"],
+        np.maximum(
+            abs(df["high"] - df["close"].shift(1)),
+            abs(df["low"] - df["close"].shift(1))
+        )
+    ).fillna(0)
+    
+    df["atr14"] = df["tr"].rolling(14).mean()
+    df["atr_slope"] = df["atr14"].diff()
+    
+    # 0: Compression (Low ATR, Flat Slope)
+    # 1: Expansion (Rising ATR)
+    # 2: Acceleration (High Momentum + Rising ATR)
+    
+    conditions = [
+        (df["atr_slope"] > 0) & (df["close"].diff().abs() > df["atr14"]), # Acceleration
+        (df["atr_slope"] > 0), # Expansion
+    ]
+    choices = [2, 1] # 0 is default (Compression)
+    
+    df["kinetic_regime"] = np.select(conditions, choices, default=0)
+    
+    # One-Hot Encoding
+    df["kinetic_is_compression"] = (df["kinetic_regime"] == 0).astype(float)
+    df["kinetic_is_expansion"] = (df["kinetic_regime"] == 1).astype(float)
+    df["kinetic_is_acceleration"] = (df["kinetic_regime"] == 2).astype(float)
+    
+    return df
 
 tensor_topologist = TensorTopologist()
 
