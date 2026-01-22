@@ -9,7 +9,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | [COMMANDER] | %(message)s")
 logger = logging.getLogger("NexusCommander")
 
-def run_training(epochs=50, gpu=True, batch_size=32, limit=0, fvg_dual=False, fractal_sync=False, **kwargs):
+def run_training(epochs=50, gpu=True, batch_size=32, limit=0, fvg_dual=False, fractal_sync=False, dry_run=False, **kwargs):
     """
     PHASE 1: THE FORGE
     Launches train_hybrid.py with Sovereign Logic.
@@ -28,8 +28,12 @@ def run_training(epochs=50, gpu=True, batch_size=32, limit=0, fvg_dual=False, fr
         cmd.append("--fvg-dual-mode")
     if fractal_sync:
         cmd.append("--fractal-time-sync")
+    if gpu:
+        cmd.append("--gpu")
     if kwargs.get('force_rehydration'):
         cmd.append("--force-rehydration")
+    if dry_run:
+        cmd.append("--dry-run")
     
     if limit > 0:
         cmd.extend(["--limit", str(limit)])
@@ -98,7 +102,8 @@ if __name__ == "__main__":
                 limit=args.limit,
                 fvg_dual=args.fvg_dual_mode,
                 fractal_sync=args.fractal_time_sync,
-                force_rehydration=args.force_rehydration
+                force_rehydration=args.force_rehydration,
+                dry_run=args.dry_run
             )
             
         elif args.mode == "war":
@@ -116,7 +121,8 @@ if __name__ == "__main__":
                 limit=args.limit,
                 fvg_dual=args.fvg_dual_mode,
                 fractal_sync=args.fractal_time_sync,
-                force_rehydration=args.force_rehydration
+                force_rehydration=args.force_rehydration,
+                dry_run=args.dry_run
             ):
                 run_war_games(episodes=args.episodes)
                 run_daemon()

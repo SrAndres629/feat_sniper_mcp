@@ -1,838 +1,321 @@
 import os
 import sys
 import torch
+import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader, Dataset
 import numpy as np
-import pandas as pd
-from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler, random_split
 from tqdm import tqdm
 import logging
-import wandb
-from typing import Dict, List, Tuple
+import argparse
 
-# Path Setup
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+# Configuración de Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s | [%(name)s] | %(levelname)s | %(message)s')
+logger = logging.getLogger("QuantumForge")
 
-# [LEVEL 50] Advanced Models & Config
-from app.ml.models.hybrid_probabilistic import HybridProbabilistic
-from nexus_training.loss import SovereignQuantLoss
-from app.core.config import settings
+# Añadir rutas
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+try:
+    from app.core.config import settings
+    from app.ml.models.hybrid_probabilistic import HybridProbabilistic
+    from nexus_training.loss import SovereignQuantLoss
+except ImportError:
+    # Fallback para ejecución directa
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
+    from app.core.config import settings
+    from app.ml.models.hybrid_probabilistic import HybridProbabilistic
+    from nexus_training.loss import SovereignQuantLoss
 
-# Logger Setup
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("HybridTrainer")
+# --- QUANTUM CURRICULUM MANAGER ---
+class QuantumCurriculum:
+    def __init__(self, total_epochs=50):
+        self.total_epochs = total_epochs
+        self.p1 = int(total_epochs * 0.3)
+        self.p2 = int(total_epochs * 0.7)
 
-# --- ADVERSARIAL HARDENING ---
-class ChaosInjector:
-    """
-    [DATA AUGMENTATION]
-    Simulates Broker hostile conditions (Slippage, Spread Spikes, Noise).
-    Makes the Neural Net robust against LiteFinance reality.
-    """
-    def __init__(self, noise_level=0.0001, spread_shock_prob=0.1):
-        self.noise = noise_level
-        self.spread_prob = spread_shock_prob
+    def get_phase_mask(self, epoch):
+        if epoch < self.p1:
+            return {"kinetic": 0.0, "spatial": 0.1, "alpha": 0.0, "name": "PHASE 1: STRUCTURAL VISION"}
+        elif epoch < self.p2:
+            return {"kinetic": 0.5, "spatial": 0.5, "alpha": 0.2, "name": "PHASE 2: MARKET DYNAMICS"}
+        else:
+            return {"kinetic": 1.0, "spatial": 1.0, "alpha": 1.0, "name": "PHASE 3: ELITE ALPHA"}
 
-    def apply(self, sequence):
-        """
-        Input: Sequence (Length, Channels)
-        Output: Augmented Sequence
-        """
-        # 1. Gaussian Noise (Jitter) - Nervous market simulation
-        if np.random.random() < 0.5:
-            noise = np.random.normal(0, self.noise, sequence.shape)
-            sequence += noise
-
-        # 2. Spread Shock / Volatility Distortion
-        if np.random.random() < self.spread_prob:
-            # Shift features to simulate extreme spread conditions
-            sequence *= (1.0 + np.random.uniform(-0.01, 0.01, sequence.shape))
-            
-        return sequence
-
-# --- DATASET ---
+# --- DATASET CON SOFT LABELS ---
 class SniperDataset(Dataset):
-    """
-    Dataset wrapper for FEAT Sniper data.
-    Now handles Heterogeneous Inputs & Chaos Augmentation.
-    """
-    def __init__(self, sequences, labels, physics, static_features: Dict[str, np.ndarray], spatial_maps: np.ndarray = None, augment=False):
-        # Keep as numpy for memory efficiency until __getitem__
-        self.sequences = sequences
-        self.labels = labels
-        self.physics = physics 
-        self.augment = augment
-        self.injector = ChaosInjector()
+    def __init__(self, X, y, physics, static_feats, soft_label_smoothing=0.1):
+        self.X = torch.FloatTensor(X)
+        y_indices = torch.LongTensor(y)
+        num_classes = 3
+        y_soft = torch.zeros(len(y), num_classes)
+        y_soft.scatter_(1, y_indices.view(-1, 1), 1)
+        y_soft = y_soft * (1.0 - soft_label_smoothing) + (soft_label_smoothing / (num_classes - 1))
+        self.y = y_soft
+        self.physics = torch.FloatTensor(physics)
         
-        # Static Bags
-        self.form = static_features.get("form", np.zeros((len(labels), 4)))
-        self.space = static_features.get("space", np.zeros((len(labels), 3)))
-        
-        # [CIRCUIT BREAKER] Auto-fix accel dimension (3 -> 4) for Physics Viscosity
-        raw_accel = static_features.get("accel", np.zeros((len(labels), 3)))
-        if hasattr(raw_accel, 'shape') and raw_accel.shape[1] == 3:
-            print("⚠️ [DATA-PATCH] Padding Accel from 3 to 4 columns (Adding Viscosity=0)")
-            padding = np.zeros((len(labels), 1))
-            self.accel = np.hstack([raw_accel, padding])
+        # Static Feats Handling
+        if isinstance(static_feats, dict):
+            self.form = torch.FloatTensor(static_feats.get('formation_vector', np.zeros((len(X), 10))))
+            self.space = torch.FloatTensor(static_feats.get('spatial_grid', np.zeros((len(X), 50))))
+            self.accel = torch.FloatTensor(static_feats.get('acceleration_matrix', np.zeros((len(X), 4))))
+            self.time = torch.FloatTensor(static_feats.get('temporal_encoding', np.zeros((len(X), 2))))
+            self.kin = torch.FloatTensor(static_feats.get('kinetic_energy', np.zeros((len(X), 1))))
         else:
-            self.accel = raw_accel
-            
-        self.time = static_features.get("time", np.zeros((len(labels), 4)))
-        self.kinetic = static_features.get("kinetic", np.zeros((len(labels), 4)))
-        
-        # Spatial Maps
-        if spatial_maps is not None:
-            self.spatial_maps = spatial_maps
-        else:
-            self.spatial_maps = np.zeros((len(labels), 1, 50, 50))
-        
-        # [V6.1 DOCTORAL] Normalize Time for Recency Weighting
-        # Range 0.0 (Oldest) to 1.0 (Newest)
-        self.norm_time = np.linspace(0, 1, len(labels))
-        
+            self.form = torch.zeros((len(X), 10))
+            self.space = torch.zeros((len(X), 50))
+            self.accel = torch.zeros((len(X), 4))
+            self.time = torch.zeros((len(X), 2))
+            self.kin = torch.zeros((len(X), 1))
+        self.spatial_map = torch.zeros((len(X), 1, 50, 50))
+
     def __len__(self):
-        return len(self.labels)
-        
+        return len(self.X)
+
     def __getitem__(self, idx):
-        # Convert to Tensor ON DEMAND (Saves RAM)
-        seq = self.sequences[idx].copy()
-        
-        # Apply Chaos in Training
-        if self.augment:
-            seq = self.injector.apply(seq)
-            
         return (
-            torch.FloatTensor(seq),
-            torch.LongTensor([self.labels[idx]]).squeeze(),
-            torch.FloatTensor([self.physics[idx]]),
-            torch.FloatTensor(self.form[idx]),
-            torch.FloatTensor(self.space[idx]),
-            torch.FloatTensor(self.accel[idx]),
-            torch.FloatTensor(self.time[idx]),
-            torch.FloatTensor(self.kinetic[idx]),
-            torch.FloatTensor(self.spatial_maps[idx]),
-            torch.FloatTensor([self.norm_time[idx]])
+            self.X[idx], self.y[idx], self.physics[idx],
+            self.form[idx], self.space[idx], self.accel[idx],
+            self.time[idx], self.kin[idx], self.spatial_map[idx]
         )
 
-# --- UTILS ---
-def pre_flight_guard(symbol: str, real: bool = False):
-    logger.info("🛡️ Running Pre-Flight Guard...")
-    os.makedirs(settings.MODELS_DIR, exist_ok=True)
-    os.makedirs("data", exist_ok=True)
-    
-    device = "CUDA" if torch.cuda.is_available() else "CPU"
-    logger.info(f"✅ Hardware check passed (Running on {device}).")
-    return True
+# --- CARGA DE DATOS ---
+def load_real_data(symbol: str, limit=0):
+    data_path = "data/temp_real_train.npz"
+    if os.path.exists(data_path):
+        logger.info(f"⚡ CACHE FOUND: Loading {data_path}...")
+        try:
+            data = np.load(data_path, allow_pickle=True)
+            X = data['X']
+            y = data['y']
+            if 'physics' in data: physics = data['physics']
+            elif 'phys' in data: physics = data['phys']
+            else: physics = np.zeros((len(X), 6))
+            
+            if 'static_features' in data and data['static_features'].shape == ():
+                static_feats = data['static_features'].item()
+            else: static_feats = {}
 
-# --- TRAINING LOOP ---
-def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fvg_dual=False, fractal_sync=False, force_cpu=False):
+            # APLICAR LÍMITE AQUÍ
+            if limit > 0:
+                logger.warning(f"⚠️ LIMIT APPLIED: Truncating dataset to {limit} rows.")
+                X, y, physics = X[:limit], y[:limit], physics[:limit]
+                # Truncar static feats si son arrays
+                for k, v in static_feats.items():
+                    if hasattr(v, '__len__') and len(v) == len(data['X']):
+                        static_feats[k] = v[:limit]
+            
+            return X, y, physics, static_feats
+        except Exception as e:
+            logger.error(f"Cache Error: {e}")
+            raise e
+    raise FileNotFoundError("Cache not found. Run hydration first.")
+
+# --- MOTOR DE ENTRENAMIENTO ---
+def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, force_cpu=False, **kwargs):
     """
-    [V6.1.3 CORTEX HARDENING] Stable Training Protocol for Laptop GPUs.
-    Implementation of 'Illegal Instruction' Defense Mechanisms.
+    [V6.2.1 QUANTUM FORGE] - STABLE I9 & GPU HYBRID
     """
-    # --- HARDWARE SECURITY LAYER ---
+    # Recoger argumentos extra
+    limit = kwargs.get('limit', 0)
+    dry_run = kwargs.get('dry_run', False)
+
+    # 1. HARDWARE SELECTION
+    use_amp = True
     if force_cpu:
         device = torch.device("cpu")
-        logger.info("⚠️ FORCED CPU MODE (User requested)")
+        scaler_device = 'cpu'
+        logger.info(f"🛡️ I9 SOVEREIGN MODE | Device: CPU (AMP Enabled) | Batch: {batch_size}")
     else:
-        try:
-            if torch.cuda.is_available():
-                device = torch.device("cuda")
-                props = torch.cuda.get_device_properties(0)
-                vram_gb = props.total_memory / 1e9
-                logger.info(f"🛡️ GPU DETECTED: {props.name} | VRAM: {vram_gb:.1f} GB")
-
-                # [PROTOCOL: CORTEX HARDENING]
-                # 1. Disable cuDNN to prevent Kernel Panics on RTX 3060 Mobile
-                # Standard cuDNN kernels can be unstable on consumer laptop GPUs under high channel density
-                torch.backends.cudnn.enabled = False 
-                logger.warning("🛡️ SECURITY: cuDNN Disabled (Avoiding Illegal Instruction Faults)")
-                
-                # 2. Force Sync for Error Tracking
-                os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-                
-                # 3. Disable TF32 (Reduces risk of illegal instructions in modern drivers)
-                torch.backends.cuda.matmul.allow_tf32 = False
-                torch.backends.cudnn.allow_tf32 = False
-
-                # 4. Auto-Scale Batch Size for Safety
-                if vram_gb < 8.0 and batch_size > 8:
-                    logger.warning(f"⚠️ VRAM Constraint ({vram_gb:.1f}GB). Downgrading Batch Size {batch_size} -> 8.")
-                    batch_size = 8
-                
-                torch.cuda.empty_cache()
-            else:
-                device = torch.device("cpu")
-        except Exception as e:
-            logger.error(f"⚠️ CUDA Critical Failure: {e}. Fallback to CPU.")
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+            scaler_device = 'cuda'
+            logger.info(f"🛡️ QUANTUM GPU MODE | Device: RTX 3060 (AMP Enabled) | Batch: {batch_size}")
+        else:
             device = torch.device("cpu")
+            scaler_device = 'cpu'
+            logger.info(f"⚠️ CPU FALLBACK | Device: CPU (AMP Enabled) | Batch: {batch_size}")
 
-    logger.info(f"🚀 Starting Hybrid Training for {symbol} on {device} | Batch: {batch_size}")
-    
-    # --- HARDWARE CONFIGURATION (STEEL-VAULT V6.1.4) ---
-    # Decouples Physical Batch (VRAM Limit) from Logical Batch (Learning Quality)
-    physical_batch_size = 4  # Ultra-safe limit for RTX 3060 Laptop
-    accumulation_steps = 8   # 4 * 8 = 32 Effective Batch Size
-    
-    if force_cpu:
-        device = torch.device("cpu")
-        logger.info("⚠️ FORCED CPU MODE (User requested)")
-    else:
-        try:
-            if torch.cuda.is_available():
-                device = torch.device("cuda")
-                props = torch.cuda.get_device_properties(0)
-                vram_gb = props.total_memory / 1e9
-                logger.info(f"🛡️ STEEL-VAULT ACTIVE | Device: {props.name} | VRAM: {vram_gb:.1f} GB")
+    # 2. DATA LOAD
+    try:
+        X, y, phys_tensor, static_feats = load_real_data(symbol, limit=limit)
+        logger.info(f"📊 Dataset Size: {len(X)}")
+    except Exception as e:
+        logger.error(f"Data Load Failed: {e}")
+        return
 
-                # [PROTOCOL: CORTEX HARDENING]
-                torch.backends.cudnn.enabled = False 
-                torch.backends.cuda.matmul.allow_tf32 = False
-                torch.backends.cudnn.allow_tf32 = False
-                torch.backends.cudnn.benchmark = False
-                torch.backends.cudnn.deterministic = True
-                
-                os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
-                torch.cuda.empty_cache()
-                
-                logger.info(f"🛡️ MICRO-BATCH ARCHITECTURE: Physical: {physical_batch_size} | Accumulation: {accumulation_steps}x | Logical Batch: {physical_batch_size*accumulation_steps}")
-            else:
-                device = torch.device("cpu")
-        except Exception as e:
-            logger.error(f"⚠️ CUDA Critical Failure: {e}. Fallback to CPU.")
-            device = torch.device("cpu")
+    dataset = SniperDataset(X, y, phys_tensor, static_feats, soft_label_smoothing=0.1)
+    
+    # Split
+    train_size = int(0.8 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-    logger.info(f"🚀 Starting Hybrid Training for {symbol} on {device}")
-    
-    # 1. Load Data logic (保持原有 robust logic)
-    # ... (skipping unchanged code for context)
-    raw_data = np.load(data_path, allow_pickle=True)
-    
-    X = raw_data['X'] 
-    y = raw_data['y'] 
-    phys = raw_data['physics']
-    
-    if 'static_features' in raw_data:
-        static_feats = raw_data['static_features'].item()
-    else:
-        static_feats = {}
-
-    # 2. Prepare Dataset & Split (VALIDATION SET ADDED)
-    # Augmentation enabled ONLY for training set
-    full_dataset = SniperDataset(X, y, phys, static_feats, augment=False)
-    
-    # Split 80/20 to prevent Overfitting
-    train_size = int(0.8 * len(full_dataset))
-    val_size = len(full_dataset) - train_size
-    print(f"DEBUG: Dataset size: {len(full_dataset)}, Train: {train_size}, Val: {val_size}")
-    train_set, val_set = random_split(full_dataset, [train_size, val_size])
-    
-    # Enable Augmentation on the training split wrapper
-    train_dataset = SniperDataset(
-        X[train_set.indices], y[train_set.indices], phys[train_set.indices], 
-        {k: v[train_set.indices] for k, v in static_feats.items()}, 
-        augment=True
-    )
-    val_dataset = SniperDataset(
-        X[val_set.indices], y[val_set.indices], phys[val_set.indices], 
-        {k: v[val_set.indices] for k, v in static_feats.items()}, 
-        augment=False
-    )
-    
-    # 3. Dynamic Sampling (Fix Class Imbalance)
-    logger.info("⚖️ Calculating Class Weights for Sampler...")
-    train_indices = train_set.indices
-    train_labels = y[train_indices]
-    
-    class_counts = np.bincount(train_labels)
-    class_weights = 1.0 / (class_counts + 1e-9)
-    sample_weights = class_weights[train_labels]
-    
-    sampler = WeightedRandomSampler(
-        weights=torch.DoubleTensor(sample_weights),
-        num_samples=len(sample_weights),
-        replacement=True
-    )
-    
-    # Loaders - Optimized for Steel-Vault Stability (Physical Batch Size 4)
-    # num_workers=0 & pin_memory=False: Essential for Windows Laptop GPUs to avoid alignment faults
+    # Workers
+    # En Windows, num_workers=0 es lo más seguro para evitar overhead y errores
+    workers = 0 
     train_loader = DataLoader(
-        train_dataset, 
-        batch_size=physical_batch_size, 
-        sampler=sampler, 
-        num_workers=0, 
-        pin_memory=False,
-        drop_last=True
+        train_dataset, batch_size=batch_size, shuffle=True, 
+        num_workers=workers, pin_memory=(device.type == 'cuda')
     )
     val_loader = DataLoader(
-        val_dataset, 
-        batch_size=physical_batch_size, 
-        shuffle=False, 
-        num_workers=0, 
-        pin_memory=False
+        val_dataset, batch_size=batch_size, shuffle=False, 
+        num_workers=workers, pin_memory=(device.type == 'cuda')
     )
-    print(f"DEBUG: Loaders initialized. Physical Batch: {physical_batch_size} | Training Batches: {len(train_loader)}")
-    
-    # 4. Initialize Model
-    seq_len = X.shape[1]
+
+    # 3. MODEL SETUP (Correct Order!)
     input_dim = X.shape[2]
     
+    # PASO 1: CREAR EL MODELO (Instanciación)
     model = HybridProbabilistic(input_dim=input_dim, hidden_dim=settings.NEURAL_HIDDEN_DIM, num_classes=3).to(device)
     
-    # 5. Loss & Optimizer (Elite Quant Grade)
-    criterion = SovereignQuantLoss(
-        k_lambda=settings.NEURAL_LOSS_KINETIC_LAMBDA, 
-        s_lambda=settings.NEURAL_LOSS_SPATIAL_LAMBDA,
-        fvg_dual_mode=fvg_dual,
-        fractal_sync=fractal_sync
-    ).to(device)
-    
-    optimizer = optim.AdamW(
-        model.parameters(), 
-        lr=settings.NEURAL_LEARNING_RATE, 
-        weight_decay=settings.NEURAL_WEIGHT_DECAY
-    )
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=3, factor=0.5)
-    
-    logger.info("Initializing Weights & Biases (W&B) Telemetry...")
-    wandb.init(
-        project="FEAT_SNIPER_XAUUSD",
-        mode="online", 
-        name=f"Hybrid_V5_Evolution_{symbol}",
-        config={
-            "learning_rate": settings.NEURAL_LEARNING_RATE,
-            "batch_size": batch_size,
-            "architecture": "TCN-BiLSTM-Probabilistic-PGU",
-            "physics_aware": True,
-            "initial_balance": 20.0,
-            "leverage": "1:1000",
-            "broker": "LiteFinance",
-            "early_stopping_patience": 7,
-            "fvg_dual_mode": fvg_dual,
-            "fractal_sync": fractal_sync
-        }
-    )
-    # [V6.1.5 AUTO-RESUME] Look for existing Micro-Batch Snapshot
-    snapshot_path = "models/checkpoints/last_batch_snapshot.pt"
-    start_epoch = 0
-    start_batch_idx = 0
-    if os.path.exists(snapshot_path):
+    # PASO 2: COMPILAR EL MODELO (Optimización)
+    # Solo intentamos compilar SI el modelo ya existe
+    if not dry_run:
         try:
-            checkpoint = torch.load(snapshot_path, map_location=device)
-            model.load_state_dict(checkpoint['model_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-            start_epoch = checkpoint['epoch']
-            start_batch_idx = checkpoint['batch_idx'] + 1
-            logger.info(f"💾 AUTO-RESUME: Found snapshot. Resuming from Epoch {start_epoch+1}, Step {start_batch_idx}.")
+            logger.info("🔥 Compiling Neural Engine (Quantum Optimization)...")
+            # Windows a veces da problemas con 'inductor', usamos 'default' o backend seguro
+            model = torch.compile(model) 
         except Exception as e:
-            logger.warning(f"⚠️ Could not load snapshot: {e}. Starting fresh.")
-    
-    # [PILOT] Watch gradients and weights (Vital Signs)
-    wandb.watch(model, log="all", log_freq=10)
-    
-    # 6. Training Loop
-    best_val_loss = float('inf')
-    early_stop_patience = 8
-    epochs_no_improve = 0
-    
+            logger.warning(f"⚠️ Compiler Bypassed: {e}. Standard Execution enabled.")
+
+    # 4. CURRICULUM & OPTIMIZER
+    curriculum = QuantumCurriculum(total_epochs=epochs)
+    criterion = SovereignQuantLoss().to(device)
+    optimizer = optim.AdamW(model.parameters(), lr=settings.NEURAL_LEARNING_RATE, weight_decay=settings.NEURAL_WEIGHT_DECAY)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=3, factor=0.5)
+    scaler = torch.amp.GradScaler(scaler_device, enabled=use_amp)
+
+    # W&B Logic
+    if not dry_run:
+        try:
+            import wandb
+            if wandb.run is None:
+                wandb.init(project=f"FEAT_SNIPER_{symbol}", name=f"Quantum_I9_B{batch_size}", reinit=True)
+        except: pass
+
+    # AUTO-RESUME LOGIC (Desactivada en Dry Run)
+    start_epoch = 0
+    checkpoint_dir = "models/checkpoints"
+    if not dry_run and os.path.exists(checkpoint_dir):
+        checkpoints = sorted([f for f in os.listdir(checkpoint_dir) if f.endswith('.pt')])
+        if checkpoints:
+            latest = checkpoints[-1]
+            try:
+                state = torch.load(os.path.join(checkpoint_dir, latest), map_location=device)
+                # Manejar si el estado es dict completo o solo pesos
+                if isinstance(state, dict) and 'model_state_dict' in state:
+                    model.load_state_dict(state['model_state_dict'])
+                    optimizer.load_state_dict(state['optimizer_state_dict'])
+                    start_epoch = state['epoch']
+                else:
+                    # Legacy load
+                    model.load_state_dict(state)
+                logger.info(f"🔄 RESUMED from {latest} (Epoch {start_epoch})")
+            except Exception as e:
+                logger.warning(f"Could not resume from {latest}: {e}")
+
+    # 5. TRAINING LOOP
+    logger.info(f"⚔️ IGNITING FORGE | BATCH: {batch_size} | EPOCHS: {epochs}")
+
     for epoch in range(start_epoch, epochs):
-        # [CURRICULUM] SLIDING BALANCE PRESSURE & ELITE ALPHA
-        # Start gentle, end strict to avoid early "Decision Paralysis" (Freeze vs Risk)
-        # Sovereign Protocol: Linear increase of elite penalties from Epoch 1 to 30
-        pressure_factor = min(1.0, (epoch + 1) / max(1, epochs // 2))
-        elite_alpha = min(1.0, (epoch + 1) / 30.0) 
-        
-        # --- TRAIN ---
+        phase_config = curriculum.get_phase_mask(epoch)
         model.train()
         train_loss = 0.0
-        train_acc = 0.0
-        total = 0
         
-        optimizer.zero_grad() # Steel-Vault: Start with clean gradients
+        progress = tqdm(train_loader, desc=f"Ep {epoch+1} [{phase_config['name'][:10]}]", leave=False)
         
-        progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} [Vault-Mode]")
-        current_balance = 20.0
-        for i, (seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map, t_norm) in enumerate(progress):
+        for batch in progress:
+            seq = batch[0].to(device)
+            label = batch[1].to(device)
             
-            # [V6.1.5] Skip batches if resuming from snapshot
-            if epoch == start_epoch and i < start_batch_idx:
-                continue
-            
-            # [REVERT] The model (HybridProbabilistic) already performs .permute(0, 2, 1) internally.
-            seq = seq.to(device)
-            label = label.to(device)
-            f_map = f_map.to(device)
-            
-            feat_input = {
-                "form": f_form.to(device), "space": f_space.to(device),
-                "accel": f_accel.to(device), "time": f_time.to(device),
-                "kinetic": f_kin.to(device), "spatial_map": f_map
-            }
-            
-            p_tensor = torch.stack([
-                f_accel[:, 0].to(device), f_accel[:, 1].to(device),
-                f_accel[:, 2].to(device), f_accel[:, 3].to(device),
-                f_time[:, 0].to(device), f_time[:, 1].to(device)
-            ], dim=1)
+            # Aux Feats
+            f_form = batch[3].to(device)
+            f_space = batch[4].to(device)
+            f_accel = batch[5].to(device)
+            f_time = batch[6].to(device)
+            f_kin = batch[7].to(device)
+            f_map = batch[8].to(device)
 
-            # [CORTEX HARDENING] NaN Guard for Forward Pass
-            try:
-                # Forward
-                outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor) 
-                logits = outputs["logits"]
-                log_var = outputs.get("log_var") 
-                
-                # [FIX 3] Bayesian Loss with Curriculum Pressure & Recency Weighting
-                base_loss = criterion(logits, label, p_tensor, x_map=f_map, current_balance=current_balance, alpha=elite_alpha, timestamps=t_norm.to(device))
-                base_loss *= pressure_factor
-                
-                if log_var is not None:
-                    loss = torch.mean(torch.exp(-log_var.squeeze()) * base_loss + 0.5 * log_var.squeeze())
-                else:
-                    loss = base_loss.mean()
-                
-                # [STEEL-VAULT] Normalize loss for accumulation steps
-                loss = loss / accumulation_steps
-                
-                # [CORTEX HARDENING] Check for Infinite Loss BEFORE Backward
-                if not torch.isfinite(loss):
-                    logger.warning(f"⚠️ Infinite Loss detected at Step {i}. Skipping Batch.")
-                    continue
-                    
-                loss.backward()
-                
-                # [STEEL-VAULT] Optimization Step Gating
-                if (i + 1) % accumulation_steps == 0:
-                    # Gradient Clipping
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    
-                    # [V6.1.5 BLACK-BOX] Save Micro-Batch Snapshot for Auto-Resume
-                    # This ensures that if the hardware fails, we don't lose hours of work.
-                    torch.save({
-                        'epoch': epoch,
-                        'batch_idx': i,
-                        'model_state_dict': model.state_dict(),
-                        'optimizer_state_dict': optimizer.state_dict(),
-                        'loss': loss.item(),
-                    }, snapshot_path)
-                
-                # Scale back for logging fidelity
-                train_loss += loss.item() * accumulation_steps
-                preds = torch.argmax(logits, dim=1)
-                correct_batch = (preds == label).sum().item()
-                train_acc += correct_batch
-                total += label.size(0)
-                
-                progress.set_postfix(loss=loss.item() * accumulation_steps)
-                
-            except RuntimeError as e:
-                if "CUDA" in str(e) or "cublas" in str(e):
-                    logger.critical(f"🛑 VAULT DEFENSE: CUDA/CUBLAS FAULT at Step {i}. Skipping Batch.")
-                    torch.cuda.empty_cache()
-                    optimizer.zero_grad()
-                    continue 
-                else:
-                    raise e
+            feat_input = { "form": f_form, "space": f_space, "accel": f_accel,
+                           "time": f_time, "kinetic": f_kin, "spatial_map": f_map }
             
-            # [TELEMETRY] MICRO-LOGGING (High Frequency - Step by Step)
-            if i % (accumulation_steps * 5) == 0:
-                # Calculate kinetic compliance
-                probs = torch.softmax(logits, dim=1)
-                kinetic_penalty = torch.mean(torch.abs(probs[:, 2] - probs[:, 0]) * (1.0 - torch.clamp(p_tensor[:, 1] / 5.0, 0.0, 1.0)))
-                
-                wandb.log({
-                    "step_loss": loss.item() * accumulation_steps,  
-                    "batch_accuracy": correct_batch / (label.size(0) + 1e-9),
-                    "physics_compliance_penalty": kinetic_penalty.item(),
-                    "Elite_Penalty_Weight": elite_alpha,
-                    "grad_norm": torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0),
-                    "learning_rate": optimizer.param_groups[0]['lr']
-                })
+            p_tensor = torch.stack([f_accel[:, 0], f_accel[:, 1], f_accel[:, 2], f_accel[:, 3],
+                                    f_time[:, 0], f_time[:, 1]], dim=1)
 
-            progress.set_postfix(loss=loss.item())
-            
-        avg_train_loss = train_loss / len(train_loader)
-        avg_train_acc = train_acc / total
-        
-        # --- VALIDATION ---
-        model.eval()
-        val_loss = 0.0
-        val_correct = 0
-        val_total = 0
-        
-        all_preds = []
-        all_targets = []
-        
-        with torch.no_grad():
-            for seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map, t_norm in val_loader:
-                seq = seq.to(device) # No transpose needed here
-                label = label.to(device)
-                f_map = f_map.to(device)
-                
-                feat_input = {
-                    "form": f_form.to(device), "space": f_space.to(device),
-                    "accel": f_accel.to(device), "time": f_time.to(device),
-                    "kinetic": f_kin.to(device), "spatial_map": f_map
-                }
-                
-                p_tensor = torch.stack([
-                    f_accel[:, 0].to(device), f_accel[:, 1].to(device),
-                    f_accel[:, 2].to(device), f_accel[:, 3].to(device),
-                    f_time[:, 0].to(device), f_time[:, 1].to(device)
-                ], dim=1)
+            optimizer.zero_grad()
 
+            # AMP Context
+            amp_dev = 'cuda' if device.type == 'cuda' else 'cpu'
+            with torch.amp.autocast(device_type=amp_dev, enabled=use_amp):
                 outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor)
                 logits = outputs["logits"]
+                loss = criterion(logits, label, p_tensor, x_map=f_map, alpha=1.0, phase_mask=phase_config)
+
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            scaler.step(optimizer)
+            scaler.update()
+            
+            train_loss += loss.item()
+            progress.set_postfix(loss=f"{loss.item():.4f}")
+
+        # Validation
+        model.eval()
+        val_loss = 0.0
+        with torch.no_grad():
+             for batch in val_loader:
+                seq = batch[0].to(device)
+                label = batch[1].to(device)
+                # Forward simplificado para val
+                f_form = batch[3].to(device); f_space = batch[4].to(device); f_accel = batch[5].to(device)
+                f_time = batch[6].to(device); f_kin = batch[7].to(device); f_map = batch[8].to(device)
+                feat_input = { "form": f_form, "space": f_space, "accel": f_accel, "time": f_time, "kinetic": f_kin, "spatial_map": f_map }
+                p_tensor = torch.stack([f_accel[:, 0], f_accel[:, 1], f_accel[:, 2], f_accel[:, 3], f_time[:, 0], f_time[:, 1]], dim=1)
                 
-                # Pass timestamps for recency-aware validation loss if needed
-                loss = criterion(logits, label, p_tensor, x_map=f_map, timestamps=t_norm.to(device)).mean()
+                with torch.amp.autocast(device_type=amp_dev, enabled=use_amp):
+                    outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor)
+                    loss = criterion(outputs["logits"], label, p_tensor, x_map=f_map, phase_mask=phase_config)
                 val_loss += loss.item()
-                
-                preds = torch.argmax(logits, dim=1)
-                all_preds.extend(preds.cpu().numpy())
-                all_targets.extend(label.cpu().numpy())
-                
-        avg_val_loss = val_loss / len(val_loader)
-        
-        # [V6.1 DOCTORAL] Institutional Metrics Calculation
-        all_targets_arr = np.array(all_targets)
-        all_preds_arr = np.array(all_preds)
-        val_acc = np.mean(all_preds_arr == all_targets_arr)
-        
-        # [V6.1 DOCTORAL] Institutional Metrics calculation
-        # Simplified PnL for Sharpe/DD: Correct = +1, Wrong = -1.5, Neutral = 0
-        pnl_series = np.where((all_preds_arr == all_targets_arr) & (all_preds_arr != 0), 1.0, 0.0)
-        pnl_series = np.where((all_preds_arr != all_targets_arr) & (all_preds_arr != 0), -1.5, pnl_series)
-        
-        equity_series = [current_balance]
-        max_eq = current_balance
-        val_max_dd = 0.0
-        for pnl in pnl_series:
-            new_eq = equity_series[-1] + pnl * 0.1
-            equity_series.append(new_eq)
-            if new_eq > max_eq: max_eq = new_eq
-            val_max_dd = max(val_max_dd, (max_eq - new_eq) / max_eq if max_eq > 0 else 0)
-        
-        current_balance = equity_series[-1]
-        val_sharpe = (np.mean(pnl_series) / (np.std(pnl_series) + 1e-9)) * np.sqrt(252) if len(pnl_series) > 1 else 0.0
 
-        wandb.log({
-            "epoch": epoch + 1,
-            "train_loss": avg_train_loss,
-            "train_acc": avg_train_acc,
-            "val_loss": avg_val_loss,
-            "val_acc": val_acc,
-            "sharpe_ratio": val_sharpe,
-            "max_drawdown": val_max_dd,
-            "simulated_balance": current_balance,
-            "capital_survival_status": 1.0 if current_balance > 8.0 else 0.0,
-            "alpha": elite_alpha
-        })
-
-        logger.info(f"Ep {epoch+1} | Loss: {avg_val_loss:.4f} Acc: {val_acc:.4f} | Sharpe: {val_sharpe:.2f} DD: {val_max_dd:.2%} | Bal: ${current_balance:.2f}")
+        avg_loss = train_loss / len(train_loader)
+        logger.info(f"🏁 Ep {epoch+1} | Loss: {avg_loss:.4f} | Val: {val_loss/len(val_loader):.4f}")
         
-        scheduler.step(avg_val_loss)
-        
-        if avg_val_loss < best_val_loss:
-            best_val_loss = avg_val_loss
-            save_path = os.path.join(settings.MODELS_DIR, f"hybrid_prob_{symbol}_v2.pt")
+        # Save (No en dry run)
+        if not dry_run:
+            if not os.path.exists(checkpoint_dir): os.makedirs(checkpoint_dir)
             torch.save({
-                "state_dict": model.state_dict(),
-                "best_acc": val_acc,
-                "config": {"input_dim": input_dim, "hidden_dim": 64}
-            }, save_path)
-            logger.info(f"💾 NEW BEST MODEL SAVED (Val Loss: {avg_val_loss:.4f})")
-            epochs_no_improve = 0
-        else:
-            epochs_no_improve += 1
-            if epochs_no_improve >= early_stop_patience:
-                logger.info("🛑 Early stopping triggered.")
-                break
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': avg_loss
+            }, f"{checkpoint_dir}/epoch_{epoch+1}.pt")
+            scheduler.step(avg_loss)
 
-    logger.info("✅ Hybrid Training Complete.")
-
-def load_real_data(symbol: str, data_path: str = None, seq_len=60, limit=None, since_time=None):
-    """
-    [v5.0 - SMC DOCTORAL] Ingests and Hydrates data with full Institutional Structure.
-    Supports Parquet (preferred) or SQLite.
-    """
-    if data_path and data_path.endswith(".parquet"):
-        logger.info(f"📂 Loading Parquet Data: {data_path}")
-        df = pd.read_parquet(data_path)
-        if 'time' in df.columns:
-            df['time'] = pd.to_datetime(df['time'])
-            df.set_index('time', inplace=True)
-    else:
-        import sqlite3
-        db_path = "data/market_data.db"
-        if not os.path.exists(db_path):
-            logger.error(f"❌ Database not found: {db_path}")
-            return None, None, None, None
-        conn = sqlite3.connect(db_path)
-        limit_clause = f" LIMIT {limit}" if limit else ""
-        
-        # [V6.1.1] Incremental Fetching logic
-        if since_time is not None:
-            # Fetch 200-candle buffer before since_time for structural continuity
-            # We want to ensure M02/M03 have context
-            buffer_query = f"""
-                SELECT * FROM (
-                    SELECT * FROM market_data 
-                    WHERE symbol = '{symbol}' AND tick_time < '{since_time}' 
-                    ORDER BY tick_time DESC LIMIT 200
-                ) ORDER BY tick_time ASC
-            """
-            delta_query = f"SELECT * FROM market_data WHERE symbol = '{symbol}' AND tick_time >= '{since_time}' ORDER BY tick_time ASC"
-            
-            df_buffer = pd.read_sql_query(buffer_query, conn)
-            df_delta = pd.read_sql_query(delta_query, conn)
-            df = pd.concat([df_buffer, df_delta]).drop_duplicates(subset=['tick_time'])
-            logger.info(f"⚡ DELTA SYNC: Fetched {len(df_delta)} new rows (+200 buffer).")
-        else:
-            query = f"SELECT * FROM market_data WHERE symbol = '{symbol}' ORDER BY tick_time ASC{limit_clause}"
-            df = pd.read_sql_query(query, conn)
-            
-        conn.close()
-        if 'tick_time' in df.columns:
-            df['tick_time'] = pd.to_datetime(df['tick_time'])
-            df.set_index('tick_time', inplace=True)
-
-    if df.empty:
-        logger.error("❌ No data found.")
-        return None, None, None, None
-        
-    # [FIX] Alias volume to tick_volume (MT5 compatibility)
-    if 'volume' in df.columns and 'tick_volume' not in df.columns:
-        df['tick_volume'] = df['volume']
-
-    from app.ml.feat_processor.engine import FeatProcessor
-    processor = FeatProcessor()
-    
-    logger.info("🧪 Hydrating Structural Narrative (SMC Stack)...")
-    df = processor.process_dataframe(df)
-    
-    if 'label' not in df.columns:
-        from nexus_training.labeling import label_dataset_triple_barrier
-        logger.info("🏷️ Labeling data with Triple Barrier protocol...")
-        prices = df['close'].values
-        indices = np.arange(len(df))
-        atr = (df["high"] - df["low"]).rolling(14).mean().iloc[-1]
-        df['label'] = label_dataset_triple_barrier(prices, indices, pt=atr*2/prices[-1], sl=atr*2/prices[-1], h=100)
-        # Map and sanitize: Fill unknowns with HOLD (1), Force Integer
-        df['label'] = df['label'].map({-1.0: 0, 0.0: 1, 1.0: 2})
-        df['label'] = df['label'].fillna(1).astype(int)
-        
-        # Verify Integrity
-        unique_labels = df['label'].unique()
-        logger.info(f"✅ Label Integrity Check: Found classes {unique_labels}")
-        if not set(unique_labels).issubset({0, 1, 2}):
-             logger.warning(f"⚠️ FOUND INVALID LABELS: {unique_labels}. Clamping...")
-             df['label'] = df['label'].clip(0, 2)
-
-    seq_cols = list(settings.NEURAL_FEATURE_NAMES)
-    for c in seq_cols:
-        if c not in df.columns: df[c] = 0.0
-    
-    df[seq_cols] = df[seq_cols].fillna(0.0)
-
-    sequences, labels, physics_vals = [], [], []
-    static_feats = {"form": [], "space": [], "accel": [], "time": [], "kinetic": []}
-    
-    data_values = df[seq_cols].values
-    label_values = df['label'].values
-    
-    logger.info(f"🌀 Generating {len(df)-seq_len} sliding windows...")
-    for i in range(seq_len, len(df)):
-        sequences.append(data_values[i-seq_len : i])
-        labels.append(int(label_values[i]))
-        physics_vals.append(0.0)
-        
-        row = df.iloc[i]
-        
-        static_feats["kinetic"].append([
-            float(row.get('struct_age', 0)), 
-            float(row.get('fvg_bull', 0)) - float(row.get('fvg_bear', 0)),
-            float(row.get('layer_alignment', 0)),
-            float(row.get('is_inducement', 0))
-        ])
-        
-        static_feats["form"].append([
-            row.get('range_pos', 0.5), 
-            row.get('in_discount', 0),
-            row.get('in_premium', 0),
-            row.get('feat_form', 0)
-        ])
-        
-        static_feats["space"].append([
-            row.get('is_eqh', 0) or row.get('is_eql', 0),
-            row.get('test_count', 0),
-            row.get('is_mitigated', 0)
-        ])
-        
-        static_feats["accel"].append([
-            float(row.get('physics_energy', 0)),
-            float(row.get('physics_force', 0)),
-            float(row.get('physics_entropy', 0)),
-            float(row.get('physics_viscosity', 0))
-        ])
-        if len(static_feats["accel"]) == 1:
-            print(f"DEBUG: First accel row: {static_feats['accel'][0]}")
-        
-        static_feats["time"].append([
-            float(row.get('volatility_context', 1.0)),
-            float(row.get('killzone_intensity', 0.5)),
-            float(row.get('session_weight', 1.0)),
-            float(row.get('day_of_week', 0)) # Added 4th column for FeatEncoder parity
-        ])
-
-    # [V6.1.1] Stitching Slicer: Return only samples >= since_time
-    if since_time is not None:
-        # We need to find the first index in the multi-channel processed df that matches or exceeds since_time
-        # But we must be careful: FeatProcessor might drop some initial rows.
-        # We'll use the tick_time index for robust slicing.
-        mask = df.index >= pd.to_datetime(since_time)
-        # However, sequences/labels/static_feats are built from the slidding window starting at seq_len
-        # We need to align the sliding window indices with the mask.
-        
-        # New robust logic:
-        # sequences[i] corresponds to df.iloc[i + seq_len]
-        # So we only keep sequences[i] if df.index[i + seq_len] > since_time
-        # (Using > since_time because since_time was the LAST sample in the previous cache)
-        pivot_time = pd.to_datetime(since_time)
-        valid_indices = []
-        for i in range(len(sequences)):
-            # The label and static features at index i correspond to the row at df index seq_len + i
-            row_time = df.index[seq_len + i]
-            if row_time > pivot_time:
-                valid_indices.append(i)
-        
-        if not valid_indices:
-            logger.warning("⚠️ No new samples found after stitching slice.")
-            return np.array([]), np.array([]), np.array([]), {k: np.array([]) for k in static_feats}
-
-        X = np.array([sequences[i] for i in valid_indices])
-        y = np.array([labels[i] for i in valid_indices])
-        phys = np.array([physics_vals[i] for i in valid_indices])
-        new_static = {}
-        for k in static_feats:
-            new_static[k] = np.array([static_feats[k][i] for i in valid_indices])
-        return X, y, phys, new_static
-
-    X = np.array(sequences) 
-    y = np.array(labels)
-    phys = np.array(physics_vals)
-    for k in static_feats:
-        static_feats[k] = np.array(static_feats[k])
-        
-    return X, y, phys, static_feats
-
+# --- ENTRY POINT CORREGIDO ---
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Quantum Forge Training")
     parser.add_argument("--symbol", type=str, default="XAUUSD")
-    parser.add_argument("--real", action="store_true")
+    parser.add_argument("--data_path", type=str, default="data/temp_real_train.npz")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--limit", type=int, default=0, help="Limit rows for smoke testing")
-    parser.add_argument("--fvg-dual-mode", action="store_true", help="Enable FVG Dual-Objective Loss")
-    parser.add_argument("--fractal-time-sync", action="store_true", help="Sync Fractal Time features")
-    parser.add_argument("--dry-run", action="store_true", help="Run 1 batch only for verification")
-    parser.add_argument("--force-rehydration", action="store_true", help="Ignore cache and re-process entire dataset")
+    parser.add_argument("--gpu", action="store_true")
+    parser.add_argument("--limit", type=int, default=0, help="Limit dataset size for debugging")
+    parser.add_argument("--dry-run", action="store_true", help="Run without saving")
+    # Argumentos legacy para compatibilidad con nexus_commander
+    parser.add_argument("--real", action="store_true")
+    parser.add_argument("--fvg-dual-mode", action="store_true")
+    parser.add_argument("--fractal-time-sync", action="store_true")
+    parser.add_argument("--force-rehydration", action="store_true")
+    
     args = parser.parse_args()
-    print(f"DEBUG: Args parsed: {args}")
-
-    # [D.A.L.C. INTEGRATION]
-    print("\n[D.A.L.C.] INVOKING AUDITOR...")
-    import subprocess
-    audit_result = subprocess.run(["python", "tests/dalc_sanity_check.py"])
     
-    if audit_result.returncode != 0:
-        print("[!] TRAINING ABORTED BY D.A.L.C. (Logic Errors Detected).")
-        print("Check the logs above to fix the Silent Killers.")
-        sys.exit(1)
-        
-    print("[+] AUDIT PASSED. IGNITING TRAINING ENGINE.\n")
-    
-    if args.real:
-        # [SMOKE TEST OVERRIDE] Force batch_size=32 for GPU stability
-        smoke_batch_size = 32 if args.limit else args.batch_size
-        
-        temp_path = "data/temp_real_train.npz"
-        do_full_hydration = True
-        cache_data = None
-        
-        if os.path.exists(temp_path) and not args.force_rehydration:
-            try:
-                cache_data = np.load(temp_path, allow_pickle=True)
-                # Check for last_time metadata
-                if 'last_time' in cache_data:
-                    cache_time = str(cache_data['last_time'])
-                    logger.info(f"⚡ CACHE FOUND: Last processed time: {cache_time}")
-                    
-                    # Check DB for newer data
-                    import sqlite3
-                    conn = sqlite3.connect("data/market_data.db")
-                    db_max = pd.read_sql_query(f"SELECT MAX(tick_time) as mt FROM market_data WHERE symbol = '{args.symbol}'", conn).iloc[0]['mt']
-                    conn.close()
-                    
-                    if db_max and str(db_max) > cache_time:
-                        logger.info(f"🚀 INCREMENTAL SYNC: New data detected ({db_max}).")
-                        X_new, y_new, phys_new, static_new = load_real_data(args.symbol, since_time=cache_time)
-                        
-                        if X_new is not None and len(X_new) > 0:
-                            logger.info(f"🔗 MERGING: Appending {len(X_new)} new samples to cache...")
-                            X = np.concatenate([cache_data['X'], X_new])
-                            y = np.concatenate([cache_data['y'], y_new])
-                            phys_tensor = np.concatenate([cache_data['physics'], phys_new])
-                            
-                            static_feats = {}
-                            cached_static = cache_data['static_features'].item()
-                            for k in cached_static:
-                                static_feats[k] = np.concatenate([cached_static[k], static_new[k]])
-                            
-                            # Update last_time to db_max
-                            last_time = db_max
-                            do_full_hydration = False
-                        else:
-                            logger.info("✅ Cache is already up to date (Delta was empty).")
-                            do_full_hydration = False
-                    else:
-                        logger.info("✅ Cache is up to date. Using JUMPSTART.")
-                        do_full_hydration = False
-                else:
-                    logger.warning("⚠️ Legacy cache found (No last_time). Forcing full hydration...")
-            except Exception as e:
-                logger.error(f"❌ Cache error: {e}. Forcing full hydration.")
-        
-        if do_full_hydration:
-            logger.info(f"🧪 Hydrating Structural Narrative (SMC Stack)...")
-            X, y, phys_tensor, static_feats = load_real_data(args.symbol, limit=args.limit if args.limit > 0 else None)
-            
-            # Fetch max time for metadata
-            import sqlite3
-            conn = sqlite3.connect("data/market_data.db")
-            last_time = pd.read_sql_query(f"SELECT MAX(tick_time) as mt FROM market_data WHERE symbol = '{args.symbol}'", conn).iloc[0]['mt']
-            conn.close()
-
-        # Save/Update Cache
-        if not do_full_hydration or (X is not None and len(X) > 0):
-            np.savez_compressed(
-                temp_path, 
-                X=X if not cache_data or do_full_hydration else cache_data['X'], 
-                y=y if not cache_data or do_full_hydration else cache_data['y'], 
-                physics=phys_tensor if not cache_data or do_full_hydration else cache_data['physics'], 
-                static_features=static_feats if not cache_data or do_full_hydration else cache_data['static_features'],
-                last_time=last_time if not cache_data or do_full_hydration else cache_data['last_time']
-            )
-            logger.info(f"✅ Cache updated at {temp_path}.")
-
-        train_hybrid_model(
-            args.symbol, 
-            temp_path, 
-            epochs=args.epochs, 
-            batch_size=smoke_batch_size,
-            fvg_dual=args.fvg_dual_mode,
-            fractal_sync=args.fractal_time_sync
-        )
+    train_hybrid_model(
+        symbol=args.symbol,
+        data_path=args.data_path,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        force_cpu=not args.gpu,
+        limit=args.limit,
+        dry_run=args.dry_run
+    )
