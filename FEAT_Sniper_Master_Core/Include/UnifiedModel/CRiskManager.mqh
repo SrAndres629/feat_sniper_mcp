@@ -21,7 +21,7 @@ public:
    bool CheckExecutionWindow(long pythonTimestampMs) {
       if(pythonTimestampMs <= 0) return true; // Loose mode if no TS
       
-      long currentMs = GetTickCount64();
+      long currentMs = (long)GetTickCount64();
       // We assume pythonTimestampMs is relative to similar clock or we use it for drift
       // In a real SRE scenario, we'd use NTP synced clocks.
       // For now, if the command is over 3 seconds old, it's stale (high risk of price gap).

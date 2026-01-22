@@ -13,6 +13,7 @@ from .io import export_parquet, export_jsonl_gz
 from nexus_core.math_engine import calculate_kalman_filter
 from nexus_core.features import feat_features
 
+from tqdm import tqdm
 logger = logging.getLogger("FeatProcessor.Engine")
 
 from nexus_core.physics_engine.engine import physics_engine
@@ -51,6 +52,7 @@ class FeatProcessor:
         df["price_sma_dist"] = (df["close"] - df["close"].rolling(50).mean()) / (df["close"].rolling(50).std() + 1e-9)
 
         # 2. PHYSICS (4 Ch)
+        print("🧪 [Hydration] Phase 3: Physics Tensor...")
         physics_res = physics_engine.compute_vectorized_physics(df)
         for col in physics_res.columns:
             if col not in df.columns:
@@ -70,6 +72,7 @@ class FeatProcessor:
         df["physics_viscosity"] = safe_assign("physics_viscosity", "physics_viscosity")
 
         # 3. STRUCTURE (3 Ch)
+        print("🧪 [Hydration] Phase 2: Structural SMC...")
         df = structure_engine.compute_feat_index(df)
         df["structural_feat_index"] = df["feat_index"] / 100.0
         df["confluence_tensor"] = df["confluence_score"] / 5.0
@@ -101,6 +104,7 @@ class FeatProcessor:
         
         # 7. TEMPORAL FRACTAL ENGINE (Module 05) [PHASE 12 INTEGRATION]
         # =============================================================
+        print("🧪 [Hydration] Phase 1: Temporal Fractal Sync...")
         from nexus_core.temporal_engine.engine import temporal_engine
         df = temporal_engine.compute_temporal_tensor(df)
         

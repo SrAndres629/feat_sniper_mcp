@@ -39,63 +39,71 @@ def detect_order_blocks(df: pd.DataFrame) -> pd.DataFrame:
     expansion_bear = (df["open"] - df["close"]) > (atr * settings.SMC_BOS_THRESHOLD)
 
     # Detect New OBs at the point of BOS
-    bull_mask = df["bos_bull"].fillna(False) & expansion_bull.fillna(False)
-    bear_mask = df["bos_bear"].fillna(False) & expansion_bear.fillna(False)
+    bull_mask = (df["bos_bull"].fillna(False) & expansion_bull.fillna(False)).values
+    bear_mask = (df["bos_bear"].fillna(False) & expansion_bear.fillna(False)).values
     
-    ob_bull_col = df.columns.get_loc("ob_bull")
-    ob_bear_col = df.columns.get_loc("ob_bear")
-    ob_top_col = df.columns.get_loc("ob_top")
-    ob_bot_col = df.columns.get_loc("ob_bottom")
-    
+    # Pre-fetch numpy arrays for performance
+    highs = df["high"].values
+    lows = df["low"].values
+    closes = df["close"].values
+
+    # 1. MARK INITIAL ACTIVE NODES
+    bull_ob_indices = []
+    bear_ob_indices = []
+
     for i in np.where(bull_mask)[0]:
         val = last_bear_idx[i]
-        if np.isnan(val): continue
-        ob_idx = int(val)
-        df.iloc[ob_idx, ob_bull_col] = 1.0 # Mark as ACTIVE
-        df.iloc[ob_idx, ob_top_col] = df.iloc[ob_idx]["high"]
-        df.iloc[ob_idx, ob_bot_col] = df.iloc[ob_idx]["low"]
+        if not np.isnan(val):
+            ob_idx = int(val)
+            df.iat[ob_idx, df.columns.get_loc("ob_bull")] = 1.0 # Mark as ACTIVE
+            df.iat[ob_idx, df.columns.get_loc("ob_top")] = highs[ob_idx]
+            df.iat[ob_idx, df.columns.get_loc("ob_bottom")] = lows[ob_idx]
+            bull_ob_indices.append(ob_idx)
 
     for i in np.where(bear_mask)[0]:
         val = last_bull_idx[i]
-        if np.isnan(val): continue
-        ob_idx = int(val)
-        df.iloc[ob_idx, ob_bear_col] = 1.0 # Mark as ACTIVE
-        df.iloc[ob_idx, ob_top_col] = df.iloc[ob_idx]["high"]
-        df.iloc[ob_idx, ob_bot_col] = df.iloc[ob_idx]["low"]
+        if not np.isnan(val):
+            ob_idx = int(val)
+            df.iat[ob_idx, df.columns.get_loc("ob_bear")] = 1.0 # Mark as ACTIVE
+            df.iat[ob_idx, df.columns.get_loc("ob_top")] = highs[ob_idx]
+            df.iat[ob_idx, df.columns.get_loc("ob_bottom")] = lows[ob_idx]
+            bear_ob_indices.append(ob_idx)
 
-    # [PERSISTENCE ENGINE] 
-    # Propagate active zones and check for mitigation/violation
-    active_bull_zones = []
-    active_bear_zones = []
+    # 2. [VECTORIZED PERSISTENCE ENGINE]
+    # For each OB, find its first mitigation or violation point using Numpy
     
-    for i in range(len(df)):
-        low, high, close = df.iloc[i]["low"], df.iloc[i]["high"], df.iloc[i]["close"]
+    # Process Bull OBs
+    for ob_idx in bull_ob_indices:
+        top = highs[ob_idx]
+        bot = lows[ob_idx]
         
-        # Add new zones to tracker
-        if df.iloc[i, ob_bull_col] == 1.0:
-            active_bull_zones.append({"top": df.iloc[i]["ob_top"], "bot": df.iloc[i]["ob_bottom"], "mitigated": False})
-        if df.iloc[i, ob_bear_col] == 1.0:
-            active_bear_zones.append({"top": df.iloc[i]["ob_top"], "bot": df.iloc[i]["ob_bottom"], "mitigated": False})
+        # Look for first touch (Low <= Top)
+        future_lows = lows[ob_idx+1:]
+        touches = np.where(future_lows <= top)[0]
+        
+        if len(touches) > 0:
+            hit_idx = ob_idx + 1 + touches[0]
+            # Check for violation (Close < Bot) at mitigation point
+            if closes[hit_idx] < bot:
+                df.iat[hit_idx, df.columns.get_loc("ob_bull")] = 3.0 # Breaker
+            else:
+                df.iat[hit_idx, df.columns.get_loc("ob_bull")] = 2.0 # Mitigated
 
-        # Check existing bull zones
-        for zone in active_bull_zones:
-            if not zone["mitigated"]:
-                 if low <= zone["top"]:
-                     zone["mitigated"] = True
-                     # If closed below bottom -> Violated (Breaker)
-                     if close < zone["bot"]:
-                         df.iloc[i, ob_bull_col] = 3.0
-                     else:
-                         df.iloc[i, ob_bull_col] = 2.0
-
-        # Check existing bear zones
-        for zone in active_bear_zones:
-            if not zone["mitigated"]:
-                if high >= zone["bot"]:
-                    zone["mitigated"] = True
-                    if close > zone["top"]:
-                        df.iloc[i, ob_bear_col] = 3.0
-                    else:
-                        df.iloc[i, ob_bear_col] = 2.0
+    # Process Bear OBs
+    for ob_idx in bear_ob_indices:
+        top = highs[ob_idx]
+        bot = lows[ob_idx]
+        
+        # Look for first touch (High >= Bot)
+        future_highs = highs[ob_idx+1:]
+        touches = np.where(future_highs >= bot)[0]
+        
+        if len(touches) > 0:
+            hit_idx = ob_idx + 1 + touches[0]
+            # Check for violation (Close > Top) at mitigation point
+            if closes[hit_idx] > top:
+                df.iat[hit_idx, df.columns.get_loc("ob_bear")] = 3.0 # Breaker
+            else:
+                df.iat[hit_idx, df.columns.get_loc("ob_bear")] = 2.0 # Mitigated
                         
     return df

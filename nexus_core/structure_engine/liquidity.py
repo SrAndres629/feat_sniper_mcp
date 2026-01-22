@@ -35,33 +35,33 @@ def detect_liquidity_pools(df: pd.DataFrame, tolerance_atr: float = 0.1) -> pd.D
     else:
         major_l_indices = []
         
+    # Collect EQH/EQL candidates as lists to avoid df.iat overhead
+    eqh_indices = []
+    eql_indices = []
+    
     # Check Highs (EQH)
     for i in range(len(major_h_indices)):
+        idx_i = major_h_indices[i]
+        val_i = highs[idx_i]
         for j in range(i + 1, len(major_h_indices)):
-            idx_i = major_h_indices[i]
             idx_j = major_h_indices[j]
-            
-            # Distance logic
-            dist = abs(highs[idx_i] - highs[idx_j])
-            current_tol = tol_values[idx_j]
-            
-            # Simple Scalar Comparison
-            if dist <= current_tol:
-                # Set flag at J (the second high)
-                # Use iat for integer index
-                df.iat[idx_j, df.columns.get_loc("is_eqh")] = True
+            if abs(val_i - highs[idx_j]) <= tol_values[idx_j]:
+                eqh_indices.append(idx_j)
                 
     # Check Lows (EQL)
     for i in range(len(major_l_indices)):
+        idx_i = major_l_indices[i]
+        val_i = lows[idx_i]
         for j in range(i + 1, len(major_l_indices)):
-            idx_i = major_l_indices[i]
             idx_j = major_l_indices[j]
-            
-            dist = abs(lows[idx_i] - lows[idx_j])
-            current_tol = tol_values[idx_j]
-            
-            if dist <= current_tol:
-                df.iat[idx_j, df.columns.get_loc("is_eql")] = True
+            if abs(val_i - lows[idx_j]) <= tol_values[idx_j]:
+                eql_indices.append(idx_j)
+
+    # Bulk update flags
+    if eqh_indices:
+        df.loc[df.index[eqh_indices], "is_eqh"] = True
+    if eql_indices:
+        df.loc[df.index[eql_indices], "is_eql"] = True
                 
     # Liquidity Magnet Force (Calculated distance to nearest pool)
     df["liq_target_h"] = df["high"].where(df["is_eqh"]).ffill()

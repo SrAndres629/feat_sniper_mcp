@@ -86,6 +86,10 @@ class SniperDataset(Dataset):
         else:
             self.spatial_maps = np.zeros((len(labels), 1, 50, 50))
         
+        # [V6.1 DOCTORAL] Normalize Time for Recency Weighting
+        # Range 0.0 (Oldest) to 1.0 (Newest)
+        self.norm_time = np.linspace(0, 1, len(labels))
+        
     def __len__(self):
         return len(self.labels)
         
@@ -106,7 +110,8 @@ class SniperDataset(Dataset):
             torch.FloatTensor(self.accel[idx]),
             torch.FloatTensor(self.time[idx]),
             torch.FloatTensor(self.kinetic[idx]),
-            torch.FloatTensor(self.spatial_maps[idx])
+            torch.FloatTensor(self.spatial_maps[idx]),
+            torch.FloatTensor([self.norm_time[idx]])
         )
 
 # --- UTILS ---
@@ -120,25 +125,43 @@ def pre_flight_guard(symbol: str, real: bool = False):
     return True
 
 # --- TRAINING LOOP ---
-def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, force_cpu=False):
-    # [V6 PRODUCTION] GPU Acceleration enabled with Pure Core Stable PyTorch
-    if force_cpu:
-        device = torch.device("cpu")
-        logger.info("⚠️ FORCED CPU MODE (User requested)")
+def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fvg_dual=False, fractal_sync=False, force_cpu=False):
+    """
+    [V6.1.2 DOCTORAL] Training Engine with Hardware Hardening.
+    Implements Adaptive VRAM Management for RTX 3060 stability.
+    """
+    # [HARDWARE HARDENING] Permanent Stability Protocol
+    if torch.cuda.is_available() and not force_cpu:
+        device = torch.device("cuda")
+        
+        # 1. Ampere Optimization (RTX 30 Series)
+        # Use Tensor Cores for max speed without critical precision loss
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        
+        # 2. Deterministic Stability
+        # 'Benchmark' searches for the fastest algorithm but consumes extra VRAM and can fail.
+        # Disabling it ensures stability on GPUs with <12GB VRAM.
+        torch.backends.cudnn.benchmark = False 
+        torch.backends.cudnn.deterministic = True
+        
+        # 3. VRAM Hygiene
+        torch.cuda.empty_cache()
+        
+        full_vram = torch.cuda.get_device_properties(0).total_memory / 1e9
+        gpu_name = torch.cuda.get_device_name(0)
+        logger.info(f"🛡️ GPU HARDENING ACTIVE | Device: {gpu_name} | VRAM: {full_vram:.1f} GB | TF32: ON")
+        
+        # [PERMANENT AUTOTUNING]
+        # Detect VRAM bottleneck (< 8GB) and auto-downscale batch if over institutional safety limits
+        if full_vram < 8.0 and batch_size > 16:
+            logger.warning(f"⚠️ VRAM {full_vram:.1f}GB detected. Auto-adjusting Batch Size {batch_size} -> 16 for stability.")
+            batch_size = 16
     else:
-        # [V6 CUDA FALLBACK] Try GPU first, fallback to CPU if cuDNN fails
-        try:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            
-            # [V6 GPU OPTIMIZATION] Clear CUDA cache before training
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-                logger.info(f"GPU: {torch.cuda.get_device_name(0)} | VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
-        except Exception as e:
-            logger.error(f"⚠️ CUDA initialization failed: {e}. Falling back to CPU.")
-            device = torch.device("cpu")
-    
-    logger.info(f"🚀 Starting Hybrid Training for {symbol} on {device}")
+        device = torch.device("cpu")
+        logger.warning("⚠️ RUNNING ON CPU. Training will be slow.")
+
+    logger.info(f"🚀 Starting Hybrid Training for {symbol} on {device} | Batch: {batch_size}")
     
     # 1. Load Data
     if not os.path.exists(data_path):
@@ -209,7 +232,9 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fo
     # 5. Loss & Optimizer (Elite Quant Grade)
     criterion = SovereignQuantLoss(
         k_lambda=settings.NEURAL_LOSS_KINETIC_LAMBDA, 
-        s_lambda=settings.NEURAL_LOSS_SPATIAL_LAMBDA
+        s_lambda=settings.NEURAL_LOSS_SPATIAL_LAMBDA,
+        fvg_dual_mode=fvg_dual,
+        fractal_sync=fractal_sync
     ).to(device)
     
     optimizer = optim.AdamW(
@@ -232,7 +257,9 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fo
             "initial_balance": 20.0,
             "leverage": "1:1000",
             "broker": "LiteFinance",
-            "early_stopping_patience": 7
+            "early_stopping_patience": 7,
+            "fvg_dual_mode": fvg_dual,
+            "fractal_sync": fractal_sync
         }
     )
     # [PILOT] Watch gradients and weights (Vital Signs)
@@ -258,7 +285,7 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fo
         
         progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} [Train]")
         current_balance = 20.0
-        for i, (seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map) in enumerate(progress):
+        for i, (seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map, t_norm) in enumerate(progress):
             
             # [REVERT] The model (HybridProbabilistic) already performs .permute(0, 2, 1) internally.
             # Passing (Batch, Length, Channels) ensures the model's TCN sees (Batch, Channels, Length).
@@ -293,9 +320,9 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fo
             logits = outputs["logits"]
             log_var = outputs.get("log_var") # Aleatoric Uncertainty
             
-            # [FIX 3] Bayesian Loss with Curriculum Pressure
+            # [FIX 3] Bayesian Loss with Curriculum Pressure & Recency Weighting
             # Custom pressure_factor passed to handle early exploration vs late survival
-            base_loss = criterion(logits, label, p_tensor, x_map=f_map, current_balance=current_balance, alpha=elite_alpha)
+            base_loss = criterion(logits, label, p_tensor, x_map=f_map, current_balance=current_balance, alpha=elite_alpha, timestamps=t_norm.to(device))
             base_loss *= pressure_factor
             
             if log_var is not None:
@@ -338,8 +365,11 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fo
         val_correct = 0
         val_total = 0
         
+        all_preds = []
+        all_targets = []
+        
         with torch.no_grad():
-            for seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map in val_loader:
+            for seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map, t_norm in val_loader:
                 seq = seq.to(device) # No transpose needed here
                 label = label.to(device)
                 f_map = f_map.to(device)
@@ -359,35 +389,52 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fo
                 outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor)
                 logits = outputs["logits"]
                 
-                loss = criterion(logits, label, p_tensor, x_map=f_map).mean()
+                # Pass timestamps for recency-aware validation loss if needed
+                loss = criterion(logits, label, p_tensor, x_map=f_map, timestamps=t_norm.to(device)).mean()
                 val_loss += loss.item()
                 
                 preds = torch.argmax(logits, dim=1)
-                val_correct += (preds == label).sum().item()
-                val_total += label.size(0)
+                all_preds.extend(preds.cpu().numpy())
+                all_targets.extend(label.cpu().numpy())
                 
         avg_val_loss = val_loss / len(val_loader)
-        val_acc = val_correct / val_total
         
-        # [TELEMETRY] MACRO-LOGGING (Evolutionary Pulse)
-        # Real-time PnL simulation for $20 account
-        # Logic: If accuracy > 0.5, account grows; if < 0.5, account approach Margin Call
-        win_rate = val_acc
-        profit_factor = 2.0 # Assume 1:2 R:R for simulation
-        sim_pnl = (win_rate * profit_factor) - (1.0 - win_rate)
-        current_balance = max(0.01, current_balance * (1.0 + sim_pnl * 0.1)) # Scaled for visualization
+        # [V6.1 DOCTORAL] Institutional Metrics Calculation
+        all_targets_arr = np.array(all_targets)
+        all_preds_arr = np.array(all_preds)
+        val_acc = np.mean(all_preds_arr == all_targets_arr)
         
+        # [V6.1 DOCTORAL] Institutional Metrics calculation
+        # Simplified PnL for Sharpe/DD: Correct = +1, Wrong = -1.5, Neutral = 0
+        pnl_series = np.where((all_preds_arr == all_targets_arr) & (all_preds_arr != 0), 1.0, 0.0)
+        pnl_series = np.where((all_preds_arr != all_targets_arr) & (all_preds_arr != 0), -1.5, pnl_series)
+        
+        equity_series = [current_balance]
+        max_eq = current_balance
+        val_max_dd = 0.0
+        for pnl in pnl_series:
+            new_eq = equity_series[-1] + pnl * 0.1
+            equity_series.append(new_eq)
+            if new_eq > max_eq: max_eq = new_eq
+            val_max_dd = max(val_max_dd, (max_eq - new_eq) / max_eq if max_eq > 0 else 0)
+        
+        current_balance = equity_series[-1]
+        val_sharpe = (np.mean(pnl_series) / (np.std(pnl_series) + 1e-9)) * np.sqrt(252) if len(pnl_series) > 1 else 0.0
+
         wandb.log({
             "epoch": epoch + 1,
             "train_loss": avg_train_loss,
             "train_acc": avg_train_acc,
             "val_loss": avg_val_loss,
             "val_acc": val_acc,
-            "simulated_balance_pnl": current_balance,
-            "capital_survival_status": 1.0 if current_balance > 8.0 else 0.0
+            "sharpe_ratio": val_sharpe,
+            "max_drawdown": val_max_dd,
+            "simulated_balance": current_balance,
+            "capital_survival_status": 1.0 if current_balance > 8.0 else 0.0,
+            "alpha": elite_alpha
         })
 
-        logger.info(f"Ep {epoch+1} | Train Loss: {avg_train_loss:.4f} Acc: {avg_train_acc:.4f} | Val Loss: {avg_val_loss:.4f} Acc: {val_acc:.4f}")
+        logger.info(f"Ep {epoch+1} | Loss: {avg_val_loss:.4f} Acc: {val_acc:.4f} | Sharpe: {val_sharpe:.2f} DD: {val_max_dd:.2%} | Bal: ${current_balance:.2f}")
         
         scheduler.step(avg_val_loss)
         
@@ -409,7 +456,7 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fo
 
     logger.info("✅ Hybrid Training Complete.")
 
-def load_real_data(symbol: str, data_path: str = None, seq_len=60, limit=None):
+def load_real_data(symbol: str, data_path: str = None, seq_len=60, limit=None, since_time=None):
     """
     [v5.0 - SMC DOCTORAL] Ingests and Hydrates data with full Institutional Structure.
     Supports Parquet (preferred) or SQLite.
@@ -428,8 +475,28 @@ def load_real_data(symbol: str, data_path: str = None, seq_len=60, limit=None):
             return None, None, None, None
         conn = sqlite3.connect(db_path)
         limit_clause = f" LIMIT {limit}" if limit else ""
-        query = f"SELECT * FROM market_data WHERE symbol = '{symbol}' ORDER BY tick_time ASC{limit_clause}"
-        df = pd.read_sql_query(query, conn)
+        
+        # [V6.1.1] Incremental Fetching logic
+        if since_time is not None:
+            # Fetch 200-candle buffer before since_time for structural continuity
+            # We want to ensure M02/M03 have context
+            buffer_query = f"""
+                SELECT * FROM (
+                    SELECT * FROM market_data 
+                    WHERE symbol = '{symbol}' AND tick_time < '{since_time}' 
+                    ORDER BY tick_time DESC LIMIT 200
+                ) ORDER BY tick_time ASC
+            """
+            delta_query = f"SELECT * FROM market_data WHERE symbol = '{symbol}' AND tick_time >= '{since_time}' ORDER BY tick_time ASC"
+            
+            df_buffer = pd.read_sql_query(buffer_query, conn)
+            df_delta = pd.read_sql_query(delta_query, conn)
+            df = pd.concat([df_buffer, df_delta]).drop_duplicates(subset=['tick_time'])
+            logger.info(f"⚡ DELTA SYNC: Fetched {len(df_delta)} new rows (+200 buffer).")
+        else:
+            query = f"SELECT * FROM market_data WHERE symbol = '{symbol}' ORDER BY tick_time ASC{limit_clause}"
+            df = pd.read_sql_query(query, conn)
+            
         conn.close()
         if 'tick_time' in df.columns:
             df['tick_time'] = pd.to_datetime(df['tick_time'])
@@ -523,6 +590,39 @@ def load_real_data(symbol: str, data_path: str = None, seq_len=60, limit=None):
             float(row.get('day_of_week', 0)) # Added 4th column for FeatEncoder parity
         ])
 
+    # [V6.1.1] Stitching Slicer: Return only samples >= since_time
+    if since_time is not None:
+        # We need to find the first index in the multi-channel processed df that matches or exceeds since_time
+        # But we must be careful: FeatProcessor might drop some initial rows.
+        # We'll use the tick_time index for robust slicing.
+        mask = df.index >= pd.to_datetime(since_time)
+        # However, sequences/labels/static_feats are built from the slidding window starting at seq_len
+        # We need to align the sliding window indices with the mask.
+        
+        # New robust logic:
+        # sequences[i] corresponds to df.iloc[i + seq_len]
+        # So we only keep sequences[i] if df.index[i + seq_len] > since_time
+        # (Using > since_time because since_time was the LAST sample in the previous cache)
+        pivot_time = pd.to_datetime(since_time)
+        valid_indices = []
+        for i in range(len(sequences)):
+            # The label and static features at index i correspond to the row at df index seq_len + i
+            row_time = df.index[seq_len + i]
+            if row_time > pivot_time:
+                valid_indices.append(i)
+        
+        if not valid_indices:
+            logger.warning("⚠️ No new samples found after stitching slice.")
+            return np.array([]), np.array([]), np.array([]), {k: np.array([]) for k in static_feats}
+
+        X = np.array([sequences[i] for i in valid_indices])
+        y = np.array([labels[i] for i in valid_indices])
+        phys = np.array([physics_vals[i] for i in valid_indices])
+        new_static = {}
+        for k in static_feats:
+            new_static[k] = np.array([static_feats[k][i] for i in valid_indices])
+        return X, y, phys, new_static
+
     X = np.array(sequences) 
     y = np.array(labels)
     phys = np.array(physics_vals)
@@ -539,7 +639,10 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--limit", type=int, default=0, help="Limit rows for smoke testing")
+    parser.add_argument("--fvg-dual-mode", action="store_true", help="Enable FVG Dual-Objective Loss")
+    parser.add_argument("--fractal-time-sync", action="store_true", help="Sync Fractal Time features")
     parser.add_argument("--dry-run", action="store_true", help="Run 1 batch only for verification")
+    parser.add_argument("--force-rehydration", action="store_true", help="Ignore cache and re-process entire dataset")
     args = parser.parse_args()
     print(f"DEBUG: Args parsed: {args}")
 
@@ -560,14 +663,79 @@ if __name__ == "__main__":
         smoke_batch_size = 32 if args.limit else args.batch_size
         
         temp_path = "data/temp_real_train.npz"
-        if os.path.exists(temp_path):
-            logger.info(f"⚡ JUMPSTART: Loading existing processed data from {temp_path}")
-        else:
+        do_full_hydration = True
+        cache_data = None
+        
+        if os.path.exists(temp_path) and not args.force_rehydration:
+            try:
+                cache_data = np.load(temp_path, allow_pickle=True)
+                # Check for last_time metadata
+                if 'last_time' in cache_data:
+                    cache_time = str(cache_data['last_time'])
+                    logger.info(f"⚡ CACHE FOUND: Last processed time: {cache_time}")
+                    
+                    # Check DB for newer data
+                    import sqlite3
+                    conn = sqlite3.connect("data/market_data.db")
+                    db_max = pd.read_sql_query(f"SELECT MAX(tick_time) as mt FROM market_data WHERE symbol = '{args.symbol}'", conn).iloc[0]['mt']
+                    conn.close()
+                    
+                    if db_max and str(db_max) > cache_time:
+                        logger.info(f"🚀 INCREMENTAL SYNC: New data detected ({db_max}).")
+                        X_new, y_new, phys_new, static_new = load_real_data(args.symbol, since_time=cache_time)
+                        
+                        if X_new is not None and len(X_new) > 0:
+                            logger.info(f"🔗 MERGING: Appending {len(X_new)} new samples to cache...")
+                            X = np.concatenate([cache_data['X'], X_new])
+                            y = np.concatenate([cache_data['y'], y_new])
+                            phys_tensor = np.concatenate([cache_data['physics'], phys_new])
+                            
+                            static_feats = {}
+                            cached_static = cache_data['static_features'].item()
+                            for k in cached_static:
+                                static_feats[k] = np.concatenate([cached_static[k], static_new[k]])
+                            
+                            # Update last_time to db_max
+                            last_time = db_max
+                            do_full_hydration = False
+                        else:
+                            logger.info("✅ Cache is already up to date (Delta was empty).")
+                            do_full_hydration = False
+                    else:
+                        logger.info("✅ Cache is up to date. Using JUMPSTART.")
+                        do_full_hydration = False
+                else:
+                    logger.warning("⚠️ Legacy cache found (No last_time). Forcing full hydration...")
+            except Exception as e:
+                logger.error(f"❌ Cache error: {e}. Forcing full hydration.")
+        
+        if do_full_hydration:
             logger.info(f"🧪 Hydrating Structural Narrative (SMC Stack)...")
             X, y, phys_tensor, static_feats = load_real_data(args.symbol, limit=args.limit if args.limit > 0 else None)
             
-            # Save to temp for iterative dev
-            np.savez_compressed(temp_path, X=X, y=y, physics=phys_tensor, static_features=static_feats)
-            logger.info(f"✅ Data cached to {temp_path} for next run.")
-        
-        train_hybrid_model(args.symbol, temp_path, epochs=args.epochs, batch_size=smoke_batch_size)
+            # Fetch max time for metadata
+            import sqlite3
+            conn = sqlite3.connect("data/market_data.db")
+            last_time = pd.read_sql_query(f"SELECT MAX(tick_time) as mt FROM market_data WHERE symbol = '{args.symbol}'", conn).iloc[0]['mt']
+            conn.close()
+
+        # Save/Update Cache
+        if not do_full_hydration or (X is not None and len(X) > 0):
+            np.savez_compressed(
+                temp_path, 
+                X=X if not cache_data or do_full_hydration else cache_data['X'], 
+                y=y if not cache_data or do_full_hydration else cache_data['y'], 
+                physics=phys_tensor if not cache_data or do_full_hydration else cache_data['physics'], 
+                static_features=static_feats if not cache_data or do_full_hydration else cache_data['static_features'],
+                last_time=last_time if not cache_data or do_full_hydration else cache_data['last_time']
+            )
+            logger.info(f"✅ Cache updated at {temp_path}.")
+
+        train_hybrid_model(
+            args.symbol, 
+            temp_path, 
+            epochs=args.epochs, 
+            batch_size=smoke_batch_size,
+            fvg_dual=args.fvg_dual_mode,
+            fractal_sync=args.fractal_time_sync
+        )

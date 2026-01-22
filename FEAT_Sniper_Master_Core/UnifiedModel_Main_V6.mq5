@@ -173,8 +173,8 @@ void OnTick() {
    json += "\"ask\":" + DoubleToString(tick.ask, _Digits) + ",";
    
    // Flow Dynamics
-   json += "\"tick_vol\":" + IntegerToString(tick.tick_volume) + ",";
-   json += "\"real_vol\":" + IntegerToString(tick.volume) + ",";
+   json += "\"tick_vol\":" + IntegerToString((long)tick.volume) + ",";
+   json += "\"real_vol\":" + DoubleToString(tick.volume_real, 2) + ",";
    
    // Candle Structure (Live)
    json += "\"open\":" + DoubleToString(open, _Digits) + ",";

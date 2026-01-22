@@ -6,6 +6,7 @@ from app.ml.feat_processor.vectorized_tensor import VectorizedChronosProcessor
 from app.ml.feat_processor.macro import MacroTensorFactory
 
 from nexus_core.physics_engine.engine import physics_engine
+from tqdm import tqdm
 
 class AlphaTensorOrchestrator:
     """
@@ -36,12 +37,14 @@ class AlphaTensorOrchestrator:
              df = df.sort_index()
 
         # 1. TEMPORAL & LIQUIDITY VECTORIZATION
+        print("🧪 [Hydration] Phase 1: Temporal & Liquidity...")
         df = self.chronos.process(df)
         
         # [CRITICAL] Force clean index after chronos
         df = df.reset_index(drop=True)
         
         # 2. STRUCTURAL TOPOLOGY (Vectorized SMC)
+        print("🧪 [Hydration] Phase 2: Structural Topology...")
         struct_res = self.structure.compute_feat_index(df)
         
         # [CRITICAL] Ensure struct_res has same length as df before concat
@@ -58,6 +61,7 @@ class AlphaTensorOrchestrator:
                 df[col] = struct_res[col].values
 
         # 3. PHYSICS CORE (Vectorized Newton/Thermodynamics)
+        print("🧪 [Hydration] Phase 3: Physics Core...")
         physics_res = physics_engine.compute_vectorized_physics(df)
         physics_res = physics_res.reset_index(drop=True)
         
@@ -66,55 +70,32 @@ class AlphaTensorOrchestrator:
             if col not in df.columns:
                 df[col] = physics_res[col].values
 
-        # 4. PROBABILISTIC REGIME GATING (Physics-Driven Heuristic Head)
-        # This simulates the "Neural Output" for the Risk Engine using fundamental laws.
-        # In the future, this is replaced by the actual Model Inference.
+        # 4. PROBABILISTIC REGIME GATING (Vectorized Acceleration)
+        print("🧪 [Hydration] Phase 4: Regime Gating...")
         
         atr = (df["high"] - df["low"]).rolling(14).mean().ffill()
         
-        # P(Scalp): High Force (F=ma) + High Entropy (Volatility) + Killzone
-        # Logic: Scalping needs violence (Force) and Opportunity (Entropy/Killzone)
-        
         # [CRITICAL ALIGNMENT] Ensure variables share same index before math
-        # [NUCLEAR OPTION] Force Flattened Numpy Arrays to bypass Pandas Checks
-        force = np.array(df["feat_force"].values).flatten()
-        killzone = np.array(df["killzone_intensity"].values).flatten()
-        entropy = np.array(df["physics_entropy"].values).flatten()
+        force = df["feat_force"].values
+        killzone = df["killzone_intensity"].values
+        entropy = df["physics_entropy"].values
+        energy = df["physics_energy"].values
+        confluence = df["confluence_score"].values
+        viscosity = df["physics_viscosity"].values
         
-        # Ensure shapes match (min length)
-        min_len = min(len(force), len(killzone), len(entropy))
-        raw_scalp = force[:min_len] * killzone[:min_len] * entropy[:min_len]
+        # Scale & Clip using Numpy (Bypass df.iloc overhead)
+        raw_scalp = np.clip(force * killzone * entropy, 0, 1)
+        raw_day = np.clip(energy * confluence * (1.0 - viscosity), 0, 1)
         
-        df["p_scalp"] = 0.0
-        df.iloc[:min_len, df.columns.get_loc("p_scalp")] = np.clip(raw_scalp, 0, 1)
-        
-        # P(DayTrade): Sustained Energy + Structural Confluence - Viscosity
-        # Logic: Day trading needs clean moves (Low Viscosity) and Structure
-        energy = np.array(df["physics_energy"].values).flatten()
-        confluence = np.array(df["confluence_score"].values).flatten()
-        viscosity = np.array(df["physics_viscosity"].values).flatten()
-        
-        min_len_day = min(len(energy), len(confluence), len(viscosity))
-        raw_day = energy[:min_len_day] * confluence[:min_len_day] * (1.0 - viscosity[:min_len_day])
-        
-        df["p_daytrade"] = 0.0
-        df.iloc[:min_len_day, df.columns.get_loc("p_daytrade")] = np.clip(raw_day, 0, 1)
-        
-        # P(Swing): Massive Structural Displacement + Low Entropy (Order) + Macro Alignment
-        # Logic: Swing needs Order (Low Entropy) and major Structural/Macro shifts
         if "struct_displacement_z" in df.columns:
-            # [NUCLEAR OPTION] Pure Numpy to bypass Pandas alignment
-            struct_disp = np.array(df["struct_displacement_z"].values).flatten()
-            phys_entropy = np.array(df["physics_entropy"].values).flatten()
-            
-            entropy_factor = 1.0 - phys_entropy
-            raw_swing = np.abs(struct_disp) * entropy_factor
-            
-            df["p_swing"] = 0.0
-            min_len_swing = min(len(raw_swing), len(df))
-            df.iloc[:min_len_swing, df.columns.get_loc("p_swing")] = np.clip(raw_swing[:min_len_swing], 0, 1)
+            struct_disp = df["struct_displacement_z"].values
+            raw_swing = np.clip(np.abs(struct_disp) * (1.0 - entropy), 0, 1)
         else:
-            df["p_swing"] = 0.1
+            raw_swing = np.full(len(df), 0.1)
+            
+        df["p_scalp"] = raw_scalp
+        df["p_daytrade"] = raw_day
+        df["p_swing"] = raw_swing
             
         # Normalize Probabilities (Softmax-ish) - Use .values for safety
         p_scalp = np.array(df["p_scalp"].values).flatten()

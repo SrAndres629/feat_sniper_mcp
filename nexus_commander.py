@@ -9,7 +9,7 @@ from datetime import datetime
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | [COMMANDER] | %(message)s")
 logger = logging.getLogger("NexusCommander")
 
-def run_training(epochs=50, gpu=True, batch_size=32, limit=0):
+def run_training(epochs=50, gpu=True, batch_size=32, limit=0, fvg_dual=False, fractal_sync=False, **kwargs):
     """
     PHASE 1: THE FORGE
     Launches train_hybrid.py with Sovereign Logic.
@@ -23,6 +23,13 @@ def run_training(epochs=50, gpu=True, batch_size=32, limit=0):
         "--epochs", str(epochs),
         "--batch_size", str(batch_size)
     ]
+    
+    if fvg_dual:
+        cmd.append("--fvg-dual-mode")
+    if fractal_sync:
+        cmd.append("--fractal-time-sync")
+    if kwargs.get('force_rehydration'):
+        cmd.append("--force-rehydration")
     
     if limit > 0:
         cmd.extend(["--limit", str(limit)])
@@ -72,8 +79,11 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=0, help="Limit dataset size (0 for full dataset).")
     parser.add_argument("--symbol", type=str, default="XAUUSD", help="Target trading symbol.")
     parser.add_argument("--gpu", action="store_true", help="Force CUDA acceleration if available.")
+    parser.add_argument("--fvg-dual-mode", action="store_true", help="Enable FVG Dual-Objective Loss in training.")
+    parser.add_argument("--fractal-time-sync", action="store_true", help="Enable Fractal Time Dimension synchronization.")
     parser.add_argument("--episodes", type=int, default=100, help="Number of episodes for War Games (RL).")
     parser.add_argument("--dry-run", action="store_true", help="Audit configuration without engaging engine.")
+    parser.add_argument("--force-rehydration", action="store_true", help="Force full data refresh and bypass cache.")
     
     args = parser.parse_args()
     
@@ -85,7 +95,10 @@ if __name__ == "__main__":
                 epochs=args.epochs, 
                 gpu=args.gpu, 
                 batch_size=args.batch_size, 
-                limit=args.limit
+                limit=args.limit,
+                fvg_dual=args.fvg_dual_mode,
+                fractal_sync=args.fractal_time_sync,
+                force_rehydration=args.force_rehydration
             )
             
         elif args.mode == "war":
@@ -96,7 +109,15 @@ if __name__ == "__main__":
             
         elif args.mode == "full_auto":
             logger.info("🚀 FULL AUTO SEQUENCE INITIATED: [Forge -> War Games -> Daemon]")
-            if run_training(epochs=args.epochs, gpu=args.gpu, batch_size=args.batch_size, limit=args.limit):
+            if run_training(
+                epochs=args.epochs, 
+                gpu=args.gpu, 
+                batch_size=args.batch_size, 
+                limit=args.limit,
+                fvg_dual=args.fvg_dual_mode,
+                fractal_sync=args.fractal_time_sync,
+                force_rehydration=args.force_rehydration
+            ):
                 run_war_games(episodes=args.episodes)
                 run_daemon()
                 

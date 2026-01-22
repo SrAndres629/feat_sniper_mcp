@@ -14,17 +14,21 @@ class SovereignQuantLoss(nn.Module):
     4. Killzone Gravity: 2.5x impact during London/NY.
     5. Drawdown Awareness: Scales with margin pressure.
     """
-    def __init__(self, weight=None, gamma_focal=2.0, k_lambda=0.6, s_lambda=0.4):
+    def __init__(self, weight=None, gamma_focal=2.0, k_lambda=0.6, s_lambda=0.4, fvg_dual_mode=False, fractal_sync=False, temporal_decay=0.01):
         super(SovereignQuantLoss, self).__init__()
         self.ce_loss = nn.CrossEntropyLoss(weight=weight, reduction='none')
         self.gamma_focal = gamma_focal
         self.k_lambda = k_lambda
         self.s_lambda = s_lambda
+        self.fvg_dual_mode = fvg_dual_mode
+        self.fractal_sync = fractal_sync
+        self.temporal_decay = temporal_decay
         
-    def forward(self, pred, target, physics_tensor, x_map=None, current_balance=20.0, alpha=1.0):
+    def forward(self, pred, target, physics_tensor, x_map=None, current_balance=20.0, alpha=1.0, timestamps=None):
         """
         physics_tensor: (Batch, 6) -> [Energy, Force, Entropy, Viscosity, Volatility, Intensity]
         alpha: Curriculum factor (0.0 to 1.0) to scale the intensity of elite penalties.
+        timestamps: (Batch,) normalized or raw timestamps for recency weighting.
         """
         # 1. BASE CLASSIFICATION with Focal Adjustment
         ce_raw = self.ce_loss(pred, target)
@@ -63,8 +67,8 @@ class SovereignQuantLoss(nn.Module):
         # Higher volatility = Lower learning weight (to ignore news noise)
         vol_weight = 1.0 / (1.0 + torch.clamp(volatility, 0.0, 5.0))
         
-        # 5. KILLZONE GRAVITY (2.5x impact)
-        temporal_weight = 1.0 + (intensity * 1.5)
+        # 5. KILLZONE GRAVITY (2.5x impact + Fractal Sync)
+        temporal_weight = 1.0 + (intensity * (2.5 if self.fractal_sync else 1.5))
         
         # 6. KINETIC & SPATIAL PENALTIES
         prob_dir = probs[:, 2] - probs[:, 0]
@@ -89,6 +93,14 @@ class SovereignQuantLoss(nn.Module):
             total_density = top_density + bottom_density + 1e-9
             spatial_loss = (probs[:, 2] * (top_density / total_density)) + \
                           (probs[:, 0] * (bottom_density / total_density))
+            
+            # [DOCTORAL] FVG DUAL-OBJECTIVE
+            if self.fvg_dual_mode:
+                # Penalize BUY if price is at Top Density (potentially hitting Supply FVG)
+                # Penalize SELL if price is at Bottom Density (potentially hitting Demand FVG)
+                fvg_penalty = (probs[:, 2] * (top_density / total_density) * 2.0) + \
+                              (probs[:, 0] * (bottom_density / total_density) * 2.0)
+                spatial_loss += fvg_penalty
 
         # [ZERO-DAY PROTOCOL] 2. Stagnation Penalty (Time-Under-Risk)
         # Condition: Low Volatility (Dead Market) + Model is In-Trade (Buy/Sell)
@@ -112,10 +124,25 @@ class SovereignQuantLoss(nn.Module):
         pressure_raw = 20.0 / (balance_tensor - MARGIN_PER_001 + 1e-9)
         balance_pressure = torch.clamp(pressure_raw, 1.0, 10.0)
 
+        # [V6.1 DOCTORAL] TEMPORAL IMPORTANCE (RECENCY)
+        # Formula: W(t) = exp(alpha * (t - max_t))
+        # This makes recent errors much more expensive than old ones.
+        temporal_importance = torch.ones_like(ce_raw)
+        if timestamps is not None:
+            # Assume timestamps are scaled 0-1 (0: Oldest, 1: Newest)
+            # We use alpha * (t - 1) to decay from 1 (newest) down to exp(-alpha)
+            # Actually, let's use a simpler exponential decay from the max in batch
+            max_ts = torch.max(timestamps)
+            # temporal_decay controls how much we "forget" the past
+            # range: [exp(-decay * offset), 1.0]
+            temporal_importance = torch.exp(self.temporal_decay * (timestamps - max_ts))
+            # Rescale to ensure average loss is preserved (Stability)
+            temporal_importance = temporal_importance / (torch.mean(temporal_importance) + 1e-9)
+
         # FINAL COMPOSITION
-        # Focal Loss * Asymmetry * VolatilityGating * Killzone * Drawdown
+        # Focal Loss * Asymmetry * VolatilityGating * Killzone * Drawdown * Recency
         # Alpha scales the severity of the institutional penalties.
-        penalty_composition = focal_weight * asymmetry_weight * vol_weight * temporal_weight * balance_pressure
+        penalty_composition = focal_weight * asymmetry_weight * vol_weight * temporal_weight * balance_pressure * temporal_importance
         
         # We blend from standard CE (alpha=0) to full Sovereign context (alpha=1)
         # Note: pt is focal probability, using focal_weight as multiplier.
@@ -134,8 +161,3 @@ class SovereignQuantLoss(nn.Module):
         
         return total_loss
 
-        # FINAL COMPOSITION
-        weighted_loss = ce_raw * asymmetry_weight * balance_pressure
-        total_loss = torch.mean(weighted_loss + (kinetic_violation * self.k_lambda) + (spatial_loss * self.s_lambda))
-        
-        return total_loss
