@@ -197,6 +197,21 @@ class PhysicsEngine:
         res["target_kinetic_state_confirmed"] = ((bull_impulse & defend_bull) | (bear_impulse & defend_bear)).astype(float)
         res["target_kinetic_state_failed"] = ((bull_impulse & ~defend_bull) | (bear_impulse & ~defend_bear)).astype(float)
         res["target_kinetic_state_neutral"] = (1.0 - res["target_kinetic_state_impulse"]).clip(0, 1)
+        
+        # 6. [M2-M3 CORRELATION] Potential Energy & Viscosity Modifier
+        # These are placeholders that will be populated by the StructureEngine
+        # when FVG zones are detected. We initialize them here for schema consistency.
+        res["potential_energy"] = pd.Series(0.0, index=df.index)
+        res["viscosity_modifier"] = pd.Series(1.0, index=df.index)  # 1.0 = no modification
+        res["acceleration_quality"] = pd.Series(1.0, index=df.index)  # 1.0 = healthy, <1.0 = artificial
+        
+        # Artificial Acceleration Detection (High Force + Low Volume)
+        if "volume" in df.columns:
+            vol_mean = df["volume"].rolling(20, min_periods=1).mean()
+            rvol = df["volume"] / (vol_mean + self.eps)
+            # If force is high but volume is low, acceleration is "artificial"
+            artificial_mask = (res["physics_force"] > 1.5) & (rvol < 0.7)
+            res.loc[artificial_mask, "acceleration_quality"] = 0.5
 
         return res.fillna(0.0)
 

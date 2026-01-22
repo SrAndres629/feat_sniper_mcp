@@ -1,13 +1,11 @@
 import pandas as pd
 import numpy as np
 from .fractals import identify_fractals
-from .sessions import identify_trading_session, get_session_weight
-from app.skills.volume_profile import volume_profile
 
 def detect_structural_shifts(df: pd.DataFrame) -> pd.DataFrame:
     """
-    [v5.1 - VECTORIZED TOPOLOGY] Precise BOS/CHOCH Detection.
-    Factors: Vectorized Session Mapping, Rolling POC, and Hierarchical Fractals.
+    [v6.0 - INSTITUTIONAL TOPOLOGY] Real-Close BOS/CHoCH Core.
+    No wick signals. Structure is only broken when the auction CLOSES past the level.
     """
     if df.empty: return df
     df = identify_fractals(df)
@@ -18,72 +16,45 @@ def detect_structural_shifts(df: pd.DataFrame) -> pd.DataFrame:
     df["internal_h"] = df["high"].where(df["minor_h"]).ffill()
     df["internal_l"] = df["low"].where(df["minor_l"]).ffill()
 
-    # 2. VECTORIZED SESSION MAPPING (No .map bottleneck)
-    # [FIX] Handle RangeIndex vs DatetimeIndex
+    # 2. Institutional Session Analysis
+    # Fallback if settings not available or for tests
+    try:
+        from app.core.config import settings
+        session_weights = settings.SMC_SESSION_WEIGHTS
+    except:
+        session_weights = {"LONDON": 1.5, "NY": 1.2, "ASIA": 0.5}
+
     if hasattr(df.index, 'hour'):
         hours = df.index.hour
-    elif 'time' in df.columns:
-        # Check if 'time' is already datetime or needs conversion
-        if pd.api.types.is_datetime64_any_dtype(df['time']):
-            hours = df['time'].dt.hour
-        else:
-            # Assume unix ms or string, try safe conversion
-            try:
-                hours = pd.to_datetime(df['time'], unit='ms').dt.hour
-            except:
-                try:
-                     hours = pd.to_datetime(df['time']).dt.hour
-                except:
-                     hours = pd.Series(0, index=df.index) # Fallback
     else:
-        hours = pd.Series(0, index=df.index) # Fallback to ASIA (0)
-    # Simplified mapping for vectorization:
-    # 3-11: LONDON, 13-20: NY, Else: ASIA
+        hours = pd.Series(0, index=df.index)
+
     df["session_type"] = "ASIA"
-    df.loc[(hours >= 3) & (hours <= 11), "session_type"] = "LONDON"
-    df.loc[(hours >= 13) & (hours <= 20), "session_type"] = "NY"
+    df.loc[(hours >= 7) & (hours <= 11), "session_type"] = "LONDON"
+    df.loc[(hours >= 12) & (hours <= 16), "session_type"] = "NY"
     
-    # Session Weights (Doctoral Institutional Importance)
-    weights = {"LONDON": 1.5, "NY": 1.2, "ASIA": 0.5}
-    df["session_weight"] = df["session_type"].map(weights).fillna(1.0)
+    df["session_weight"] = df["session_type"].map(session_weights).fillna(0.5)
 
-    # 3. DOCTORAL POC (High-Fidelity KDE Integration)
-    # Instead of a rolling mean proxy, we use the real Auction POC.
-    # We calculate the profile for the last 'n' bars (e.g. 50) as the relevant value area.
-    window = 50
-    if len(df) >= window:
-        profile = volume_profile.get_profile(df.tail(window))
-        poc = profile.get("poc", df["close"].iloc[-1])
-    else:
-        poc = df["close"].rolling(24).mean().iloc[-1]
-    
-    df["rolling_poc"] = poc # This becomes a scalar applied to the current state
+    # 3. [DOCTORAL] Real-Close BOS (Structural Confirmation)
+    # Rule: Price CLOSES past the previous swing high/low
+    df["bos_bull"] = (df["close"] > df["swing_h"].shift(1)) & (df["close"].shift(1) <= df["swing_h"].shift(1))
+    df["bos_bear"] = (df["close"] < df["swing_l"].shift(1)) & (df["close"].shift(1) >= df["swing_l"].shift(1))
 
-    # 4. SWING BOS (Structural Confirmation)
-    # Rule: Candle Close > Previous Swing High
-    raw_bos_bull = (df["close"] > df["swing_h"].shift(1)) & (df["close"].shift(1) <= df["swing_h"].shift(1))
-    raw_bos_bear = (df["close"] < df["swing_l"].shift(1)) & (df["close"].shift(1) >= df["swing_l"].shift(1))
-    
-    # Validation: Institutional Force (Trending POC)
-    df["bos_bull"] = (raw_bos_bull & (df["close"] > df["rolling_poc"])).fillna(False).astype(bool)
-    df["bos_bear"] = (raw_bos_bear & (df["close"] < df["rolling_poc"])).fillna(False).astype(bool)
-
-    # 5. INTERNAL CHOCH (Change of Character)
-    # CHoCH is the first sign of reversal: price breaking the last internal structural point
-    # of a preceding move.
+    # 4. Change of Character (CHoCH)
+    # The first break of internal structure signaling potential reversal
     df["choch_bull"] = (df["close"] > df["internal_h"].shift(1)) & (df["swing_h"].shift(1) < df["swing_h"].shift(2))
     df["choch_bear"] = (df["close"] < df["internal_l"].shift(1)) & (df["swing_l"].shift(1) > df["swing_l"].shift(2))
     
-    # 6. BOS STRENGTH (For Neural Ingest)
-    is_bos = (df["bos_bull"] | df["bos_bear"])
-    df["bos_strength"] = df["session_weight"] * np.where(is_bos, 1.2, 0.0)
+    # 5. BOS STRENGTH (Scale Invariant)
+    is_bos = (df["bos_bull"].fillna(False) | df["bos_bear"].fillna(False)).astype(bool)
+    df["bos_strength"] = df["session_weight"] * np.where(is_bos, 1.0, 0.0)
 
-    # 7. RANGE EQUILIBRIUM (Premium vs Discount)
+    # 6. Range Equilibrium (Premium vs Discount)
     range_dist = (df["swing_h"] - df["swing_l"]) + 1e-9
     df["range_pos"] = (df["close"] - df["swing_l"]) / range_dist
     
-    # Refined Strength: Buy in Discount, Sell in Premium
-    df.loc[df["bos_bull"] & (df["range_pos"] < 0.5), "bos_strength"] *= 1.5
-    df.loc[df["bos_bear"] & (df["range_pos"] > 0.5), "bos_strength"] *= 1.5
+    # Optimization: Stronger BOS if occurring in appropriate range zone
+    df.loc[df["bos_bull"].fillna(False) & (df["range_pos"] < 0.5), "bos_strength"] *= 1.2
+    df.loc[df["bos_bear"].fillna(False) & (df["range_pos"] > 0.5), "bos_strength"] *= 1.2
 
     return df

@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Tuple, Dict
 
 class NeuralSettings(BaseModel):
-    LAYER_MICRO_PERIODS: Tuple[int, ...] = (1, 2, 3, 6, 7, 8, 9, 12, 13, 14)
+    LAYER_MICRO_PERIODS: Tuple[int, ...] = (3, 5, 8, 13, 21, 34, 55, 89, 144, 233)
     LAYER_OPERATIVE_PERIODS: Tuple[int, ...] = (16, 24, 32, 48, 64, 96, 128, 160, 192, 224)
     LAYER_MACRO_PERIODS: Tuple[int, ...] = (256, 320, 384, 448, 512, 640, 768, 896, 1024, 1280)
     LAYER_BIAS_PERIOD: int = 2048
@@ -35,6 +35,11 @@ class NeuralSettings(BaseModel):
     MC_DROPOUT_SAMPLES: int = 20
     SPATIAL_BINS: int = 50
     STRUCTURAL_PHASE_MAP: Dict[str, float] = {"RANGE": 0.0, "NORMAL": 0.0, "ACCUMULATION": 0.5, "EXPANSION": 1.0, "MOMENTUM": 0.8}
+    
+    # SMC Configuration
+    SMC_SESSION_WEIGHTS: Dict[str, float] = {"LONDON": 1.5, "NY": 1.2, "ASIA": 0.5}
+    SMC_OB_MITIGATION_PCT: float = 0.5
+    SMC_BOS_THRESHOLD: float = 1.5
     
     # Training Hyperparameters
     NEURAL_LEARNING_RATE: float = 0.001

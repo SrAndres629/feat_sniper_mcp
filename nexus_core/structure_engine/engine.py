@@ -47,8 +47,8 @@ class StructureEngine:
 
     def calculate_confluence_score(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        [THE GOLDEN RULE - VECTORIZED] 
-        Validates zone overlaps with adaptive weights across entire history.
+        [THE GOLDEN RULE - v6] 
+        Validates zone overlaps with adaptive weights and persistent states.
         """
         if df.empty: 
             df["confluence_score"] = 0.0
@@ -60,44 +60,48 @@ class StructureEngine:
         w_breaker = 0.7 
         w_liq = 0.6
         
-        # Vectorized Presence Flags
-        # [FIX] Arithmetic Logic (Safe for Float/NaN)
-        # We sum the columns (fillna 0) and check if > 0.
-        def _any(c1, c2):
-            # Ensure we default to a Series of 0.0 if column missing
-            v1 = df[c1].fillna(0) if c1 in df.columns else pd.Series(0.0, index=df.index)
-            v2 = df[c2].fillna(0) if c2 in df.columns else pd.Series(0, index=df.index)
-            return ((v1 + v2) > 0).astype(float)
+        # 1. OB Contribution (State Based)
+        # 1:Active (Full Weight), 2:Mitigated (Half Weight), 3:Breaker (Specific Weight)
+        ob_score = np.zeros(len(df))
+        if "ob_bull" in df.columns:
+            ob_score += np.where(df["ob_bull"] == 1.0, w_ob, 0.0)
+            ob_score += np.where(df["ob_bull"] == 2.0, w_ob * 0.5, 0.0)
+        if "ob_bear" in df.columns:
+            ob_score += np.where(df["ob_bear"] == 1.0, w_ob, 0.0)
+            ob_score += np.where(df["ob_bear"] == 2.0, w_ob * 0.5, 0.0)
             
-        has_ob = _any("ob_bull", "ob_bear")
-        has_fvg = _any("fvg_bull", "fvg_bear")
-        has_breaker = _any("breaker_bull", "breaker_bear")
-        has_liq = _any("is_eqh", "is_eql")
+        # 2. FVG Contribution (Gravity Based)
+        fvg_score = df["fvg_gravity"].abs().clip(0, 1) * w_fvg if "fvg_gravity" in df.columns else 0.0
         
-        # Mitigation Decay
-        ob_weight = np.where(df.get("is_mitigated", False), w_ob * 0.5, w_ob)
-        fvg_weight = np.where(df.get("fvg_mitigated", False), w_fvg * 0.5, w_fvg)
+        # 3. Breaker Contribution
+        breaker_score = np.zeros(len(df))
+        if "ob_bull" in df.columns:
+             breaker_score += np.where(df["ob_bull"] == 3.0, w_breaker, 0.0)
+        if "ob_bear" in df.columns:
+             breaker_score += np.where(df["ob_bear"] == 3.0, w_breaker, 0.0)
+
+        # 4. Liquidity Pools
+        has_liq = ((df.get("is_eqh", 0) + df.get("is_eql", 0)) > 0).astype(float) * w_liq
         
-        # Aggregate Score
-        score = (has_ob * ob_weight) + (has_fvg * fvg_weight) + (has_breaker * w_breaker) + (has_liq * w_liq)
+        # Aggregate
+        score = ob_score + fvg_score + breaker_score + has_liq
         
-        # Temporal Alignment
-        if "major_h" in df.columns:
-            # [FIX] Arithmetic Logic
-            align_val = (df["major_h"].fillna(0) + df["major_l"].fillna(0))
-            alignment = (align_val > 0).astype(float).rolling(50).max().fillna(0)
-            score = score * (1.0 + (alignment * 0.5))
+        # Temporal Alignment (H1/H4 Context)
+        if "session_weight" in df.columns:
+            score = score * df["session_weight"]
             
         df["confluence_score"] = score.round(2)
         return df
 
     def compute_feat_index(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        [CHRONOS VECTORIZED FEAT INDEX]
-        Calculates the FEAT Index relative to ATR and Structural Force.
+        [v6.2 DOCTORAL SEAL: M2-M3 FULL CORRELATION]
+        Unified sensory output with complete Physics-Geometry coupling.
+        Viscosity is now geometrically adjusted based on FVG zones.
+        Acceleration Quality (Q_a) = Acceleration × RVOL_Normalized.
         """
         df = self.detect_structural_shifts(df)
-        df = self.detect_imbalances(df)
+        df = self.detect_imbalances(df)  # Populates physics and FVG columns
         df = detect_liquidity_pools(df)
         df = detect_order_blocks(df)
         df = calculate_trap_score(df) 
@@ -107,89 +111,89 @@ class StructureEngine:
         df = detect_consolidation_zones(df)
         df = self.calculate_confluence_score(df)
         
-        
-        # [FIX] Helper for Safe Boolean Series Retrieval
-        def _get_bool(col_name):
-            if col_name in df.columns:
-                return df[col_name].fillna(False).astype(bool)
-            return pd.Series(False, index=df.index)
-
-        # 1. Structural Force (Vectorized)
+        # 1. Structural Conviction (F-Score)
         f_score = df.get("bos_strength", pd.Series(0.0, index=df.index)).fillna(0.0)
         
-        # [FIX] Arithmetic Logic for CHoCH
-        c_bull = _get_bool("choch_bull").astype(int)
-        c_bear = _get_bool("choch_bear").astype(int)
-        f_score += np.where((c_bull + c_bear) > 0, 0.5, 0.0)
+        # 2. Institutional Gravity (G-Score) - From FVG Duality
+        gravity_score = df.get("fvg_gravity", pd.Series(0.0, index=df.index)).abs().clip(0, 1.5)
         
-        # 2. Institutional Efficiency (E-Score)
-        # Safe bitwise OR on Series
-        has_ob = _get_bool("ob_bull") | _get_bool("ob_bear")
-        has_fvg = _get_bool("fvg_bull") | _get_bool("fvg_bear")
+        # 3. Propulsion Score (P-Score) - Trend Continuation from FVG Duality
+        propulsion_score = df.get("fvg_propulsion", pd.Series(0.0, index=df.index)).abs().clip(0, 1.5)
         
-        ob_presence = np.where(has_ob, 1.0, 0.0)
-        fvg_presence = np.where(has_fvg, 1.0, 0.2)
-        e_score = fvg_presence + ob_presence
-        
-        # 3. ATR-Normalized Range (A-Score)
-        atr = (df["high"] - df["low"]).rolling(14).mean().ffill()
-        curr_range = df["high"] - df["low"]
-        a_score = (curr_range / (atr * 2 + 1e-9)).clip(0, 1)
+        # 4. Space Quality (S-Score)
+        s_score = df.get("range_pos", pd.Series(0.5, index=df.index)).fillna(0.5)
 
-        # 4. Final Aggregation
-        w = self.config["weights"]
+        # ===================================================
+        # 5. [M2-M3 SEALED CORRELATION] Geometric Coupling
+        # ===================================================
+        from nexus_core.physics_engine.engine import physics_engine
+        physics_res = physics_engine.compute_vectorized_physics(df)
         
-        # [CHRONOS] Session-based T-Score (Liquidity Time)
-        times = df.index
-        # Get hour in UTC (or adjusted for exchange time)
-        if hasattr(times, 'hour'):
-             hours = times.hour
+        # Base Physics Metrics
+        base_viscosity = physics_res.get("physics_viscosity", pd.Series(1.0, index=df.index))
+        base_accel = physics_res.get("physics_accel", pd.Series(0.0, index=df.index))
+        
+        # RVOL for Acceleration Quality
+        if "volume" in df.columns:
+            vol_mean = df["volume"].rolling(20, min_periods=1).mean()
+            rvol = df["volume"] / (vol_mean + 1e-9)
         else:
-             # Fallback if index not datetime (should be fixed by vectorized_tensor but defensive here)
-             hours = pd.Series(0, index=df.index)
+            rvol = pd.Series(1.0, index=df.index)
         
-        # Scoring: London (7-11 UTC) and NY (12-16 UTC) are 1.0. Asian (23-06 UTC) is 0.5. Weekend/Dead is 0.0.
-        t_score = pd.Series(0.2, index=df.index) # Base
+        # [SEAL 1] VISCOSITY GEOMETRIC COUPLING
+        # Rule: If price is inside a GRAVITY FVG zone, reduce viscosity by 30%
+        # This represents the "vacuum" effect of the gap.
+        from nexus_core.structure_engine.imbalances import FVG_GRAVITY
+        is_in_gravity_zone = (df.get("fvg_type", None) == FVG_GRAVITY)
         
-        if hasattr(times, 'hour'):
-            t_score[((hours >= 7) & (hours <= 11)) | ((hours >= 12) & (hours <= 16))] = 1.0 # High Liquidity
-            t_score[((hours >= 0) & (hours <= 6))] = 0.5 # Asian
+        viscosity_modifier = pd.Series(1.0, index=df.index)
+        viscosity_modifier[is_in_gravity_zone] = 0.7  # 30% reduction
         
-        # [FEAT UPDATE] Calculate Space Quality (E) using EMA Layers
-        # Optimal Space is when Price pulls back to Structure (dist ~ 0)
+        # Also reduce viscosity if propulsion is high (runaway gap = zero friction)
+        high_propulsion = propulsion_score > 0.5
+        viscosity_modifier[high_propulsion] = viscosity_modifier[high_propulsion] * 0.8  # 20% additional
         
-        if "dist_structure" in df.columns:
-            d_struct = df["dist_structure"].abs()
-            # Reward being close to Structure (Lower distance = Higher Quality for entry)
-            # Scaling: 1.0 at d=0, decaying as price moves away.
-            space_quality = 1.0 / (1.0 + d_struct)
-        else:
-             # If no structure column, space quality is zero (No identifiable floor)
-             space_quality = 0.0
-            
-        raw_feat = (w["F"] * f_score + w["E"] * space_quality + w["A"] * a_score + w["T"] * t_score)
-        raw_feat += df["confluence_score"] * 0.2
+        df["viscosity_modifier"] = viscosity_modifier
         
-        # 5. Trap Penalty
+        # [SEAL 2] ACCELERATION QUALITY (Q_a = Accel × RVOL_Normalized)
+        # Rule: High acceleration with low volume = artificial movement
+        accel_magnitude = base_accel.abs()
+        rvol_normalized = (rvol / (rvol.rolling(20, min_periods=1).mean() + 1e-9)).clip(0.1, 3.0)
+        
+        # Q_a = Normalized product
+        acceleration_quality = (accel_magnitude * rvol_normalized).clip(0.0, 2.0)
+        
+        # Penalty: If accel is high (>0.5) but RVOL is low (<0.7), quality drops
+        artificial_mask = (accel_magnitude > 0.5) & (rvol < 0.7)
+        acceleration_quality[artificial_mask] = acceleration_quality[artificial_mask] * 0.3
+        
+        # Normalize to [0, 1] for neural consumption
+        df["acceleration_quality"] = (acceleration_quality / 2.0).clip(0, 1)
+        
+        # [SEAL 3] POTENTIAL ENERGY
+        fvg_mid = (df.get("fvg_bull_top", 0.0) + df.get("fvg_bull_bottom", 0.0)) / 2
+        distance_to_gap = (df["close"] - fvg_mid).abs() + 1e-9
+        df["potential_energy"] = (gravity_score / distance_to_gap).clip(0, 10)
+
+        # ===================================================
+        # 6. Final Aggregation (TCN Channels 7-14)
+        # ===================================================
+        feat_val = (f_score * 0.25 + gravity_score * 0.2 + propulsion_score * 0.2 + s_score * 0.15)
+        
+        # Add quality metrics contribution (Channels 13-14)
+        feat_val += df["acceleration_quality"] * 0.1
+        feat_val += (1.0 - df["viscosity_modifier"]) * 0.1  # Lower viscosity = higher feat
+        
+        # Trap Penalty
         trap_penalty = 1.0 - (df.get("trap_score", 0.0) * 0.5)
-        feat_val = raw_feat * trap_penalty
+        feat_val = feat_val * trap_penalty
         
-        # Pattern Metadata (MAE)
-        mae = self.mae_recognizer.detect_mae_pattern(df)
-        
-        # [FIX] Integrity Preservation: Assign to DF instead of new object
         df["feat_index"] = (feat_val * 100).round(2)
-        df["trap_score"] = df.get("trap_score", 0.0).round(2)
-        df["confluence_score"] = df["confluence_score"].round(2)
-        df["structure_status"] = mae["status"]
-        df["is_mae_expansion"] = mae["is_expansion"]
         
-        # Meta-tensors for Alpha Orchestrator
-        if "session_weight" not in df.columns:
-            df["session_weight"] = 1.0
-        if "struct_displacement_z" not in df.columns:
-            df["struct_displacement_z"] = 0.0
-            
+        # Map additional fields for AlphaTensor
+        if "structural_feat_index" not in df.columns:
+             df["structural_feat_index"] = df["feat_index"] / 100.0
+             
         return df
 
     def get_structural_report(self, df: pd.DataFrame) -> Dict[str, Any]:

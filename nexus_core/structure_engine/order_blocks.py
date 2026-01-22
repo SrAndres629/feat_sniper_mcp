@@ -1,94 +1,101 @@
 import pandas as pd
 import numpy as np
-
-import pandas as pd
-import numpy as np
+from app.core.config import settings
 
 def detect_order_blocks(df: pd.DataFrame) -> pd.DataFrame:
     """
-    [v5.1 - VECTORIZED SMC] 
-    Institutional Order Block (OB) Detection via Vectorized Logic.
-    Definition: The last opposite candle before a validated BOS/Expansion.
-    Includes Inducement (IDM) validation and Breaker transformation.
+    [v6.0 - DOCTORAL PERSISTENCE] 
+    Institutional Order Block (OB) Detection with Persistent Node Logic.
+    State Machine:
+    - 1: ACTIVE (Price has not returned)
+    - 2: MITIGATED (Price touched the zone)
+    - 3: VIOLATED (Price closed past the zone -> Potential Breaker)
     """
     if df.empty: return df
     df = df.copy()
     
     # 0. Initialization
-    df["ob_bull"] = False
-    df["ob_bear"] = False
-    df["ob_top"] = 0.0
-    df["ob_bottom"] = 0.0
-    df["is_mitigated"] = False
+    df["ob_bull"] = 0.0 # 0: None, 1: Active, 2: Mitigated, 3: Breaker
+    df["ob_bear"] = 0.0
+    df["ob_top"] = np.nan
+    df["ob_bottom"] = np.nan
     
-    # Needs BOS and FVG columns (Displacement validation)
     if "bos_bull" not in df.columns: return df
 
-    # 1. VECTORIZED CANDLE SEARCH
-    # We identify the candles where BOS occurs
-    is_bos_bull = df["bos_bull"]
-    is_bos_bear = df["bos_bear"]
-    
-    # For each BOS, we need the index of the 'last opposite candle'
-    # Strategy: 
-    # 1. Mark all bearish candles (for Bull OB)
-    # 2. Use ffill to propagate the index of the last bearish candle
-    # 3. Only keep those that preceded a Bullish BOS within N bars
-    
+    # Prepare logic helpers
     is_bearish = df["close"] < df["open"]
     is_bullish = df["close"] > df["open"]
+    atr = (df["high"] - df["low"]).rolling(14).mean().ffill().fillna(df["close"] * 0.001)
     
-    # Get indices of contrary candles
-    df["last_bear_idx"] = np.where(is_bearish, np.arange(len(df)), np.nan)
-    df["last_bear_idx"] = df["last_bear_idx"].ffill()
+    # Track indices for last opposite candles
+    last_bear_idx_series = pd.Series(np.where(is_bearish, np.arange(len(df)), np.nan)).ffill()
+    last_bull_idx_series = pd.Series(np.where(is_bullish, np.arange(len(df)), np.nan)).ffill()
     
-    df["last_bull_idx"] = np.where(is_bullish, np.arange(len(df)), np.nan)
-    df["last_bull_idx"] = df["last_bull_idx"].ffill()
+    last_bear_idx = last_bear_idx_series.values
+    last_bull_idx = last_bull_idx_series.values
 
-    # 2. DISPLACEMENT & IDM VALIDATION (Institutional Intent)
-    # DISPLACEMENT: Does the expansion contain an FVG?
-    has_fvg_bull = df["fvg_bull"].rolling(5).max() > 0 if "fvg_bull" in df.columns else False
-    has_fvg_bear = df["fvg_bear"].rolling(5).max() > 0 if "fvg_bear" in df.columns else False
-    
-    # INDUCEMENT (IDM): Was minor liquidity swept before the BOS?
-    # We already have 'major_h/l' which are only true if IDM was swept (from fractals.py)
-    # So if BOS carries the signal, it's already validated.
+    # Displacement validation (Must have expansion > ATR scalar)
+    expansion_bull = (df["close"] - df["open"]) > (atr * settings.SMC_BOS_THRESHOLD)
+    expansion_bear = (df["open"] - df["close"]) > (atr * settings.SMC_BOS_THRESHOLD)
 
-    # 3. ASSIGN OBs
-    # Bull OB: Last Bearish candle before Bullish BOS + Displacement
-    bull_mask = is_bos_bull & (df["last_bear_idx"] > 0) & has_fvg_bull
-    bear_mask = is_bos_bear & (df["last_bull_idx"] > 0) & has_fvg_bear
+    # Detect New OBs at the point of BOS
+    bull_mask = df["bos_bull"].fillna(False) & expansion_bull.fillna(False)
+    bear_mask = df["bos_bear"].fillna(False) & expansion_bear.fillna(False)
     
-    # Apply to specific candles
-    for idx in df.index[bull_mask]:
-        candle_loc = int(df.at[idx, "last_bear_idx"])
-        df.at[df.index[candle_loc], "ob_bull"] = True
-        df.at[df.index[candle_loc], "ob_top"] = df.iloc[candle_loc]["high"]
-        df.at[df.index[candle_loc], "ob_bottom"] = df.iloc[candle_loc]["low"]
+    ob_bull_col = df.columns.get_loc("ob_bull")
+    ob_bear_col = df.columns.get_loc("ob_bear")
+    ob_top_col = df.columns.get_loc("ob_top")
+    ob_bot_col = df.columns.get_loc("ob_bottom")
+    
+    for i in np.where(bull_mask)[0]:
+        val = last_bear_idx[i]
+        if np.isnan(val): continue
+        ob_idx = int(val)
+        df.iloc[ob_idx, ob_bull_col] = 1.0 # Mark as ACTIVE
+        df.iloc[ob_idx, ob_top_col] = df.iloc[ob_idx]["high"]
+        df.iloc[ob_idx, ob_bot_col] = df.iloc[ob_idx]["low"]
 
-    for idx in df.index[bear_mask]:
-        candle_loc = int(df.at[idx, "last_bull_idx"])
-        df.at[df.index[candle_loc], "ob_bear"] = True
-        df.at[df.index[candle_loc], "ob_top"] = df.iloc[candle_loc]["high"]
-        df.at[df.index[candle_loc], "ob_bottom"] = df.iloc[candle_loc]["low"]
+    for i in np.where(bear_mask)[0]:
+        val = last_bull_idx[i]
+        if np.isnan(val): continue
+        ob_idx = int(val)
+        df.iloc[ob_idx, ob_bear_col] = 1.0 # Mark as ACTIVE
+        df.iloc[ob_idx, ob_top_col] = df.iloc[ob_idx]["high"]
+        df.iloc[ob_idx, ob_bot_col] = df.iloc[ob_idx]["low"]
 
-    # 4. VECTORIZED MITIGATION & BREAKER LOGIC
-    # Rule: Once a candle closes past an OB, it becomes a Breaker.
-    # To keep it efficient, we track running levels
+    # [PERSISTENCE ENGINE] 
+    # Propagate active zones and check for mitigation/violation
+    active_bull_zones = []
+    active_bear_zones = []
     
-    df["active_bull_ob_top"] = df["ob_top"].where(df["ob_bull"]).ffill()
-    df["active_bull_ob_bot"] = df["ob_bottom"].where(df["ob_bull"]).ffill()
-    df["active_bear_ob_top"] = df["ob_top"].where(df["ob_bear"]).ffill()
-    df["active_bear_ob_bot"] = df["ob_bottom"].where(df["ob_bear"]).ffill()
-    
-    # Mitigation: Current Low penetrates Bull OB Top
-    df["is_mitigated"] = (df["low"] <= df["active_bull_ob_top"]) | (df["high"] >= df["active_bear_ob_bot"])
-    
-    # Breaker: Close violates the OB zone
-    df["breaker_bear"] = (df["close"] < df["active_bull_ob_bot"]) & (df["close"].shift(1) >= df["active_bull_ob_bot"])
-    df["breaker_bull"] = (df["close"] > df["active_bear_ob_top"]) & (df["close"].shift(1) <= df["active_bear_ob_top"])
-    
-    # Clean up Temp Columns
-    df.drop(columns=["last_bear_idx", "last_bull_idx", "active_bull_ob_top", "active_bull_ob_bot", "active_bear_ob_top", "active_bear_ob_bot"], inplace=True)
-    
+    for i in range(len(df)):
+        low, high, close = df.iloc[i]["low"], df.iloc[i]["high"], df.iloc[i]["close"]
+        
+        # Add new zones to tracker
+        if df.iloc[i, ob_bull_col] == 1.0:
+            active_bull_zones.append({"top": df.iloc[i]["ob_top"], "bot": df.iloc[i]["ob_bottom"], "mitigated": False})
+        if df.iloc[i, ob_bear_col] == 1.0:
+            active_bear_zones.append({"top": df.iloc[i]["ob_top"], "bot": df.iloc[i]["ob_bottom"], "mitigated": False})
+
+        # Check existing bull zones
+        for zone in active_bull_zones:
+            if not zone["mitigated"]:
+                 if low <= zone["top"]:
+                     zone["mitigated"] = True
+                     # If closed below bottom -> Violated (Breaker)
+                     if close < zone["bot"]:
+                         df.iloc[i, ob_bull_col] = 3.0
+                     else:
+                         df.iloc[i, ob_bull_col] = 2.0
+
+        # Check existing bear zones
+        for zone in active_bear_zones:
+            if not zone["mitigated"]:
+                if high >= zone["bot"]:
+                    zone["mitigated"] = True
+                    if close > zone["top"]:
+                        df.iloc[i, ob_bear_col] = 3.0
+                    else:
+                        df.iloc[i, ob_bear_col] = 2.0
+                        
     return df
