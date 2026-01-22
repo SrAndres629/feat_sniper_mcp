@@ -127,39 +127,45 @@ def pre_flight_guard(symbol: str, real: bool = False):
 # --- TRAINING LOOP ---
 def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fvg_dual=False, fractal_sync=False, force_cpu=False):
     """
-    [V6.1.2 DOCTORAL] Training Engine with Hardware Hardening.
-    Implements Adaptive VRAM Management for RTX 3060 stability.
+    [V6.1.3 CORTEX HARDENING] Stable Training Protocol for Laptop GPUs.
+    Implementation of 'Illegal Instruction' Defense Mechanisms.
     """
-    # [HARDWARE HARDENING] Permanent Stability Protocol
-    if torch.cuda.is_available() and not force_cpu:
-        device = torch.device("cuda")
-        
-        # 1. Ampere Optimization (RTX 30 Series)
-        # Use Tensor Cores for max speed without critical precision loss
-        torch.backends.cuda.matmul.allow_tf32 = True
-        torch.backends.cudnn.allow_tf32 = True
-        
-        # 2. Deterministic Stability
-        # 'Benchmark' searches for the fastest algorithm but consumes extra VRAM and can fail.
-        # Disabling it ensures stability on GPUs with <12GB VRAM.
-        torch.backends.cudnn.benchmark = False 
-        torch.backends.cudnn.deterministic = True
-        
-        # 3. VRAM Hygiene
-        torch.cuda.empty_cache()
-        
-        full_vram = torch.cuda.get_device_properties(0).total_memory / 1e9
-        gpu_name = torch.cuda.get_device_name(0)
-        logger.info(f"🛡️ GPU HARDENING ACTIVE | Device: {gpu_name} | VRAM: {full_vram:.1f} GB | TF32: ON")
-        
-        # [PERMANENT AUTOTUNING]
-        # Detect VRAM bottleneck (< 8GB) and auto-downscale batch if over institutional safety limits
-        if full_vram < 8.0 and batch_size > 16:
-            logger.warning(f"⚠️ VRAM {full_vram:.1f}GB detected. Auto-adjusting Batch Size {batch_size} -> 16 for stability.")
-            batch_size = 16
-    else:
+    # --- HARDWARE SECURITY LAYER ---
+    if force_cpu:
         device = torch.device("cpu")
-        logger.warning("⚠️ RUNNING ON CPU. Training will be slow.")
+        logger.info("⚠️ FORCED CPU MODE (User requested)")
+    else:
+        try:
+            if torch.cuda.is_available():
+                device = torch.device("cuda")
+                props = torch.cuda.get_device_properties(0)
+                vram_gb = props.total_memory / 1e9
+                logger.info(f"🛡️ GPU DETECTED: {props.name} | VRAM: {vram_gb:.1f} GB")
+
+                # [PROTOCOL: CORTEX HARDENING]
+                # 1. Disable cuDNN to prevent Kernel Panics on RTX 3060 Mobile
+                # Standard cuDNN kernels can be unstable on consumer laptop GPUs under high channel density
+                torch.backends.cudnn.enabled = False 
+                logger.warning("🛡️ SECURITY: cuDNN Disabled (Avoiding Illegal Instruction Faults)")
+                
+                # 2. Force Sync for Error Tracking
+                os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+                
+                # 3. Disable TF32 (Reduces risk of illegal instructions in modern drivers)
+                torch.backends.cuda.matmul.allow_tf32 = False
+                torch.backends.cudnn.allow_tf32 = False
+
+                # 4. Auto-Scale Batch Size for Safety
+                if vram_gb < 8.0 and batch_size > 8:
+                    logger.warning(f"⚠️ VRAM Constraint ({vram_gb:.1f}GB). Downgrading Batch Size {batch_size} -> 8.")
+                    batch_size = 8
+                
+                torch.cuda.empty_cache()
+            else:
+                device = torch.device("cpu")
+        except Exception as e:
+            logger.error(f"⚠️ CUDA Critical Failure: {e}. Fallback to CPU.")
+            device = torch.device("cpu")
 
     logger.info(f"🚀 Starting Hybrid Training for {symbol} on {device} | Batch: {batch_size}")
     
@@ -315,29 +321,49 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fv
 
             optimizer.zero_grad()
             
-            # Forward
-            outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor) 
-            logits = outputs["logits"]
-            log_var = outputs.get("log_var") # Aleatoric Uncertainty
-            
-            # [FIX 3] Bayesian Loss with Curriculum Pressure & Recency Weighting
-            # Custom pressure_factor passed to handle early exploration vs late survival
-            base_loss = criterion(logits, label, p_tensor, x_map=f_map, current_balance=current_balance, alpha=elite_alpha, timestamps=t_norm.to(device))
-            base_loss *= pressure_factor
-            
-            if log_var is not None:
-                loss = torch.mean(torch.exp(-log_var.squeeze()) * base_loss + 0.5 * log_var.squeeze())
-            else:
-                loss = base_loss.mean()
-            
-            loss.backward()
-            optimizer.step()
-            
-            train_loss += loss.item()
-            preds = torch.argmax(logits, dim=1)
-            correct_batch = (preds == label).sum().item()
-            train_acc += correct_batch
-            total += label.size(0)
+            # [CORTEX HARDENING] NaN Guard for Forward Pass
+            try:
+                # Forward
+                outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor) 
+                logits = outputs["logits"]
+                log_var = outputs.get("log_var") # Aleatoric Uncertainty
+                
+                # [FIX 3] Bayesian Loss with Curriculum Pressure & Recency Weighting
+                base_loss = criterion(logits, label, p_tensor, x_map=f_map, current_balance=current_balance, alpha=elite_alpha, timestamps=t_norm.to(device))
+                base_loss *= pressure_factor
+                
+                if log_var is not None:
+                    loss = torch.mean(torch.exp(-log_var.squeeze()) * base_loss + 0.5 * log_var.squeeze())
+                else:
+                    loss = base_loss.mean()
+                
+                # [CORTEX HARDENING] Check for Infinite Loss BEFORE Backward
+                if not torch.isfinite(loss):
+                    logger.warning(f"⚠️ Infinite Loss detected at Step {i}. Skipping Batch.")
+                    continue
+                    
+                loss.backward()
+                
+                # [CORTEX HARDENING] Gradient Clipping (Vital for LSTMs/TCNs)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                
+                optimizer.step()
+                
+                train_loss += loss.item()
+                preds = torch.argmax(logits, dim=1)
+                correct_batch = (preds == label).sum().item()
+                train_acc += correct_batch
+                total += label.size(0)
+                
+                progress.set_postfix(loss=loss.item())
+                
+            except RuntimeError as e:
+                if "illegal instruction" in str(e) or "CUDA" in str(e):
+                    logger.critical(f"🛑 CUDA FAULT at Step {i}. Attempting recovery...")
+                    torch.cuda.empty_cache()
+                    continue # Skip this batch, try to save the Epoch
+                else:
+                    raise e
             
             # [TELEMETRY] MICRO-LOGGING (High Frequency - Step by Step)
             if i % 10 == 0:

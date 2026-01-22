@@ -124,32 +124,22 @@ class SovereignQuantLoss(nn.Module):
         pressure_raw = 20.0 / (balance_tensor - MARGIN_PER_001 + 1e-9)
         balance_pressure = torch.clamp(pressure_raw, 1.0, 10.0)
 
-        # [V6.1 DOCTORAL] TEMPORAL IMPORTANCE (RECENCY)
+        # [V6.1.3 CORTEX HARDENING] TEMPORAL IMPORTANCE (RECENCY)
         # Formula: W(t) = exp(alpha * (t - max_t))
-        # This makes recent errors much more expensive than old ones.
         temporal_importance = torch.ones_like(ce_raw)
         if timestamps is not None:
-            # Assume timestamps are scaled 0-1 (0: Oldest, 1: Newest)
-            # We use alpha * (t - 1) to decay from 1 (newest) down to exp(-alpha)
-            # Actually, let's use a simpler exponential decay from the max in batch
             max_ts = torch.max(timestamps)
-            # temporal_decay controls how much we "forget" the past
-            # range: [exp(-decay * offset), 1.0]
             temporal_importance = torch.exp(self.temporal_decay * (timestamps - max_ts))
-            # Rescale to ensure average loss is preserved (Stability)
             temporal_importance = temporal_importance / (torch.mean(temporal_importance) + 1e-9)
 
         # FINAL COMPOSITION
         # Focal Loss * Asymmetry * VolatilityGating * Killzone * Drawdown * Recency
-        # Alpha scales the severity of the institutional penalties.
         penalty_composition = focal_weight * asymmetry_weight * vol_weight * temporal_weight * balance_pressure * temporal_importance
         
         # We blend from standard CE (alpha=0) to full Sovereign context (alpha=1)
-        # Note: pt is focal probability, using focal_weight as multiplier.
         weighted_ce = ce_raw * (1.0 + (penalty_composition - 1.0) * alpha)
         
         # [ELITE QUANT SUMMATION]
-        # Base + Kinetic + Spatial + TRAP PENALTY + STAGNATION + ENTROPY
         total_loss = torch.mean(
             weighted_ce + 
             (kinetic_violation * self.k_lambda * alpha) + 
@@ -159,5 +149,10 @@ class SovereignQuantLoss(nn.Module):
             (entropy_penalty * alpha)
         )
         
+        # [CORTEX HARDENING] NaN Shield
+        # If loss is Infinite or NaN, clamp it to avoid crashing the CUDA Driver
+        if not torch.isfinite(total_loss):
+            return torch.tensor(10.0, device=pred.device, requires_grad=True)
+            
         return total_loss
 
