@@ -318,6 +318,7 @@ async def get_performance_analytics():
             exit_reasons=exit_stats,
             equity_curve=equity
         )
+        )
         
     except Exception as e:
         logger.error(f"Error loading analytics: {e}")
