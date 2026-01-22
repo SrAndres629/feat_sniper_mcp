@@ -48,14 +48,24 @@ class TensorTopologist:
         # For this prototype, we'll build a synthetic proximity based on Bollinger or similar if exact zone coords aren't passed easiest.
         # BETTER: Use the 'confluence_score' directly as the Intensity Tensor.
         
-        # If confluence > 0, we are "Touching".
-        # If confluence == 0, we need distance.
+        # 51. Psychological Levels (00, 20, 50, 80)
+        # Gold respects these levels as implicit support/resistance
+        price_mod = current_price % 10.0
+        # Distances to 0, 2, 5, 8, 10
+        dist_0 = min(price_mod, 10 - price_mod)  # 00
+        dist_2 = abs(price_mod - 2.0)            # 20
+        dist_5 = abs(price_mod - 5.0)            # 50
+        dist_8 = abs(price_mod - 8.0)            # 80
         
-        # Tensor Shape: [ConfluenceIntensity, ZoneProximity, VolatilityContext]
+        min_dist = min(dist_0, dist_2, dist_5, dist_8)
         
+        # Gaussian proximity (Sigma=1.0)
+        psych_proximity = np.exp(-(min_dist**2) / (2 * (1.0**2)))
+        
+        # Tensor Shape: [ConfluenceIntensity, PsychProximity, VolatilityContext]
         tensor = np.array([
-            confluence / 5.0, # Normalized Intensity (Max score approx 5)
-            0.0, # Placeholder for precise proximity if not touching
+            confluence / 5.0, # Normalized Intensity
+            psych_proximity,  # Proximity to Psychology Levels (00, 20, 50, 80)
             atr  # Context
         ], dtype=np.float32)
         

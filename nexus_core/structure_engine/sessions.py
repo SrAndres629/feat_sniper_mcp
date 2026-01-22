@@ -1,38 +1,56 @@
+"""
+[MODULE 05 - LEGACY REFACTOR]
+Session identification using config-driven parameters.
+Eliminates hardcoded weights.
+"""
 import pandas as pd
 from datetime import time
+from app.core.config import settings
+
 
 def identify_trading_session(dt: pd.Timestamp) -> str:
     """
-    Identifies the active trading session based on New York Time (EST/EDT).
-    Simplified for structural weighting.
+    Identifies the active trading session based on UTC time.
+    Uses config-driven Killzone definitions.
     """
-    # NYC Time
     if not hasattr(dt, "time"):
-        return "NY_OPEN" # Default for synthetic data or non-time indices
+        return "NY_OPEN"  # Default for synthetic data
 
     current_time = dt.time()
+    h = dt.hour if hasattr(dt, 'hour') else current_time.hour
     
-    # London: 03:00 - 12:00 (Overlap with NY)
-    # NY: 08:00 - 17:00 
-    # Asia: 19:00 - 03:00
+    # Use config-driven ranges
+    london_start, london_end = settings.TEMPORAL_LONDON_OPEN
+    ny_start, ny_end = settings.TEMPORAL_NY_OPEN
+    lc_start, lc_end = settings.TEMPORAL_LONDON_CLOSE
     
-    if current_time >= time(8, 0) and current_time <= time(12, 0):
-        return "NY_OPEN" # High Importance
-    elif current_time > time(12, 0) and current_time <= time(17, 0):
-        return "NY_LATE"
-    elif current_time >= time(3, 0) and current_time < time(8, 0):
+    # NY/London Overlap
+    if lc_start <= h < lc_end:
+        return "LONDON_CLOSE"
+    
+    # NY Open
+    if ny_start <= h < ny_end:
+        return "NY_OPEN"
+    
+    # London
+    if london_start <= h < london_end:
         return "LONDON"
-    elif current_time >= time(19, 0) or current_time < time(3, 0):
+    
+    # NY Late
+    if ny_end <= h < 21:
+        return "NY_LATE"
+    
+    # Asia (night session)
+    asia_start, asia_end = settings.TEMPORAL_ASIA
+    if h >= asia_start or h < asia_end:
         return "ASIA"
     
     return "NONE"
 
+
 def get_session_weight(session: str) -> float:
-    weights = {
-        "NY_OPEN": 1.0,
-        "LONDON": 0.8,
-        "NY_LATE": 0.5,
-        "ASIA": 0.3,
-        "NONE": 0.1
-    }
-    return weights.get(session, 0.1)
+    """
+    Returns session weight from config.
+    No hardcoded values.
+    """
+    return settings.TEMPORAL_SESSION_WEIGHTS.get(session, 0.1)

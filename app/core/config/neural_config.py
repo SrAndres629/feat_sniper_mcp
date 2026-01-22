@@ -41,6 +41,37 @@ class NeuralSettings(BaseModel):
     SMC_OB_MITIGATION_PCT: float = 0.5
     SMC_BOS_THRESHOLD: float = 1.5
     
+    # Resonance Engine Configuration (Module 04)
+    RESONANCE_HMA_FAST: int = 9       # Hull MA Fast Period
+    RESONANCE_HMA_MEDIUM: int = 21    # Hull MA Medium Period
+    RESONANCE_HMA_SLOW: int = 55      # Hull MA Slow Period
+    RESONANCE_ALMA_PERIOD: int = 200  # ALMA Institutional Anchor
+    RESONANCE_ALMA_OFFSET: float = 0.85  # ALMA Gaussian offset (0-1)
+    RESONANCE_ALMA_SIGMA: float = 6.0    # ALMA Gaussian sigma
+    RESONANCE_ELASTICITY_LOOKBACK: int = 20  # Z-Score lookback
+    RESONANCE_DISPERSION_THRESHOLD: float = 2.0  # Std devs for mean reversion
+    
+    # Temporal Engine Configuration (Module 05)
+    # Killzone definitions (UTC hours)
+    TEMPORAL_LONDON_OPEN: Tuple[int, int] = (7, 11)    # 07:00 - 11:00 UTC
+    TEMPORAL_NY_OPEN: Tuple[int, int] = (13, 17)       # 13:00 - 17:00 UTC (9-1 PM EST)
+    TEMPORAL_LONDON_CLOSE: Tuple[int, int] = (15, 17)  # 15:00 - 17:00 UTC (NY/London overlap)
+    TEMPORAL_ASIA: Tuple[int, int] = (23, 7)           # 23:00 - 07:00 UTC (low liquidity)
+    
+    # Session weights (institutional importance)
+    TEMPORAL_SESSION_WEIGHTS: Dict[str, float] = {
+        "NY_OPEN": 1.0,      # Peak institutional activity
+        "LONDON": 0.85,      # High activity
+        "LONDON_CLOSE": 0.9, # NY/London overlap = high volatility
+        "NY_LATE": 0.5,      # Declining activity
+        "ASIA": 0.2,         # Low liquidity, avoid
+        "NONE": 0.1          # Dead zone
+    }
+    
+    # Killzone Gaussian parameters
+    TEMPORAL_KZ_PEAK_SPREAD: float = 1.5  # Hours around peak for max intensity
+    TEMPORAL_FRACTAL_BLOCK_SIZE: int = 4  # 4-hour IPDA blocks
+    
     # Training Hyperparameters
     NEURAL_LEARNING_RATE: float = 0.001
     NEURAL_WEIGHT_DECAY: float = 1e-4

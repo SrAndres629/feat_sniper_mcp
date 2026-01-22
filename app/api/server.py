@@ -274,8 +274,31 @@ async def get_performance_analytics():
             total_trades=len(closed),
             win_rate=win_rate,
             profit_factor=profit_factor,
-            sharpe_ratio=0.0,  # TODO: Calculate properly
-            max_drawdown=0.0,  # TODO: Calculate properly
+        # Calculate Sharpe Ratio
+        if len(closed) > 1:
+            returns = [e.get("pnl_pips", 0) for e in closed]
+            mean_ret = sum(returns) / len(returns)
+            std_dev = (sum((x - mean_ret) ** 2 for x in returns) / (len(returns) - 1)) ** 0.5
+            sharpe = (mean_ret / std_dev) * (252 ** 0.5) if std_dev > 0 else 0.0 # Annualized approx
+        else:
+            sharpe = 0.0
+            
+        # Calculate Max Drawdown
+        peak = equity[0]
+        max_dd = 0.0
+        for eq in equity:
+            if eq > peak:
+                peak = eq
+            dd = (peak - eq) / peak if peak > 0 else 0
+            if dd > max_dd:
+                max_dd = dd
+        
+        return PerformanceReport(
+            total_trades=len(closed),
+            win_rate=win_rate,
+            profit_factor=profit_factor,
+            sharpe_ratio=sharpe,
+            max_drawdown=max_dd,
             total_pnl_pips=total_pnl,
             avg_trade_duration_minutes=sum(e.get("duration_minutes", 0) for e in closed) / len(closed) if closed else 0,
             exit_reasons=exit_stats,

@@ -83,16 +83,18 @@ class FeatProcessor:
         df["spread_velocity"] = df["spread_z"].diff().fillna(0)
         df["tick_density"] = df["volume"] / (df["volume"].rolling(50).mean() + 1e-9)
 
-        # 5. MTF ALIGNMENT (4 Ch)
-        # Binary alignment flags based on SMA convergence (Simulating MTF)
-        ema5 = df["close"].ewm(span=5).mean()
-        ema20 = df["close"].ewm(span=20).mean()
-        ema50 = df["close"].ewm(span=50).mean()
+        # 5. MTF ALIGNMENT (4 Ch) [REFACTORED v6.0 - Zero-Lag HMA]
+        # Using Hull MA for reduced phase lag
+        from nexus_core.resonance_engine.filters import hull_ma
         
-        df["align_m5"] = (ema5 > ema20).astype(float)
-        df["align_m15"] = (ema5 > ema50).astype(float)
-        df["align_h1"] = (ema20 > ema50).astype(float)
-        df["align_h4"] = (df["close"] > ema50).astype(float)
+        hma_fast = hull_ma(df["close"], settings.RESONANCE_HMA_FAST)
+        hma_medium = hull_ma(df["close"], settings.RESONANCE_HMA_MEDIUM)
+        hma_slow = hull_ma(df["close"], settings.RESONANCE_HMA_SLOW)
+        
+        df["align_m5"] = (hma_fast > hma_medium).astype(float)
+        df["align_m15"] = (hma_fast > hma_slow).astype(float)
+        df["align_h1"] = (hma_medium > hma_slow).astype(float)
+        df["align_h4"] = (df["close"] > hma_slow).astype(float)
 
         # 6. AGGRESSION / DELTA (4 Ch)
         df["buy_aggression"] = np.where(df["close"] > df["open"], df["volume"], 0) / (df["volume"] + 1e-9)
@@ -164,7 +166,19 @@ class FeatProcessor:
         res["session_weight"] = safe_get("session_weight", default=0.5)
         res["trap_score"] = safe_get("trap_score", default=0.0)
         
+        # [MODULE 05.9] MTF Fractal Position Encoding
+        # Allows FeatEncoder to discover temporal patterns like "H4-3 = expansion"
+        for tf in ["m5", "m15", "m30", "h1", "h4", "d1"]:
+            res[f"{tf}_position"] = safe_get(f"{tf}_position", default=2)
+            res[f"{tf}_phase"] = safe_get(f"{tf}_phase", default=0.5)
+        
+        # Weekly cycle
+        res["dow_sin"] = safe_get("dow_sin", default=0.0)
+        res["dow_cos"] = safe_get("dow_cos", default=1.0)
+        res["weekly_phase"] = safe_get("weekly_phase", default=0.5)
+        
         return res
+
 
     def tensorize_snapshot(self, snap: Dict, feature_names: List[str]) -> np.ndarray:
         return tensorize_snapshot(snap, feature_names)
