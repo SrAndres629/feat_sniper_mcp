@@ -8,10 +8,14 @@ import numpy as np
 from tqdm import tqdm
 import logging
 import argparse
+import torch._dynamo # [V6.2.2] Import necesario para control de errores
 
 # Configuración de Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s | [%(name)s] | %(levelname)s | %(message)s')
 logger = logging.getLogger("QuantumForge")
+
+# [V6.2.2] SUPRESIÓN DE ERRORES DE COMPILADOR (Para Windows sin C++)
+torch._dynamo.config.suppress_errors = True
 
 # Añadir rutas
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -25,6 +29,22 @@ except ImportError:
     from app.core.config import settings
     from app.ml.models.hybrid_probabilistic import HybridProbabilistic
     from nexus_training.loss import SovereignQuantLoss
+
+# --- HELPER: CLEAN STATE DICT [V6.2.2] ---
+def clean_state_dict(state_dict):
+    """
+    Limpia prefijos de compilación (_orig_mod, module) para evitar 'Missing Keys'.
+    """
+    new_state_dict = {}
+    for k, v in state_dict.items():
+        name = k
+        # Eliminar prefijos de TorchCompile o DDP
+        if name.startswith('_orig_mod.'):
+            name = name[10:]
+        elif name.startswith('module.'):
+            name = name[7:]
+        new_state_dict[name] = v
+    return new_state_dict
 
 # --- QUANTUM CURRICULUM MANAGER ---
 class QuantumCurriculum:
@@ -53,7 +73,6 @@ class SniperDataset(Dataset):
         self.y = y_soft
         self.physics = torch.FloatTensor(physics)
         
-        # Static Feats Handling
         if isinstance(static_feats, dict):
             self.form = torch.FloatTensor(static_feats.get('formation_vector', np.zeros((len(X), 10))))
             self.space = torch.FloatTensor(static_feats.get('spatial_grid', np.zeros((len(X), 50))))
@@ -95,11 +114,9 @@ def load_real_data(symbol: str, limit=0):
                 static_feats = data['static_features'].item()
             else: static_feats = {}
 
-            # APLICAR LÍMITE AQUÍ
             if limit > 0:
                 logger.warning(f"⚠️ LIMIT APPLIED: Truncating dataset to {limit} rows.")
                 X, y, physics = X[:limit], y[:limit], physics[:limit]
-                # Truncar static feats si son arrays
                 for k, v in static_feats.items():
                     if hasattr(v, '__len__') and len(v) == len(data['X']):
                         static_feats[k] = v[:limit]
@@ -113,9 +130,8 @@ def load_real_data(symbol: str, limit=0):
 # --- MOTOR DE ENTRENAMIENTO ---
 def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, force_cpu=False, **kwargs):
     """
-    [V6.2.1 QUANTUM FORGE] - STABLE I9 & GPU HYBRID
+    [V6.2.2 CORTEX HARDENING] - Robust Compilation & State Management
     """
-    # Recoger argumentos extra
     limit = kwargs.get('limit', 0)
     dry_run = kwargs.get('dry_run', False)
 
@@ -145,13 +161,10 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, fo
 
     dataset = SniperDataset(X, y, phys_tensor, static_feats, soft_label_smoothing=0.1)
     
-    # Split
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-    # Workers
-    # En Windows, num_workers=0 es lo más seguro para evitar overhead y errores
     workers = 0 
     train_loader = DataLoader(
         train_dataset, batch_size=batch_size, shuffle=True, 
@@ -162,21 +175,19 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, fo
         num_workers=workers, pin_memory=(device.type == 'cuda')
     )
 
-    # 3. MODEL SETUP (Correct Order!)
+    # 3. MODEL SETUP
     input_dim = X.shape[2]
-    
-    # PASO 1: CREAR EL MODELO (Instanciación)
     model = HybridProbabilistic(input_dim=input_dim, hidden_dim=settings.NEURAL_HIDDEN_DIM, num_classes=3).to(device)
     
-    # PASO 2: COMPILAR EL MODELO (Optimización)
-    # Solo intentamos compilar SI el modelo ya existe
+    # [V6.2.2] ROBUST COMPILATION FALLBACK
     if not dry_run:
         try:
             logger.info("🔥 Compiling Neural Engine (Quantum Optimization)...")
-            # Windows a veces da problemas con 'inductor', usamos 'default' o backend seguro
+            # En Windows sin VC++, esto suele fallar con Inductor.
+            # El try/except + suppress_errors permite continuar en modo 'Eager' si falla.
             model = torch.compile(model) 
         except Exception as e:
-            logger.warning(f"⚠️ Compiler Bypassed: {e}. Standard Execution enabled.")
+            logger.warning(f"⚠️ Compiler Failed (Missing cl.exe?): {e}. Running in Eager Mode.")
 
     # 4. CURRICULUM & OPTIMIZER
     curriculum = QuantumCurriculum(total_epochs=epochs)
@@ -185,7 +196,6 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, fo
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', patience=3, factor=0.5)
     scaler = torch.amp.GradScaler(scaler_device, enabled=use_amp)
 
-    # W&B Logic
     if not dry_run:
         try:
             import wandb
@@ -193,7 +203,7 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, fo
                 wandb.init(project=f"FEAT_SNIPER_{symbol}", name=f"Quantum_I9_B{batch_size}", reinit=True)
         except: pass
 
-    # AUTO-RESUME LOGIC (Desactivada en Dry Run)
+    # [V6.2.2] ROBUST AUTO-RESUME
     start_epoch = 0
     checkpoint_dir = "models/checkpoints"
     if not dry_run and os.path.exists(checkpoint_dir):
@@ -202,17 +212,22 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, fo
             latest = checkpoints[-1]
             try:
                 state = torch.load(os.path.join(checkpoint_dir, latest), map_location=device)
-                # Manejar si el estado es dict completo o solo pesos
+                
+                # --- STATE DICT CLEANING ---
                 if isinstance(state, dict) and 'model_state_dict' in state:
-                    model.load_state_dict(state['model_state_dict'])
-                    optimizer.load_state_dict(state['optimizer_state_dict'])
+                    clean_state = clean_state_dict(state['model_state_dict'])
+                    model.load_state_dict(clean_state, strict=False) # Strict=False para tolerar cambios menores
+                    if 'optimizer_state_dict' in state:
+                        optimizer.load_state_dict(state['optimizer_state_dict'])
                     start_epoch = state['epoch']
                 else:
                     # Legacy load
-                    model.load_state_dict(state)
+                    clean_state = clean_state_dict(state)
+                    model.load_state_dict(clean_state, strict=False)
+                    
                 logger.info(f"🔄 RESUMED from {latest} (Epoch {start_epoch})")
             except Exception as e:
-                logger.warning(f"Could not resume from {latest}: {e}")
+                logger.warning(f"⚠️ Could not resume from {latest}: {e}. Starting fresh.")
 
     # 5. TRAINING LOOP
     logger.info(f"⚔️ IGNITING FORGE | BATCH: {batch_size} | EPOCHS: {epochs}")
@@ -244,7 +259,6 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, fo
 
             optimizer.zero_grad()
 
-            # AMP Context
             amp_dev = 'cuda' if device.type == 'cuda' else 'cpu'
             with torch.amp.autocast(device_type=amp_dev, enabled=use_amp):
                 outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor)
@@ -267,7 +281,6 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, fo
              for batch in val_loader:
                 seq = batch[0].to(device)
                 label = batch[1].to(device)
-                # Forward simplificado para val
                 f_form = batch[3].to(device); f_space = batch[4].to(device); f_accel = batch[5].to(device)
                 f_time = batch[6].to(device); f_kin = batch[7].to(device); f_map = batch[8].to(device)
                 feat_input = { "form": f_form, "space": f_space, "accel": f_accel, "time": f_time, "kinetic": f_kin, "spatial_map": f_map }
@@ -281,7 +294,6 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, fo
         avg_loss = train_loss / len(train_loader)
         logger.info(f"🏁 Ep {epoch+1} | Loss: {avg_loss:.4f} | Val: {val_loss/len(val_loader):.4f}")
         
-        # Save (No en dry run)
         if not dry_run:
             if not os.path.exists(checkpoint_dir): os.makedirs(checkpoint_dir)
             torch.save({
@@ -292,7 +304,6 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=64, fo
             }, f"{checkpoint_dir}/epoch_{epoch+1}.pt")
             scheduler.step(avg_loss)
 
-# --- ENTRY POINT CORREGIDO ---
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Quantum Forge Training")
     parser.add_argument("--symbol", type=str, default="XAUUSD")
@@ -302,7 +313,7 @@ if __name__ == "__main__":
     parser.add_argument("--gpu", action="store_true")
     parser.add_argument("--limit", type=int, default=0, help="Limit dataset size for debugging")
     parser.add_argument("--dry-run", action="store_true", help="Run without saving")
-    # Argumentos legacy para compatibilidad con nexus_commander
+    # Legacy args
     parser.add_argument("--real", action="store_true")
     parser.add_argument("--fvg-dual-mode", action="store_true")
     parser.add_argument("--fractal-time-sync", action="store_true")
