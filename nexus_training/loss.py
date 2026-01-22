@@ -132,9 +132,11 @@ class SovereignQuantLoss(nn.Module):
             temporal_importance = torch.exp(self.temporal_decay * (timestamps - max_ts))
             temporal_importance = temporal_importance / (torch.mean(temporal_importance) + 1e-9)
 
-        # FINAL COMPOSITION
-        # Focal Loss * Asymmetry * VolatilityGating * Killzone * Drawdown * Recency
-        penalty_composition = focal_weight * asymmetry_weight * vol_weight * temporal_weight * balance_pressure * temporal_importance
+        # [V6.1.4 STEEL-VAULT] Numerical Stability Clamping
+        # [V6.1.4 STEEL-VAULT] Numerical Stability Clamping
+        # Clamping the penalty composition prevents extreme gradients that crash Cublas kernels.
+        # This keeps the math within safe IEEE-754 limits for mobile GPUs.
+        penalty_composition = torch.clamp(penalty_composition, 0.1, 100.0)
         
         # We blend from standard CE (alpha=0) to full Sovereign context (alpha=1)
         weighted_ce = ce_raw * (1.0 + (penalty_composition - 1.0) * alpha)

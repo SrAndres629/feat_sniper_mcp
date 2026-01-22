@@ -22,6 +22,11 @@ class DALC_Auditor:
     def __init__(self):
         self.errors = []
         self.warnings = []
+        # [V6.1.4 STEEL-VAULT] Silence redundant hydration logs during audit
+        # This prevents the Phase 1-4 logs from appearing twice in the terminal.
+        logging.getLogger("FeatProcessor.Engine").setLevel(logging.ERROR)
+        logging.getLogger("FeatProcessor.AlphaTensor").setLevel(logging.ERROR)
+        logging.getLogger("FeatProcessor.Engineering").setLevel(logging.ERROR)
 
     def log_fail(self, test_name, message):
         logger.error(f"🛑 FAIL: {test_name} - {message}")

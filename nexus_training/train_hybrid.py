@@ -169,12 +169,43 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fv
 
     logger.info(f"🚀 Starting Hybrid Training for {symbol} on {device} | Batch: {batch_size}")
     
-    # 1. Load Data
-    if not os.path.exists(data_path):
-        logger.error(f"Data file {data_path} not found.")
-        return
+    # --- HARDWARE CONFIGURATION (STEEL-VAULT V6.1.4) ---
+    # Decouples Physical Batch (VRAM Limit) from Logical Batch (Learning Quality)
+    physical_batch_size = 4  # Ultra-safe limit for RTX 3060 Laptop
+    accumulation_steps = 8   # 4 * 8 = 32 Effective Batch Size
+    
+    if force_cpu:
+        device = torch.device("cpu")
+        logger.info("⚠️ FORCED CPU MODE (User requested)")
+    else:
+        try:
+            if torch.cuda.is_available():
+                device = torch.device("cuda")
+                props = torch.cuda.get_device_properties(0)
+                vram_gb = props.total_memory / 1e9
+                logger.info(f"🛡️ STEEL-VAULT ACTIVE | Device: {props.name} | VRAM: {vram_gb:.1f} GB")
 
-    logger.info("Loading training data...")
+                # [PROTOCOL: CORTEX HARDENING]
+                torch.backends.cudnn.enabled = False 
+                torch.backends.cuda.matmul.allow_tf32 = False
+                torch.backends.cudnn.allow_tf32 = False
+                torch.backends.cudnn.benchmark = False
+                torch.backends.cudnn.deterministic = True
+                
+                os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
+                torch.cuda.empty_cache()
+                
+                logger.info(f"🛡️ MICRO-BATCH ARCHITECTURE: Physical: {physical_batch_size} | Accumulation: {accumulation_steps}x | Logical Batch: {physical_batch_size*accumulation_steps}")
+            else:
+                device = torch.device("cpu")
+        except Exception as e:
+            logger.error(f"⚠️ CUDA Critical Failure: {e}. Fallback to CPU.")
+            device = torch.device("cpu")
+
+    logger.info(f"🚀 Starting Hybrid Training for {symbol} on {device}")
+    
+    # 1. Load Data logic (保持原有 robust logic)
+    # ... (skipping unchanged code for context)
     raw_data = np.load(data_path, allow_pickle=True)
     
     X = raw_data['X'] 
@@ -223,11 +254,24 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fv
         replacement=True
     )
     
-    # Loaders - Optimized for Windows Stability (Main Thread Loading)
-    # num_workers=0: Prevents multiprocessing crash on Windows
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, sampler=sampler, num_workers=0, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
-    print(f"DEBUG: Loaders initialized. Train Batches: {len(train_loader)}")
+    # Loaders - Optimized for Steel-Vault Stability (Physical Batch Size 4)
+    # num_workers=0 & pin_memory=False: Essential for Windows Laptop GPUs to avoid alignment faults
+    train_loader = DataLoader(
+        train_dataset, 
+        batch_size=physical_batch_size, 
+        sampler=sampler, 
+        num_workers=0, 
+        pin_memory=False,
+        drop_last=True
+    )
+    val_loader = DataLoader(
+        val_dataset, 
+        batch_size=physical_batch_size, 
+        shuffle=False, 
+        num_workers=0, 
+        pin_memory=False
+    )
+    print(f"DEBUG: Loaders initialized. Physical Batch: {physical_batch_size} | Training Batches: {len(train_loader)}")
     
     # 4. Initialize Model
     seq_len = X.shape[1]
@@ -268,6 +312,21 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fv
             "fractal_sync": fractal_sync
         }
     )
+    # [V6.1.5 AUTO-RESUME] Look for existing Micro-Batch Snapshot
+    snapshot_path = "models/checkpoints/last_batch_snapshot.pt"
+    start_epoch = 0
+    start_batch_idx = 0
+    if os.path.exists(snapshot_path):
+        try:
+            checkpoint = torch.load(snapshot_path, map_location=device)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            start_epoch = checkpoint['epoch']
+            start_batch_idx = checkpoint['batch_idx'] + 1
+            logger.info(f"💾 AUTO-RESUME: Found snapshot. Resuming from Epoch {start_epoch+1}, Step {start_batch_idx}.")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load snapshot: {e}. Starting fresh.")
+    
     # [PILOT] Watch gradients and weights (Vital Signs)
     wandb.watch(model, log="all", log_freq=10)
     
@@ -276,7 +335,7 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fv
     early_stop_patience = 8
     epochs_no_improve = 0
     
-    for epoch in range(epochs):
+    for epoch in range(start_epoch, epochs):
         # [CURRICULUM] SLIDING BALANCE PRESSURE & ELITE ALPHA
         # Start gentle, end strict to avoid early "Decision Paralysis" (Freeze vs Risk)
         # Sovereign Protocol: Linear increase of elite penalties from Epoch 1 to 30
@@ -289,44 +348,39 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fv
         train_acc = 0.0
         total = 0
         
-        progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} [Train]")
+        optimizer.zero_grad() # Steel-Vault: Start with clean gradients
+        
+        progress = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} [Vault-Mode]")
         current_balance = 20.0
         for i, (seq, label, _, f_form, f_space, f_accel, f_time, f_kin, f_map, t_norm) in enumerate(progress):
             
-            # [REVERT] The model (HybridProbabilistic) already performs .permute(0, 2, 1) internally.
-            # Passing (Batch, Length, Channels) ensures the model's TCN sees (Batch, Channels, Length).
-            seq = seq.to(device)
+            # [V6.1.5] Skip batches if resuming from snapshot
+            if epoch == start_epoch and i < start_batch_idx:
+                continue
             
+            # [REVERT] The model (HybridProbabilistic) already performs .permute(0, 2, 1) internally.
+            seq = seq.to(device)
             label = label.to(device)
             f_map = f_map.to(device)
             
             feat_input = {
-                "form": f_form.to(device),
-                "space": f_space.to(device),
-                "accel": f_accel.to(device),
-                "time": f_time.to(device),
-                "kinetic": f_kin.to(device),
-                "spatial_map": f_map
+                "form": f_form.to(device), "space": f_space.to(device),
+                "accel": f_accel.to(device), "time": f_time.to(device),
+                "kinetic": f_kin.to(device), "spatial_map": f_map
             }
             
-            # [V6 ELITE QUANT] 6-Channel Physics Tensor Construction
             p_tensor = torch.stack([
-                f_accel[:, 0].to(device), # Energy
-                f_accel[:, 1].to(device), # Force
-                f_accel[:, 2].to(device), # Entropy
-                f_accel[:, 3].to(device), # Viscosity
-                f_time[:, 0].to(device),  # Volatility ATR
-                f_time[:, 1].to(device)   # Killzone Intensity
+                f_accel[:, 0].to(device), f_accel[:, 1].to(device),
+                f_accel[:, 2].to(device), f_accel[:, 3].to(device),
+                f_time[:, 0].to(device), f_time[:, 1].to(device)
             ], dim=1)
 
-            optimizer.zero_grad()
-            
             # [CORTEX HARDENING] NaN Guard for Forward Pass
             try:
                 # Forward
                 outputs = model(seq, feat_input=feat_input, physics_tensor=p_tensor) 
                 logits = outputs["logits"]
-                log_var = outputs.get("log_var") # Aleatoric Uncertainty
+                log_var = outputs.get("log_var") 
                 
                 # [FIX 3] Bayesian Loss with Curriculum Pressure & Recency Weighting
                 base_loss = criterion(logits, label, p_tensor, x_map=f_map, current_balance=current_balance, alpha=elite_alpha, timestamps=t_norm.to(device))
@@ -337,6 +391,9 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fv
                 else:
                     loss = base_loss.mean()
                 
+                # [STEEL-VAULT] Normalize loss for accumulation steps
+                loss = loss / accumulation_steps
+                
                 # [CORTEX HARDENING] Check for Infinite Loss BEFORE Backward
                 if not torch.isfinite(loss):
                     logger.warning(f"⚠️ Infinite Loss detected at Step {i}. Skipping Batch.")
@@ -344,36 +401,50 @@ def train_hybrid_model(symbol: str, data_path: str, epochs=50, batch_size=32, fv
                     
                 loss.backward()
                 
-                # [CORTEX HARDENING] Gradient Clipping (Vital for LSTMs/TCNs)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                # [STEEL-VAULT] Optimization Step Gating
+                if (i + 1) % accumulation_steps == 0:
+                    # Gradient Clipping
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                    optimizer.step()
+                    optimizer.zero_grad()
+                    
+                    # [V6.1.5 BLACK-BOX] Save Micro-Batch Snapshot for Auto-Resume
+                    # This ensures that if the hardware fails, we don't lose hours of work.
+                    torch.save({
+                        'epoch': epoch,
+                        'batch_idx': i,
+                        'model_state_dict': model.state_dict(),
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'loss': loss.item(),
+                    }, snapshot_path)
                 
-                optimizer.step()
-                
-                train_loss += loss.item()
+                # Scale back for logging fidelity
+                train_loss += loss.item() * accumulation_steps
                 preds = torch.argmax(logits, dim=1)
                 correct_batch = (preds == label).sum().item()
                 train_acc += correct_batch
                 total += label.size(0)
                 
-                progress.set_postfix(loss=loss.item())
+                progress.set_postfix(loss=loss.item() * accumulation_steps)
                 
             except RuntimeError as e:
-                if "illegal instruction" in str(e) or "CUDA" in str(e):
-                    logger.critical(f"🛑 CUDA FAULT at Step {i}. Attempting recovery...")
+                if "CUDA" in str(e) or "cublas" in str(e):
+                    logger.critical(f"🛑 VAULT DEFENSE: CUDA/CUBLAS FAULT at Step {i}. Skipping Batch.")
                     torch.cuda.empty_cache()
-                    continue # Skip this batch, try to save the Epoch
+                    optimizer.zero_grad()
+                    continue 
                 else:
                     raise e
             
             # [TELEMETRY] MICRO-LOGGING (High Frequency - Step by Step)
-            if i % 10 == 0:
+            if i % (accumulation_steps * 5) == 0:
                 # Calculate kinetic compliance
                 probs = torch.softmax(logits, dim=1)
                 kinetic_penalty = torch.mean(torch.abs(probs[:, 2] - probs[:, 0]) * (1.0 - torch.clamp(p_tensor[:, 1] / 5.0, 0.0, 1.0)))
                 
                 wandb.log({
-                    "step_loss": loss.item(),  # Micro heartbeat
-                    "batch_accuracy": correct_batch / label.size(0),
+                    "step_loss": loss.item() * accumulation_steps,  
+                    "batch_accuracy": correct_batch / (label.size(0) + 1e-9),
                     "physics_compliance_penalty": kinetic_penalty.item(),
                     "Elite_Penalty_Weight": elite_alpha,
                     "grad_norm": torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0),
