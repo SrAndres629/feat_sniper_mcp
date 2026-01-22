@@ -274,16 +274,30 @@ async def get_performance_analytics():
             total_trades=len(closed),
             win_rate=win_rate,
             profit_factor=profit_factor,
-        # Calculate Sharpe Ratio
-        if len(closed) > 1:
-            returns = [e.get("pnl_pips", 0) for e in closed]
-            mean_ret = sum(returns) / len(returns)
-            std_dev = (sum((x - mean_ret) ** 2 for x in returns) / (len(returns) - 1)) ** 0.5
-            sharpe = (mean_ret / std_dev) * (252 ** 0.5) if std_dev > 0 else 0.0 # Annualized approx
+        # [DOCTORAL] Calculate Sharpe Ratio correctly using Daily Returns
+        # Technical Debt Removal: Do not treat trade series as time series.
+        # 1. Aggregate PnL by Day
+        daily_pnl = {}
+        for e in closed:
+            ts = e.get("close_time", "")
+            if ts:
+                # Extract YYYY-MM-DD
+                try:
+                    date_str = ts.split("T")[0]
+                    daily_pnl[date_str] = daily_pnl.get(date_str, 0.0) + e.get("pnl_pips", 0)
+                except:
+                    pass
+        
+        if len(daily_pnl) > 1:
+            daily_returns = list(daily_pnl.values())
+            mean_daily = sum(daily_returns) / len(daily_returns)
+            std_daily = (sum((x - mean_daily) ** 2 for x in daily_returns) / (len(daily_returns) - 1)) ** 0.5
+            # Annualize: Mean * 252, Std * sqrt(252) -> Sharpe * sqrt(252)
+            sharpe = (mean_daily / std_daily) * (252 ** 0.5) if std_daily > 0 else 0.0
         else:
             sharpe = 0.0
-            
-        # Calculate Max Drawdown
+
+        # Calculate Max Drawdown (Standard Equity High watermark)
         peak = equity[0]
         max_dd = 0.0
         for eq in equity:
@@ -291,7 +305,7 @@ async def get_performance_analytics():
                 peak = eq
             dd = (peak - eq) / peak if peak > 0 else 0
             if dd > max_dd:
-                max_dd = dd
+                max_dd = dd    
         
         return PerformanceReport(
             total_trades=len(closed),

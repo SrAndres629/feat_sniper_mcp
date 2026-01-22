@@ -40,7 +40,7 @@ class NexusEngine:
         self.brain_semaphore = asyncio.Semaphore(20)
         self._background_tasks = set()
         
-        # Service Placeholders
+        # Core Services initialized in start()
         self.ml_engine = None
         self.risk_engine = None
         self.trade_manager = None

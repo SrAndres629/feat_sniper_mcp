@@ -10,7 +10,6 @@ from typing import Dict, Any
 from nexus_core.math_engine import fast_bin_indices, bin_volume_fast, calculate_weighted_kde
 from nexus_core.structure_engine import structure_engine
 from nexus_core.acceleration import acceleration_engine
-from nexus_core.herd_radar import herd_radar
 
 class FEATFeatures:
     def __init__(self):
@@ -200,7 +199,10 @@ class FEATFeatures:
             "liquidity_below": 0.0,
         }
         try:
-            sentiment = herd_radar.get_sentiment("XAUUSD")  # TODO: Make symbol dynamic
+            # Lazy import to avoid circular dependency
+            from nexus_core.herd_radar import herd_radar
+            target_symbol = getattr(self, "symbol", "XAUUSD")
+            sentiment = herd_radar.get_sentiment(target_symbol)
             if sentiment:
                 sentiment_features = sentiment.to_neural_dict()
         except Exception:
